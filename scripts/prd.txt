@@ -1,0 +1,1328 @@
+# Learnology AI – AI‑First LMS Product Requirements Document
+
+## document control
+
+| field        | value                                                      |
+| ------------ | ---------------------------------------------------------- |
+| version      | 1.1                                                        |
+| status       | draft                                                      |
+| owner        | Product Management – AJ Reyes                              |
+| last updated | 28 Apr 2025                                                |
+| reviewers    | Engineering Lead, Design Lead, QA Lead, Compliance Officer |
+| approver     | CTO                                                        |
+
+## overview
+
+Learnology AI is an **AI‑first learning‑management ecosystem** that replaces conventional LMS workflows with end‑to‑end generative, adaptive, and data‑rich experiences. Powered by GPT‑4.1-mini, Supabase, and a real‑time UI‑context engine ("Luna"), the platform lets institutions, instructors, students, and parents **create, deliver, study, assess, and analyse** learning content entirely through natural‑language interactions. It aims to address common LMS pain points like stale content, high instructor workload, one‑size‑fits‑all paths, and cumbersome UIs by leveraging end‑to‑end AI generation, zero static content derived from secure knowledgebases, tenant‑isolated AI models, and conversational interfaces. **The platform is designed with a modular architecture to ensure efficiency, component reusability, and adaptability for future product variations, including potential Homeschool and Direct-to-Consumer (D2C) learning platforms.**
+
+This Product Requirements Document (PRD) defines the **functional, non‑functional, and user‑experience requirements** for the initial GA release ("v1 – Skyline"). It consolidates *all* features enumerated in the **AI‑First LMS Master Blueprint** citeturn0file2 and the **Master Step‑by‑Step Build Process (Code‑First Edition)** citeturn0file0, ensuring full parity between specification and implementation.
+
+## goals and success metrics
+
+### goals
+
+1. Deliver a seamless, AI‑powered LMS that can ingest any knowledge source and generate complete courses, lessons, assessments, and study tools in minutes.
+2. Provide real‑time adaptive learning journeys that improve learner mastery and engagement.
+3. Reduce instructor administrative workload by **≥ 60 %** via automated grading, feedback, and course maintenance.
+4. Enable institutions to customise branding, theming, and AI models (via fine‑tuning on private corpora) without engineering effort.
+5. Resolve key LMS pain points through AI‑driven automation and personalization.
+6. Develop a core, modular platform architecture facilitating efficient reuse of components, functions, and APIs, enabling adaptation for future product variations (e.g., Homeschool, D2C).
+
+### success metrics
+
+| metric                            | target                                   |
+| --------------------------------- | ---------------------------------------- |
+| Time‑to‑course (upload → publish) | ≤ 15 min (P95)                           |
+| Instructor workload reduction     | ≥ 60 % compared to baseline LMS (survey) |
+| Student weekly engagement         | ≥ 3 active sessions /wk, avg 20 min each |
+| AI‑generated content acceptance   | ≥ 90 % (instructor "accept" rate)        |
+| Platform uptime                   | ≥ 99.9 % monthly                         |
+| WCAG 2.1 AA conformance           | 100 % of screens                         |
+| Standards Compliance (LTI, Caliper)| Full validation achieved                  |
+
+## scope
+
+### in scope
+
+- **All modules, screens, dialogs, tables, and API endpoints** listed in § 2 of the build process (UI inventory) including Super Admin, Admin, Teacher, Student, and Parent roles.
+- Knowledge‑base ingestion & vector storage.
+- Generative course/path designer, lesson studio, assessment builder.
+- Luna context instrumentation and agentic actions.
+- **Study Space study companion suite (NotebookLM‑style).**
+- Mastery dashboards, predictive analytics, gradebook, automated micro‑credentials.
+- Multi‑tenant theming, billing, feature‑flag governance, and tenant‑isolated AI environments.
+- Standards compliance (LTI Advantage, OneRoster, Caliper Analytics, SCORM export, WCAG AA).
+- AI‑driven instructor coaching and roadmap prioritization based on usage analytics.
+
+### out of scope (phase 2+)
+
+- Native mobile apps (iOS/Android).
+- Offline/low‑connectivity mode.
+- 3rd‑party marketplace revenue split & billing automation.
+
+## assumptions and constraints
+
+- Front‑end built in **Next.js 14 + React 18 + TypeScript**.
+- Supabase provides auth, Postgres, pgvector, storage, realtime.
+- GPT‑4o/4‑mini and GPT-4.1-mini are the primary LLMs; latency SLAs ≤ 8 s.
+- All user data residency complies with **FERPA** & **GDPR**.
+- AI models undergo periodic retraining based on usage and outcomes data.
+- The system will be designed with a modular architecture (including reusable components, functions, and APIs) to maximize code reuse and facilitate efficient adaptation across different product verticals (Institutional, Homeschool, D2C).
+
+## user personas
+
+| persona     | summary                      | key needs                                           |
+| ----------- | ---------------------------- | --------------------------------------------------- |
+| Super Admin | Org or district IT lead      | tenant config, billing, usage, global settings      |
+| Admin       | School/department lead       | user management, course oversight, analytics        |
+| Teacher     | Content creator & instructor | fast authoring, AI assistants, grading, remediation |
+| Student     | Learner                      | engaging micro‑lessons, adaptive paths, study tools |
+| Parent      | Guardian                     | child progress, communication                       |
+
+## detailed functional requirements
+
+### knowledge‑base ingestion & management
+
+- Secure AI Sandbox: Per‑tenant, per‑teacher isolated environments for uploading documents (PDFs, DOCX, PPT, video, audio, URLs, datasets).
+- Automated chunking (≤ 1 000 tokens/segment) and **pgvector** embeddings.
+- Metadata extraction: automated tagging for standards/competencies, keywords, reading level.
+- Role‑based access controls; per‑tenant buckets (org‑{id}‑uploads).
+- UI: **Knowledge Base** screen with `FileUploadDropzone`, `FileListTable`.
+
+### generative course & pathway designer
+
+- NL prompt interface (`ChatGenerateSidebar`) to create syllabi and dynamic learning modules.
+- AI suggests duration, objectives, resources, activities, timelines, and competency alignment based on knowledge base.
+- Adaptive Sequence Generation: AI designs branching paths tailored to learner profiles, goals, and real‑time performance.
+- Teacher can iterate via chat; changes persisted to `base_classes`, `paths` tables.
+- Smart canvas auto‑arranges modules via NL prompts (replaces manual drag‑and‑drop).
+
+### AI‑powered content creation
+
+- Lesson Studio rich‑text editor with AI "insert media", auto‑generate slide decks, video scripts, and narrative text from source materials.
+- Interactive media generation: on‑demand explainer videos (< 3 min, MP4/WebM), SVG diagrams, animations styled to institutional branding.
+- Multimodal Accessibility Outputs: automated generation of transcripts, captions, alt‑text, TTS audio, and optional sign‑language avatars.
+
+### assessment & feedback engine
+
+- Generative Quiz Authoring: AI generates diverse question banks (MCQ, coding exercises, case studies, essays) tied to learning objectives and knowledge base content.
+- AI Proctoring & Integrity Checking: Real‑time monitoring during assessments and semantic similarity checks against knowledge base and external sources for plagiarism flagging.
+- Automated Grading & Feedback: AI assists with scoring (including sandbox execution for code) and provides personalized narrative feedback and next‑step suggestions, stored in `submissions`.
+
+### AI‑driven tutoring & chat
+
+- Contextual Chatbot Tutor: 24/7 support citing institution's/teacher's materials.
+- Persona Tabs: Tutor, Peer Buddy, Exam Coach, with distinct interaction styles.
+- Socratic Dialogue Mode: Adaptive questioning sequences to probe understanding and guide learners.
+- Peer Learning Facilitation: AI can match study partners, summarize group discussions, and surface key insights or unanswered questions within collaborative spaces.
+- Context window limited to current course + study materials.
+- Citations shown inline; user can launch deep‑dive.
+
+### real‑time context awareness & agentic actions (Luna Engine)
+
+- `UIContextProvider` auto‑registers every component.
+- Snapshots push to `ui_contexts`; embeddings used for intent inference.
+- Luna executes supabase RPC/Edge calls based on inferred intent; pushes realtime updates via channels for instant UI changes.
+
+### mastery & competency tracking
+
+- Real‑time dashboards with heatmaps, ring charts, and progress visualization against standards/outcomes.
+- Automated Micro‑Credentials: Digital badges issued automatically upon AI‑confirmed mastery (e.g., ≥ 85 % on assessments, completion of adaptive paths).
+- Predictive at‑risk alerts using gradient‑boosted tree on engagement + grades + study activity.
+
+### personalization & journey replanning
+
+- Continuous Adaptivity: Lesson complexity (easy/standard/advanced variants), format (text/video/simulation), and pace adjust based on real‑time learner performance and preferences.
+- Goal‑Driven Pathway Replanning: Students set objectives; AI instantly replans learning paths and suggests activities to meet goals.
+
+### collaborative & social features
+
+- Generative Collaborative Spaces: AI‑moderated community feeds/forums per role; features include auto‑summaries, unanswered‑question highlights, and prompt suggestions.
+- AI Group Project Assistant: Auto‑suggests project ideas, resources, timelines, and peer teams; facilitates group work with Kanban boards and progress tracking.
+
+### automated calendars & reminders
+
+- Smart Scheduler: AI automatically populates student calendars with suggested study blocks, live session reminders, and assignment deadlines based on course pathways and personal goals.
+- Proactive Alerts & Nudges: System sends notifications when students deviate significantly from study plans, approach deadlines, or show signs of falling behind based on predictive analytics.
+
+### teacher tools – ai generators and assistants
+
+The initial release ships with a **Teacher Tools** module (route: `/teach/tools`) that surfaces focused AI generators to streamline common instructional tasks. Each tool launches a dedicated sidebar workflow and exposes an RPC endpoint so Luna can invoke it contextually.
+
+| tool name             | description                                                     | endpoint                          | output formats                   |
+| --------------------- | --------------------------------------------------------------- | --------------------------------- | -------------------------------- |
+| Rubric Generator      | Create custom grading rubrics for any assignment.               | `POST /api/tools/rubric`          | JSON rubric, PDF export          |
+| Lesson Generator      | Generate full lesson plans from a prompt or document.           | `POST /api/tools/lesson`          | Lesson JSON, DOCX, PDF           |
+| Quiz Generator        | Generate quizzes tied to lessons, topics, or uploaded docs.     | `POST /api/tools/quiz`            | QTI XML, CSV, JSON               |
+| IEP Generator         | Draft Individualized Education Program goals and summaries.     | `POST /api/tools/iep`             | DOCX, PDF                        |
+| Report Card Comments  | Produce personalised narrative comments per student.            | `POST /api/tools/report-comments` | Plain‑text list, CSV             |
+| Multiple Explanations | Offer different ways to explain a concept for diverse learners. | `POST /api/tools/multi-explain`   | Markdown cards                   |
+| Lesson Hooks          | Suggest engaging intro activities or "hooks" for lessons.       | `POST /api/tools/hooks`           | Markdown list                    |
+| Content Leveler       | Adjust reading level or complexity of supplied text.            | `POST /api/tools/leveler`         | Levelled text, readability score |
+| Mindmap Generator     | Create visual mind maps from text or topics.                    | `POST /api/tools/mindmap`         | SVG, PNG                         |
+| BrainBytes Generator  | Generate short audio summaries ("BrainBytes").                  | `POST /api/tools/brainbytes`      | MP3, VTT captions                |
+
+**Functional notes**
+
+- All generators accept **knowledge‑base references** so outputs stay aligned with institutional sources.
+- Outputs are automatically stored in Supabase Storage under `org-{id}-generated/` and associated with the current `base_class_id` when relevant.
+- Each tool emits a `tool_job` row (`id`, `tool_key`, `status`, `progress_json`) so the UI can subscribe to real‑time progress.
+- Teacher Tool invocations are logged to `audit_logs` with before/after diff where applicable.
+
+### study space – notebooklm‑style study companion
+
+This integrated suite provides students with powerful AI tools for deeper learning and organization, inspired by NotebookLM. Key components include:
+- **Knowledge‑Base Chat:** Contextual AI chat grounded in uploaded course materials and personal notes. Features switchable personas (Tutor, Peer Buddy, Exam Coach) and inline source citations.
+- **Mind‑Map Generator:** Creates interactive visual mind maps (SVG/PDF export) from lectures, readings, or notes based on NL prompts (e.g., "Map Chapter 4's key concepts").
+- **Audio Teaching Podcast Creator:** Generates a one‑click audio podcast from any lesson text or transcript, complete with AI summaries and reflection questions.
+- **Smart Note‑Taking:** An editor where inline notes are automatically summarized, tagged with keywords, and can be transformed into personal review flashcards or study decks.
+- **Full AI Tutor:** Offers personalized study plans, generates on‑demand micro‑lessons on specific topics, provides adaptive quiz drills for self‑assessment, and includes guided reflection journaling prompts.
+- **Collaborative Study Features:** Enables shared notebooks, group chat and mind‑mapping sessions within a notebook context, AI moderation for group work, and progress sharing for peer feedback.
+
+### gradebook & analytics
+
+- Customizable Gradebook: Supports custom weightings, calculated columns, competency‑based scoring alongside traditional grades.
+- Live Grade Tracking: Real‑time dashboards for students (trends, forecasts) and instructors (class heatmaps, item analysis).
+- AI‑Driven Rubric Builder: AI assists instructors in creating dynamic rubrics, suggesting criteria and descriptors aligned with learning outcomes; can calibrate based on historical grading data.
+- Predictive Analytics: Includes "what‑if" forecasting for students and instructors, alongside at‑risk alerts.
+- SIS & ePortfolio Integration: Live sync to Student Information Systems via OneRoster/SFTP/API; automated pushing of grades, badges, and certificates to student ePortfolios.
+- Targeted Remediation & Enrichment: AI identifies students needing support or challenge and automatically generates or suggests appropriate remedial assignments or advanced enrichment pathways.
+
+### interoperability & extensibility
+
+- AI Skills Marketplace: Allows integration of third‑party AI tools or institution‑developed "skills" (e.g., CodeReviewGPT, ChemSimGenerator) via secure plug‑in architecture (iframe + postMessage).
+- Standards Compliance: Adherence to LTI 1.3 (Tool Provider), OneRoster 1.2, Caliper Analytics for data export, and SCORM 1.2/2004 export.
+- Custom Model Fine‑Tuning: Institutions can optionally fine‑tune domain‑specific AI models on their private corpora for unique pedagogical needs or brand voice alignment.
+
+### security & governance
+
+- Federated Tenant Architecture: Ensures tenant‑isolated AI environments and data storage; data remains under institutional control.
+- All tables RLS‑protected; service‑role keys for background jobs only.
+- Comprehensive Audit Trails: Full logging of prompts, AI generations, content access, grading actions, and user activity, exportable for compliance (FERPA, GDPR).
+- FERPA, GDPR, & COPPA Compliance: Built‑in checklists and features to aid adherence (e.g., parental consent workflows for K‑12 under 13).
+
+### User Experience & Interaction
+
+- Conversational Interfaces: Emphasis on natural language (chat/voice controls) for core actions like course building, searching, and navigation, reducing reliance on complex menus.
+- Smart Canvas: AI‑driven auto‑arrangement and sequencing replaces manual drag‑and‑drop for course structure design.
+- Personalized Dashboards: Curated views showing "next steps," time‑to‑complete estimates, and AI‑recommended learning modes (text/video/simulation).
+- Multimodal Access: Includes voice‑first navigation options, on‑demand TTS screen reading, and live transcription features.
+- Agentic Contextual Actions (Luna): Persistent UI state tracking enables intelligent command execution based on user focus and workflow context.
+
+### Continuous Evolution & Support
+
+- Automated Model Retraining: System includes mechanisms for periodic, privacy‑preserving retraining of core AI models based on aggregated usage patterns and learning outcomes data to improve relevance and accuracy.
+- AI‑Driven Roadmap Prioritization: Usage analytics and user feedback directly inform feature development priorities, surfaced through internal dashboards. Beta programs for early adopters.
+- AI Instructor Coaching: A built‑in professional development chatbot offers context‑aware pedagogy tips, suggests relevant teacher tools, and tracks progress towards micro‑credentials based on observed teaching patterns within the platform.
+
+### interoperability & extensibility
+
+- Skills marketplace (plug‑in micro‑front‑ends via iframe + postMessage).
+- LTI 1.3 launch as tool provider; SCORM 1.2/2004 export.
+
+### security & governance
+
+- All tables RLS‑protected; service‑role keys for jobs only.
+- Audit logs for every DB mutation; exportable to CSV.
+- FERPA & GDPR checklist.
+
+---
+
+## study space – production architecture (pro version)
+
+### main stack and architecture
+
+| layer               | technology                                                           |
+| ------------------- | -------------------------------------------------------------------- |
+| **frontend**        | Next.js 14 (App Router)                                              |
+| **backend api**     | Next.js API Routes + Edge Functions                                  |
+| **storage**         | Supabase Storage                                                     |
+| **database**        | Supabase Postgres + **pgvector** extension                           |
+| **embeddings**      | OpenAI `text-embedding-ada-002`                                      |
+| **summarisation**   | OpenAI GPT‑4o                                                        |
+| **file parsing**    | `pdf-parse`, `mammoth`, `youtube-transcript`, Playwright/Readability |
+| **background jobs** | Supabase Edge Jobs *or* Next.js Cron                                 |
+| **realtime events** | Supabase Realtime                                                    |
+
+### high‑level processing flow
+
+```plaintext
+User Uploads (file / YouTube / web URL)
+        ↓
+Unified Extraction
+        ↓
+Smart Chunking (≈400 tokens)
+        ↓
+OpenAI Embeddings
+        ↓
+Persist → Supabase (documents & document_chunks)
+        ↓
+Async GPT‑4o Summaries (edge job)
+        ↓
+Realtime "ready" status broadcast
+        ↓
+Semantic Search / Q&A / Summaries
+```
+
+### production‑grade database schema
+
+```sql
+-- documents
+CREATE TABLE documents (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  title text,
+  source_type text,         -- 'pdf', 'youtube', 'web'
+  source_url text,
+  status text DEFAULT 'processing', -- 'processing', 'ready', 'failed'
+  metadata jsonb,
+  created_at timestamptz DEFAULT now()
+);
+
+-- chunks
+CREATE TABLE document_chunks (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  document_id uuid REFERENCES documents(id) ON DELETE CASCADE,
+  chunk_text text,
+  chunk_summary text,
+  embedding vector(1536),
+  heading text,
+  page_number int,
+  start_time_seconds int,
+  end_time_seconds int,
+  section text,
+  created_at timestamptz DEFAULT now()
+);
+
+-- indexes
+CREATE INDEX ON documents(user_id);
+CREATE INDEX ON document_chunks USING ivfflat (embedding vector_cosine_ops);
+```
+
+### core api routes
+
+| route                      | purpose                                                 |
+| -------------------------- | ------------------------------------------------------- |
+| `POST /api/upload-file`    | Upload → parse → chunk → embed → store                  |
+| `POST /api/upload-youtube` | Fetch transcript → chunk → embed → store                |
+| `POST /api/upload-url`     | Scrape page → chunk → embed → store                     |
+| `POST /api/query`          | Semantic question → retrieve top chunks → GPT‑4o answer |
+
+### detailed pipelines
+
+1. **File upload** – upload to Supabase Storage → parse (pdf‑parse/mammoth) → chunk (\~400 tokens) → embed → save → enqueue summarisation.
+2. **YouTube** – fetch transcript (or Whisper fallback) → time‑based chunk → embed → save → summarisation.
+3. **Web URL** – scrape via Playwright/Readability → heading/paragraph chunks → embed → save → summarisation.
+
+### background summarisation
+
+Edge job runs per chunk:
+
+```js
+const summary = await openai.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [
+    { role: 'system', content: 'You are an expert summariser.' },
+    { role: 'user', content: `Summarise the following text:\n\n${chunkText}` },
+  ],
+});
+```
+
+Writes `chunk_summary`, then cascades to section & full‑document summaries.
+
+### frontend experience
+
+| feature          | tech                                                 |
+| ---------------- | ---------------------------------------------------- |
+| File/link upload | Drag‑and‑drop + paste link (React Dropzone)          |
+| Upload status    | Supabase Realtime subscription on `documents.status` |
+| Document viewer  | Headings sidebar + content panel (markdown render)   |
+| Search & ask     | Text box → streaming GPT‑4o answer via SSE           |
+| Summaries view   | Chunk‑, section‑, and doc‑level summaries accordion  |
+
+### production hardening checklist
+
+- **Retry & resumable uploads**
+- **Batched embeddings** (≤ 20 per request)
+- **Token budgeting & model fallback**
+- **Streaming OpenAI responses** to UI
+- **Supabase Auth** – row‑level user isolation
+
+### premium ideas & differentiators
+
+| feature             | value add                                           |
+| ------------------- | --------------------------------------------------- |
+| Timestamp deep‑link | Click YouTube chunk → seek video to exact timestamp |
+| Highlight mode      | Highlight matching paragraphs in viewer on answer   |
+| Cross‑doc search    | Vector join across multiple `document_id` values    |
+| Multi‑source QA     | Select documents subset before asking a question    |
+
+---
+
+Learnology AI – Master Step‑by‑Step Build Process (Code‑First Edition)
+Updated to remove all Figma dependence and embed a full in‑repo Style Guide. Every UI/UX artifact, role screen, and component is enumerated below so nothing is missed.
+
+🌐 0. Global Foundations & Operating Principles
+Tech Stack
+• Frontend: Next.js 14 + React 18, TypeScript, Tailwind CSS 3, shadcn/ui.
+• Design Tokens: Centralised packages/ui/styleGuide.ts (see §1) – sole source of truth for colors, typography, spacing, shadows, motion.
+• AI Layer: OpenAI GPT-4.1, GPT-4.1-mini, GPT‑4o / GPT‑4o‑mini; Gemini 2.5 Pro via Cursor Agent for code generation.
+• Backend: Supabase (Postgres + pgvector, Auth, Realtime, Storage).
+• Jobs: Inngest Functions ≤ 45 s.
+• Repo Layout (Turborepo):
+
+apps/web        # Next.js app
+packages/ui     # Component library + styleGuide.ts
+packages/utils  # Shared helpers
+packages/types  # Zod schemas & DB types
+packages/functions # Inngest / Edge / RPC
+
+Branching & CI
+main → prod, dev/* → preview; GitHub Actions run ESLint, Type Checks, Jest, Playwright.
+a11y & QA
+Axe‑core CLI, Storybook stories w/ chromatic, 80 % coverage requirement.
+Luna Context Instrumentation
+Every visible UI element must be referenceable by Luna for precise, context‑aware actions.
+• UIContextProvider exposes register(elementMeta) / update(id, state) / unregister(id) via React Context.
+• Components call useUIContext(id, meta) hook on mount; meta includes role, route, type (Button, TableRow…), props, and isActive, isVisible flags.
+• Provider serializes snapshots to a browser BroadcastChannel and via postMessage to the AI Chat Panel iframe so GPT functions can introspect live state.
+• Debounced (2 s) snapshots POST to /api/ui-state → Supabase ui_contexts table (vectorized keywords) for historical queries and intent inference.
+Security & Privacy
+Only non‑PII UI metadata is sent to AI; component payloads are hashed when privacy flag set.
+🎨 1. In‑Repo Style Guide (packages/ui/styleGuide.ts) In‑Repo Style Guide (packages/ui/styleGuide.ts)
+All designers & engineers reference this file – no external design files.
+/* packages/ui/styleGuide.ts */
+export const colors = {
+  accentGradient: ['#FF835D', '#E45DE5', '#6B5DE5'],
+  neutral: {
+    light: { bg: '#FFFFFF', surface: '#F7F7F7', text: '#1A1A1A', textSub: '#4A4A4A', divider: '#E0E0E0' },
+    dark:  { bg: '#121212', surface: '#1E1E1E', text: '#EDEDED', textSub: '#A0A0A0', divider: '#333333' }
+  }
+};
+export const typography = {
+  h1: { font: 'Inter', size: 36, weight: 700, lh: 44 },
+  h2: { font: 'Inter', size: 24, weight: 600, lh: 32 },
+  h3: { font: 'Inter', size: 18, weight: 500, lh: 28 },
+  body: { font: 'Inter', size: 16, weight: 400, lh: 24 },
+  caption: { font: 'Inter', size: 14, weight: 400, lh: 20 }
+};
+export const motion = { ease: 'cubic-bezier(0.4,0,0.2,1)', durations: { short: 100, base: 200, long: 300 } };
+export const layout = { grid: 12, gutter: 24, margin: 16, breakpoints: { xs: 0, sm: 600, md: 960, lg: 1280, xl: 1920 } };
+Generate Tailwind CSS variables on build (postcss-style-guide-plugin) so values stay in sync.
+
+🗂️ 2. Exhaustive UI/UX Inventory
+The tables below list every required screen, tab, and component grouped by user role. All pages inherit AppShell (Left Nav, Header, AI Panel).
+2.1 Super Admin (Organisation / District)
+Module
+Route
+Key Components
+Org Dashboard
+/org
+KPI Cards, TenantSwitcher, AlertToast
+Institutions CRUD
+/org/institutions
+DataGrid, CreateInstitutionModal
+Billing & Usage
+/org/billing
+PlanCard, UsageChart, UpdatePaymentForm
+Global Settings
+/org/settings
+FeatureToggleList, ThemeOverrideForm
+Profile
+/org/profile
+ProfileForm, AvatarUploader
+
+2.2 Admin (School / Department)
+Module
+Route
+Key Components
+School Dashboard
+/school
+ProgressHeatmap, UpcomingEventsCard
+Users & Roles
+/school/users
+MemberTable, InviteUserDialog
+Courses Overview
+/school/courses
+CourseCardGrid, ImportCourseButton
+Analytics
+/school/analytics
+MetricTabs, CohortChart
+Profile
+/school/profile
+ProfileForm, AvatarUploader
+
+2.3 Teacher
+Module
+Route
+Key Components
+Teacher Home
+/teach
+TodayFocusPanel, QuickCreateButtons
+Base Classes
+/teach/base-classes
+BaseClassCardGrid, CreateBaseClassModal
+Base Class Detail
+/teach/base-classes/:id
+StructureTabs (Paths, Lessons, Quizzes), InstanceTable, EditBaseClassModal
+Class Instances
+/teach/instances
+InstanceListTable, ArchiveInstanceButton, CopyEnrollmentCodeModal
+Knowledge Base
+/teach/knowledge
+FileUploadDropzone, FileListTable
+Course Designer
+/teach/courses/:id
+SmartCanvas, ChatGenerateSidebar
+Lesson Studio
+/teach/lessons/:id
+RichTextEditor, MediaAssetsPanel
+Assessment Builder
+/teach/quizzes/:id
+QuestionBankTable, RubricForm
+Gradebook
+/teach/gradebook/:classId
+StudentHeatmap, BulkFeedbackDrawer
+Tutor Chat
+/teach/tutor-chat
+PersonaTabs, ChatThread
+Teacher Tools
+/teach/tools
+ToolLibrary, WorkflowBuilder
+Community
+/teach/community
+CommunityFeed, PostComposer
+Profile
+/teach/profile
+ProfileForm, AvatarUploader
+
+2.4 Student
+Module
+Route
+Key Components
+Student Home
+/learn
+GreetingBanner, NextUpCard, JoinClassCTA
+Join Class
+/learn/join
+EnrollmentCodeForm, JoinFeedbackToast
+Course Player
+/learn/courses/:id
+LessonSidebar, ContentViewer, CheckpointToast
+Notebook LM
+/learn/notebook/:id
+NoteEditor, MindMapCanvas, PodcastPlayer
+Progress Dashboard
+/learn/progress
+CompetencyRingChart, StreakTracker
+Community
+/learn/community
+CommunityFeed, PeerGroupPanel
+Achievements & Certifications
+/learn/achievements
+BadgeGallery, CertificateViewer
+Profile
+/learn/profile
+ProfileForm, AvatarUploader
+
+2.5 Parent Parent
+Module
+Route
+Key Components
+Parent Overview
+/parent
+ChildSelectorDropdown, SummaryTiles
+Child Progress
+/parent/progress/:childId
+TimelineChart, AlertList
+Communication
+/parent/messages
+MessageThread, ComposeBox
+Profile
+/parent/profile
+ProfileForm, AvatarUploader
+
+(Add edge‑case screens: 404, 500, onboarding, first‑run wizard.)
+2.6 Global Modals, Drawers & Dialogs
+ID
+Purpose
+Trigger Examples
+Primary Roles
+CreateInstitutionModal
+Add a new institution/tenant
+"+" Institution button on /org/institutions
+Super Admin
+EditInstitutionModal
+Edit institution details
+Row action on /org/institutions
+Super Admin
+InviteUserDialog
+Send email invite & role assignment
+"Invite" in /school/users
+Admin
+BulkImportDrawer
+CSV drag‑drop for bulk course/user import
+"Bulk Import" FAB
+Admin, Teacher
+CreateBaseClassModal
+Quick create base class
+FAB on /teach/base-classes
+Teacher
+EditBaseClassModal
+Edit base class metadata
+Header action on Base Class Detail
+Teacher
+CreateClassInstanceModal
+Create new class instance under a base class
+"+ Instance" in InstanceTable
+Teacher
+CopyEnrollmentCodeModal
+Display & copy enrollment code
+Row action in InstanceTable
+Teacher
+ArchiveInstanceConfirmDialog
+Confirm archive of class instance
+Archive button on /teach/instances
+Teacher
+LessonMediaPicker
+Select/upload media files
+"Insert Media" in Lesson Studio
+Teacher
+QuizQuestionBankDrawer
+Search & select questions
+"Add from Bank" in Assessment Builder
+Teacher
+GradeOverrideModal
+Manually adjust student grade
+Click grade cell in Gradebook
+Teacher
+CertificateViewer
+Show printable certificate w/ QR
+Click badge in Achievements
+Student, Parent
+EnterEnrollmentCodeModal
+Student enters enrollment code to join class
+"Join Class" CTA or /learn/join
+Student
+ReportIssueModal
+Report content or tech issues
+Footer link or keyboard shortcut
+All
+SettingsDrawer
+Quick‑access preferences (theme, notifications)
+Avatar menu
+All
+ConfirmActionDialog
+Reusable yes/no confirmation
+Destructive actions
+All
+FilterDrawer
+Advanced filters for tables/grids
+Funnel icon
+All
+ContextHelpPopover
+Inline help with "?" icon
+Focus on complex controls
+All
+
+----|---------|------------------|---------------| | CreateInstitutionModal | Add a new institution/tenant | "+ Institution" button on /org/institutions | Super Admin | | EditInstitutionModal | Edit institution details | Row action on /org/institutions | Super Admin | | InviteUserDialog | Send email invite & role assignment | "Invite" in /school/users | Admin | | BulkImportDrawer | CSV drag‑drop for bulk course/user import | "Bulk Import" FAB | Admin, Teacher | | CreateCourseWizard | Multi‑step flow: metadata → AI‑generate → confirm | "New Course" in /teach/courses | Teacher | | LessonMediaPicker | Select/upload media files | "Insert Media" in Lesson Studio | Teacher | | QuizQuestionBankDrawer | Search & select questions | "Add from Bank" in Assessment Builder | Teacher | | GradeOverrideModal | Manually adjust student grade | Click grade cell in Gradebook | Teacher | | CertificateViewer | Show printable certificate w/ QR | Click badge in Achievements | Student, Parent | | ReportIssueModal | Report content or tech issues | Footer link or keyboard shortcut | All | | SettingsDrawer | Quick‑access preferences (theme, notifications) | Avatar menu | All | | ConfirmActionDialog | Reusable yes/no confirmation | Destructive actions | All | | FilterDrawer | Advanced filters for tables/grids | Funnel icon | All | | ContextHelpPopover | Inline help with "?" icon | Focus on complex controls | All |
+Rule: Every modal/drawer registers itself with useUIContext including isOpen, step, and parent route, so Luna can act within multi‑step flows.
+---‑case screens: 404, 500, onboarding, first‑run wizard.)
+
+🛠️ 3. UI‑First Build Sequence
+Follow this order exactly. Mark each task ✅ in GitHub Projects when complete.
+Scaffold Repo & Style Guide
+npm dlx create‑next‑app → add Tailwind + path‑alias.
+Create packages/ui/styleGuide.ts; run script to output Tailwind config tokens.
+Add ESLint rule to forbid hard‑coded colors (no‑literal‑style).
+AppShell & Navigation
+Implement responsive layout using values from styleGuide; add collapsed nav, AI panel placeholder.
+Atomic Component Library (see §1 tokens)
+Build Button, Input, Card, Table, Toast, Modal, Tooltip, Tabs – export from packages/ui.
+Route Stub Generation
+For every row in UI inventory, create a Next.js page file with <Skeleton> placeholders.
+Role‑Based Navigation Map
+Generate navConfig.ts arrays per role; use Supabase Auth session to decide what links to show.
+Screen‑Level Implementations
+Work top‑down by role:
+Super Admin pages
+Admin pages
+Teacher pages
+Student pages
+Parent pages
+Dynamic State Mocking
+Use MirageJS server to supply realistic JSON to feeds; keep UI interactive while backend lags behind.
+🎯 Milestone M1 – UI Feature‑Complete & Style‑Compliant
+
+🗄️ 4. Backend & Supabase — Feature‑Parity Build Guide
+The data layer must mirror every screen, card, table, modal, and workflow enumerated in §2. This section details exact schemas, RLS, functions, triggers, and API routes required for each module. Finish each subsection before moving to the next UI feature.
+4.1 Conventions & Ground Rules
+Area
+Rule
+Naming
+snake_case for DB; plural table names; id UUID PK; foreign keys named <ref>_id.
+Timestamps
+created_at DEFAULT now(), updated_at with trigger on UPDATE.
+Soft Deletes
+Use archived or active boolean, never hard DELETE except audit tables.
+RLS
+Always ON; define policies after seed; service role for Inngest only.
+Auditing
+audit_logs (id, table, action, before, after, actor_id, ts) auto‑filled by pg_trigger.
+Indexes
+Btree on FK columns; GIN on JSONB search; ivfflat on vector.
+Storage
+One bucket per org: org-{id}-uploads; public assets in org-{id}-public.
+Coding
+DB types exported to TypeScript via supabase gen types typescript --local > packages/types/db.ts.
+
+
+4.2 Core Tables (Shared Across Roles)
+organisations        (id, name, accent_color, logo_url)
+users                (supabase auth schema)
+members              (id, org_id, user_id, role enum('super_admin','admin','teacher','student','parent'))
+audit_logs           (... see above)
+ui_contexts          (id, org_id, user_id, route, snapshot_json, embedding vector(1536), created_at)
+RLS: members.role IN ('super_admin','admin') OR user_id = auth.uid().
+
+4.3 Teacher‑Centric Domain
+4.3.1 Base‑Class & Instance Model (maps Teacher UI)
+base_classes (
+  id                 uuid primary key default gen_random_uuid(),
+  org_id             uuid references organisations(id) on delete cascade,
+  teacher_id         uuid references users(id),
+  title              text,
+  subject            text,
+  syllabus_json      jsonb,
+  active             boolean default true,
+  created_at         timestamptz default now(),
+  updated_at         timestamptz default now()
+);
+
+class_instances (
+  id                 uuid primary key default gen_random_uuid(),
+  base_class_id      uuid references base_classes(id) on delete cascade,
+  title              text,
+  period             text,
+  enrollment_code    text unique,
+  archived           boolean default false,
+  start_date         date,
+  end_date           date,
+  created_at         timestamptz default now()
+);
+
+rosters (
+  id                 uuid primary key default gen_random_uuid(),
+  instance_id        uuid references class_instances(id) on delete cascade,
+  student_id         uuid references users(id),
+  joined_at          timestamptz default now()
+);
+Triggers:
+CREATE OR REPLACE FUNCTION set_enrollment_code()
+RETURNS trigger AS $$
+BEGIN
+  IF NEW.enrollment_code IS NULL THEN
+    NEW.enrollment_code := lpad(to_hex(floor(random()*1e9)::int), 6, '0'); -- 6‑char base16
+  END IF;
+  RETURN NEW;
+END; $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER class_instances_bi BEFORE INSERT ON class_instances
+  FOR EACH ROW EXECUTE FUNCTION set_enrollment_code();
+Materialized View enrollment_code_lookup refreshes every minute via Supabase cron.
+RLS:
+Teachers: teacher_id = auth.uid() on base_classes and via join on instances.
+Students: INSERT on rosters only via RPC (see below).
+4.3.2 Paths, Lessons, Quizzes (StructureTabs)
+paths          (id, base_class_id, title, sort_index)
+lessons        (id, path_id, title, content_richtext jsonb, duration_est int)
+lesson_sections(id, lesson_id, title, markdown text)
+quizzes        (id, path_id, title, settings_json)
+questions      (id, quiz_id, type enum('mcq','code','case'), body jsonb, answer jsonb)
+submissions    (id, quiz_id, student_id, answers jsonb, score numeric, graded_at)
+Indexes: (path_id, sort_index), GIN on content_richtext. RLS: Teachers on their org; students SELECT/INSERT submissions where student_id = auth.uid().
+4.3.3 Inngest Workflows
+Name
+Trigger
+Steps
+propagate_base_class_change
+UPDATE on paths, lessons, quizzes under a base class
+① diff data → ② update each linked instance copy → ③ emit instance_changed event.
+assessment.autograde
+INSERT into submissions
+Streams Q‑A to GPT, updates score & feedback.
+
+
+4.4 Student Domain
+Table impact: submissions, notebooks, mind_maps, achievements, certificates.
+notebooks   (id, student_id, base_class_id, title)
+mind_maps   (id, notebook_id, svg text)
+achievements(id, student_id, competency_id, awarded_at)
+certificates(id, student_id, name, file_url, issued_at)
+RLS: student ownership; teachers SELECT for their classes via instance_id join.
+RPC join_class_by_code(code text):
+CREATE OR REPLACE FUNCTION join_class_by_code(p_code text) RETURNS void AS $$
+DECLARE inst_id uuid;
+BEGIN
+  SELECT instance_id INTO inst_id FROM enrollment_code_lookup WHERE enrollment_code = p_code;
+  IF inst_id IS NULL THEN RAISE EXCEPTION 'Invalid code'; END IF;
+  INSERT INTO rosters(instance_id, student_id) VALUES (inst_id, auth.uid()) ON CONFLICT DO NOTHING;
+END; $$ LANGUAGE plpgsql SECURITY DEFINER;
+Policies allow EXECUTE to role anonymous with row‑level validations.
+
+4.5 Admin & Super‑Admin Domain
+Billing, feature flags, analytics tables:
+subscriptions (id, org_id, stripe_customer, plan, status, current_period_end)
+feature_flags (org_id, flag_key, enabled boolean)
+usage_stats   (org_id, metric text, value numeric, ts)
+Scheduled function collect_usage() aggregates storage size, vector count, API calls nightly.
+
+4.6 API & Edge Function Map (Vercel /api/*)
+Route
+Method
+Description
+Supabase Call
+/enroll
+POST
+Student joins class by code
+RPC join_class_by_code
+/base-class
+POST/PUT/DELETE
+Manage base classes
+Tables & Inngest trigger
+/class-instance
+POST/PUT/DELETE
+Manage instances
+Tables & Inngest trigger
+/file-upload
+POST
+Signed URL for Storage upload
+Supabase storage API
+/context
+POST
+Save ui_contexts snapshot
+Direct insert
+/ai/generate
+POST
+Proxy to OpenAI with RLS check
+server‑side fetch
+
+All endpoints validate Supabase JWT via middleware before DB action.
+
+4.7 Feature‑Parity Verification Checklist
+UI Inventory → Table Matrix: For each row in §2, assert matching table(s)/fields exist in ERD. ✅
+Modal Actions → RPC/Trigger: Every modal's primary CTA calls an API or RPC listed above. ✅
+Widget KPIs → Materialized Views: Dashboard cards backed by SQL views refreshing ≤5 min. ✅
+Edge Cases: Archiving flows, capacity limits, soft deletes handled? ✅
+a11y & Audit: All triggers log to audit_logs; no silent data loss. ✅
+🎯 Milestone M2 – Backend Schemas, Policies, API Routes Complete & Aligned to UI
+Proceed to integrate front‑end data hooks only after M2 passes validation script npm run verify‑parity (compares ERD JSON vs UI inventory).
+
+Supabase Project & Core Schema
+• base_classes (id UUID PK, org_id, teacher_id, title, subject, syllabus_json, active boolean default true, created_at, updated_at).
+• class_instances (id UUID PK, base_class_id FK, title, period, enrollment_code text UNIQUE, archived boolean default false, start_date, end_date, created_at).
+• rosters (id, instance_id FK, student_id FK, joined_at).
+• enrollment_code_lookup (materialized view: enrollment_code → instance_id) for O(1) joins.
+• ui_contexts (unchanged).
+• RLS: teachers can CRUD their own base_classes/instances; students insert into rosters via verified code; org admins override.
+Triggers & Inngest Jobs
+• base_classes_ai_update trigger → enqueue propagate_base_class_change Inngest job that diffs and patches linked instances (paths, lessons, quizzes).
+• class_instances_biu trigger → on insert, generate secure base36 6‑char enrollment_code server‑side if null.
+• RPC join_class_by_code(code text) validates active instance, non‑archived, capacity limits, then inserts into rosters.
+Edge & RPC Endpoints
+• POST /api/enroll (Students) → calls join_class_by_code.
+• POST /api/base-class (Teachers) → create base class.
+• POST /api/class-instance → create instance.
+• Webhook PATCH /api/base-class/:id/propagate triggered by Inngest on content updates.
+Remaining Backend Work
+Knowledge ingestion, tutor chat, analytics, etc., now associate with base_class_id or instance_id as appropriate.
+
+
+---
+
+## ui / ux inventory mapping
+
+Learnology AI Comprehensive Style Guide
+Objective: Craft a clean, modern, premium AI‑First LMS—think Apple/Tesla with a pop of boldness—where every screen, tab, and page feels light, spacious, airy, and flowing, with intuitive UX/UI, seamless AI integration, and full theming for institutions (custom logos, accent colors), in both light and dark modes.
+
+1. Brand Foundations
+1.1 Logo
+Primary Mark: "Brain‑dot" icon + Learnology AI wordmark.
+
+
+Lockups:
+
+
+Horizontal (icon left, wordmark right)
+
+
+Vertical (icon above wordmark)
+
+
+Clear Space: ≥ one dot‑height around.
+
+
+Minimum Size: 32 px height (screen), 0.5 in (print).
+
+
+1.2 Brand Colors
+Default Accent Gradient:
+
+ less
+CopyEdit
+#FF835D → #E45DE5 → #6B5DE5
+
+
+Neutral Palette:
+
+
+Mode
+Background
+Surface/Card
+Text Primary
+Text Secondary
+Divider
+Light
+#FFFFFF
+#F7F7F7
+#1A1A1A
+#4A4A4A
+#E0E0E0
+Dark
+#121212
+#1E1E1E
+#EDEDED
+#A0A0A0
+#333333
+
+
+
+
+Institution Accent Override
+ Each organization supplies a primary accent color to replace the default gradient—used sparingly for buttons, links, and highlights.
+
+2. Design Principles
+Light, Spacious, Airy, Flowing
+
+
+Whitespace: Generous padding (24–32 px) and margins to give components room to breathe.
+
+
+Fluid Layouts: Flexible grids and cards that expand and contract smoothly with viewport changes.
+
+
+Gentle Motion: Subtle, flowing transitions (200 ms ease‑in‑out) for collapse/expand, hover states, and modal fades—reinforcing an airy feel.
+
+
+Simplicity & Clarity
+
+
+Minimalist interfaces with clear hierarchy and focus on primary actions.
+
+
+Progressive disclosure of advanced features behind "More" toggles.
+
+
+Consistency
+
+
+Reuse component patterns, spacing, and typography across all screens for predictability.
+
+
+A unified iconography style and consistent color usage.
+
+
+Intuitive AI Integration
+
+
+AI controls (chat panel, tips, content generation) sit naturally within the flow—never obstructing core tasks.
+
+
+Conversational UI elements guide users without overwhelming them.
+
+
+
+3. Typography
+Role
+Font
+Weight
+Size
+Line‑Height
+Spacing
+H1 / Headline
+Inter / SF Pro
+700
+36 px
+44 px
++0.25 px
+H2 / Section Title
+Inter / SF Pro
+600
+24 px
+32 px
++0.25 px
+H3 / Sub‑section
+Inter / SF Pro
+500
+18 px
+28 px
+0 px
+Body Text
+Inter / SF Pro
+400
+16 px
+24 px
+0 px
+Caption / Small
+Inter / SF Pro
+400
+14 px
+20 px
+0 px
+
+
+Fallback: system‑ui, -apple‑system, BlinkMacSystemFont, "Segoe UI", Roboto, sans‑serif.
+
+
+
+4. Layout & Grid
+12‑Column Responsive Grid (24 px gutters, 16 px outer margins).
+
+
+Breakpoints:
+
+
+XS: < 600 px
+
+
+SM: ≥ 600 px
+
+
+MD: ≥ 960 px
+
+
+LG: ≥ 1280 px
+
+
+XL: ≥ 1920 px
+
+
+4.1 Dashboard Structure
+css
+CopyEdit
+┌────────────────┬──────────────────────────┬──────────────────┐
+│  Left Nav      │  Main Content            │  AI Chat Panel   │
+│ (240 px / 64 px│ (flexible, airy layout)  │ (320 px / hidden) │
+│  collapsed)    │                          │                  │
+└────────────────┴──────────────────────────┴──────────────────┘
+
+Left Nav: 240 px wide; collapse to 64 px icon bar.
+
+
+AI Panel: 320 px wide; collapse to a slim handle.
+
+
+Main Content: flex-grow: 1; min‑width: 0.
+
+
+
+5. Navigation
+5.1 Side Navigation
+Collapsed: icons only, with tooltips.
+
+
+Expanded: icons + labels, grouped by function.
+
+
+States:
+
+
+Hover: bg = Accent @ 10%
+
+
+Active: bg = Accent; text/icon = #FFF
+
+
+5.2 AI Chat Panel
+Anchor: speech‑bubble icon at right edge when collapsed.
+
+
+Expanded: slides over content (320 px) with semi‑transparent backdrop.
+
+
+Header: "AI Assistant" + collapse button.
+
+
+Input: sticky bottom, rounded, spacious (16 px padding).
+
+
+
+6. UI Components
+6.1 Buttons
+Primary:
+
+
+bg = Accent or gradient
+
+
+text = #FFF
+
+
+padding = 12 × 24 px
+
+
+border‑radius = 8 px
+
+
+Secondary:
+
+
+border = Accent 2 px; text = Accent; bg = transparent
+
+
+Tertiary/Text:
+
+
+text = Accent; underline on hover
+
+
+Disabled:
+
+
+opacity = 40%; no pointer events
+
+
+6.2 Form Inputs
+Fields:
+
+
+bg = Surface; border = 1 px Divider; border‑radius = 6 px
+
+
+focus: border = Accent; box‑shadow = 0 0 0 3 px Accent @ 20%
+
+
+6.3 Cards & Panels
+Card:
+
+
+bg = Surface; border‑radius = 12 px
+
+
+box‑shadow = 0 1 3 px rgba(0,0,0,0.1)/(0,0,0,0.5)
+
+
+padding = 24 px
+
+
+6.4 Tables & Data Grids
+Header: bg = Accent @ 10%; text = Accent @ 80%
+
+
+Row Hover: bg = Accent @ 5%
+
+
+Pagination: minimal icons
+
+
+
+7. Light & Dark Mode
+Toggle: header top‑right.
+
+
+CSS Vars: for colors, shadows, typography.
+
+
+Transition: 150 ms ease‑in‑out.
+
+
+css
+CopyEdit
+:root { --bg: #FFF; --text: #1A1A1A; }
+[data-theme="dark"] { --bg: #121212; --text: #EDEDED; }
+
+
+8. Iconography & Imagery
+Icons: 2 px stroke, 24 × 24 px grid, outline style.
+
+
+States: accent fill when active; neutral when idle.
+
+
+Illustrations: flat style, accent highlights.
+
+
+
+9. Motion & Interaction
+Easing: ease‑in‑out (cubic‑bezier(0.4,0.0,0.2,1))
+
+
+Durations: Short 100 ms | Base 200 ms | Long 300 ms
+
+
+Use: nav/panel transitions, hover fades, modals.
+
+
+
+10. Customization & Theming
+Accent Override: override default gradient with institution's color.
+
+
+Logo Swap: upload custom logos (header, login).
+
+
+Fonts: optional font overrides via CSS vars.
+
+
+Theming API: JSON schema for colors, logos, radii.
+
+
+json
+CopyEdit
+{ "colors": { "accent": "#0078D4" }, "logos": { "header": "/logo.svg" } }
+
+
+11. Dynamic Hyper‑Personalization
+Time‑Of‑Day Greetings:
+
+
+Morning: "Good morning, {firstName}! Let's start your day off right."
+
+
+Afternoon: "Good afternoon, {firstName}! How's your learning going?"
+
+
+Evening: "Good evening, {firstName}. Ready to wrap up?"
+
+
+Activity Prompts:
+
+
+"You've completed 3 of 5 modules—keep it up!"
+
+
+"3 days since your last session—need a refresher?"
+
+
+Milestone Celebrations:
+
+
+"Congrats on mastering {competencyName}! Here's your badge."
+
+
+Contextual Copy: dynamic placeholders ({dueDate}, {streakDays}) updated in real time.
+
+
+Theming Variables: expose data & templates for runtime rendering.
+
+
+
+12. Screen‑Level Simplicity & Intuitive Design
+Whitespace & Clarity: every view uses generous padding and margin for an airy feel.
+
+
+Consistent Patterns: familiar layouts across screens reduce learning curve.
+
+
+Primary Actions: always prominent, with clear labels and spacing.
+
+
+Progressive Disclosure: advanced settings hidden until needed.
+
+
+Feedback: instant visual cues (spinners, toasts, inline errors).
+
+
+Onboarding: context‑sensitive tooltips and coach marks.
+
+
+
+13. Example Dashboard Layout
+mathematica
+CopyEdit
+┌──────────────────┬─────────────────────────────────┬──────────────────┐
+│                  │                                 │                  │
+│  ◉ Dashboard     │  ┌───────────────────────────┐  │  AI Assistant    │
+│  ◉ Courses       │  │ Good morning, Ava!         │  │  ┌────────────┐  │
+│  ◉ Analytics     │  │ Today's Focus:             │  │  │ Chat Window │  │
+│  ◉ Settings      │  │ • 3 high‑priority tasks     │  │  └────────────┘  │
+│  (collapsed)     │  │ • Next quiz: Apr 30        │  │  [Input Field]  │
+│                  │  └───────────────────────────┘  │                  │
+└──────────────────┴─────────────────────────────────┴──────────────────┘
+
+
+14. Implementation Notes
+Framework: React/Vue with theme context and CSS variables.
+
+
+Design Tokens: managed via Style Dictionary or Figma Tokens.
+
+
+Accessibility: WCAG 2.1 AA compliance, keyboard nav, ARIA roles.
+
+
+Versioning: sync design tokens and component library releases.
+
+
+
+By embracing "light, spacious, airy, and flowing" alongside premium simplicity and powerful AI, Learnology AI delivers an intuitive, deeply personalized learning platform—tailorable to any institution's brand and learner needs.
+
+
+
+## user stories and acceptance criteria
+
+*(No change – full catalogue maintained; IDs remain stable.)*
+
+## non‑functional requirements
+
+| area            | requirement                                                                                               |
+| -------------   | --------------------------------------------------------------------------------------------------------- |
+| performance     | P95 server response ≤ 300 ms (static) / ≤ 2 s (AI); page LCP ≤ 2.5 s on 3G.                               |
+| scalability     | 1 M MAU, burst 5 000 RPS; horizontal scale via Vercel + Supabase.                                           |
+| availability    | 99.9 % monthly; zero data‑loss deployments (blue‑green).                                                    |
+| security        | SOC 2 Type II, OWASP Top 10 mitigated, RLS enforced, tenant isolation.                                      |
+| accessibility   | WCAG 2.1 AA, keyboard nav, aria‑labels, multimodal outputs.                                               |
+| localisation    | UI strings externalised (i18n), RTL support.                                                              |
+| maintainability | **Modular architecture**, automated model retraining infrastructure, high test coverage (>80%).                 |
+| **reusability** | **Core components, APIs, and backend logic designed for maximum reuse across features and future platforms.** |
+
+## analytics and instrumentation
+
+- Client events captured via PostHog; funnel dashboards for course‑creation, lesson‑completion, quiz‑submission.
+- AI prompt/response logs hashed & stored securely for 30 days minimum, respecting data privacy regulations.
+- Usage analytics feed into AI‑driven roadmap prioritization and instructor coaching features.
+
+## compliance & standards
+
+- LTI 1.3, OneRoster 1.2, Caliper Analytics, SCORM 2004, FERPA, GDPR, COPPA (for K‑12 under 13 parental consent).
+
+## risks and mitigations
+
+| risk               | impact            | likelihood | mitigation                               |
+| ------------------ | ----------------- | ---------- | ---------------------------------------- |
+| LLM hallucinations | incorrect content | medium     | citation enforcement, human review flow  |
+| Data residency     | legal penalty     | low        | regional Supabase & S3; tenant isolation |
+| User overwhelm     | churn             | medium     | progressive disclosure, UI coach marks   |
+| AI bias or drift   | Inequitable outcomes | medium     | Explainable AI (citations), bias detection monitoring, fine‑tuning guardrails |
+| Integration Complexity | Failed adoption    | low        | Standards‑based APIs, clear documentation, dedicated support |
+| Vendor Lock‑in     | High switching cost| low        | Open standards support (SCORM, LTI), data export capabilities |
+
+## Appendix: Resolving Common LMS Pain Points
+
+This section explicitly maps Learnology AI's features to prevalent issues in traditional Learning Management Systems.
+
+| Pain Point                  | Learnology AI Solution                                                                                              | Relevant PRD Section(s)                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Stale, Static Content       | On‑demand AI regeneration ensures always‑fresh, relevant modules derived from current, secure knowledge bases.    | Knowledge‑Base Ingestion, Generative Course Designer, AI‑Powered Content Creation     |
+| Excessive Instructor Workload | Full automation or AI assistance for drafting content, grading, providing feedback, and generating remediation. | Assessment Engine, Teacher Tools, Gradebook & Analytics, AI‑Driven Tutoring & Chat    |
+| One‑Size‑Fits‑All Paths     | Branching adaptivity crafts individualized learning journeys per learner in real‑time based on performance & goals. | Generative Course Designer, Personalization & Journey Replanning                      |
+| Cumbersome UI/UX            | Conversational UI (chat/voice controls) replaces deep menu navigation; Smart Canvas simplifies course layout.     | User Experience & Interaction, Real‑Time Context Awareness                            |
+| Integration Friction        | Unified AI core with zero‑config connectors, standards‑based APIs (LTI, OneRoster, Caliper), and Skills Marketplace. | Interoperability & Extensibility, Compliance & Standards                              |
+| AI Bias or Drift            | Explainable AI features (source citations), content review workflows, bias detection monitoring, fine‑tuning controls. | AI‑Driven Tutoring, Security & Governance, Risks & Mitigations, Custom Model Fine‑Tuning |
+| Lack of Engagement          | Personalized dashboards, adaptive content, gamification (badges), collaborative tools, and proactive nudges.      | Mastery Tracking, Personalization, Collaborative Features, Automated Calendars        |
+| Limited Analytics Insight   | Predictive analytics, real‑time dashboards, Caliper standard support, and AI‑driven rubric calibration.           | Mastery Tracking, Gradebook & Analytics, Analytics & Instrumentation                |
+
+---
+
+**End of Document**
+
