@@ -17,7 +17,7 @@ const Header = () => {
   }, []);
 
   return (
-    <header className="flex items-center justify-between h-16 px-4 border-b bg-background sticky top-0 z-10">
+    <header className="flex items-center justify-between h-16 px-6 border-b border-[#E0E0E0] dark:border-[#333333] bg-background sticky top-0 z-10">
       {/* Left Side: Nav Toggle Removed */}
       {/* Placeholder for Left Side Content if needed */}
       <div></div>

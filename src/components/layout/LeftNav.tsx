@@ -50,13 +50,13 @@ const LeftNav = () => {
     <TooltipProvider delayDuration={0}>
       <nav
         className={cn(
-          "h-full flex flex-col bg-gray-50 dark:bg-gray-950 border-r transition-all duration-300 ease-in-out overflow-hidden",
+          "h-full flex flex-col border-r border-[#E0E0E0] dark:border-[#333333] transition-all duration-300 ease-in-out overflow-hidden",
           // isNavCollapsed ? "items-center" : "" // Removed earlier
         )}
         aria-label="Main Navigation"
       >
         {/* Logo */}
-        <div className={cn("h-16 flex items-center justify-between border-b", isNavCollapsed ? "justify-center px-2" : "px-4")}>
+        <div className={cn("h-16 flex items-center justify-between border-b border-[#E0E0E0] dark:border-[#333333]", isNavCollapsed ? "justify-center px-2" : "px-4")}>
           {isNavCollapsed ? (
              <Button
                variant="ghost"
@@ -101,8 +101,9 @@ const LeftNav = () => {
 
         {/* Navigation Items */}
         <div className={cn(
-          "flex-1 overflow-y-auto overflow-x-hidden py-4",
-          isNavCollapsed ? "px-2 space-y-2" : "px-4 space-y-1" // Adjust padding/spacing when collapsed
+          "flex-1 overflow-y-auto overflow-x-hidden", // Remove default padding, apply below
+          // Use more spacious padding (p-6 = 24px), adjust collapsed padding
+          isNavCollapsed ? "p-3 space-y-2" : "p-6 space-y-1"
           )}>
           {filteredNavItems.map((item) => (
             <NavItemLink key={item.href} item={item} pathname={pathname} isCollapsed={isNavCollapsed} />

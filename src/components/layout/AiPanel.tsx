@@ -12,11 +12,11 @@ const AiPanel = () => {
 
   return (
     <aside
-      className="h-full flex flex-col bg-background border-l"
+      className="h-full flex flex-col bg-background border-l border-[#E0E0E0] dark:border-[#333333]"
       aria-label="AI Chat Panel"
     >
       {/* Panel Header */}
-      <div className="h-16 flex items-center justify-start px-4 border-b shrink-0 gap-2">
+      <div className="h-16 flex items-center justify-start px-6 border-b border-[#E0E0E0] dark:border-[#333333] shrink-0 gap-2">
         <Button
           variant="ghost"
           size="icon"
@@ -31,7 +31,7 @@ const AiPanel = () => {
       </div>
 
       {/* Message List Area */}
-      <div className="flex-1 p-4 overflow-y-auto space-y-4">
+      <div className="flex-1 p-6 overflow-y-auto space-y-4">
         {/* Placeholder for chat messages */}
         <div className={cn(
           "p-3 rounded-lg self-start max-w-xs",
@@ -54,7 +54,7 @@ const AiPanel = () => {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 border-t shrink-0">
+      <div className="p-6 border-t border-[#E0E0E0] dark:border-[#333333] shrink-0">
         <div className="flex gap-2">
           <Input placeholder="Ask Luna anything..." className="flex-1" />
           <Button size="icon" aria-label="Send message">
