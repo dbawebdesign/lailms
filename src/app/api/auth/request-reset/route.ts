@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -11,20 +11,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Username is required' }, { status: 400 })
     }
 
-    // Create Supabase server client
-    const cookieStore = cookies()
+    // Create Supabase server client with async handlers
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          get(name: string) {
+          async get(name: string) {
+            const cookieStore = await cookies()
             return cookieStore.get(name)?.value
           },
-          set(name: string, value: string, options: any) {
+          async set(name: string, value: string, options: CookieOptions) {
+            const cookieStore = await cookies()
             cookieStore.set({ name, value, ...options })
           },
-          remove(name: string, options: any) {
+          async remove(name: string, options: CookieOptions) {
+            const cookieStore = await cookies()
             cookieStore.set({ name, value: '', ...options })
           },
         },

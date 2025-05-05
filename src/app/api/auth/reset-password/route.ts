@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -14,20 +14,22 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Create Supabase server client
-    const cookieStore = cookies()
+    // Create Supabase server client with async handlers
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          get(name: string) {
+          async get(name: string) {
+            const cookieStore = await cookies()
             return cookieStore.get(name)?.value
           },
-          set(name: string, value: string, options: any) {
+          async set(name: string, value: string, options: CookieOptions) {
+            const cookieStore = await cookies()
             cookieStore.set({ name, value, ...options })
           },
-          remove(name: string, options: any) {
+          async remove(name: string, options: CookieOptions) {
+            const cookieStore = await cookies()
             cookieStore.set({ name, value: '', ...options })
           },
         },
@@ -50,15 +52,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Reset code has expired' }, { status: 400 })
     }
 
+    // Define the expected type for the profile data
+    type ProfileWithOrg = {
+      user_id: string;
+      username: string;
+      organisation_id: string;
+      organisations: { abbr: string } | null; // Expect single object or null
+    }
+
     // Next, get user profile to verify username
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('user_id, username, organisation_id, organisations:organisation_id (abbr)')
       .eq('user_id', resetData.user_id)
-      .single()
+      .single<ProfileWithOrg>() // Apply the type assertion
 
     if (profileError || !profileData) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      // Handle profile fetch error
+      console.error('Profile fetch error for reset:', profileError);
+      return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
     // Verify username matches
@@ -66,11 +78,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Username does not match reset code' }, { status: 400 })
     }
 
-    // Get organization abbreviation for constructing pseudo-email
+    // Get organization abbreviation (Type checker should now work)
     const orgAbbr = profileData.organisations?.abbr
 
     if (!orgAbbr) {
-      return NextResponse.json({ error: 'Organization not found' }, { status: 500 })
+      // Handle missing org abbr
+      console.error('Organisation abbreviation not found for user:', profileData.user_id);
+      return NextResponse.json({ error: 'Organization data missing or invalid' }, { status: 500 })
     }
 
     // Construct pseudo-email

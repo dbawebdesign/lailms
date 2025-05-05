@@ -1,6 +1,10 @@
+'use client'
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@learnologyai/ui'
+// import { Button } from '@learnologyai/ui' // Temporarily comment out
+import { Input } from '@/components/ui/input'
+import { toast } from 'sonner'
 
 interface InviteCodeData {
   valid: boolean
@@ -51,9 +55,10 @@ export default function SignupForm() {
       setInviteCodeData(data)
       setStep(2) // Move to next step
     } catch (error) {
-      setError(error.message || 'An error occurred while verifying your invite code')
-    } finally {
       setIsLoading(false)
+      // Assert error type
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
+      toast.error(`Invite code verification failed: ${errorMessage}`)
     }
   }
 
@@ -93,9 +98,10 @@ export default function SignupForm() {
       // Redirect to login page on success
       router.push('/login?registered=true')
     } catch (error) {
-      setError(error.message || 'An error occurred while creating your account')
-    } finally {
       setIsLoading(false)
+      // Assert error type
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
+      toast.error(`Signup failed: ${errorMessage}`)
     }
   }
 
@@ -119,7 +125,7 @@ export default function SignupForm() {
             <label htmlFor="inviteCode" className="block text-sm font-medium mb-1">
               Invite Code
             </label>
-            <input
+            <Input
               id="inviteCode"
               type="text"
               value={inviteCode}
@@ -131,13 +137,13 @@ export default function SignupForm() {
             />
           </div>
           
-          <Button
+          <button
             type="submit"
             className="w-full mt-4"
             disabled={isLoading}
           >
             {isLoading ? 'Verifying...' : 'Continue'}
-          </Button>
+          </button>
         </form>
       </div>
     )
@@ -166,7 +172,7 @@ export default function SignupForm() {
             <label htmlFor="firstName" className="block text-sm font-medium mb-1">
               First Name
             </label>
-            <input
+            <Input
               id="firstName"
               type="text"
               value={firstName}
@@ -181,7 +187,7 @@ export default function SignupForm() {
             <label htmlFor="lastName" className="block text-sm font-medium mb-1">
               Last Name
             </label>
-            <input
+            <Input
               id="lastName"
               type="text"
               value={lastName}
@@ -197,7 +203,7 @@ export default function SignupForm() {
           <label htmlFor="username" className="block text-sm font-medium mb-1">
             Username
           </label>
-          <input
+          <Input
             id="username"
             type="text"
             value={username}
@@ -212,7 +218,7 @@ export default function SignupForm() {
           <label htmlFor="password" className="block text-sm font-medium mb-1">
             Password
           </label>
-          <input
+          <Input
             id="password"
             type="password"
             value={password}
@@ -228,7 +234,7 @@ export default function SignupForm() {
           <label htmlFor="confirmPassword" className="block text-sm font-medium mb-1">
             Confirm Password
           </label>
-          <input
+          <Input
             id="confirmPassword"
             type="password"
             value={confirmPassword}
@@ -262,22 +268,21 @@ export default function SignupForm() {
         )}
         
         <div className="flex items-center justify-between gap-4 mt-6">
-          <Button
+          <button
             type="button"
-            variant="outline"
             onClick={() => setStep(1)}
-            disabled={isLoading}
+            className="flex-1 inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
           >
             Back
-          </Button>
+          </button>
           
-          <Button
+          <button
             type="submit"
-            className="flex-1"
+            className="flex-1 inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
             disabled={isLoading}
           >
             {isLoading ? 'Creating Account...' : 'Create Account'}
-          </Button>
+          </button>
         </div>
       </form>
     </div>

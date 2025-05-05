@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { Database } from 'packages/types/supabase';
+import { Database } from '@learnologyai/types';
 
 export async function GET(request: Request) {
   const supabase = createSupabaseServerClient();

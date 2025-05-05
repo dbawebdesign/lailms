@@ -1,3 +1,28 @@
+-- Function to automatically update 'updated_at' timestamps
+CREATE OR REPLACE FUNCTION public.set_updated_at() 
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the organisations table FIRST
+CREATE TABLE public.organisations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  abbr text UNIQUE, -- Used in invite codes, should probably be unique
+  settings jsonb,
+  created_at timestamptz DEFAULT now() NOT NULL,
+  updated_at timestamptz DEFAULT now() NOT NULL
+);
+
+-- Add trigger for updated_at on organisations
+CREATE TRIGGER set_organisations_updated_at
+BEFORE UPDATE ON public.organisations
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
 -- Create the role enum
 CREATE TYPE public.role AS ENUM (
   'super_admin', 

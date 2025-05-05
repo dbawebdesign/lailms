@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -11,25 +11,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invite code is required' }, { status: 400 })
     }
 
-    // Create Supabase server client
-    const cookieStore = cookies()
+    // Create Supabase server client with async handlers
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          get(name: string) {
+          async get(name: string) {
+            const cookieStore = await cookies()
             return cookieStore.get(name)?.value
           },
-          set(name: string, value: string, options: any) {
+          async set(name: string, value: string, options: CookieOptions) {
+            const cookieStore = await cookies()
             cookieStore.set({ name, value, ...options })
           },
-          remove(name: string, options: any) {
+          async remove(name: string, options: CookieOptions) {
+            const cookieStore = await cookies()
             cookieStore.set({ name, value: '', ...options })
           },
         },
       }
     )
+
+    // Define expected type for invite code data with nested organisation
+    type InviteCodeWithOrg = {
+        id: string;
+        code: string;
+        role: string; 
+        organisation_id: string; 
+        is_redeemed: boolean; 
+        expires_at: string | null;
+        organisations: { id: string; name: string; abbr: string } | null; // Expect single object or null
+    }
 
     // Query the invite code
     const { data, error } = await supabase
@@ -44,7 +57,7 @@ export async function POST(req: NextRequest) {
         organisations:organisation_id (id, name, abbr)
       `)
       .eq('code', code)
-      .single()
+      .single<InviteCodeWithOrg>() // Apply type assertion
 
     if (error || !data) {
       return NextResponse.json({ error: 'Invalid invite code' }, { status: 400 })
@@ -64,10 +77,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       valid: true,
       role: data.role,
-      organisation: {
-        id: data.organisations?.id,
-        name: data.organisations?.name,
-      },
+      organisation: data.organisations ? {
+        id: data.organisations.id,
+        name: data.organisations.name,
+      } : null,
     })
   } catch (error) {
     console.error('Error verifying invite code:', error)

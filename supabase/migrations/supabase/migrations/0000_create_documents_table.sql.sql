@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.documents (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   file_name TEXT NOT NULL,
   storage_path TEXT NOT NULL UNIQUE,
-  status public.document_status NOT NULL DEFAULT 'queued'::public.document_status,
+  status TEXT NOT NULL DEFAULT 'queued',
   organisation_id UUID NOT NULL REFERENCES public.organisations(id) ON DELETE CASCADE,
   uploaded_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
   file_type TEXT,
