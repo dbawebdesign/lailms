@@ -34,11 +34,8 @@ CREATE TABLE public.invite_codes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     code TEXT UNIQUE NOT NULL DEFAULT substring(md5(random()::text) for 10), -- Simple random code generation
     organisation_id UUID NOT NULL REFERENCES public.organisations(id) ON DELETE CASCADE,
-    role user_role NOT NULL, -- Role assigned upon redeeming the code
+    role user_role NOT NULL, -- Role assigned upon using the code
     expires_at TIMESTAMPTZ,
-    is_redeemed BOOLEAN DEFAULT false NOT NULL,
-    redeemed_by UUID REFERENCES public.members(id) ON DELETE SET NULL,
-    redeemed_at TIMESTAMPTZ,
     created_by UUID REFERENCES public.members(id) ON DELETE SET NULL, -- Who generated the code
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
@@ -101,7 +98,6 @@ CREATE INDEX idx_members_username ON public.members(username);
 CREATE INDEX idx_invite_codes_organisation_id ON public.invite_codes(organisation_id);
 CREATE INDEX idx_invite_codes_code ON public.invite_codes(code);
 CREATE INDEX idx_invite_codes_created_by ON public.invite_codes(created_by);
-CREATE INDEX idx_invite_codes_redeemed_by ON public.invite_codes(redeemed_by);
 CREATE INDEX idx_base_classes_organisation_id ON public.base_classes(organisation_id);
 CREATE INDEX idx_class_instances_base_class_id ON public.class_instances(base_class_id);
 CREATE INDEX idx_class_instances_enrollment_code ON public.class_instances(enrollment_code);

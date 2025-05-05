@@ -1,3 +1,6 @@
+-- Enable the pgvector extension if it doesn't exist
+CREATE EXTENSION IF NOT EXISTS vector SCHEMA extensions;
+
 -- Migration to complete Task 3 missing items
 -- Implements:
 -- 1. Enrollment code generation trigger
@@ -6,6 +9,19 @@
 -- 4. Order maintenance triggers
 -- 5. Vector support finalization
 -- 6. Additional RLS policy fixes
+
+-- Generic function to update the updated_at timestamp
+CREATE OR REPLACE FUNCTION public.update_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.updated_at = timezone('utc'::text, now());
+   RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Add enrollment_code column if it doesn't exist (idempotent)
+ALTER TABLE public.class_instances
+ADD COLUMN IF NOT EXISTS enrollment_code TEXT NULL;
 
 -- ===== 1. Enrollment Code Generation Trigger =====
 
@@ -36,6 +52,15 @@ FOR EACH ROW
 EXECUTE FUNCTION public.generate_enrollment_code();
 
 -- ===== 2. Audit Logging Triggers =====
+
+-- Create the audit_action ENUM type if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'audit_action' AND typnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')) THEN
+        CREATE TYPE public.audit_action AS ENUM ('INSERT', 'UPDATE', 'DELETE');
+    END IF;
+END
+$$;
 
 -- Create audit log function
 CREATE OR REPLACE FUNCTION public.log_audit_event()
@@ -127,50 +152,44 @@ CREATE TRIGGER audit_lessons_trigger
 AFTER INSERT OR UPDATE OR DELETE ON public.lessons
 FOR EACH ROW EXECUTE FUNCTION public.log_audit_event();
 
--- ===== 3. Enrollment Code Lookup Materialized View =====
-
--- Create materialized view for quick enrollment code lookup
-DROP MATERIALIZED VIEW IF EXISTS public.enrollment_code_lookup;
-CREATE MATERIALIZED VIEW public.enrollment_code_lookup AS
-SELECT 
-  ci.id AS class_instance_id,
-  ci.enrollment_code,
-  ci.name AS class_name,
-  bc.name AS base_class_name,
-  bc.organisation_id,
-  o.name AS organisation_name
-FROM 
-  public.class_instances ci
-JOIN 
-  public.base_classes bc ON ci.base_class_id = bc.id
-JOIN 
-  public.organisations o ON bc.organisation_id = o.id
-WHERE 
-  ci.enrollment_code IS NOT NULL;
-
--- Create index on the enrollment_code for faster lookup
-CREATE UNIQUE INDEX idx_enrollment_code_lookup 
-ON public.enrollment_code_lookup(enrollment_code);
-
--- Function to refresh the materialized view when class_instances change
-CREATE OR REPLACE FUNCTION public.refresh_enrollment_code_lookup()
-RETURNS TRIGGER AS $$
-BEGIN
-  REFRESH MATERIALIZED VIEW CONCURRENTLY public.enrollment_code_lookup;
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
--- Trigger to refresh the view when class_instances are modified
-DROP TRIGGER IF EXISTS refresh_enrollment_code_lookup_trigger ON public.class_instances;
-CREATE TRIGGER refresh_enrollment_code_lookup_trigger
-AFTER INSERT OR UPDATE OR DELETE ON public.class_instances
-FOR EACH STATEMENT
-EXECUTE FUNCTION public.refresh_enrollment_code_lookup();
-
 -- ===== 4. Order Maintenance Triggers =====
 
--- Function to maintain order_index for lessons
+-- Ensure paths table exists first
+CREATE TABLE IF NOT EXISTS public.paths (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organisation_id UUID REFERENCES public.organisations(id) ON DELETE CASCADE, -- Assuming organisations exists
+    name TEXT NOT NULL,
+    description TEXT,
+    settings JSONB,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+-- Trigger for updating updated_at timestamp on paths
+DROP TRIGGER IF EXISTS handle_updated_at_paths ON public.paths;
+CREATE TRIGGER handle_updated_at_paths
+BEFORE UPDATE ON public.paths
+FOR EACH ROW
+EXECUTE FUNCTION public.update_timestamp();
+
+-- Ensure lessons table exists before creating lesson_sections
+CREATE TABLE IF NOT EXISTS public.lessons (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    path_id UUID REFERENCES public.paths(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT,
+    order_index INTEGER DEFAULT 0,
+    settings JSONB,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+-- Trigger for lessons update timestamp
+DROP TRIGGER IF EXISTS handle_updated_at_lessons ON public.lessons;
+CREATE TRIGGER handle_updated_at_lessons
+BEFORE UPDATE ON public.lessons
+FOR EACH ROW
+EXECUTE FUNCTION public.update_timestamp();
+
+-- Function to maintain order_index for lessons (Moved Earlier)
 CREATE OR REPLACE FUNCTION public.maintain_lesson_order()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -207,14 +226,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Lesson ordering trigger
-DROP TRIGGER IF EXISTS maintain_lesson_order_trigger ON public.lessons;
-CREATE TRIGGER maintain_lesson_order_trigger
-BEFORE INSERT OR UPDATE OF order_index ON public.lessons
-FOR EACH ROW
-EXECUTE FUNCTION public.maintain_lesson_order();
-
--- Function to handle lesson deletion
+-- Function to handle lesson deletion (Moved Earlier)
 CREATE OR REPLACE FUNCTION public.reindex_lessons_after_delete()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -228,14 +240,40 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Lesson deletion trigger
+-- Lesson ordering trigger (Original placement - Now after function definition)
+DROP TRIGGER IF EXISTS maintain_lesson_order_trigger ON public.lessons;
+CREATE TRIGGER maintain_lesson_order_trigger
+BEFORE INSERT OR UPDATE OF order_index ON public.lessons
+FOR EACH ROW
+EXECUTE FUNCTION public.maintain_lesson_order();
+
+-- Lesson deletion trigger (Original placement - Now after function definition)
 DROP TRIGGER IF EXISTS reindex_lessons_after_delete_trigger ON public.lessons;
 CREATE TRIGGER reindex_lessons_after_delete_trigger
 AFTER DELETE ON public.lessons
 FOR EACH ROW
 EXECUTE FUNCTION public.reindex_lessons_after_delete();
 
--- Similar functions for lesson_sections
+-- Ensure lesson_sections table exists before creating triggers
+CREATE TABLE IF NOT EXISTS public.lesson_sections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lesson_id UUID REFERENCES public.lessons(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    content TEXT,
+    order_index INTEGER DEFAULT 0,
+    settings JSONB,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+-- Trigger for lesson_sections update timestamp
+DROP TRIGGER IF EXISTS handle_updated_at_lesson_sections ON public.lesson_sections;
+CREATE TRIGGER handle_updated_at_lesson_sections
+BEFORE UPDATE ON public.lesson_sections
+FOR EACH ROW
+EXECUTE FUNCTION public.update_timestamp();
+
+-- Similar functions for lesson_sections (maintain_section_order, reindex_sections_after_delete)
+-- Function to maintain order_index for sections (Moved Earlier)
 CREATE OR REPLACE FUNCTION public.maintain_section_order()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -272,14 +310,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Section ordering trigger
-DROP TRIGGER IF EXISTS maintain_section_order_trigger ON public.lesson_sections;
-CREATE TRIGGER maintain_section_order_trigger
-BEFORE INSERT OR UPDATE OF order_index ON public.lesson_sections
-FOR EACH ROW
-EXECUTE FUNCTION public.maintain_section_order();
-
--- Function to handle section deletion
+-- Function to handle section deletion (Moved Earlier)
 CREATE OR REPLACE FUNCTION public.reindex_sections_after_delete()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -293,7 +324,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Section deletion trigger
+-- Section ordering trigger (Now after function definition)
+DROP TRIGGER IF EXISTS maintain_section_order_trigger ON public.lesson_sections;
+CREATE TRIGGER maintain_section_order_trigger
+BEFORE INSERT OR UPDATE OF order_index ON public.lesson_sections
+FOR EACH ROW
+EXECUTE FUNCTION public.maintain_section_order();
+
+-- Section deletion trigger (Now after function definition)
 DROP TRIGGER IF EXISTS reindex_sections_after_delete_trigger ON public.lesson_sections;
 CREATE TRIGGER reindex_sections_after_delete_trigger
 AFTER DELETE ON public.lesson_sections
@@ -310,11 +348,11 @@ CREATE INDEX IF NOT EXISTS idx_lesson_sections_embedding ON public.lesson_sectio
 USING ivfflat (content_embedding vector_l2_ops) WITH (lists = 100);
 
 -- Uncomment vector columns in ui_contexts
-ALTER TABLE public.ui_contexts ADD COLUMN IF NOT EXISTS context_embedding vector(1536);
+-- ALTER TABLE public.ui_contexts ADD COLUMN IF NOT EXISTS context_embedding vector(1536);
 
 -- Create vector index for ui_contexts
-CREATE INDEX IF NOT EXISTS idx_ui_contexts_embedding ON public.ui_contexts 
-USING ivfflat (context_embedding vector_l2_ops) WITH (lists = 100);
+-- CREATE INDEX IF NOT EXISTS idx_ui_contexts_embedding ON public.ui_contexts 
+-- USING ivfflat (context_embedding vector_l2_ops) WITH (lists = 100);
 
 -- ===== 6. Additional RLS Policy Fixes =====
 
