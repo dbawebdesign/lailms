@@ -2,13 +2,15 @@
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileIcon, UploadIcon, XIcon } from 'lucide-react'
+import { FileIcon, UploadIcon, XIcon, LinkIcon, YoutubeIcon } from 'lucide-react'
 import { formatBytes } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 // Define accepted file types
 const ACCEPTED_FILE_TYPES = {
@@ -65,6 +67,31 @@ interface FileUploadDropzoneProps {
   className?: string
 }
 
+// Helper function to detect URL type with better pattern matching
+function detectUrlType(url: string): 'youtube' | 'webpage' | null {
+  // Try to ensure it's a valid URL first
+  try {
+    new URL(url);
+  } catch {
+    return null; // Not a valid URL
+  }
+  
+  // Check for YouTube patterns
+  const youtubePatterns = [
+    /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/user\/[^\/]+\/[^\/]+\/|youtube\.com\/[^\/]+#[^\/]+\/[^\/]+\/|youtube\.com\/channel\/[^\/]+\/[^\/]+\/)([^&?\/\s]{11})/i,
+    /^(https?:\/\/)?(www\.)?(youtube\.com\/shorts\/|youtube\.com\/clip\/)([^&?\/\s]+)/i
+  ];
+  
+  for (const pattern of youtubePatterns) {
+    if (pattern.test(url)) {
+      return 'youtube';
+    }
+  }
+  
+  // It's a valid URL but not YouTube
+  return 'webpage';
+}
+
 export function FileUploadDropzone({
   organisationId,
   onUrlSubmit,
@@ -75,7 +102,9 @@ export function FileUploadDropzone({
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [url, setUrl] = useState('')
+  const [urlType, setUrlType] = useState<'youtube' | 'webpage' | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [urlValidationMessage, setUrlValidationMessage] = useState('')
   const router = useRouter()
   
   // Handle drag events
@@ -175,33 +204,102 @@ export function FileUploadDropzone({
     })
   }
   
+  // Validate URL on change
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newUrl = e.target.value;
+    setUrl(newUrl);
+    
+    if (!newUrl.trim()) {
+      setUrlType(null);
+      setUrlValidationMessage('');
+      return;
+    }
+    
+    // Detect URL type
+    const detectedType = detectUrlType(newUrl);
+    setUrlType(detectedType);
+    
+    if (!detectedType) {
+      setUrlValidationMessage('Please enter a valid URL starting with http:// or https://');
+    } else if (detectedType === 'youtube') {
+      setUrlValidationMessage('');
+    } else {
+      setUrlValidationMessage('');
+    }
+  };
+  
   // Handle URL submission
   const handleUrlSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     
-    if (!url.trim()) return
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) return;
+    
+    // Final validation check
+    const detectedType = detectUrlType(trimmedUrl);
+    if (!detectedType) {
+      toast({
+        title: 'Invalid URL',
+        description: 'Please enter a valid URL starting with http:// or https://',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     try {
-      setIsUploading(true)
-      if (onUrlSubmit) {
-        await onUrlSubmit(url)
-        setUrl('')
-        toast({
-          title: 'URL submitted successfully',
-          description: 'The URL has been submitted for processing.',
-        })
+      setIsUploading(true);
+      
+      // Create metadata to store URL information
+      const metadata = {
+        originalUrl: trimmedUrl,
+        type: detectedType,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Create JSON file with URL metadata
+      const jsonContent = JSON.stringify(metadata);
+      const jsonBlob = new Blob([jsonContent], { type: 'application/json' });
+      const fileName = `${detectedType}_${Date.now()}.json`;
+      const file = new File([jsonBlob], fileName, { type: 'application/json' });
+      
+      // Prepare form data
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('organisation_id', organisationId);
+      
+      // Send to API
+      const response = await fetch('/api/knowledge-base/upload', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
+      
+      // Clear URL input
+      setUrl('');
+      setUrlType(null);
+      
+      toast({
+        title: 'URL submitted successfully',
+        description: `The ${detectedType === 'youtube' ? 'YouTube video' : 'webpage'} has been submitted for processing.`,
+      });
+      
+      // Refresh the file list
+      router.refresh();
     } catch (error) {
-      console.error('Error submitting URL:', error)
+      console.error('Error submitting URL:', error);
       toast({
         title: 'URL submission failed',
         description: error instanceof Error ? error.message : 'Failed to submit URL for processing',
         variant: 'destructive',
-      })
+      });
     } finally {
-      setIsUploading(false)
+      setIsUploading(false);
     }
-  }
+  };
   
   // Handle uploading all files
   const handleUploadAll = async () => {
@@ -300,24 +398,59 @@ export function FileUploadDropzone({
       {/* URL input for web pages */}
       {onUrlSubmit && (
         <div className="mt-4">
-          <form onSubmit={handleUrlSubmit} className="flex space-x-2">
-            <div className="flex-grow">
-              <Label htmlFor="url-input" className="sr-only">
-                Enter a URL
-              </Label>
-              <Input
-                id="url-input"
-                type="url"
-                placeholder="Enter a URL to analyze (e.g., https://example.com/article)"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                disabled={isUploading}
-                className="w-full"
-              />
+          <form onSubmit={handleUrlSubmit} className="space-y-2">
+            <Label htmlFor="url-input" className="block mb-1 text-sm font-medium">
+              Add Content from URL (YouTube videos or web pages)
+            </Label>
+            
+            <div className="flex space-x-2">
+              <div className="relative flex-grow">
+                <Input
+                  id="url-input"
+                  type="url"
+                  placeholder="Enter a URL (e.g., https://example.com/article or YouTube link)"
+                  value={url}
+                  onChange={handleUrlChange}
+                  disabled={isUploading}
+                  className="w-full pl-10" // Added left padding for icon
+                />
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  {urlType === 'youtube' ? (
+                    <YoutubeIcon className="h-4 w-4 text-red-500" />
+                  ) : (
+                    <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </div>
+              </div>
+              <Button 
+                type="submit" 
+                disabled={isUploading || !url.trim() || !urlType}
+                className="flex-shrink-0"
+              >
+                {isUploading ? 'Adding...' : 'Add URL'}
+              </Button>
             </div>
-            <Button type="submit" disabled={isUploading || !url.trim()}>
-              Add URL
-            </Button>
+            
+            {url.trim() && urlType && (
+              <div className="text-xs mt-1 flex items-center space-x-2">
+                <Badge variant={urlType === 'youtube' ? 'destructive' : 'secondary'}>
+                  {urlType === 'youtube' ? 'YouTube Video' : 'Web Page'}
+                </Badge>
+                <span className="text-muted-foreground">
+                  {urlType === 'youtube' 
+                    ? 'Video transcript will be extracted for processing' 
+                    : 'Page content will be extracted for processing'}
+                </span>
+              </div>
+            )}
+            
+            {urlValidationMessage && (
+              <Alert variant="destructive" className="mt-2 py-2">
+                <AlertDescription className="text-xs">
+                  {urlValidationMessage}
+                </AlertDescription>
+              </Alert>
+            )}
           </form>
         </div>
       )}

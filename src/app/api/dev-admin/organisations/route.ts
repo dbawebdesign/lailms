@@ -219,20 +219,74 @@ export async function POST(req: Request) {
     settings: body.settings || null
   };
 
-  // Insert the new organization
-  const { data: newOrganisation, error: createError } = await supabaseAdminClient
-    .from('organisations')
-    .insert(organisationData)
-    .select()
-    .single();
+  try {
+    // Insert the new organization
+    const { data: newOrganisation, error: createError } = await supabaseAdminClient
+      .from('organisations')
+      .insert(organisationData)
+      .select()
+      .single();
 
-  if (createError) {
-    console.error('Error creating organisation:', createError);
+    if (createError) {
+      console.error('Error creating organisation:', createError);
+      return NextResponse.json(
+        { error: 'Failed to create organisation', details: createError.message },
+        { status: 500 }
+      );
+    }
+
+    // Create a storage bucket for the organization
+    const orgId = newOrganisation.id;
+    const bucketName = `org-${orgId}-uploads`;
+    
+    console.log(`Creating storage bucket: ${bucketName}`);
+    const { error: bucketError } = await supabaseAdminClient.storage.createBucket(
+      bucketName,
+      { 
+        public: false,
+        fileSizeLimit: 50 * 1024 * 1024, // 50 MB limit
+        allowedMimeTypes: [
+          'application/pdf',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'application/vnd.ms-powerpoint',
+          'text/csv',
+          'text/plain',
+          'audio/mpeg',
+          'audio/wav',
+          'audio/ogg',
+          'video/mp4',
+          'video/webm',
+          'video/ogg',
+          'image/jpeg',
+          'image/png',
+          'image/gif',
+          'image/webp'
+        ]
+      }
+    );
+
+    if (bucketError) {
+      console.error(`Error creating bucket for organisation ${orgId}:`, bucketError);
+      // We don't want to fail the whole request if just the bucket creation fails
+      // The bucket can be created later if needed
+      return NextResponse.json({
+        ...newOrganisation,
+        warning: `Organisation created but storage bucket creation failed: ${bucketError.message}`
+      }, { status: 201 });
+    }
+
+    return NextResponse.json({
+      ...newOrganisation,
+      message: 'Organisation and storage bucket created successfully'
+    }, { status: 201 });
+  } catch (error) {
+    console.error('Error in organisation creation process:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return NextResponse.json(
-      { error: 'Failed to create organisation', details: createError.message },
+      { error: 'Failed to complete organisation setup', details: errorMessage },
       { status: 500 }
     );
   }
-
-  return NextResponse.json(newOrganisation, { status: 201 });
 } 
