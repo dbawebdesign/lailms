@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "outDir": "./dist",
+    "declaration": true,
+    "declarationMap": true,
+    "module": "NodeNext", // Suitable for Node.js functions
+    "moduleResolution": "NodeNext",
+    "baseUrl": ".",
+    "rootDir": "src" // Assuming source code is in src/
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+} 

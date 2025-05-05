@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { 
   FileIcon, 
@@ -11,7 +11,8 @@ import {
   Trash2, 
   RefreshCw,
   Download,
-  MoreVertical
+  MoreVertical,
+  MoreHorizontal
 } from 'lucide-react'
 import { formatBytes } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -32,47 +33,52 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { toast } from '@/components/ui/use-toast'
+import { toast } from 'sonner'
+import type { Database } from 'packages/types/supabase'
 
 // Document status type
 export type DocumentStatus = 'queued' | 'processing' | 'completed' | 'error'
 
-// Document type corresponding to the database schema
-export interface Document {
-  id: string
-  file_name: string
-  storage_path: string
-  status: DocumentStatus
-  organisation_id: string
-  uploaded_by: string
-  file_type: string | null
-  file_size: number | null
-  metadata: any | null
-  created_at: string
-  updated_at: string
-}
+type Document = Database['public']['Tables']['documents']['Row']
 
 interface FileListTableProps {
-  documents: Document[]
-  isLoading?: boolean
-  onRefresh?: () => void
-  onDelete?: (documentId: string) => Promise<void>
-  onRetry?: (documentId: string) => Promise<void>
-  onDownload?: (documentId: string) => Promise<void>
-  emptyMessage?: string
+  organisationId: string
 }
 
-export function FileListTable({
-  documents,
-  isLoading = false,
-  onRefresh,
-  onDelete,
-  onRetry,
-  onDownload,
-  emptyMessage = 'No documents uploaded yet'
-}: FileListTableProps) {
+export function FileListTable({ organisationId }: FileListTableProps) {
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [actionInProgress, setActionInProgress] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchDocuments() {
+      if (!organisationId) return; // Redundant check now, but harmless
+
+      setIsLoading(true);
+      setError(null);
+      try {
+        // Fetch documents from the new API endpoint
+        const response = await fetch(`/api/knowledge-base/documents`); // No need to pass orgId, API infers it
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        const data: Document[] = await response.json();
+        setDocuments(data);
+
+      } catch (err) {
+        console.error("Failed to fetch documents:", err);
+        const message = err instanceof Error ? err.message : "An unknown error occurred";
+        setError(`Failed to load documents: ${message}`);
+        toast.error(`Failed to load documents: ${message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchDocuments();
+  }, [organisationId]); // Refetch when organisationId changes
 
   // Get status badge based on document status
   const getStatusBadge = (status: DocumentStatus) => {
@@ -121,176 +127,92 @@ export function FileListTable({
   }
 
   // Handle document deletion
-  const handleDelete = async (documentId: string) => {
-    if (!onDelete) return
+  const handleDelete = async (docId: string) => {
+    if (deletingId) return; // Prevent multiple deletes
 
+    setDeletingId(docId);
     try {
-      setDeletingId(documentId)
-      setActionInProgress(documentId)
-      await onDelete(documentId)
-      toast({
-        title: 'Document deleted',
-        description: 'The document has been successfully deleted.',
-      })
-    } catch (error) {
-      console.error('Error deleting document:', error)
-      toast({
-        title: 'Deletion failed',
-        description: error instanceof Error ? error.message : 'Failed to delete document',
-        variant: 'destructive',
-      })
+      const response = await fetch(`/api/knowledge-base/documents?docId=${docId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      // Remove the document from the local state on successful deletion
+      setDocuments((prevDocs) => prevDocs.filter((doc) => doc.id !== docId));
+      toast.success('Document deleted successfully');
+
+    } catch (err) {
+      console.error('Failed to delete document:', err);
+      const message = err instanceof Error ? err.message : 'An unknown error occurred';
+      toast.error(`Failed to delete document: ${message}`);
     } finally {
-      setDeletingId(null)
-      setActionInProgress(null)
+      setDeletingId(null);
     }
   }
 
-  // Handle retry processing for documents with error
-  const handleRetry = async (documentId: string) => {
-    if (!onRetry) return
-
-    try {
-      setActionInProgress(documentId)
-      await onRetry(documentId)
-      toast({
-        title: 'Processing restarted',
-        description: 'The document has been queued for processing again.',
-      })
-    } catch (error) {
-      console.error('Error retrying document:', error)
-      toast({
-        title: 'Retry failed',
-        description: error instanceof Error ? error.message : 'Failed to retry document processing',
-        variant: 'destructive',
-      })
-    } finally {
-      setActionInProgress(null)
-    }
-  }
-
-  // Handle document download
-  const handleDownload = async (documentId: string) => {
-    if (!onDownload) return
-
-    try {
-      setActionInProgress(documentId)
-      await onDownload(documentId)
-    } catch (error) {
-      console.error('Error downloading document:', error)
-      toast({
-        title: 'Download failed',
-        description: error instanceof Error ? error.message : 'Failed to download document',
-        variant: 'destructive',
-      })
-    } finally {
-      setActionInProgress(null)
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center py-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  if (isLoading) return <p>Loading documents...</p>
+  if (error) return <p className="text-red-500">{error}</p>
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Uploaded Documents</h2>
-        {onRefresh && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onRefresh}
-            className="ml-auto"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-        )}
-      </div>
-
-      {documents.length === 0 ? (
-        <div className="text-center py-8 border rounded-md bg-muted/20">
-          <p className="text-muted-foreground">{emptyMessage}</p>
-        </div>
-      ) : (
-        <Table>
-          <TableCaption>
-            List of your uploaded documents and their processing status.
-          </TableCaption>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[300px]">Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Size</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Uploaded</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Name</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>Size</TableHead>
+          <TableHead>Uploaded</TableHead>
+          <TableHead>Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {documents.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={6} className="text-center">
+              No documents uploaded for this organisation yet.
+            </TableCell>
+          </TableRow>
+        ) : (
+          documents.map((doc) => (
+            <TableRow key={doc.id}>
+              <TableCell className="font-medium">{doc.name}</TableCell>
+              <TableCell><Badge variant={doc.status === 'processed' ? 'default' : 'secondary'}>{doc.status}</Badge></TableCell>
+              <TableCell>{doc.file_type}</TableCell>
+              <TableCell>{formatBytes(doc.file_size ?? 0)}</TableCell>
+              <TableCell>{doc.created_at ? format(new Date(doc.created_at), 'PPpp') : 'N/A'}</TableCell>
+              <TableCell>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={!!deletingId}>
+                      <span className="sr-only">Open menu</span>
+                      {deletingId === doc.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <MoreHorizontal className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {/* <DropdownMenuItem>View Details</DropdownMenuItem> */}
+                    {/* <DropdownMenuItem>Process</DropdownMenuItem> */}
+                    <DropdownMenuItem 
+                      onClick={() => handleDelete(doc.id)} 
+                      className="text-red-600" 
+                      disabled={!!deletingId}
+                    >
+                      {deletingId === doc.id ? 'Deleting...' : 'Delete'}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {documents.map((doc) => (
-              <TableRow key={doc.id}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center">
-                    {getFileIcon(doc.file_type)}
-                    <span className="ml-2 truncate max-w-[250px]">{doc.file_name}</span>
-                  </div>
-                </TableCell>
-                <TableCell>{doc.file_type || 'Unknown'}</TableCell>
-                <TableCell>{doc.file_size ? formatBytes(doc.file_size) : 'Unknown'}</TableCell>
-                <TableCell>{getStatusBadge(doc.status)}</TableCell>
-                <TableCell>{format(new Date(doc.created_at), 'MMM d, yyyy')}</TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" disabled={!!actionInProgress}>
-                        {actionInProgress === doc.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <MoreVertical className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuGroup>
-                        {doc.status === 'completed' && onDownload && (
-                          <DropdownMenuItem onClick={() => handleDownload(doc.id)}>
-                            <Download className="h-4 w-4 mr-2" />
-                            <span>Download</span>
-                          </DropdownMenuItem>
-                        )}
-                        {doc.status === 'error' && onRetry && (
-                          <DropdownMenuItem onClick={() => handleRetry(doc.id)}>
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            <span>Retry Processing</span>
-                          </DropdownMenuItem>
-                        )}
-                        {onDelete && (
-                          <DropdownMenuItem 
-                            onClick={() => handleDelete(doc.id)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            {deletingId === doc.id ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4 mr-2" />
-                            )}
-                            <span>Delete</span>
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </div>
+          ))
+        )}
+      </TableBody>
+    </Table>
   )
 } 

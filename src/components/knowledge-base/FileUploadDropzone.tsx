@@ -58,7 +58,7 @@ interface UploadedFile {
 }
 
 interface FileUploadDropzoneProps {
-  onUpload: (files: File[]) => Promise<void>
+  organisationId: string
   onUrlSubmit?: (url: string) => Promise<void>
   maxFiles?: number
   maxSize?: number // in bytes
@@ -66,7 +66,7 @@ interface FileUploadDropzoneProps {
 }
 
 export function FileUploadDropzone({
-  onUpload,
+  organisationId,
   onUrlSubmit,
   maxFiles = 10,
   maxSize = 50 * 1024 * 1024, // 50MB default
@@ -216,8 +216,29 @@ export function FileUploadDropzone({
     
     try {
       setIsUploading(true)
-      await onUpload(files.map(f => f.file))
-      
+
+      // Prepare form data
+      const formData = new FormData()
+      files.forEach((uploadedFile) => {
+        formData.append('file', uploadedFile.file)
+      })
+      formData.append('organisation_id', organisationId)
+
+      // Replace direct onUpload call with fetch to API endpoint
+      const response = await fetch('/api/knowledge-base/upload', {
+        method: 'POST',
+        body: formData,
+        // Headers might not be needed as FormData sets Content-Type
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+      }
+
+      // Assuming the API returns the details of the uploaded document(s)
+      // const result = await response.json()
+
       // Clear files after successful upload
       setFiles([])
       
