@@ -1,0 +1,147 @@
+{
+  "meta": {
+    "generatedAt": "2025-05-05T03:00:46.016Z",
+    "tasksAnalyzed": 17,
+    "thresholdScore": 5,
+    "projectName": "Your Project Name",
+    "usedResearch": false
+  },
+  "complexityAnalysis": [
+    {
+      "taskId": 5,
+      "taskTitle": "Knowledge Base Ingestion System",
+      "complexityScore": 8,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down the Knowledge Base Ingestion System implementation into detailed subtasks covering UI components, document upload functionality, processing pipeline for different file types, chunking algorithm, embedding generation, and storage system with proper tenant isolation.",
+      "reasoning": "This task involves multiple complex components: UI development, file handling for diverse formats, text processing, embedding generation, and vector storage. It requires integration with external APIs (OpenAI) and implementation of tenant isolation for security. The processing pipeline needs to handle various file types with different parsing approaches."
+    },
+    {
+      "taskId": 6,
+      "taskTitle": "Luna Context Engine Implementation",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide the Luna Context Engine implementation into specific subtasks covering the UIContextProvider, component registration system, context serialization, communication channels, state storage with vector embeddings, and intent inference system.",
+      "reasoning": "This task requires building a sophisticated real-time UI tracking system with several interconnected components. It involves complex state management, cross-component communication, vector embeddings, and intent inference. The system needs to track UI state changes and communicate with other components while maintaining performance."
+    },
+    {
+      "taskId": 7,
+      "taskTitle": "AI Chat Panel and Integration",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down the AI Chat Panel implementation into detailed subtasks covering UI components, streaming response handling, context-aware prompting, knowledge base integration, citation display, chat history management, and API routes with proper security.",
+      "reasoning": "This task involves building a complex chat interface with streaming responses, context awareness, and knowledge base integration. It requires sophisticated prompt engineering, error handling for API calls, and proper security enforcement. The system needs to handle different personas and display citations from knowledge base content."
+    },
+    {
+      "taskId": 8,
+      "taskTitle": "Base Class and Instance Management",
+      "complexityScore": 6,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide the Base Class and Instance Management implementation into specific subtasks covering the BaseClassCardGrid, CreateBaseClassModal, BaseClassDetail view with StructureTabs, InstanceListTable, enrollment code system, and API routes with proper security.",
+      "reasoning": "This task involves creating multiple UI components and database interactions for managing educational content. It requires implementing CRUD operations, form validation, and a code generation system. While complex, it follows standard patterns for data management applications with predictable workflows."
+    },
+    {
+      "taskId": 9,
+      "taskTitle": "Generative Course Designer",
+      "complexityScore": 8,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down the Generative Course Designer implementation into detailed subtasks covering the SmartCanvas visualization, ChatGenerateSidebar, AI prompt engineering for course generation, adaptive sequence generation, storage API, and course editing functionality.",
+      "reasoning": "This task involves complex AI integration for course generation with sophisticated prompt engineering. It requires building a visual canvas for course structure, natural language processing for teacher inputs, and adaptive sequence generation. The system needs to handle complex educational structures and provide intuitive editing capabilities."
+    },
+    {
+      "taskId": 10,
+      "taskTitle": "Lesson Studio Implementation",
+      "complexityScore": 8,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Divide the Lesson Studio implementation into specific subtasks covering the RichTextEditor component, AI-powered content generation, MediaAssetsPanel, 'insert media' functionality, multimodal accessibility output generation, and API routes with proper security.",
+      "reasoning": "This task involves building a sophisticated rich text editor with AI-powered content generation capabilities. It requires handling multiple media types, implementing accessibility features, and creating a complex UI. The system needs to integrate with AI services for generating various content types and ensure proper security controls."
+    },
+    {
+      "taskId": 11,
+      "taskTitle": "Assessment Builder and Feedback Engine",
+      "complexityScore": 9,
+      "recommendedSubtasks": 7,
+      "expansionPrompt": "Break down the Assessment Builder implementation into detailed subtasks covering the QuestionBankTable, AI-powered quiz generation for different question types, RubricForm component, automated grading system, integrity checking, personalized feedback generation, and API routes with proper security.",
+      "reasoning": "This task involves building a complex assessment system with multiple question types, automated grading, and integrity checking. It requires sophisticated AI integration for grading subjective responses and generating personalized feedback. The system needs to handle different assessment formats and ensure academic integrity."
+    },
+    {
+      "taskId": 12,
+      "taskTitle": "Study Space Core Implementation",
+      "complexityScore": 8,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Divide the Study Space implementation into specific subtasks covering the NoteEditor, MindMapCanvas, PodcastPlayer, Knowledge-Base Chat, Mind-Map Generator, Audio Teaching Podcast Creator, Smart Note-Taking system, collaborative features, and API routes with proper security.",
+      "reasoning": "This task involves building multiple complex components for a comprehensive study companion. It requires implementing various AI-powered features like mind map generation, podcast creation, and smart note-taking. The system needs to integrate with the knowledge base and support collaborative functionality."
+    },
+    {
+      "taskId": 13,
+      "taskTitle": "Teacher Tools Implementation",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down the Teacher Tools implementation into detailed subtasks covering the ToolLibrary component, individual tool implementations, dedicated sidebar workflows, API endpoints, job tracking system, and storage of generated outputs with proper tenant isolation.",
+      "reasoning": "This task involves implementing multiple AI-powered tools for teachers with consistent interfaces. While each tool has similar patterns, the variety and number of tools increase complexity. The system needs to handle job tracking, real-time updates, and proper storage of generated content."
+    },
+    {
+      "taskId": 14,
+      "taskTitle": "Mastery Tracking and Competency System",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide the Mastery Tracking implementation into specific subtasks covering the Progress Dashboard with CompetencyRingChart and StreakTracker, real-time dashboards, automated micro-credentials system, predictive at-risk alerts, BadgeGallery and CertificateViewer components, and API routes with proper security.",
+      "reasoning": "This task involves building a sophisticated tracking system with data visualization, predictive analytics, and credential management. It requires implementing complex charts, badge issuance logic, and machine learning models for at-risk predictions. The system needs to handle real-time updates and provide intuitive visualizations."
+    },
+    {
+      "taskId": 15,
+      "taskTitle": "Gradebook and Analytics Implementation",
+      "complexityScore": 8,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down the Gradebook implementation into detailed subtasks covering the StudentHeatmap and BulkFeedbackDrawer components, customizable weightings and scoring, live grade tracking, AI-driven rubric builder, predictive analytics, SIS integration, and API routes with proper security.",
+      "reasoning": "This task involves building a complex gradebook system with advanced analytics, customizable scoring, and external integrations. It requires implementing sophisticated data visualization, predictive models, and integration with Student Information Systems. The system needs to handle complex calculations and provide real-time updates."
+    },
+    {
+      "taskId": 16,
+      "taskTitle": "Personalization and Adaptive Learning",
+      "complexityScore": 9,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Divide the Personalization and Adaptive Learning implementation into specific subtasks covering continuous adaptivity, goal-driven pathway replanning, personalized dashboards, targeted remediation and enrichment system, and API routes with proper security.",
+      "reasoning": "This task involves building a sophisticated adaptive learning system that dynamically adjusts content based on learner performance. It requires complex algorithms for personalization, pathway planning, and targeted interventions. The system needs to integrate with multiple components and handle complex educational decision-making."
+    },
+    {
+      "taskId": 17,
+      "taskTitle": "Interoperability and Standards Compliance",
+      "complexityScore": 8,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down the Interoperability implementation into detailed subtasks covering LTI 1.3 Tool Provider support, OneRoster 1.2 API, Caliper Analytics, SCORM export, AI Skills Marketplace architecture, custom model fine-tuning interface, and API documentation.",
+      "reasoning": "This task involves implementing multiple education technology standards and creating a secure plug-in system. It requires deep understanding of various protocols and standards like LTI, OneRoster, and SCORM. The system needs to handle secure third-party integrations and provide comprehensive documentation."
+    },
+    {
+      "taskId": 18,
+      "taskTitle": "Security, Governance, and Compliance",
+      "complexityScore": 9,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Divide the Security and Compliance implementation into specific subtasks covering audit logging, federated tenant architecture, FERPA/GDPR/COPPA compliance features, data residency controls, security dashboard, and data export/deletion capabilities.",
+      "reasoning": "This task involves implementing critical security features and ensuring compliance with multiple regulations. It requires sophisticated audit logging, tenant isolation, and data privacy controls. The system needs to handle complex compliance requirements while maintaining security and performance."
+    },
+    {
+      "taskId": 19,
+      "taskTitle": "Performance Optimization and Deployment",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down the Performance Optimization implementation into detailed subtasks covering code splitting and lazy loading, database query optimization, image optimization, server-side rendering, Vercel deployment, CI/CD pipelines, monitoring and logging, and horizontal scaling.",
+      "reasoning": "This task involves optimizing application performance across multiple dimensions and preparing for production deployment. It requires implementing various optimization techniques, configuring deployment environments, and setting up monitoring systems. The task is complex due to its broad scope but follows established patterns."
+    },
+    {
+      "taskId": 20,
+      "taskTitle": "Testing, Documentation, and Launch Preparation",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide the Testing and Documentation implementation into specific subtasks covering unit testing, integration testing, accessibility testing, security audits, user documentation, administrator guides, training materials, support systems, and launch preparations.",
+      "reasoning": "This task involves comprehensive testing across multiple dimensions, creating extensive documentation, and preparing for launch. It requires implementing various testing methodologies, creating user guides, and setting up support systems. The task is complex due to its broad scope and critical importance for launch readiness."
+    },
+    {
+      "taskId": 21,
+      "taskTitle": "Implement Student-Facing Course Player UI",
+      "complexityScore": 8,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down the Course Player UI implementation into detailed subtasks covering the main layout, sidebar navigation, content viewer, assessment integration, progress tracking, adaptive features, and accessibility compliance.",
+      "reasoning": "This task involves building a comprehensive UI for students to interact with course content. It requires implementing multiple complex components that need to work together seamlessly. The system must handle rich content rendering, assessment integration, progress tracking, and adaptive features while ensuring accessibility compliance."
+    }
+  ]
+}
