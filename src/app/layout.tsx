@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { UIContextProvider } from "@/context/UIContext";
+import { LunaContextRegistration } from "@/components/providers/LunaContextRegistration";
 import AppShell from "@/components/layout/AppShell";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
@@ -42,7 +43,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <UIContextProvider>
-            <AppShell>{children}</AppShell>
+            <LunaContextRegistration>
+              <AppShell>{children}</AppShell>
+            </LunaContextRegistration>
           </UIContextProvider>
         </ThemeProvider>
       </body>
