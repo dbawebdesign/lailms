@@ -13,6 +13,7 @@ interface LunaContextElementProps {
   metadata?: Record<string, any>;
   parentId?: string;
   registerEvents?: boolean;
+  actionable?: boolean; // Whether this component can be controlled by Luna
 }
 
 /**
@@ -27,7 +28,8 @@ const LunaContextElement: React.FC<LunaContextElementProps> = ({
   state = {},
   metadata = {},
   parentId,
-  registerEvents = false
+  registerEvents = false,
+  actionable = true
 }) => {
   const componentRef = useRef<HTMLDivElement>(null);
   const [componentId, setComponentId] = useState<string | null>(null);
@@ -96,17 +98,27 @@ const LunaContextElement: React.FC<LunaContextElementProps> = ({
     }
   };
 
-  // Add event handlers if registerEvents is true
-  const eventHandlers = registerEvents
-    ? {
-        onClick: handleInteraction,
-        onFocus: handleFocus,
-        onBlur: handleBlur
-      }
-    : {};
+  // Only add event listeners if registerEvents is true
+  const eventProps = registerEvents ? {
+    onClick: handleInteraction,
+    onFocus: handleFocus,
+    onBlur: handleBlur
+  } : {};
+
+  // Data attributes for action listener to find this component
+  const dataAttributes = actionable && componentId ? {
+    'data-luna-id': componentId,
+    'data-luna-type': type,
+    'data-luna-role': role,
+    'data-luna-actionable': 'true'
+  } : {};
 
   return (
-    <div ref={componentRef} {...eventHandlers}>
+    <div 
+      ref={componentRef}
+      {...eventProps}
+      {...dataAttributes}
+    >
       {children}
     </div>
   );

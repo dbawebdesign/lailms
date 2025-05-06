@@ -157,12 +157,24 @@ export function LunaAIChat() {
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `API error: ${response.status}`);
+      // Check if response is ok and contains valid JSON
+      let data;
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          // Handle non-JSON responses (like HTML error pages)
+          const text = await response.text();
+          throw new Error(`Received non-JSON response: Status ${response.status}`);
+        }
+      } catch (parseError) {
+        throw new Error(`Failed to parse response: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `API error: ${response.status}`);
+      }
       
       // Add assistant message to history
       messageHistory.current.push({ role: 'assistant', content: data.response });
@@ -203,7 +215,7 @@ export function LunaAIChat() {
           {
             id: uuidv4(),
             role: 'assistant',
-            content: `Sorry, I encountered an error: ${message}. Please try again.`,
+            content: `Sorry, I encountered an error while processing your request. Technical details: ${message}. Please try again later.`,
             timestamp: new Date(),
             persona: currentPersona
           }
