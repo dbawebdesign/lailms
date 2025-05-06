@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, ReactNode } from "react";
 interface UIContextProps {
   isNavCollapsed: boolean;
   toggleNavCollapsed: () => void;
+  setNavCollapsed: (isCollapsed: boolean) => void;
   isPanelVisible: boolean;
   togglePanelVisible: () => void;
   setPanelVisible: (isVisible: boolean) => void;
@@ -22,6 +23,10 @@ export const UIContextProvider: React.FC<{ children: ReactNode }> = ({
     setIsNavCollapsed(!isNavCollapsed);
   };
 
+  const setNavCollapsed = (isCollapsed: boolean) => {
+    setIsNavCollapsed(isCollapsed);
+  };
+
   const togglePanelVisible = () => {
     setIsPanelVisible(!isPanelVisible);
   };
@@ -35,6 +40,7 @@ export const UIContextProvider: React.FC<{ children: ReactNode }> = ({
       value={{
         isNavCollapsed,
         toggleNavCollapsed,
+        setNavCollapsed,
         isPanelVisible,
         togglePanelVisible,
         setPanelVisible,
