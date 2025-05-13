@@ -32,13 +32,13 @@ function mapDbToUi(dbClass: DbBaseClass): BaseClass {
 
 interface RouteParams {
   params: {
-    id: string; // This is base_class_id
+    baseClassId: string; 
   }
 }
 
 // GET a single base class by ID
 export async function GET(request: Request, { params }: RouteParams) {
-  const { id: baseClassId } = params;
+  const { baseClassId } = params;
   const supabase = createRouteHandlerClient({ cookies });
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -47,16 +47,16 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 
   try {
-    const { data: memberData, error: memberError } = await supabase
-      .from('members')
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
       .select('organisation_id')
-      .eq('id', user.id)
+      .eq('user_id', user.id)
       .single();
 
-    if (memberError || !memberData || !memberData.organisation_id) {
+    if (profileError || !profileData || !profileData.organisation_id) {
       return NextResponse.json({ error: 'User organisation not found.' }, { status: 403 });
     }
-    const organisationId = memberData.organisation_id;
+    const organisationId = profileData.organisation_id;
 
     const { data, error } = await supabase
       .from('base_classes')
@@ -78,7 +78,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
 // UPDATE a base class by ID
 export async function PUT(request: Request, { params }: RouteParams) {
-  const { id: baseClassId } = params;
+  const { baseClassId } = params;
   const supabase = createRouteHandlerClient({ cookies });
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -91,16 +91,16 @@ export async function PUT(request: Request, { params }: RouteParams) {
     const { name, description, subject, gradeLevel, lengthInWeeks, ...otherSettings } = body;
 
     // Fetch user's organisation_id to ensure they can only update within their org
-    const { data: memberData, error: memberError } = await supabase
-      .from('members')
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
       .select('organisation_id')
-      .eq('id', user.id)
+      .eq('user_id', user.id)
       .single();
 
-    if (memberError || !memberData || !memberData.organisation_id) {
+    if (profileError || !profileData || !profileData.organisation_id) {
       return NextResponse.json({ error: 'User organisation not found for update.' }, { status: 403 });
     }
-    const organisationId = memberData.organisation_id;
+    const organisationId = profileData.organisation_id;
 
     // Fetch existing settings to merge, as PUT should ideally merge settings JSONB
     const { data: existingClass, error: fetchError } = await supabase
@@ -168,7 +168,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
 // DELETE a base class by ID
 export async function DELETE(request: Request, { params }: RouteParams) {
-  const { id: baseClassId } = params;
+  const { baseClassId } = params;
   const supabase = createRouteHandlerClient({ cookies });
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -177,16 +177,16 @@ export async function DELETE(request: Request, { params }: RouteParams) {
   }
 
   try {
-    const { data: memberData, error: memberError } = await supabase
-      .from('members')
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
       .select('organisation_id')
-      .eq('id', user.id)
+      .eq('user_id', user.id)
       .single();
 
-    if (memberError || !memberData || !memberData.organisation_id) {
+    if (profileError || !profileData || !profileData.organisation_id) {
       return NextResponse.json({ error: 'User organisation not found for delete operation.' }, { status: 403 });
     }
-    const organisationId = memberData.organisation_id;
+    const organisationId = profileData.organisation_id;
 
     // TODO: Consider implications of deleting a base class with active instances.
     // Should it be archived instead? Or cascade delete instances (current schema has ON DELETE CASCADE for instances)?

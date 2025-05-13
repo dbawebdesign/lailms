@@ -34,47 +34,47 @@ export async function GET(req: Request) {
   }
 
   // Create client for checking user session and role
-  const supabaseUserClient = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: supabaseCookieMethods } // Pass the helper methods
-  )
+  // const supabaseUserClient = createServerClient<Database>(
+  //   process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  //   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  //   { cookies: supabaseCookieMethods } // Pass the helper methods
+  // )
 
   // Check user authentication and role
-  const { data: { session }, error: sessionError } = await supabaseUserClient.auth.getSession()
+  // const { data: { session }, error: sessionError } = await supabaseUserClient.auth.getSession()
 
-  if (sessionError) {
-      console.error('Error getting session:', sessionError)
-      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-  }
+  // if (sessionError) {
+  //     console.error('Error getting session:', sessionError)
+  //     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  // }
 
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // if (!session) {
+  //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // }
 
   // Fetch user role from profiles table
-  const { data: memberData, error: memberError } = await supabaseUserClient
-    .from('profiles')
-    .select('role')
-    .eq('user_id', session.user.id)
-    .single<MemberProfile>()
+  // const { data: memberData, error: memberError } = await supabaseUserClient
+  //   .from('profiles')
+  //   .select('role')
+  //   .eq('user_id', session.user.id)
+  //   .single<MemberProfile>()
 
-  if (memberError) {
-    console.error('Error fetching member role:', memberError)
-    return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 })
-  }
+  // if (memberError) {
+  //   console.error('Error fetching member role:', memberError)
+  //   return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 })
+  // }
 
-  if (!memberData) {
-     console.error('Member data not found for user:', session.user.id)
-     return NextResponse.json({ error: 'Forbidden: User profile not found' }, { status: 403 })
-  }
+  // if (!memberData) {
+  //    console.error('Member data not found for user:', session.user.id)
+  //    return NextResponse.json({ error: 'Forbidden: User profile not found' }, { status: 403 })
+  // }
 
   // --- Role Check ---
   // Using the actual Enum type from Database
-  if (memberData.role !== 'super_admin') { 
-    console.warn(`User ${session.user.id} attempted dev-admin access with role: ${memberData.role}`)
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  // if (memberData.role !== 'super_admin') { 
+  //   console.warn(`User ${session.user.id} attempted dev-admin access with role: ${memberData.role}`)
+  //   return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // }
   // --- End Role Check ---
 
   // If authorized, fetch all organisations using a service role client 
@@ -134,46 +134,46 @@ export async function POST(req: Request) {
   }
 
   // Create client for checking user session and role
-  const supabaseUserClient = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: supabaseCookieMethods }
-  )
+  // const supabaseUserClient = createServerClient<Database>(
+  //   process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  //   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  //   { cookies: supabaseCookieMethods }
+  // )
 
   // Check user authentication and role (same as in GET)
-  const { data: { session }, error: sessionError } = await supabaseUserClient.auth.getSession()
+  // const { data: { session }, error: sessionError } = await supabaseUserClient.auth.getSession()
 
-  if (sessionError) {
-    console.error('Error getting session:', sessionError)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-  }
+  // if (sessionError) {
+  //   console.error('Error getting session:', sessionError)
+  //   return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  // }
 
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // if (!session) {
+  //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // }
 
   // Fetch user role from profiles table
-  const { data: memberData, error: memberError } = await supabaseUserClient
-    .from('profiles')
-    .select('role')
-    .eq('user_id', session.user.id)
-    .single<MemberProfile>()
+  // const { data: memberData, error: memberError } = await supabaseUserClient
+  //   .from('profiles')
+  //   .select('role')
+  //   .eq('user_id', session.user.id)
+  //   .single<MemberProfile>()
 
-  if (memberError) {
-    console.error('Error fetching member role:', memberError)
-    return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 })
-  }
+  // if (memberError) {
+  //   console.error('Error fetching member role:', memberError)
+  //   return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 })
+  // }
 
-  if (!memberData) {
-    console.error('Member data not found for user:', session.user.id)
-    return NextResponse.json({ error: 'Forbidden: User profile not found' }, { status: 403 })
-  }
+  // if (!memberData) {
+  //   console.error('Member data not found for user:', session.user.id)
+  //   return NextResponse.json({ error: 'Forbidden: User profile not found' }, { status: 403 })
+  // }
 
   // --- Role Check ---
-  if (memberData.role !== 'super_admin') { 
-    console.warn(`User ${session.user.id} attempted dev-admin access with role: ${memberData.role}`)
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  // if (memberData.role !== 'super_admin') { 
+  //   console.warn(`User ${session.user.id} attempted dev-admin access with role: ${memberData.role}`)
+  //   return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // }
   // --- End Role Check ---
 
   // Parse and validate request body

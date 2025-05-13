@@ -6,13 +6,34 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Bot, User, ExternalLink, Mic, MicOff } from 'lucide-react';
+import { Loader2, Bot, User, ExternalLink, Mic, MicOff, Wand2, Presentation, Wrench } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { useRouter } from 'next/navigation';
+import { CourseOutlineMessage } from '@/components/luna/CourseOutlineMessage';
 
-// Persona types
-export type PersonaType = 'tutor' | 'peer' | 'examCoach';
+// Define a structure for the course outline from the API
+interface CourseOutlineModule {
+  title: string;
+  topics: string[];
+  suggestedLessons?: { title: string; objective?: string }[];
+  suggestedAssessments?: { type: string; description?: string }[];
+}
 
-// Message with citations interface
+interface GeneratedCourseOutline {
+  baseClassName?: string;
+  description?: string;
+  subject?: string;
+  gradeLevel?: string;
+  lengthInWeeks?: number;
+  modules: CourseOutlineModule[];
+}
+
+// Updated Persona types to include teacher roles
+export type StudentPersonaType = 'tutor' | 'peer' | 'examCoach';
+export type TeacherPersonaType = 'classCoPilot' | 'instructionalStrategist' | 'platformGuide';
+export type PersonaType = StudentPersonaType | TeacherPersonaType;
+
+// Message interface might need updates for different message types (e.g., outline)
 export interface Citation {
   id: string;
   title: string;
@@ -21,45 +42,47 @@ export interface Citation {
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system'; // Added system role
   content: string;
   timestamp: Date;
+  persona?: PersonaType; // Track which persona generated the message
+  // Specific data payloads for different message types
   citations?: Citation[];
   isLoading?: boolean;
-  persona?: PersonaType;
+  isOutline?: boolean; // Flag to indicate this message contains an outline
+  outlineData?: GeneratedCourseOutline; // The actual outline data
+  actions?: Array<{ label: string; action: () => void }>; // For buttons like "Save", "Open"
 }
 
 /**
- * Luna AI Chat component that uses the UI context system
- * Implements persona selection, context-aware responses, and citation support
+ * Luna AI Chat component - Updated for Teacher Personas
  */
 export function LunaAIChat() {
+  const router = useRouter();
   const [userMessage, setUserMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [currentPersona, setCurrentPersona] = useState<PersonaType>('tutor');
+  // TODO: Determine user role (student/teacher) to set default persona
+  const [currentUserRole, setCurrentUserRole] = useState<'student' | 'teacher'>('teacher'); // Placeholder
+  const defaultPersona = currentUserRole === 'teacher' ? 'classCoPilot' : 'tutor';
+  const [currentPersona, setCurrentPersona] = useState<PersonaType>(defaultPersona);
   
-  // Message history for API calls
   const messageHistory = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  
-  // Get the current UI context
   const { context, isReady } = useLunaContext();
 
-  // Auto scroll to the bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Auto-focus the input field when component mounts
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  // Add welcome message based on persona when component mounts
+  // Add initial welcome message
   useEffect(() => {
     if (messages.length === 0) {
       setMessages([{
@@ -70,101 +93,120 @@ export function LunaAIChat() {
         persona: currentPersona
       }]);
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
+
+  // Define Personas Data (including teacher ones)
+  const studentPersonas = [
+    { id: 'tutor', name: 'Tutor', icon: <Bot size={14} /> },
+    { id: 'peer', name: 'Peer Buddy', icon: <User size={14} /> },
+    { id: 'examCoach', name: 'Exam Coach', icon: <Loader2 size={14} /> } // Re-using Loader2 for now
+  ];
+  const teacherPersonas = [
+    { id: 'classCoPilot', name: 'Class Co-Pilot', icon: <Wand2 size={14} /> },
+    { id: 'instructionalStrategist', name: 'Instructional Strategist', icon: <Presentation size={14} /> },
+    { id: 'platformGuide', name: 'Platform Guide', icon: <Wrench size={14} /> }
+  ];
+
+  // TODO: Filter personas based on currentUserRole
+  const availablePersonas = currentUserRole === 'teacher' ? teacherPersonas : studentPersonas;
 
   const getWelcomeMessage = (persona: PersonaType): string => {
     switch (persona) {
-      case 'tutor':
-        return "Hello! I'm Luna, your AI tutor. How can I help with your learning today?";
-      case 'peer':
-        return "Hi there! I'm Luna, your peer learning buddy. Let's study together! What are you working on?";
-      case 'examCoach':
-        return "Welcome! I'm Luna, your exam coach. Need help preparing for a test or practicing questions?";
-      default:
-        return "Hello! I'm Luna, your AI assistant. How can I help you today?";
+      // Student Personas
+      case 'tutor': return "Hello! I'm Luna, your AI tutor. How can I help?";
+      case 'peer': return "Hi there! I'm Luna, your peer learning buddy. What are you working on?";
+      case 'examCoach': return "Welcome! I'm Luna, your exam coach. Ready to practice?";
+      // Teacher Personas
+      case 'classCoPilot': return "Hello! I'm the Class Co-Pilot. Describe the course you want to design, and I'll help generate an outline.";
+      case 'instructionalStrategist': return "Hi! As your Instructional Strategist, I can help with teaching methods, differentiation, and assessment ideas. What's on your mind?";
+      case 'platformGuide': return "Welcome! Need help using LearnologyAI? Ask me anything about the platform features.";
+      default: return "Hello! I'm Luna. How can I assist?";
     }
   };
-  
-  // Handle persona change
+
   const handlePersonaChange = (persona: PersonaType) => {
     setCurrentPersona(persona);
-    
-    // Add a system message about the persona change
     setMessages(prev => [
       ...prev,
       {
         id: uuidv4(),
+        role: 'system', // Use system role for persona change notification
+        content: `Switched to ${availablePersonas.find(p => p.id === persona)?.name ?? 'assistant'} mode.`,
+        timestamp: new Date(),
+      },
+      {
+        id: uuidv4(),
         role: 'assistant',
-        content: `I've switched to ${persona === 'tutor' ? 'Tutor' : persona === 'peer' ? 'Peer Buddy' : 'Exam Coach'} mode. ${getWelcomeMessage(persona)}`,
+        content: getWelcomeMessage(persona),
         timestamp: new Date(),
         persona
       }
     ]);
+    messageHistory.current = []; // Clear history on persona change
   };
   
-  // Handle sending a message to Luna
   const handleSendMessage = async () => {
-    if (!userMessage.trim() || !context || isLoading) return;
+    if (!userMessage.trim() || isLoading || (currentUserRole === 'student' && !isReady)) return; // Student needs context ready
     
-    const currentMessage = userMessage.trim();
-    
-    // Create a new user message
-    const userMsg: ChatMessage = {
-      id: uuidv4(),
-      role: 'user',
-      content: currentMessage,
-      timestamp: new Date()
-    };
-    
-    // Add user message to conversation
+    const currentInput = userMessage.trim();
+    const userMsg: ChatMessage = { id: uuidv4(), role: 'user', content: currentInput, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
-    
-    // Clear input
     setUserMessage('');
-    
-    // Set loading state
     setIsLoading(true);
     setError(null);
     
-    // Add temporary loading message
     const tempBotMessageId = uuidv4();
-    setMessages(prev => [
-      ...prev,
-      {
-        id: tempBotMessageId,
-        role: 'assistant',
-        content: '...',
-        timestamp: new Date(),
-        isLoading: true,
-        persona: currentPersona
-      }
-    ]);
-    
-    // Add message to history for API
-    messageHistory.current.push({ role: 'user', content: currentMessage });
-    
+    setMessages(prev => [...prev, { id: tempBotMessageId, role: 'assistant', content: '', timestamp: new Date(), isLoading: true, persona: currentPersona }]);
+
     try {
-      // Send user message and current context to the backend API
+      let assistantResponse: ChatMessage;
+
+      if (currentPersona === 'classCoPilot') {
+        // --- Class Co-Pilot Logic --- 
+        const response = await fetch('/api/teach/generate-course-outline', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: currentInput }),
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `API Error: ${response.status}`);
+        }
+        const outlineData: GeneratedCourseOutline = await response.json();
+        
+        // Store outline and prepare message with actions
+        assistantResponse = {
+          id: uuidv4(),
+          role: 'assistant',
+          content: `Okay, I've generated a draft outline for "${outlineData.baseClassName || 'your course'}". You can save this as a base class or open it in the designer for more detailed editing.`,
+          timestamp: new Date(),
+          persona: currentPersona,
+          isOutline: true,
+          outlineData: outlineData,
+          // Actions defined here will be rendered with the message
+          actions: [
+            { label: 'Save Outline', action: () => handleSaveOutline(outlineData) },
+            { label: 'Open in Designer', action: () => handleOpenInDesigner(outlineData) },
+          ]
+        };
+        // Note: messageHistory is NOT updated for this specific API call currently
+
+      } else {
+        // --- Default Persona Logic (Tutor, Peer, Coach, etc.) --- 
+        messageHistory.current.push({ role: 'user', content: currentInput });
       const response = await fetch('/api/luna/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          message: currentMessage, 
-          context, 
-          messages: messageHistory.current 
-        }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: currentInput, context, messages: messageHistory.current, persona: currentPersona }), // Pass persona to backend
       });
 
-      // Check if response is ok and contains valid JSON
       let data;
       try {
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
           data = await response.json();
         } else {
-          // Handle non-JSON responses (like HTML error pages)
           const text = await response.text();
           throw new Error(`Received non-JSON response: Status ${response.status}`);
         }
@@ -175,65 +217,154 @@ export function LunaAIChat() {
       if (!response.ok) {
         throw new Error(data.error || `API error: ${response.status}`);
       }
-      
-      // Add assistant message to history
       messageHistory.current.push({ role: 'assistant', content: data.response });
       
-      // Remove temporary loading message and add the real response
-      setMessages(prev => {
-        // Filter out the loading message
-        const filteredMessages = prev.filter(msg => msg.id !== tempBotMessageId);
-        
-        // Add the assistant's response
-        return [
-          ...filteredMessages,
-          {
+        assistantResponse = {
             id: uuidv4(),
             role: 'assistant',
             content: data.response,
             timestamp: new Date(),
             persona: currentPersona,
-            // Add citations if they exist in the response
             citations: data.citations || []
+        };
           }
-        ];
-      });
+
+      // Update messages state with the final assistant response
+      setMessages(prev => prev.filter(msg => msg.id !== tempBotMessageId).concat(assistantResponse));
 
     } catch (err) {
-      console.error("Failed to get response from Luna:", err);
+      console.error("Chat Error:", err);
       const message = err instanceof Error ? err.message : "An unknown error occurred";
       setError(`Error: ${message}`);
-      
-      // Remove temporary loading message and add error message
-      setMessages(prev => {
-        // Filter out the loading message
-        const filteredMessages = prev.filter(msg => msg.id !== tempBotMessageId);
-        
-        // Add an error message
-        return [
-          ...filteredMessages,
-          {
-            id: uuidv4(),
-            role: 'assistant',
-            content: `Sorry, I encountered an error while processing your request. Technical details: ${message}. Please try again later.`,
-            timestamp: new Date(),
-            persona: currentPersona
-          }
-        ];
-      });
+      setMessages(prev => prev.filter(msg => msg.id !== tempBotMessageId).concat({
+        id: uuidv4(), role: 'assistant', content: `Sorry, an error occurred: ${message}`, timestamp: new Date(), persona: currentPersona
+      }));
     } finally {
       setIsLoading(false);
     }
   };
   
-  // Handle Enter key press in input
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !isLoading) {
       handleSendMessage();
     }
   };
 
-  // Toggle voice recording (placeholder implementation)
+  // --- Action Handlers for Class Co-Pilot --- 
+
+  const handleSaveOutline = async (outline: GeneratedCourseOutline | undefined) => {
+    if (!outline) return null;
+    console.log("Attempting to save outline:", outline);
+    setIsLoading(true); // Show loading state for the save action
+    let newBaseClassId: string | null = null;
+    try {
+      const baseClassData = {
+        name: outline.baseClassName || "Untitled Generated Course",
+        description: outline.description,
+        subject: outline.subject,
+        gradeLevel: outline.gradeLevel,
+        lengthInWeeks: outline.lengthInWeeks || 10,
+        // Store the full outline in settings for retrieval by the designer
+        settings: { 
+          generatedOutline: {
+            modules: outline.modules,
+            // Include any other outline-specific data we want to preserve
+            // that isn't already covered in the base fields
+          } 
+        }
+      };
+
+      const response = await fetch('/api/teach/base-classes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(baseClassData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+        
+        if (response.status === 401) {
+          throw new Error('Authentication required. Please log in and try again.');
+        } else if (response.status === 403) {
+          throw new Error('You do not have permission to create courses. Please contact your administrator.');
+        } else {
+          throw new Error(errorData.error || `Server error (${response.status}): Failed to save base class`);
+        }
+      }
+      
+      const newBaseClass = await response.json();
+      newBaseClassId = newBaseClass.id;
+      
+      // Add confirmation message to chat
+      setMessages(prev => [...prev, {
+        id: uuidv4(),
+        role: 'system',
+        content: `✅ Outline saved as Base Class: "${newBaseClass.name}" (ID: ${newBaseClassId}). You can now open it in the designer.`, 
+        timestamp: new Date()
+      }]);
+
+    } catch (error: any) {
+      console.error("Error saving base class:", error);
+      setMessages(prev => [...prev, {
+        id: uuidv4(),
+        role: 'system', // Use system role for error
+        content: `❌ Error saving outline: ${error.message}`,
+        timestamp: new Date()
+      }]);
+      throw error; // Re-throw to allow the calling function to handle it
+    } finally {
+      setIsLoading(false);
+    }
+    return newBaseClassId; // Return ID for potential immediate navigation
+  };
+
+  const handleOpenInDesigner = async (outline: GeneratedCourseOutline | undefined) => {
+    if (!outline) return;
+    console.log("Attempting to open outline in designer:", outline);
+    
+    // Save the outline first, then navigate with ID
+    setMessages(prev => [...prev, {
+      id: uuidv4(),
+      role: 'system',
+      content: `Saving the outline before opening in the designer...`,
+      timestamp: new Date()
+    }]);
+    
+    try {
+      const savedId = await handleSaveOutline(outline);
+      
+      if (savedId) {
+        // Add confirmation message to chat
+        setMessages(prev => [...prev, {
+          id: uuidv4(),
+          role: 'system',
+          content: `✅ Successfully saved and opening in designer...`,
+          timestamp: new Date()
+        }]);
+        
+        // Add query parameter to ensure compatibility with both route patterns
+        router.push(`/teach/base-classes/${savedId}?id=${savedId}`);
+      } else {
+        // Handle case where saving succeeded but no ID was returned
+        setMessages(prev => [...prev, {
+          id: uuidv4(),
+          role: 'system',
+          content: `⚠️ The outline was saved but couldn't be opened in the designer. Try accessing it from the Course Designer page.`,
+          timestamp: new Date()
+        }]);
+      }
+    } catch (error: any) {
+      // Handle specific error cases
+      setMessages(prev => [...prev, {
+        id: uuidv4(),
+        role: 'system',
+        content: `❌ Error: ${error.message || 'Failed to save the outline. Please try again or check your authentication status.'}`,
+        timestamp: new Date()
+      }]);
+    }
+  };
+
+  // --- Voice Recording Placeholder --- 
   const toggleRecording = () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       alert('Your browser does not support voice recording');
@@ -258,7 +389,7 @@ export function LunaAIChat() {
     }
   };
 
-  // Render markdown content
+  // --- Message Formatting --- 
   const formatMessageContent = (content: string) => {
     // This is a placeholder - ideally use a markdown parser like react-markdown
     return content.split('\n').map((line, i) => (
@@ -268,25 +399,22 @@ export function LunaAIChat() {
     ));
   };
 
+  // --- Render --- 
   return (
     <div className="flex flex-col h-full">
       {/* Persona Selector */}
-      <div className="flex border-b p-1 bg-muted/10">
-        {[
-          { id: 'tutor', name: 'Tutor', icon: <Bot size={14} /> },
-          { id: 'peer', name: 'Peer Buddy', icon: <User size={14} /> },
-          { id: 'examCoach', name: 'Exam Coach', icon: <Loader2 size={14} /> }
-        ].map((persona) => (
+      <div className="flex border-b p-1 bg-muted/10 flex-wrap">
+        {availablePersonas.map((persona) => (
           <Button
             key={persona.id}
             variant={currentPersona === persona.id ? "default" : "ghost"}
             size="sm"
-            className={`flex-1 text-xs gap-1 h-8 ${currentPersona === persona.id ? "" : "opacity-70"}`}
+            className={`flex-grow md:flex-1 text-xs gap-1 h-8 m-[1px] min-w-[100px] ${currentPersona === persona.id ? "" : "opacity-70"}`}
             title={`Switch to ${persona.name} mode`}
             onClick={() => handlePersonaChange(persona.id as PersonaType)}
           >
             {persona.icon}
-            <span>{persona.name}</span>
+            <span className="truncate">{persona.name}</span>
           </Button>
         ))}
       </div>
@@ -298,28 +426,50 @@ export function LunaAIChat() {
             {messages.map((message) => (
               <div 
                 key={message.id}
-                className={`flex gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex gap-2 ${message.role === 'user' ? 'justify-end' : message.role === 'system' ? 'justify-center' : 'justify-start'}`}
               >
-                {/* Avatar/Icon for the assistant */}
                 {message.role === 'assistant' && (
                   <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground flex-shrink-0">
                     <Bot size={16} />
                   </div>
                 )}
                 
-                {/* Message bubble */}
+                {message.role === 'system' ? (
+                  <div className="text-center w-full">
+                    <span className="text-xs text-muted-foreground italic px-2 py-1 bg-muted rounded-full">{message.content}</span>
+                  </div>
+                ) : (
                 <div 
-                  className={`max-w-[80%] rounded-lg p-3 ${
-                    message.role === 'user' 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted text-foreground'
-                  } ${message.isLoading ? 'animate-pulse' : ''}`}
+                    className={`max-w-[85%] rounded-lg p-3 ${ message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground' } ${message.isLoading ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                   <div className="text-sm">
-                    {formatMessageContent(message.content)}
+                      {message.isLoading ? (
+                        <div className="flex space-x-1.5">
+                          <div className="h-2 w-2 rounded-full bg-current animate-bounce"></div>
+                          <div className="h-2 w-2 rounded-full bg-current animate-bounce delay-150"></div>
+                          <div className="h-2 w-2 rounded-full bg-current animate-bounce delay-300"></div>
+                        </div>
+                      ) : (
+                        message.isOutline && message.outlineData ? (
+                            <CourseOutlineMessage outline={message.outlineData} />
+                        ) : (
+                            formatMessageContent(message.content)
+                        )
+                      )}
                   </div>
                   
-                  {/* Citations if any */}
+                    {/* Render Action Buttons (Displayed below content/outline) */}
+                    {message.actions && message.actions.length > 0 && (
+                      <div className="mt-3 pt-2 border-t border-muted-foreground/20 flex flex-wrap gap-2">
+                        {message.actions.map((action, index) => (
+                          <Button key={index} size="sm" variant="outline" onClick={action.action} disabled={isLoading}>
+                            {action.label}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Citations (Displayed below content/outline and actions) */}
                   {message.citations && message.citations.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-muted-foreground/20 text-xs">
                       <p className="font-semibold mb-1">Sources:</p>
@@ -347,8 +497,8 @@ export function LunaAIChat() {
                     </div>
                   )}
                 </div>
+                )}
                 
-                {/* Avatar/Icon for the user */}
                 {message.role === 'user' && (
                   <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground flex-shrink-0">
                     <User size={16} />
@@ -356,24 +506,6 @@ export function LunaAIChat() {
                 )}
               </div>
             ))}
-            
-            {/* Loading indicator */}
-            {isLoading && !messages.some(m => m.isLoading) && (
-              <div className="flex gap-2 justify-start">
-                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground flex-shrink-0">
-                  <Bot size={16} />
-                </div>
-                <div className="max-w-[80%] rounded-lg p-3 bg-muted text-foreground animate-pulse">
-                  <div className="flex space-x-2">
-                    <div className="h-2 w-2 rounded-full bg-current animate-bounce"></div>
-                    <div className="h-2 w-2 rounded-full bg-current animate-bounce delay-150"></div>
-                    <div className="h-2 w-2 rounded-full bg-current animate-bounce delay-300"></div>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Error display */}
             {error && (
               <div className="flex justify-start">
                 <div className="p-3 rounded-lg bg-destructive text-destructive-foreground max-w-[80%]">
@@ -381,8 +513,6 @@ export function LunaAIChat() {
                 </div>
               </div>
             )}
-            
-            {/* Invisible element to scroll to */}
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
@@ -397,7 +527,7 @@ export function LunaAIChat() {
             size="icon"
             className="h-10 w-10 rounded-full flex-shrink-0"
             onClick={toggleRecording}
-            disabled={isLoading || !isReady}
+            disabled={isLoading || !isReady || isRecording}
           >
             {isRecording ? <MicOff size={18} className="text-destructive" /> : <Mic size={18} />}
           </Button>
@@ -405,11 +535,11 @@ export function LunaAIChat() {
           <Input
             ref={inputRef}
             type="text"
-            placeholder={`Ask ${currentPersona === 'tutor' ? 'your tutor' : currentPersona === 'peer' ? 'your peer buddy' : 'your exam coach'}...`}
+            placeholder={`Ask ${availablePersonas.find(p => p.id === currentPersona)?.name ?? 'Luna'}...`}
             value={userMessage}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setUserMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isLoading || !isReady || isRecording}
+            disabled={isLoading || (currentUserRole === 'student' && !isReady) || isRecording}
             className="flex-grow focus-visible:ring-primary"
           />
           

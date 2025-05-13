@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { BaseClassCreationData, BaseClass } from '@/types/teach'; // Our frontend type
+import { createClient } from '@supabase/supabase-js';
 
 // Database representation (subset, focusing on what we insert/select)
 interface DbBaseClass {
@@ -29,12 +29,13 @@ function mapDbToUi(dbClass: DbBaseClass): BaseClass {
     gradeLevel: dbClass.settings?.gradeLevel,
     lengthInWeeks: dbClass.settings?.lengthInWeeks ?? 0, // Default to 0 if undefined
     creationDate: dbClass.created_at, // Assuming creationDate in UI is created_at from DB
-    // organisationId: dbClass.organisation_id // if needed on frontend type
+    settings: dbClass.settings || {}, // Pass through settings
   };
 }
 
 export async function GET(request: Request) {
-  const supabase = createRouteHandlerClient({ cookies });
+  // Use createSupabaseServerClient which properly handles cookie management
+  const supabase = createSupabaseServerClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
@@ -43,19 +44,26 @@ export async function GET(request: Request) {
   }
 
   try {
-    // 1. Get the user's organisation_id from the members (or profiles) table
-    const { data: memberData, error: memberError } = await supabase
-      .from('members') // or 'profiles' if that's the primary one linked to auth.users
-      .select('organisation_id')
-      .eq('id', user.id) // or 'user_id' if using profiles table
+    // 1. Get the user's organisation_id AND role from the profiles table
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('organisation_id, role')
+      .eq('user_id', user.id)
       .single();
 
-    if (memberError || !memberData || !memberData.organisation_id) {
-      console.error("API Error fetching member/organisation:", memberError);
+    if (profileError || !profileData || !profileData.organisation_id) {
+      console.error("API Error fetching profile/organisation:", profileError);
       return NextResponse.json({ error: 'User organisation not found or an error occurred.' }, { status: 403 });
     }
 
-    const organisationId = memberData.organisation_id;
+    const organisationId = profileData.organisation_id;
+    const userRole = profileData.role;
+
+    // Check if user is authorized to view base classes (should be a teacher or admin)
+    if (!userRole || (userRole !== 'teacher' && userRole !== 'admin' && userRole !== 'super_admin')) {
+      console.error("API Error: User is not authorized to view base classes. Role:", userRole);
+      return NextResponse.json({ error: 'You do not have permission to view base classes.' }, { status: 403 });
+    }
 
     // 2. Fetch base_classes for that organisation_id
     const { data, error } = await supabase
@@ -79,59 +87,102 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const supabase = createRouteHandlerClient({ cookies });
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    console.error("API Auth Error POST base-classes:", authError);
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+  // Use createSupabaseServerClient which properly handles cookie management
+  const supabase = createSupabaseServerClient();
+  
   try {
-    const body = await request.json() as BaseClassCreationData;
-    
-    // 1. Get the user's organisation_id
-    const { data: memberData, error: memberError } = await supabase
-      .from('members') // or 'profiles'
-      .select('organisation_id')
-      .eq('id', user.id) // or 'user_id'
+    // 1. Verify auth and user profile in one go with service role client
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.error("API Auth Error POST base-classes:", authError);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 2. Get the user's profile
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('user_id, organisation_id, role')
+      .eq('user_id', user.id)
       .single();
 
-    if (memberError || !memberData || !memberData.organisation_id) {
-      console.error("API Error fetching member/organisation for POST:", memberError);
+    if (profileError) {
+      console.error("API Error fetching profile:", profileError);
+      return NextResponse.json({ 
+        error: 'Failed to fetch user profile', 
+        details: profileError.message 
+      }, { status: 500 });
+    }
+
+    if (!profileData || !profileData.organisation_id) {
+      console.error("API Error: User has no organisation_id in profile");
       return NextResponse.json({ error: 'User organisation not found for creation.' }, { status: 403 });
     }
-    const organisationId = memberData.organisation_id;
 
-    // 2. Prepare data for insertion, including structuring the settings JSONB
-    const { name, description, subject, gradeLevel, lengthInWeeks, ...otherBodyData } = body;
+    const organisationId = profileData.organisation_id;
+    const userRole = profileData.role;
+
+    // Check if user is authorized to create base classes (must be a teacher or admin)
+    if (!userRole || (userRole !== 'teacher' && userRole !== 'admin' && userRole !== 'super_admin')) {
+      console.error("API Error: User is not authorized to create base classes. Role:", userRole);
+      return NextResponse.json({ error: 'You do not have permission to create base classes.' }, { status: 403 });
+    }
+
+    // 3. Parse request body
+    const body = await request.json() as BaseClassCreationData;
+    
+    // 4. Use admin role to bypass RLS for trustworthy operations
+    // We've already validated the user has permission above
+    const adminClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
+    
+    // 5. Prepare data for insertion
+    const { name, description, subject, gradeLevel, lengthInWeeks, settings, ...otherBodyData } = body;
     const dbInsertData = {
       organisation_id: organisationId,
+      user_id: user.id,
       name,
       description: description || null,
       settings: {
         subject: subject || undefined,
         gradeLevel: gradeLevel || undefined,
-        lengthInWeeks: lengthInWeeks || undefined, // Ensure it's a number or undefined
-        // any other settings from otherBodyData if they go into JSONB
+        lengthInWeeks: lengthInWeeks || undefined,
+        ...(settings || {}), // Merge any additional settings
       },
-      // created_at and updated_at will be set by Supabase default triggers
     };
 
-    const { data, error } = await supabase
+    console.log("Attempting to insert base class with data:", {
+      ...dbInsertData,
+      userRole,
+      userId: user.id,
+    });
+
+    // Use admin client to bypass RLS
+    const { data, error } = await adminClient
       .from('base_classes')
       .insert(dbInsertData)
-      .select('*') // Select all columns of the newly created row
-      .single(); // Expecting a single row back
+      .select('*')
+      .single();
 
     if (error) {
       console.error("API Error POST base-classes:", error);
+      
+      // Special handling for common errors
+      if (error.code === '42501') {
+        return NextResponse.json({ 
+          error: 'Permission denied: You do not have the required role or organization membership to create base classes.',
+          details: error.message
+        }, { status: 403 });
+      }
+      
       throw error;
     }
 
     if (!data) {
-        console.error("API Error POST base-classes: No data returned after insert");
-        return NextResponse.json({ error: 'Failed to create base class, no data returned.' }, { status: 500 });
+      console.error("API Error POST base-classes: No data returned after insert");
+      return NextResponse.json({ error: 'Failed to create base class, no data returned.' }, { status: 500 });
     }
 
     return NextResponse.json(mapDbToUi(data as DbBaseClass), { status: 201 });
@@ -142,6 +193,9 @@ export async function POST(request: Request) {
     if (error.code === '23505') { // Unique violation
         return NextResponse.json({ error: 'A base class with this name might already exist or another unique constraint was violated.' }, { status: 409 });
     }
-    return NextResponse.json({ error: 'Failed to create base class' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to create base class', 
+      details: error.message || 'Unknown error'
+    }, { status: 500 });
   }
 } 

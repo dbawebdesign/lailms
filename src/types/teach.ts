@@ -6,11 +6,13 @@ export interface BaseClass {
   gradeLevel?: string;  // Optional
   lengthInWeeks: number; // e.g., 1 to 52
   creationDate: string;  // ISO date string
+  settings?: Record<string, any>; // For any additional settings
   // Add other relevant fields later, e.g., status (active, archived)
 }
 
 export interface BaseClassCreationData extends Omit<BaseClass, 'id' | 'creationDate'> {
   // Any specific fields for creation if different, but likely the same as BaseClass minus id/creationDate
+  settings?: Record<string, any>; // Explicitly add settings to fix type issue in route handler
 }
 
 export interface ClassInstance {

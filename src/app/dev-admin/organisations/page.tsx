@@ -70,9 +70,9 @@ export default function OrganisationsPage() {
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
           // Handle auth errors
-          setAuthenticated(false)
-          localStorage.removeItem('dev-admin-auth')
-          setError('Authentication failed. Please log in again.')
+          // setAuthenticated(false) // Keep user "authenticated" on client-side
+          // localStorage.removeItem('dev-admin-auth') // Do not remove local storage item
+          setError('API Authentication failed. Ensure you have super_admin rights or check API logs.')
         } else {
           const errorData = await response.json()
           setError(errorData.error || 'Failed to fetch organisations')

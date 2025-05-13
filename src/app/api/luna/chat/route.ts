@@ -5,14 +5,34 @@ import { z } from 'zod';
 
 // Hard-code the API key directly for development
 // In production, use environment variables properly
-const OPENAI_API_KEY = "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";
+// const OPENAI_API_KEY = "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";
 
 // Initialize OpenAI client directly with the hard-coded key
-const openaiClient = new OpenAI({
-  apiKey: OPENAI_API_KEY,
-});
+// const openaiClient = new OpenAI({
+// apiKey: OPENAI_API_KEY,
+// });
+// console.log("OpenAI client initialized with API key:", OPENAI_API_KEY.substring(0, 10) + "***");
 
-console.log("OpenAI client initialized with API key:", OPENAI_API_KEY.substring(0, 10) + "***");
+// --- Environment Variable and OpenAI Client Initialization ---
+console.log('[Luna Chat API] Environment check:');
+console.log('[Luna Chat API] OPENAI_API_KEY defined:', !!process.env.OPENAI_API_KEY);
+console.log('[Luna Chat API] OPENAI_API_KEY first 10 chars:', process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.substring(0, 10) + '...' : 'undefined');
+console.log('[Luna Chat API] NODE_ENV:', process.env.NODE_ENV);
+
+let openaiClient: OpenAI | null = null;
+const apiKey = process.env.OPENAI_API_KEY;
+
+if (!apiKey) {
+  console.error("[Luna Chat API] WARNING: OPENAI_API_KEY environment variable is not set or empty. API may not function correctly.");
+} else {
+  try {
+    openaiClient = new OpenAI({ apiKey });
+    console.log('[Luna Chat API] OpenAI client initialized successfully.');
+  } catch (error) {
+    console.error("[Luna Chat API] Failed to initialize OpenAI client:", error);
+  }
+}
+// --- End of Environment Variable and OpenAI Client Initialization ---
 
 // --- Tool Definitions ---
 
@@ -262,6 +282,14 @@ function extractCitationsFromToolResults(toolResults: any[]): { id: string; titl
 }
 
 export async function POST(request: Request) {
+  if (!openaiClient) {
+    console.error("[Luna Chat API] OpenAI client is not initialized. Check API key.");
+    return NextResponse.json(
+      { error: "OpenAI client is not initialized. Administrator, please check the server logs and API key configuration." },
+      { status: 500 }
+    );
+  }
+
   try {
     // Parse the request body
     let requestBody;

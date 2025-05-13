@@ -40,10 +40,14 @@ export default function SignupForm() {
     setIsLoading(true)
 
     try {
+      // Trim any whitespace from the invite code
+      const trimmedCode = inviteCode.trim()
+      setInviteCode(trimmedCode) // Update state with trimmed code
+      
       const response = await fetch('/api/invite-code/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: inviteCode }),
+        body: JSON.stringify({ code: trimmedCode }),
       })
 
       const data = await response.json()
@@ -52,8 +56,10 @@ export default function SignupForm() {
         throw new Error(data.error || 'Failed to verify invite code')
       }
 
+      console.log('[SignupForm] Verified invite code:', trimmedCode)
       setInviteCodeData(data)
       setStep(2) // Move to next step
+      setIsLoading(false) // Reset loading state for step 2
     } catch (error) {
       setIsLoading(false)
       // Assert error type
@@ -76,32 +82,39 @@ export default function SignupForm() {
     }
 
     try {
+      const formData = {
+        inviteCode,
+        username,
+        password,
+        firstName,
+        lastName,
+        gradeLevel,
+      }
+
+      console.log('[SignupForm] Submitting formData:', formData); // Debug log
+
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          inviteCode,
-          username,
-          password,
-          firstName,
-          lastName,
-          gradeLevel,
-        }),
+        body: JSON.stringify(formData),
       })
 
-      const data = await response.json()
+      console.log('[SignupForm] Fetch response:', response); // Debug log
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create account')
+        const errorData = await response.json()
+        console.error('[SignupForm] Signup failed:', errorData); // Debug log
+        setError(errorData.error || 'Signup failed. Please try again.')
+        setIsLoading(false)
+        return
       }
 
       // Redirect to login page on success
       router.push('/login?registered=true')
     } catch (error) {
+      console.error('[SignupForm] Network or other error during signup:', error); // Debug log
+      setError('An unexpected error occurred. Please try again.')
       setIsLoading(false)
-      // Assert error type
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
-      toast.error(`Signup failed: ${errorMessage}`)
     }
   }
 

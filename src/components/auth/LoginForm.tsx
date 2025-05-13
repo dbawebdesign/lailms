@@ -42,7 +42,7 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-md p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+    <div className="w-full max-w-md p-6 bg-white/15 backdrop-blur-md border border-gray-200/20 rounded-lg shadow-lg">
       <h2 className="text-2xl font-bold mb-6 text-center">Log In</h2>
       
       {justRegistered && (

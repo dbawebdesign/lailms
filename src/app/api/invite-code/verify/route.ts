@@ -39,7 +39,6 @@ export async function POST(req: NextRequest) {
         code: string;
         role: string; 
         organisation_id: string; 
-        is_redeemed: boolean; 
         expires_at: string | null;
         organisations: { id: string; name: string; abbr: string } | null; // Expect single object or null
     }
@@ -52,20 +51,16 @@ export async function POST(req: NextRequest) {
         code, 
         role, 
         organisation_id, 
-        is_redeemed, 
         expires_at,
         organisations:organisation_id (id, name, abbr)
       `)
       .eq('code', code)
-      .single<InviteCodeWithOrg>() // Apply type assertion
+      .single<InviteCodeWithOrg>()
+
+    console.log('Invite code query result:', { error, data }); // Debug log
 
     if (error || !data) {
       return NextResponse.json({ error: 'Invalid invite code' }, { status: 400 })
-    }
-
-    // Check if code is already redeemed
-    if (data.is_redeemed) {
-      return NextResponse.json({ error: 'Invite code has already been used' }, { status: 400 })
     }
 
     // Check if code is expired

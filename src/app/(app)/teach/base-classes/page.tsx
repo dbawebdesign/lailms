@@ -5,7 +5,7 @@ import { BaseClass, BaseClassCreationData } from "@/types/teach";
 import { BaseClassCardGrid } from "@/components/teach/BaseClassCardGrid";
 import { CreateBaseClassModal } from "@/components/teach/CreateBaseClassModal";
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, BookOpenText, Plus } from "lucide-react";
 
 // --- Mock API --- (To be moved to a separate file e.g., src/lib/api/teach-mocks.ts later)
 const MOCK_BASE_CLASSES: BaseClass[] = [
@@ -117,23 +117,36 @@ export default function TeachBaseClassesPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">My Base Classes</h1>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Create New Base Class
+    <div className="container mx-auto p-6">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">My Base Classes</h1>
+        <Button onClick={() => setIsModalOpen(true)} variant="default" size="lg">
+          <PlusCircle className="mr-2 h-5 w-5" /> Create New Base Class
         </Button>
-      </header>
+      </div>
 
-      <BaseClassCardGrid
-        baseClasses={baseClasses}
-        onViewDetails={handleViewDetails}
-        onEdit={handleEdit}
-        onClone={handleClone}
-        onArchive={handleArchive}
-        onDelete={handleDelete}
-      />
-
+      {baseClasses.length > 0 ? (
+        <BaseClassCardGrid
+          baseClasses={baseClasses}
+          onViewDetails={handleViewDetails}
+          onEdit={handleEdit}
+          onClone={handleClone}
+          onArchive={handleArchive}
+          onDelete={handleDelete}
+        />
+      ) : (
+        <div className="text-center py-12">
+          <BookOpenText className="mx-auto h-16 w-16 text-slate-400 dark:text-slate-500" />
+          <h3 className="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">No Base Classes Yet</h3>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            Get started by creating your first base class. It will serve as a template for your course instances.
+          </p>
+          <Button onClick={() => setIsModalOpen(true)} variant="outline" className="mt-6">
+            <Plus className="mr-2 h-4 w-4" /> Create Base Class
+          </Button>
+        </div>
+      )}
+      
       <CreateBaseClassModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
