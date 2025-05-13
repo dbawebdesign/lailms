@@ -1,3 +1,6 @@
+-- Ensure the pgvector extension is available
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Create a vector similarity search function
 CREATE OR REPLACE FUNCTION vector_search(
   query_embedding VECTOR(1536),
@@ -26,9 +29,9 @@ BEGIN
     d.metadata AS document_metadata,
     1 - (dc.embedding <=> query_embedding) AS similarity
   FROM
-    document_chunks dc
+    public.document_chunks dc
   JOIN
-    documents d ON dc.document_id = d.id
+    public.documents d ON dc.document_id = d.id
   WHERE
     dc.organisation_id = vector_search.organisation_id
     AND 1 - (dc.embedding <=> query_embedding) > match_threshold

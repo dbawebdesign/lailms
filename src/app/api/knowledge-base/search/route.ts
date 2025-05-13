@@ -136,9 +136,9 @@ export async function POST(req: Request) {
 
   // Get organization ID for the user
   const { data: memberData, error: memberError } = await supabase
-    .from('members')
+    .from('profiles')
     .select('organisation_id')
-    .eq('auth_id', session.user.id)
+    .eq('user_id', session.user.id)
     .single()
 
   if (memberError || !memberData?.organisation_id) {
@@ -166,8 +166,9 @@ export async function POST(req: Request) {
     const queryEmbedding = embeddingResponse.data[0].embedding
     
     // Execute the vector similarity search using the RPC function
+    // Reverting to named parameters as positional arguments caused type errors
     const { data, error: searchError } = await supabase.rpc(
-      // @ts-expect-error - We know this RPC function exists in our schema
+      // @ts-expect-error - We know this RPC function exists in our schema, but may have typing issues
       'vector_search',
       {
         query_embedding: queryEmbedding,
@@ -181,7 +182,7 @@ export async function POST(req: Request) {
       console.error('Error executing vector search:', searchError)
       
       // Fall back to a more basic search if vector search fails
-      const { data: basicResults, error: basicError } = await supabase
+      const { data: basicDocs, error: basicError } = await supabase
         .from('documents')
         .select(`
           id,
@@ -197,18 +198,44 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Search functionality unavailable' }, { status: 500 })
       }
       
-      return NextResponse.json({
-        results: basicResults || [],
-        query,
-        count: basicResults?.length || 0,
-        method: 'basic_fallback',
-        note: 'Vector search failed, showing basic document list'
-      })
+      // Map basicDocs to a structure somewhat consistent with VectorSearchResult for the client
+      const fallbackResults = (basicDocs || []).map(doc => ({
+        id: doc.id,
+        chunk_id: doc.id, // No chunk_id for basic doc search, use doc.id
+        document_id: doc.id,
+        title: doc.file_name || 'Untitled Document',
+        snippet: 'Basic document match. Full content not available in this view.',
+        url: `/knowledge-base/documents/${doc.id}`, // Basic URL
+        score: 0, // No similarity score
+        metadata: doc.metadata || {},
+        file_name: doc.file_name,
+        file_type: doc.file_type,
+        // Ensure other fields expected by VectorSearchResult if necessary, or handle downstream
+      }));
+
+      return NextResponse.json(
+        fallbackResults,
+        { status: 200 } 
+        // Optionally include a message: 
+        // { headers: { 'X-Search-Message': "Vector search unavailable, basic results shown." } }
+      );
     }
     
+    // If vector search is successful
+    // Cast to unknown first to satisfy the linter
+    const resultsData = data as unknown as VectorSearchResult[];
+    const processedResults = resultsData.map(chunk => {
+      const citationKey = generateCitationKey(chunk);
+      const referenceContext = extractReferenceContext(chunk, query);
+      return {
+        ...chunk,
+        citation_key: citationKey,
+        reference_context: referenceContext
+      };
+    });
+    
     // Apply post-processing filters if needed (e.g., filter by document type)
-    const searchResults = data as VectorSearchResult[];
-    let filteredResults: VectorSearchResult[] = searchResults || [];
+    let filteredResults = processedResults;
     
     if (filter?.documentType && filteredResults.length > 0) {
       filteredResults = filteredResults.filter(
@@ -222,21 +249,14 @@ export async function POST(req: Request) {
       )
     }
     
-    // Enhance results with citation keys and context
-    const enhancedResults = filteredResults.map((result: VectorSearchResult) => ({
-      ...result,
-      citation_key: generateCitationKey(result),
-      reference_context: extractReferenceContext(result, query)
-    }));
-    
     // Generate a query ID for tracking this search
     const queryId = uuidv4();
     
     return NextResponse.json({
-      results: enhancedResults,
+      results: filteredResults,
       query,
       queryId,
-      count: enhancedResults.length,
+      count: filteredResults.length,
       method: 'vector_search'
     })
     

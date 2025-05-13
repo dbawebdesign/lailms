@@ -28,16 +28,22 @@ WITH (lists = 100); -- Adjust lists parameter based on expected data size
 -- Set up RLS policies for document chunks
 ALTER TABLE document_chunks ENABLE ROW LEVEL SECURITY;
 
--- Create policy for chunk access - only allow users to access chunks from their organization
+-- Drop the policy if it exists before creating it (idempotency)
+DROP POLICY IF EXISTS "Users can access chunks from their organization" ON document_chunks;
+
+-- Create policy for chunk access - users can access chunks from their organization via profiles table
 CREATE POLICY "Users can access chunks from their organization" 
   ON document_chunks 
   FOR SELECT 
   USING (
     organisation_id IN (
-      SELECT organisation_id FROM members 
-      WHERE auth_id = auth.uid()
+      SELECT organisation_id FROM public.profiles -- Changed to profiles
+      WHERE user_id = auth.uid() -- Changed to user_id
     )
   );
+
+-- Drop the service role policy if it exists before creating it (idempotency)
+DROP POLICY IF EXISTS "Service role can access all chunks" ON document_chunks;
 
 -- Allow service role to access all chunks
 CREATE POLICY "Service role can access all chunks" 

@@ -11,6 +11,7 @@ import { BaseClass } from '@/types/teach';
 // import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { supabase } from '@/utils/supabase/browser'; // <-- Revert to alias path
 // import { supabase } from '../../../../../utils/supabase/browser'; // <-- Remove relative path
+import LunaContextElement from '@/components/luna/LunaContextElement';
 
 interface CourseModule {
   title: string;
@@ -169,25 +170,32 @@ export default function BaseClassDetailPage() {
                 <CardTitle>Course Structure</CardTitle>
                 <CardDescription>Overview of the modules and topics in this course</CardDescription>
               </CardHeader>
-              <CardContent>
-                {modules.length > 0 ? (
-                  <div className="space-y-4">
-                    {modules.map((module, idx) => (
-                      <div key={idx} className="border rounded-lg p-4">
-                        <h3 className="font-semibold text-lg">{module.title}</h3>
-                        <p className="text-sm text-muted-foreground mb-2">Topics:</p>
-                        <ul className="list-disc list-inside space-y-1 pl-2">
-                          {module.topics.map((topic, topicIdx) => (
-                            <li key={topicIdx} className="text-sm">{topic}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">No modules defined yet. Use the Class Co-Pilot to generate a course structure.</p>
-                )}
-              </CardContent>
+              <LunaContextElement 
+                type="course-structure" 
+                role="display" 
+                content={{ modules }}
+                metadata={{ baseClassId: baseClass.id, baseClassName: baseClass.name }}
+              >
+                <CardContent>
+                  {modules.length > 0 ? (
+                    <div className="space-y-4">
+                      {modules.map((module, idx) => (
+                        <div key={idx} className="border rounded-lg p-4">
+                          <h3 className="font-semibold text-lg">{module.title}</h3>
+                          <p className="text-sm text-muted-foreground mb-2">Topics:</p>
+                          <ul className="list-disc list-inside space-y-1 pl-2">
+                            {module.topics.map((topic, topicIdx) => (
+                              <li key={topicIdx} className="text-sm">{topic}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No modules defined yet. Use the Class Co-Pilot to generate a course structure.</p>
+                  )}
+                </CardContent>
+              </LunaContextElement>
             </Card>
             
             <Card>
