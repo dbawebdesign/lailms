@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 // Import parsers (ensure these are installed in packages/functions/package.json)
 import pdf from 'https://esm.sh/pdf-parse@1.1.1'; // Check compatibility with Deno/Edge Runtime
@@ -9,16 +9,17 @@ import { YoutubeTranscript } from 'https://esm.sh/youtube-transcript@1.0.6';
 // Import chunking and embedding utilities
 import { chunkText, TextChunk } from '../_shared/chunking.ts';
 import { generateEmbeddings } from '../_shared/embedding.ts';
+import { EMBEDDING_MODEL } from '../_shared/embedding.ts'; // Import EMBEDDING_MODEL
 
 console.log(`Function "process-document" up and running!`) 
 
-type DocumentRecord = {
+interface DocumentRecord {
   id: string;
   organisation_id: string;
   storage_path: string;
   file_type: string | null;
   metadata: Record<string, any> | null;
-  // Add other relevant fields from your documents table
+  base_class_id?: string | null; // Added base_class_id as optional
 }
 
 // Define the status enum matching your SQL migration
@@ -274,18 +275,22 @@ async function processWebUrl(url: string): Promise<{text: string, metadata: Reco
 }
 
 // Main processing function
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let docIdToUpdate: string | null = null; // Keep track of ID for error status update
+  let supabase: SupabaseClient | null = null; // Use SupabaseClient type
+
   try {
-    // 1. Extract documentId from the request payload
-    const { documentId } = await req.json()
+    // 1. Extract documentId
+    const { documentId } = await req.json();
     if (!documentId) {
-      throw new Error('Missing documentId in request payload');
+      throw new Error('Missing documentId');
     }
+    docIdToUpdate = documentId; // Store for potential error update
     console.log('Processing document ID:', documentId);
 
     // 2. Initialize Supabase Client (use ENV variables)
@@ -301,38 +306,32 @@ serve(async (req) => {
         throw new Error('Missing OpenAI API key');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey,
+    // Initialize the supabase client declared outside
+    supabase = createClient(supabaseUrl, supabaseServiceRoleKey,
         { global: { headers: { Authorization: `Bearer ${supabaseServiceRoleKey}` } } }
       );
 
-    // 3. Fetch document record
+    // 3. Fetch document record (including base_class_id)
     console.log('Fetching document record...');
     const { data: document, error: fetchError } = await supabase
       .from('documents')
-      .select('id, organisation_id, storage_path, file_type, metadata') // Select necessary fields
+      .select('id, organisation_id, storage_path, file_type, metadata, base_class_id') // Fetch base_class_id
       .eq('id', documentId)
-      .single<DocumentRecord>()
+      .single<DocumentRecord>() // Use updated type
 
-    if (fetchError) {
-      console.error('Error fetching document:', fetchError);
-      throw new Error(`Failed to fetch document: ${fetchError.message}`);
-    }
-    if (!document) {
-      throw new Error(`Document with ID ${documentId} not found.`);
-    }
-    console.log('Document record fetched:', document);
+    if (fetchError) throw fetchError; // Simplified error throwing
+    if (!document) throw new Error(`Document not found`);
+    
+    const baseClassId = document.base_class_id; // Extract baseClassId
+    console.log('Document record fetched:', { ...document, baseClassId }); // Log including baseClassId
 
     // 4. Update status to 'processing'
     console.log('Updating status to processing...');
     const { error: statusUpdateError } = await supabase
       .from('documents')
       .update({ status: 'processing' as DocumentStatus })
-      .eq('id', documentId)
-
-    if (statusUpdateError) {
-      console.error('Failed to update status to processing:', statusUpdateError);
-      throw new Error(`Failed to update status to processing: ${statusUpdateError.message}`);
-    }
+      .eq('id', documentId);
+    if (statusUpdateError) throw statusUpdateError;
     console.log('Status updated to processing.');
 
     // 5. Process based on type to extract text
@@ -411,74 +410,61 @@ serve(async (req) => {
 
     console.log('Text extraction complete (first 100 chars):', extractedText.substring(0, 100));
 
-    // 6. NEW: Chunk the extracted text
-    console.log('Chunking extracted text...');
-    if (!extractedText.trim()) {
-      throw new Error('No text was extracted from the document.');
-    }
-    
-    const documentTitle = metadata.title || document.storage_path.split('/').pop() || 'Untitled';
-    
-    // Chunk text with document title as context
-    const chunks = chunkText(extractedText, {
-      maxTokensPerChunk: 1000,
-      overlapTokens: 50,
+    // 6. Chunk the extracted text
+    console.log('Starting chunking...');
+    // Pass only the text to chunkText. Metadata is handled internally or added later.
+    const chunks: TextChunk[] = chunkText(extractedText, {
+      maxTokensPerChunk: 1000, // Or get from config/env
+      overlapTokens: 50,      // Or get from config/env
       preserveParagraphs: true,
       preserveSections: true
     });
-    
-    console.log(`Text chunked into ${chunks.length} segments.`);
+    console.log(`Text chunked into ${chunks.length} chunks.`);
 
-    // 7. NEW: Generate embeddings for chunks
+    // 7. Generate embeddings for chunks
     console.log('Generating embeddings...');
+    // Pass the array of TextChunk objects and the API key
     const chunksWithEmbeddings = await generateEmbeddings(chunks, openaiApiKey);
-    
-    // 8. NEW: Store chunks and embeddings in database
-    console.log('Storing chunks in database...');
-    const chunkInsertPromises = chunksWithEmbeddings.map((chunk, index) => {
-      // Prepare chunk data for insertion
-      const chunkData = {
-        document_id: documentId,
-        organisation_id: document.organisation_id,
-        chunk_index: index,
-        content: chunk.content,
-        embedding: chunk.embedding,
-        token_count: chunk.tokenCount,
-        metadata: {
-          ...chunk.metadata,
-          documentTitle,
-          document_type: document.file_type,
-          position: index / chunks.length // Normalized position in document (0-1)
-        }
-      };
-      
-      return supabase
-        .from('document_chunks')
-        .insert(chunkData)
-        .then(({ error }) => {
-          if (error) {
-            console.error(`Error storing chunk ${index}:`, error);
-            return false;
-          }
-          return true;
-        });
-    });
-    
-    // Wait for all chunks to be inserted
-    const chunkInsertResults = await Promise.all(chunkInsertPromises);
-    const successfulInserts = chunkInsertResults.filter(result => result).length;
-    
-    console.log(`Successfully stored ${successfulInserts} of ${chunks.length} chunks.`);
-    
-    // 9. Update document metadata with chunking info
+    console.log(`Generated embeddings for ${chunksWithEmbeddings.length} chunks.`);
+
+    // Check for errors during embedding (returns empty embedding array on error)
+    const embeddingErrors = chunksWithEmbeddings.filter(c => c.embedding.length === 0).length;
+    if (embeddingErrors > 0) {
+      console.warn(`${embeddingErrors} chunks failed to generate embeddings.`);
+      // Decide how to handle this - maybe update status differently?
+    }
+
+    // Prepare chunks for insertion, adding document/org/baseClass IDs
+    const chunksToInsert = chunksWithEmbeddings.map(chunk => ({
+      document_id: documentId,
+      organisation_id: document.organisation_id,
+      base_class_id: baseClassId, // Include base_class_id here
+      content: chunk.content,
+      metadata: { ...metadata, ...chunk.metadata }, // Combine original + chunker metadata
+      embedding: chunk.embedding,
+    }));
+
+    console.log('Inserting chunks into database...');
+    const { error: insertChunksError } = await supabase
+      .from('document_chunks')
+      .insert(chunksToInsert);
+
+    if (insertChunksError) {
+      console.error('Error inserting chunks:', insertChunksError);
+      throw new Error(`Failed to insert chunks: ${insertChunksError.message}`);
+    }
+    console.log(`Successfully inserted ${chunksToInsert.length} chunks.`);
+
+    // 8. Update document metadata with chunking info
     const updatedMetadata = {
       ...metadata,
       chunk_count: chunks.length,
-      processed_date: new Date().toISOString(),
-      embedding_model: 'text-embedding-3-small'
+      embedded_chunk_count: chunksToInsert.length - embeddingErrors, // Count successful embeddings
+      processing_date: new Date().toISOString(),
+      embedding_model: EMBEDDING_MODEL // Use constant from embedding.ts if exported, or hardcode
     };
 
-    // 10. Update status to 'completed'
+    // 9. Update status to 'completed'
     console.log('Updating status to completed...');
     const { error: finalStatusError } = await supabase
       .from('documents')
@@ -496,7 +482,7 @@ serve(async (req) => {
     }
     console.log('Status updated to completed.');
 
-    // 11. NEW: Trigger the summarization function
+    // 10. NEW: Trigger the summarization function
     try {
       console.log('Triggering summarization process...');
       
@@ -529,7 +515,7 @@ serve(async (req) => {
       documentId: documentId, 
       message: 'Document processed successfully',
       chunks: chunks.length,
-      stored_chunks: successfulInserts
+      stored_chunks: chunksToInsert.length
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
@@ -542,22 +528,15 @@ serve(async (req) => {
     
     // Try to update document status to error if documentId is available
     try {
-      const { documentId } = await req.json();
-      if (documentId) {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL');
-        const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-        
-        if (supabaseUrl && supabaseServiceRoleKey) {
-          const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-          await supabase
-            .from('documents')
-            .update({
-              status: 'error' as DocumentStatus,
-              processing_error: errorMessage
-            })
-            .eq('id', documentId);
-          console.log(`Updated document ${documentId} status to error`);
-        }
+      if (docIdToUpdate && supabase) {
+        await supabase
+          .from('documents')
+          .update({
+            status: 'error' as DocumentStatus,
+            processing_error: errorMessage
+          })
+          .eq('id', docIdToUpdate);
+        console.log(`Updated document ${docIdToUpdate} status to error`);
       }
     } catch (updateError) {
       console.error('Failed to update document status to error:', updateError);

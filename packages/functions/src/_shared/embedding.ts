@@ -6,8 +6,8 @@
 import { TextChunk } from './chunking';
 
 // Embedding parameters
-const EMBEDDING_MODEL = 'text-embedding-3-small';
-const EMBEDDING_DIMENSIONS = 1536;
+export const EMBEDDING_MODEL = 'text-embedding-3-small';
+export const EMBEDDING_DIMENSIONS = 1536;
 const EMBEDDING_MAX_BATCH_SIZE = 1000; // OpenAI allows up to 2048 inputs per batch
 const EMBEDDING_MAX_TOKENS = 8192; // Model's context window
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,10 @@ import { BaseClass } from '@/types/teach';
 import { supabase } from '@/utils/supabase/browser'; // <-- Revert to alias path
 // import { supabase } from '../../../../../utils/supabase/browser'; // <-- Remove relative path
 import LunaContextElement from '@/components/luna/LunaContextElement';
+
+// Import the new components
+import BaseClassDocumentUpload from '@/components/teach/BaseClassDocumentUpload';
+import BaseClassDocumentList from '@/components/teach/BaseClassDocumentList';
 
 interface CourseModule {
   title: string;
@@ -39,6 +43,12 @@ export default function BaseClassDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [documentListVersion, setDocumentListVersion] = useState(0); // State for refreshing list
+
+  // Callback to refresh the document list
+  const refreshDocumentList = useCallback(() => {
+    setDocumentListVersion(prev => prev + 1);
+  }, []);
 
   useEffect(() => {
     const fetchBaseClass = async () => {
@@ -162,6 +172,20 @@ export default function BaseClassDetailPage() {
           <TabsTrigger value="lessons">Lessons</TabsTrigger>
           <TabsTrigger value="assessments">Assessments</TabsTrigger>
         </TabsList>
+
+        {/* Document Management Section - Moved Here */}
+        {baseClassId && (
+          <div className="my-6 space-y-6"> {/* Added margin and spacing */}
+            <BaseClassDocumentUpload 
+              baseClassId={baseClassId} 
+              onUploadSuccess={refreshDocumentList} 
+            />
+            <BaseClassDocumentList 
+              baseClassId={baseClassId} 
+              refreshCounter={documentListVersion} 
+            />
+          </div>
+        )}
         
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -204,33 +228,29 @@ export default function BaseClassDetailPage() {
                 <CardDescription>Create and manage instances of this class</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="outline" className="w-full mb-4">
-                  Create New Instance
+                <Button className="w-full mb-2" asChild>
+                   <Link href={`/teach/instances/create?baseClassId=${baseClass.id}`}>Create New Instance</Link>
                 </Button>
-                <p className="text-sm text-muted-foreground">
-                  Instances let you create multiple occurrences of this class for different periods, semesters, or years.
+                <p className="text-sm text-muted-foreground mb-4">
+                    Instances let you create multiple occurrences of this class for different periods, semesters, or years.
                 </p>
-                <div className="mt-4">
-                  <Link href={`/teach/base-classes/${baseClassId}/instances`} className="text-sm text-primary underline">
-                    View All Instances
-                  </Link>
-                </div>
+                <Link href={`/teach/instances?baseClassId=${baseClass.id}`} className="text-sm text-primary hover:underline">
+                  View All Instances
+                </Link>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
         
-        <TabsContent value="paths">
+        <TabsContent value="paths" className="space-y-6">
+          {/* Path-specific content can be added here */}
           <Card>
             <CardHeader>
               <CardTitle>Learning Paths</CardTitle>
-              <CardDescription>Create and manage learning paths for this course</CardDescription>
+              <CardDescription>Manage and visualize learning paths for this course.</CardDescription>
             </CardHeader>
-            <CardContent className="h-[400px] flex items-center justify-center">
-              <div className="text-center">
-                <p className="text-muted-foreground">Learning path editor will be implemented here</p>
-                <p className="text-sm text-muted-foreground mt-2">This is where the SmartCanvas visual editor will go</p>
-              </div>
+            <CardContent>
+              <p>Learning Path content will go here.</p>
             </CardContent>
           </Card>
         </TabsContent>
