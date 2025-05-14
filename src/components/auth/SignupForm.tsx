@@ -121,21 +121,21 @@ export default function SignupForm() {
   // Render Step 1: Invite Code Verification
   if (step === 1) {
     return (
-      <div className="w-full max-w-md p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold mb-6 text-center">Create Account</h2>
-        <p className="text-gray-600 dark:text-gray-300 mb-4 text-center">
+      <div className="w-full max-w-md p-8 bg-white dark:bg-neutral-900 rounded-xl shadow-2xl dark:shadow-neutral-950/50">
+        <h2 className="text-3xl font-semibold mb-6 text-center text-neutral-800 dark:text-neutral-100">Create Account</h2>
+        <p className="text-neutral-600 dark:text-neutral-400 mb-6 text-center">
           Enter your invite code to get started
         </p>
         
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 rounded">
+          <div className="mb-4 p-3 bg-red-100 text-red-700 dark:bg-red-800/30 dark:text-red-300 rounded-md">
             {error}
           </div>
         )}
         
         <form onSubmit={handleVerifyCode}>
-          <div className="mb-4">
-            <label htmlFor="inviteCode" className="block text-sm font-medium mb-1">
+          <div className="mb-5">
+            <label htmlFor="inviteCode" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
               Invite Code
             </label>
             <Input
@@ -143,7 +143,7 @@ export default function SignupForm() {
               type="text"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value)}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+              className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
               required
               placeholder="Enter your invite code"
               disabled={isLoading}
@@ -152,7 +152,7 @@ export default function SignupForm() {
           
           <button
             type="submit"
-            className="w-full mt-4"
+            className="w-full mt-8 py-3 px-4 bg-neutral-800 text-neutral-100 font-semibold rounded-lg hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:focus:ring-offset-black dark:focus:ring-neutral-500 disabled:opacity-50 transition-colors duration-150"
             disabled={isLoading}
           >
             {isLoading ? 'Verifying...' : 'Continue'}
@@ -164,25 +164,25 @@ export default function SignupForm() {
 
   // Render Step 2: Account Creation
   return (
-    <div className="w-full max-w-md p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-2 text-center">Create Your Account</h2>
+    <div className="w-full max-w-md p-8 bg-white dark:bg-neutral-900 rounded-xl shadow-2xl dark:shadow-neutral-950/50">
+      <h2 className="text-3xl font-semibold mb-2 text-center text-neutral-800 dark:text-neutral-100">Create Your Account</h2>
       
       {inviteCodeData && (
-        <p className="text-green-600 dark:text-green-400 mb-4 text-center">
+        <p className="text-green-600 dark:text-green-400 mb-6 text-center text-sm">
           Welcome to {inviteCodeData.organisation.name}! You're signing up as a {inviteCodeData.role}.
         </p>
       )}
       
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 rounded">
+        <div className="mb-4 p-3 bg-red-100 text-red-700 dark:bg-red-800/30 dark:text-red-300 rounded-md">
           {error}
         </div>
       )}
       
-      <form onSubmit={handleSignup} className="space-y-4">
+      <form onSubmit={handleSignup} className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label htmlFor="firstName" className="block text-sm font-medium mb-1">
+            <label htmlFor="firstName" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
               First Name
             </label>
             <Input
@@ -190,14 +190,14 @@ export default function SignupForm() {
               type="text"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+              className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
               required
               disabled={isLoading}
             />
           </div>
           
           <div>
-            <label htmlFor="lastName" className="block text-sm font-medium mb-1">
+            <label htmlFor="lastName" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
               Last Name
             </label>
             <Input
@@ -205,7 +205,7 @@ export default function SignupForm() {
               type="text"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+              className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
               required
               disabled={isLoading}
             />
@@ -213,7 +213,7 @@ export default function SignupForm() {
         </div>
         
         <div>
-          <label htmlFor="username" className="block text-sm font-medium mb-1">
+          <label htmlFor="username" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
             Username
           </label>
           <Input
@@ -221,14 +221,14 @@ export default function SignupForm() {
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+            className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
             required
             disabled={isLoading}
           />
         </div>
         
         <div>
-          <label htmlFor="password" className="block text-sm font-medium mb-1">
+          <label htmlFor="password" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
             Password
           </label>
           <Input
@@ -236,7 +236,7 @@ export default function SignupForm() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+            className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
             required
             disabled={isLoading}
             minLength={8}
@@ -244,7 +244,7 @@ export default function SignupForm() {
         </div>
         
         <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium mb-1">
+          <label htmlFor="confirmPassword" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
             Confirm Password
           </label>
           <Input
@@ -252,51 +252,38 @@ export default function SignupForm() {
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+            className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
             required
             disabled={isLoading}
+            minLength={8}
           />
         </div>
         
         {inviteCodeData?.role === 'student' && (
           <div>
-            <label htmlFor="gradeLevel" className="block text-sm font-medium mb-1">
-              Grade Level
+            <label htmlFor="gradeLevel" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
+              Grade Level (e.g., 9, 10, 11, 12)
             </label>
-            <select
+            <Input
               id="gradeLevel"
+              type="text" // Changed to text for flexibility, can be number if strict
               value={gradeLevel}
               onChange={(e) => setGradeLevel(e.target.value)}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+              className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
+              // required // Grade level might be optional depending on requirements
+              placeholder="e.g., 10"
               disabled={isLoading}
-            >
-              <option value="">Select Grade Level</option>
-              {[...Array(12)].map((_, i) => (
-                <option key={i + 1} value={String(i + 1)}>
-                  Grade {i + 1}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         )}
         
-        <div className="flex items-center justify-between gap-4 mt-6">
-          <button
-            type="button"
-            onClick={() => setStep(1)}
-            className="flex-1 inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
-          >
-            Back
-          </button>
-          
-          <button
-            type="submit"
-            className="flex-1 inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Creating Account...' : 'Create Account'}
-          </button>
-        </div>
+        <button
+          type="submit"
+          className="w-full mt-8 py-3 px-4 bg-neutral-800 text-neutral-100 font-semibold rounded-lg hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:focus:ring-offset-black dark:focus:ring-neutral-500 disabled:opacity-50 transition-colors duration-150"
+          disabled={isLoading}
+        >
+          {isLoading ? 'Creating Account...' : 'Sign Up'}
+        </button>
       </form>
     </div>
   )

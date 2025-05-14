@@ -64,24 +64,24 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-md p-6 bg-white/15 backdrop-blur-md border border-gray-200/20 rounded-lg shadow-lg">
-      <h2 className="text-2xl font-bold mb-6 text-center">Log In</h2>
+    <div className="w-full max-w-md p-8 bg-white dark:bg-neutral-900 rounded-xl shadow-2xl dark:shadow-neutral-950/50">
+      <h2 className="text-3xl font-semibold mb-6 text-center text-neutral-800 dark:text-neutral-100">Log In</h2>
       
       {justRegistered && (
-        <div className="mb-4 p-3 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200 rounded">
+        <div className="mb-4 p-3 bg-green-100 text-green-700 dark:bg-green-800/30 dark:text-green-300 rounded-md">
           Account created successfully! Please log in with your new credentials.
         </div>
       )}
       
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 rounded">
+        <div className="mb-4 p-3 bg-red-100 text-red-700 dark:bg-red-800/30 dark:text-red-300 rounded-md">
           {error}
         </div>
       )}
       
-      <form onSubmit={handleLogin} className="space-y-4">
+      <form onSubmit={handleLogin} className="space-y-5">
         <div>
-          <label htmlFor="username" className="block text-sm font-medium mb-1">
+          <label htmlFor="username" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
             Username
           </label>
           <input
@@ -89,14 +89,15 @@ export default function LoginForm() {
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+            className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
             required
             disabled={isLoading}
+            placeholder="Enter your username"
           />
         </div>
         
         <div>
-          <label htmlFor="password" className="block text-sm font-medium mb-1">
+          <label htmlFor="password" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
             Password
           </label>
           <input
@@ -104,16 +105,17 @@ export default function LoginForm() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+            className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
             required
             disabled={isLoading}
+            placeholder="Enter your password"
           />
         </div>
         
-        <div className="flex justify-end">
+        <div className="flex justify-end mt-1">
           <Link
             href="/reset-password"
-            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+            className="text-sm text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors duration-150"
           >
             Forgot password?
           </Link>
@@ -121,7 +123,7 @@ export default function LoginForm() {
         
         <button
           type="submit"
-          className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          className="w-full mt-6 py-3 px-4 bg-neutral-800 text-neutral-100 font-semibold rounded-lg hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:focus:ring-offset-black dark:focus:ring-neutral-500 disabled:opacity-50 transition-colors duration-150"
           disabled={isLoading}
         >
           {isLoading ? 'Logging in...' : 'Log In'}

@@ -24,6 +24,7 @@ interface DbBaseClass {
 function mapDbToUi(dbClass: DbBaseClass): BaseClass {
   return {
     id: dbClass.id,
+    organisation_id: dbClass.organisation_id,
     name: dbClass.name,
     description: dbClass.description || undefined,
     subject: dbClass.settings?.subject,
@@ -61,16 +62,20 @@ export async function GET(request: Request) {
     const userRole = profileData.role;
 
     // Check if user is authorized to view base classes (should be a teacher or admin)
+    // For this specific request, we are fetching base classes created BY THIS USER,
+    // so role check for viewing general org base classes might be less critical here,
+    // but still good for ensuring only appropriate roles can access this endpoint.
     if (!userRole || (userRole !== 'teacher' && userRole !== 'admin' && userRole !== 'super_admin')) {
       console.error("API Error: User is not authorized to view base classes. Role:", userRole);
       return NextResponse.json({ error: 'You do not have permission to view base classes.' }, { status: 403 });
     }
 
-    // 2. Fetch base_classes for that organisation_id
+    // 2. Fetch base_classes for that organisation_id AND created by the current user
     const { data, error } = await supabase
       .from('base_classes')
       .select('*') // Select all columns defined in DbBaseClass
-      .eq('organisation_id', organisationId)
+      .eq('organisation_id', organisationId) // Ensure it's within their org
+      .eq('user_id', user.id) // And created by this specific user
       .order('created_at', { ascending: false });
 
     if (error) {

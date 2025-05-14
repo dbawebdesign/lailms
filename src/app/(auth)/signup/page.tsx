@@ -18,9 +18,9 @@ export default function SignupPage() {
       
       <SignupForm />
       
-      <p className="mt-8 text-center text-sm text-gray-400">
+      <p className="mt-10 text-center text-sm text-gray-500 dark:text-neutral-400">
         Already have an account?{' '}
-        <Link href="/login" className="font-medium text-blue-500 hover:text-blue-400">
+        <Link href="/login" className="font-medium text-neutral-600 hover:text-neutral-800 dark:text-neutral-300 dark:hover:text-neutral-100 transition-colors duration-150">
           Log in here
         </Link>
       </p>
