@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { BaseClassCreationData, BaseClass } from '@/types/teach'; // Our frontend type
+import { BaseClassCreationData, BaseClass, GeneratedOutline } from '@/types/teach'; // Added GeneratedOutline
 import { createClient } from '@supabase/supabase-js';
 
 // Database representation (subset, focusing on what we insert/select)
@@ -13,6 +13,7 @@ interface DbBaseClass {
     subject?: string;
     gradeLevel?: string;
     lengthInWeeks?: number;
+    generatedOutline?: GeneratedOutline; // Added this field
     // any other settings
   } | null;
   created_at: string;
@@ -87,11 +88,16 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  // Use createSupabaseServerClient which properly handles cookie management
-  const supabase = createSupabaseServerClient();
-  
   try {
-    // 1. Verify auth and user profile in one go with service role client
+    // Initialize Supabase client first, which already handles cookies internally
+    const supabase = createSupabaseServerClient();
+    
+    // Forward the caller's Cookie header when we make internal fetch requests. Using the
+    // header from the incoming request avoids the need to call the `cookies()` helper
+    // (which Next.js now treats as an async dynamic API).
+    const cookieHeader = request.headers.get('cookie') || '';
+    
+    // 1. Verify auth and user profile in one go
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
@@ -163,13 +169,12 @@ export async function POST(request: Request) {
     const { data, error } = await adminClient
       .from('base_classes')
       .insert(dbInsertData)
-      .select('*')
+      .select('id, settings, organisation_id, name, description, created_at, updated_at') // Ensure all fields for DbBaseClass and what generate-lessons might need from settings
       .single();
 
     if (error) {
       console.error("API Error POST base-classes:", error);
       
-      // Special handling for common errors
       if (error.code === '42501') {
         return NextResponse.json({ 
           error: 'Permission denied: You do not have the required role or organization membership to create base classes.',
@@ -185,7 +190,42 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to create base class, no data returned.' }, { status: 500 });
     }
 
-    return NextResponse.json(mapDbToUi(data as DbBaseClass), { status: 201 });
+    const newDbBaseClass = data as DbBaseClass;
+    const newBaseClassId = newDbBaseClass.id;
+
+    // Trigger lesson and path generation
+    if (newBaseClassId && newDbBaseClass.settings?.generatedOutline?.modules?.length) {
+      try {
+        // Construct the full URL for the internal fetch call
+        const currentUrl = new URL(request.url);
+        const generateLessonsUrl = `${currentUrl.origin}/api/teach/base-classes/${newBaseClassId}/generate-lessons`;
+        
+        console.log(`Attempting to trigger lesson generation for BaseClass ID: ${newBaseClassId} at ${generateLessonsUrl}`);
+
+        const generationResponse = await fetch(generateLessonsUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+          },
+        });
+
+        if (!generationResponse.ok) {
+          const errorBody = await generationResponse.text(); // Use .text() for more flexible error logging
+          console.error(`Failed to generate lessons for BaseClass ${newBaseClassId}. Status: ${generationResponse.status}. Body: ${errorBody}`);
+          // Do not block the response for base class creation if lesson generation fails,
+          // but log it. The user can manually trigger it later if needed.
+        } else {
+          const successBody = await generationResponse.json();
+          console.log(`Successfully triggered lesson generation for BaseClass ${newBaseClassId}:`, successBody);
+        }
+      } catch (generationError: any) {
+        console.error(`Error calling generate-lessons endpoint for BaseClass ${newBaseClassId}:`, generationError.message);
+        // Log and continue
+      }
+    }
+
+    return NextResponse.json(mapDbToUi(newDbBaseClass), { status: 201 });
 
   } catch (error: any) {
     console.error("API Exception POST base-classes:", error);

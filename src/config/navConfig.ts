@@ -13,6 +13,16 @@ import {
   UserCircle,
   Home,
   LucideIcon,
+  HelpCircle,
+  MessageSquare,
+  Briefcase,
+  FileText,
+  SlidersHorizontal,
+  Building,
+  BookMarked,
+  PenTool,
+  MessageCircle,
+  Wrench,
 } from "lucide-react";
 
 export type NavItem = {
@@ -21,29 +31,68 @@ export type NavItem = {
   icon: LucideIcon;
   roles: UserRole[];
   children?: NavItem[]; // For collapsible groups
+  isBottom?: boolean; // To group items at the bottom
 };
 
-export type UserRole = "admin" | "teacher" | "student" | "parent" | "super_admin"; // Add roles as needed
+export type UserRole = "admin" | "teacher" | "student" | "parent" | "super_admin";
+
+// Helper function to create common bottom items
+const createBottomNavItems = (roles: UserRole[]): NavItem[] => [
+  {
+    title: "Settings",
+    href: "/settings", // This could lead to a page that redirects to role-specific profile or a general settings page
+    icon: Settings,
+    roles: roles,
+    isBottom: true,
+  },
+  {
+    title: "Help",
+    href: "/help",
+    icon: HelpCircle,
+    roles: roles,
+    isBottom: true,
+  },
+  {
+    title: "Feedback",
+    href: "/feedback",
+    icon: MessageSquare,
+    roles: roles,
+    isBottom: true,
+  },
+];
+
+const allRoles: UserRole[] = ["admin", "teacher", "student", "parent", "super_admin"];
 
 const navConfig: NavItem[] = [
-  // Common
-  {
-    title: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-    roles: ["admin", "teacher", "student", "parent", "super_admin"],
-  },
   // Student Specific
   {
+    title: "Home",
+    href: "/learn",
+    icon: Home,
+    roles: ["student"],
+  },
+  {
     title: "My Courses",
-    href: "/learn/courses",
+    href: "/learn/courses", // Main entry for course player
     icon: BookOpen,
     roles: ["student"],
   },
   {
-    title: "Study Space",
-    href: "/learn/study",
+    title: "Study Space", // Previously Notebook LM
+    href: "/learn/notebook", // As per PRD: /learn/notebook/:id
     icon: NotebookText,
+    roles: ["student"],
+  },
+  {
+    title: "Progress",
+    href: "/learn/progress",
+    icon: BarChart3, // Using BarChart3 instead of GraduationCap for progress
+    roles: ["student"],
+  },
+  {
+    title: "Community",
+    href: "/learn/community",
+    icon: MessageCircle,
     roles: ["student"],
   },
   {
@@ -52,7 +101,14 @@ const navConfig: NavItem[] = [
     icon: GraduationCap,
     roles: ["student"],
   },
+
   // Teacher Specific
+  {
+    title: "Home", // Teacher Home
+    href: "/teach",
+    icon: Home,
+    roles: ["teacher"],
+  },
   {
     title: "Base Classes",
     href: "/teach/base-classes",
@@ -60,56 +116,110 @@ const navConfig: NavItem[] = [
     roles: ["teacher"],
   },
   {
-    title: "Instances",
+    title: "Class Instances",
     href: "/teach/instances",
     icon: School,
     roles: ["teacher"],
   },
   {
+    title: "Knowledge Base",
+    href: "/teach/knowledge",
+    icon: BookMarked,
+    roles: ["teacher"],
+  },
+  {
+    title: "Designer", // Consolidating Course Designer, Lesson Studio, Assessment Builder under one umbrella
+    href: "/teach/designer", // Generic route for designer tools
+    icon: PenTool,
+    roles: ["teacher"],
+  },
+  {
     title: "Gradebook",
-    href: "/teach/gradebook",
+    href: "/teach/gradebook", // PRD: /teach/gradebook/:classId
     icon: ClipboardList,
+    roles: ["teacher"],
+  },
+  {
+    title: "Tutor Chat",
+    href: "/teach/tutor-chat",
+    icon: MessageCircle, // Re-using MessageCircle
     roles: ["teacher"],
   },
   {
     title: "Teacher Tools",
     href: "/teach/tools",
-    icon: UserCog, // Or another appropriate icon
+    icon: Wrench, // Changed from UserCog to Wrench
     roles: ["teacher"],
   },
+  {
+    title: "Community",
+    href: "/teach/community",
+    icon: Users, // Using Users for teacher community
+    roles: ["teacher"],
+  },
+
   // Admin Specific
   {
-    title: "Organization",
-    href: "/admin/organization",
-    icon: Users, // Or Building
-    roles: ["admin", "super_admin"],
+    title: "School Dashboard",
+    href: "/school", // PRD route
+    icon: LayoutDashboard,
+    roles: ["admin"],
   },
   {
-    title: "User Management",
-    href: "/admin/users",
-    icon: UserCircle,
-    roles: ["admin", "super_admin"],
+    title: "Users & Roles",
+    href: "/school/users", // PRD route
+    icon: Users,
+    roles: ["admin"],
   },
   {
-    title: "Analytics",
-    href: "/admin/analytics",
-    icon: BarChart3,
-    roles: ["admin", "super_admin"],
+    title: "Courses Overview",
+    href: "/school/courses", // PRD route
+    icon: BookOpen, // Re-using BookOpen
+    roles: ["admin"],
   },
-  // Parent Specific
+  {
+    title: "School Analytics",
+    href: "/school/analytics", // PRD route
+    icon: BarChart3, // Re-using BarChart3
+    roles: ["admin"],
+  },
+
+  // Super Admin Specific
+  {
+    title: "Org Dashboard",
+    href: "/org", // PRD route
+    icon: Briefcase, // Changed from LayoutDashboard
+    roles: ["super_admin"],
+  },
+  {
+    title: "Institutions",
+    href: "/org/institutions", // PRD route
+    icon: Building,
+    roles: ["super_admin"],
+  },
+  {
+    title: "Billing & Usage",
+    href: "/org/billing", // PRD route
+    icon: FileText,
+    roles: ["super_admin"],
+  },
+  {
+    title: "Global Settings",
+    href: "/org/settings", // PRD route
+    icon: SlidersHorizontal,
+    roles: ["super_admin"],
+  },
+  
+  // Parent Specific (from original file, kept for now)
   {
       title: "My Children",
       href: "/parent/children",
-      icon: Users, // Or another icon like HeartHandshake
+      icon: Users,
       roles: ["parent"],
   },
-  // Common Bottom
-  {
-    title: "Settings",
-    href: "/settings",
-    icon: Settings,
-    roles: ["admin", "teacher", "student", "parent", "super_admin"],
-  },
+
+  // Common Bottom Items for all roles
+  ...createBottomNavItems(allRoles),
 ];
 
 export default navConfig; 

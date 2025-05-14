@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { ClassInstanceCreationData, ClassInstance } from '@/types/teach';
 
 // DB Representation (subset for what we insert/select)
@@ -44,6 +43,8 @@ function mapDbToUiInstance(dbInst: DbClassInstance): ClassInstance {
     capacity: dbInst.settings?.capacity,
     status: currentStatus,
     creationDate: dbInst.created_at,
+    createdAt: dbInst.created_at,
+    updatedAt: dbInst.updated_at,
   };
 }
 
@@ -55,7 +56,8 @@ interface RouteParams {
 
 export async function POST(request: Request, { params }: RouteParams) {
   const { baseClassId: base_class_id_from_param } = params; // Use the param name as per directory structure
-  const supabase = createRouteHandlerClient({ cookies });
+  const supabase = createSupabaseServerClient();
+
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
@@ -66,17 +68,17 @@ export async function POST(request: Request, { params }: RouteParams) {
     const body = await request.json() as Omit<ClassInstanceCreationData, 'baseClassId'>;
     const { name, startDate, endDate, period, capacity, ...otherSettings } = body;
 
-    // Verify the user has access to the parent base_class and it belongs to their org
-    const { data: memberData, error: memberError } = await supabase
-      .from('members')
+    // Retrieve organisation information from the profiles table
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
       .select('organisation_id')
-      .eq('id', user.id)
+      .eq('user_id', user.id)
       .single();
 
-    if (memberError || !memberData || !memberData.organisation_id) {
+    if (profileError || !profileData || !profileData.organisation_id) {
       return NextResponse.json({ error: 'User organisation not found.' }, { status: 403 });
     }
-    const organisationId = memberData.organisation_id;
+    const organisationId = profileData.organisation_id;
 
     const { data: parentBaseClass, error: baseClassError } = await supabase
       .from('base_classes')

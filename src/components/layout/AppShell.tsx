@@ -9,12 +9,14 @@ import MobileNav from './MobileNav';
 import { useUIContext } from '@/context/UIContext';
 import { cn } from '@/lib/utils'; // Assuming you have a cn utility
 import CommandPalette from './CommandPalette'; // Import CommandPalette
+import type { UserRole } from "@/config/navConfig"; // Import UserRole
 
 interface AppShellProps {
   children: React.ReactNode;
+  userRole: UserRole; // Add userRole prop
 }
 
-const AppShell: React.FC<AppShellProps> = ({ children }) => {
+const AppShell: React.FC<AppShellProps> = ({ children, userRole }) => {
   const { isNavCollapsed, isPanelVisible } = useUIContext();
   const [isMobile, setIsMobile] = useState(false);
 
@@ -43,7 +45,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
         {/* Left Navigation - hide completely on mobile */}
         <div className="hidden md:block transition-all duration-300 ease-in-out z-20">
           <div className={cn(isNavCollapsed ? "w-16" : "w-60")}>
-            <LeftNav />
+            <LeftNav userRole={userRole} />
           </div>
         </div>
 
@@ -61,7 +63,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
         )}
 
         {/* Mobile Nav - Bottom Navigation */}
-        <MobileNav />
+        <MobileNav userRole={userRole} />
       </div>
 
       {/* AI Panel for Mobile - Fixed positioning for overlay */}

@@ -32,8 +32,30 @@ export default function LoginForm() {
         throw new Error(data.error || 'Invalid username or password')
       }
 
-      // Redirect to dashboard on success
-      router.push('/dashboard')
+      // Redirect based on role
+      const userRole = data.role?.toUpperCase(); // Ensure role is uppercase for consistent matching
+      let redirectPath = '/dashboard'; // Default redirect
+
+      switch (userRole) {
+        case 'STUDENT':
+          redirectPath = '/learn';
+          break;
+        case 'TEACHER':
+          redirectPath = '/teach';
+          break;
+        case 'ADMIN':
+          redirectPath = '/school';
+          break;
+        case 'SUPER_ADMIN': // Ensure this matches the enum value in your DB
+          redirectPath = '/org';
+          break;
+        default:
+          // If role is not recognized or missing, redirect to a generic dashboard or error page
+          console.warn(`Unrecognized or missing user role: ${data.role}, redirecting to /dashboard`);
+          redirectPath = '/dashboard'; 
+      }
+
+      router.push(redirectPath);
     } catch (error: any) {
       setError(error.message || 'Failed to log in')
     } finally {

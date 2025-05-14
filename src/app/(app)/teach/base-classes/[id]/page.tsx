@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Save } from 'lucide-react';
 import Link from 'next/link';
-import { BaseClass } from '@/types/teach';
+import { BaseClass, GeneratedLesson } from '@/types/teach';
 // import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { supabase } from '@/utils/supabase/browser'; // <-- Revert to alias path
 // import { supabase } from '../../../../../utils/supabase/browser'; // <-- Remove relative path
@@ -19,8 +19,9 @@ import BaseClassDocumentList from '@/components/teach/BaseClassDocumentList';
 
 interface CourseModule {
   title: string;
+  description: string;
   topics: string[];
-  suggestedLessons?: { title: string; objective?: string }[];
+  suggestedLessons: GeneratedLesson[];
   suggestedAssessments?: { type: string; description?: string }[];
 }
 
@@ -75,6 +76,7 @@ export default function BaseClassDetailPage() {
           gradeLevel: data.settings?.gradeLevel || '',
           lengthInWeeks: data.settings?.lengthInWeeks || 0,
           creationDate: data.created_at,
+          organisation_id: data.organisation_id,
           settings: data.settings || {}
         };
         

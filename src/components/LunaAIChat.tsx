@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Bot, User, ExternalLink, Mic, MicOff, Wand2, Presentation, Wrench } from 'lucide-react';
+import { Loader2, Bot, User, ExternalLink, Mic, MicOff, Wand2, Presentation, Wrench, Brain, MessageSquare } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/navigation';
 import { CourseOutlineMessage } from '@/components/luna/CourseOutlineMessage';
@@ -30,7 +30,7 @@ interface GeneratedCourseOutline {
 
 // Updated Persona types to include teacher roles
 export type StudentPersonaType = 'tutor' | 'peer' | 'examCoach';
-export type TeacherPersonaType = 'classCoPilot' | 'instructionalStrategist' | 'platformGuide';
+export type TeacherPersonaType = 'lunaChat' | 'classCoPilot' | 'teachingCoach';
 export type PersonaType = StudentPersonaType | TeacherPersonaType;
 
 // Message interface might need updates for different message types (e.g., outline)
@@ -66,7 +66,7 @@ export function LunaAIChat() {
   const [isRecording, setIsRecording] = useState(false);
   // TODO: Determine user role (student/teacher) to set default persona
   const [currentUserRole, setCurrentUserRole] = useState<'student' | 'teacher'>('teacher'); // Placeholder
-  const defaultPersona = currentUserRole === 'teacher' ? 'classCoPilot' : 'tutor';
+  const defaultPersona = currentUserRole === 'teacher' ? 'lunaChat' : 'tutor';
   const [currentPersona, setCurrentPersona] = useState<PersonaType>(defaultPersona);
   
   const messageHistory = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
@@ -103,9 +103,9 @@ export function LunaAIChat() {
     { id: 'examCoach', name: 'Exam Coach', icon: <Loader2 size={14} /> } // Re-using Loader2 for now
   ];
   const teacherPersonas = [
+    { id: 'lunaChat', name: 'Luna Chat', icon: <MessageSquare size={14} /> },
     { id: 'classCoPilot', name: 'Class Co-Pilot', icon: <Wand2 size={14} /> },
-    { id: 'instructionalStrategist', name: 'Instructional Strategist', icon: <Presentation size={14} /> },
-    { id: 'platformGuide', name: 'Platform Guide', icon: <Wrench size={14} /> }
+    { id: 'teachingCoach', name: 'Teaching Coach', icon: <Brain size={14} /> }
   ];
 
   // TODO: Filter personas based on currentUserRole
@@ -118,9 +118,9 @@ export function LunaAIChat() {
       case 'peer': return "Hi there! I'm Luna, your peer learning buddy. What are you working on?";
       case 'examCoach': return "Welcome! I'm Luna, your exam coach. Ready to practice?";
       // Teacher Personas
+      case 'lunaChat': return "Hello! I'm Luna, your general AI assistant. How can I help you today?";
       case 'classCoPilot': return "Hello! I'm the Class Co-Pilot. Describe the course you want to design, and I'll help generate an outline.";
-      case 'instructionalStrategist': return "Hi! As your Instructional Strategist, I can help with teaching methods, differentiation, and assessment ideas. What's on your mind?";
-      case 'platformGuide': return "Welcome! Need help using LearnologyAI? Ask me anything about the platform features.";
+      case 'teachingCoach': return "Hi! As your Teaching Coach, I can help with teaching methods, differentiation, and lesson planning. What challenge can we tackle?";
       default: return "Hello! I'm Luna. How can I assist?";
     }
   };

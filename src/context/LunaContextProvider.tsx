@@ -104,6 +104,7 @@ export const LunaContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
     
     return () => {
       broadcastChannel.current?.close();
+      broadcastChannel.current = null; // Nullify on cleanup
     };
   // Dependency array is empty, runs once on mount
   }, []);
@@ -133,12 +134,13 @@ export const LunaContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
         if (timeout) clearTimeout(timeout);
         
         timeout = setTimeout(() => {
-          const context = serializeContext();
-          broadcastChannel.current?.postMessage(context);
-          
-          // Also store in sessionStorage for persistence
-          sessionStorage.setItem('luna-latest-ui-context', JSON.stringify(context));
-        }, 300); // 300ms debounce
+          if (broadcastChannel.current) { // Check if channel still exists
+            const context = serializeContext();
+            broadcastChannel.current.postMessage(context); // No optional chaining needed due to check
+            
+            sessionStorage.setItem('luna-latest-ui-context', JSON.stringify(context));
+          }
+        }, 300); 
       };
     })(),
     [serializeContext]

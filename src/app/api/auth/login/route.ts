@@ -39,25 +39,27 @@ export async function POST(req: NextRequest) {
     )
 
     // Define the expected type for the profile data including the related organisation
-    type ProfileWithOrg = {
+    type ProfileWithOrgAndRole = {
       user_id: string;
-      organisation_id: string;
-      organisations: { abbr: string } | null; // Expect single object or null
+      organisation_id: string | null;
+      role: string;
+      organisations: { abbr: string } | null;
     }
 
-    // First, get the organization from the profile
+    // First, get the organization and role from the profile
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select(`
         user_id,
         organisation_id,
-        organisations (abbr) // Keep simplified select
+        role,
+        organisations (abbr)
       `)
       .eq('username', username)
-      .single<ProfileWithOrg>() // Apply the type assertion here
+      .single<ProfileWithOrgAndRole>()
 
     if (profileError || !profileData) {
-      console.error('Profile fetch error:', profileError);
+      console.error('Profile fetch error from profiles table:', profileError);
       return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 })
     }
 
@@ -82,10 +84,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 })
     }
 
-    // Return success with user data
+    // Return success with user data and role
     return NextResponse.json({
       user: data.user,
       session: data.session,
+      role: profileData.role,
     })
   } catch (error) {
     console.error('Error in login API route:', error)
