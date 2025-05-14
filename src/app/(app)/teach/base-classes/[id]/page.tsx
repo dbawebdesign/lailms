@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { BaseClass, GeneratedLesson } from '@/types/teach';
 // import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -45,6 +45,11 @@ export default function BaseClassDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [documentListVersion, setDocumentListVersion] = useState(0); // State for refreshing list
+
+  // New state variables for content generation
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState('');
+  const [generationError, setGenerationError] = useState<string | null>(null);
 
   // Callback to refresh the document list
   const refreshDocumentList = useCallback(() => {
@@ -129,6 +134,139 @@ export default function BaseClassDetailPage() {
   // Extract modules from the settings if they exist
   const modules = baseClass.settings?.generatedOutline?.modules || [];
 
+  const handleGenerateAllLessonsContent = async () => {
+    if (!baseClassId) {
+      setGenerationError('Base Class ID is missing.');
+      return;
+    }
+
+    setIsGeneratingContent(true);
+    setGenerationStatus('Fetching lesson list...');
+    setGenerationError(null);
+
+    let lessonsToProcess: { id: string; title: string }[] = [];
+
+    try {
+      const response = await fetch(`/api/teach/base-classes/${baseClassId}/lessons`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to fetch lesson list' }));
+        throw new Error(errorData.message || 'Failed to fetch lesson list');
+      }
+      const data = await response.json();
+      lessonsToProcess = data.lessons || [];
+
+      if (lessonsToProcess.length === 0) {
+        setGenerationStatus('No lessons found for this base class to generate content for.');
+        setIsGeneratingContent(false);
+        return;
+      }
+
+      setGenerationStatus(`Found ${lessonsToProcess.length} lessons. Starting content generation...`);
+    } catch (err: any) {
+      console.error('Error fetching lessons:', err);
+      setGenerationError(err.message || 'Could not retrieve lessons for content generation.');
+      setIsGeneratingContent(false);
+      return;
+    }
+
+    const CONCURRENCY_LIMIT = 3; // Process 3 lessons at a time
+    let completedCount = 0;
+    let errorCount = 0;
+    const totalLessons = lessonsToProcess.length;
+    const results: { lessonTitle: string; success: boolean; error?: string }[] = [];
+
+    // Function to process a single lesson
+    const processLesson = async (lesson: { id: string; title: string }) => {
+      try {
+        setGenerationStatus(`Generating content for: \"${lesson.title}\" (${completedCount + 1}/${totalLessons})...`);
+        const res = await fetch(`/api/teach/lessons/${lesson.id}/auto-generate-sections`, {
+          method: 'POST',
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ message: `HTTP error ${res.status}` }));
+          throw new Error(errorData.message || `Failed to generate content for \"${lesson.title}\"` );
+        }
+        const resultData = await res.json();
+        console.log(`Successfully generated content for lesson ${lesson.id} (\"${lesson.title}\"):`, resultData);
+        results.push({ lessonTitle: lesson.title, success: true });
+      } catch (e: any) {
+        console.error(`Error generating content for lesson ${lesson.id} (\"${lesson.title}\"):`, e);
+        results.push({ lessonTitle: lesson.title, success: false, error: e.message });
+        errorCount++;
+      }
+      completedCount++;
+      setGenerationStatus(`Processed: \"${lesson.title}\" (${completedCount}/${totalLessons})...`);
+    };
+
+    // Concurrency management
+    const queue = [...lessonsToProcess];
+    const activePromises: Promise<void>[] = [];
+
+    const runNext = () => {
+      if (queue.length === 0) {
+        return null; // All tasks are either active or finished
+      }
+      const lesson = queue.shift()!;
+      const promise = processLesson(lesson).then(() => {
+        // Remove this promise from activePromises and run the next one if available
+        activePromises.splice(activePromises.indexOf(promise), 1);
+        const nextPromise = runNext();
+        if (nextPromise) {
+          activePromises.push(nextPromise);
+        }
+      });
+      return promise;
+    };
+
+    for (let i = 0; i < Math.min(CONCURRENCY_LIMIT, queue.length); i++) {
+      const initialPromise = runNext();
+      if (initialPromise) activePromises.push(initialPromise);
+    }
+
+    await Promise.allSettled(activePromises); // Wait for initial batch
+    // Wait for all subsequent dynamic promises to complete
+    // This simple model waits for the initial set; more robust queueing might be needed for very large numbers
+    // For this case, we rely on processLesson updating completedCount and the loop condition of activePromises to eventually empty
+    // A more robust approach for very large N might involve a while loop checking completedCount < totalLessons
+    
+    // Simplified: Wait for all processLesson calls to complete by checking completedCount
+    while(completedCount < totalLessons && activePromises.length > 0) {
+        await Promise.allSettled(activePromises); // Wait for currently active ones
+        // Check if more tasks were added by runNext and keep waiting
+        if(queue.length > 0 && activePromises.length < CONCURRENCY_LIMIT){
+            const nextP = runNext();
+            if(nextP) activePromises.push(nextP);
+        }
+        if (activePromises.length === 0 && queue.length > 0) { // Repopulate if queue still has items but active is empty
+             for (let i = 0; i < Math.min(CONCURRENCY_LIMIT, queue.length); i++) {
+                const initialPromise = runNext();
+                if (initialPromise) activePromises.push(initialPromise);
+            }
+        }
+        // Small delay to prevent tight loop if something unexpected happens
+        if (activePromises.length > 0) await new Promise(r => setTimeout(r, 100)); 
+    }
+    // Final wait for any stragglers if the loop exited prematurely
+    while (activePromises.length > 0) {
+        await Promise.allSettled(activePromises);
+    }
+
+    if (completedCount !== totalLessons) {
+        console.warn(`Concurrency issue: completedCount (${completedCount}) !== totalLessons (${totalLessons})`);
+        // Potentially add any remaining queue items to errors or re-attempt (out of scope for this immediate fix)
+        // For now, assume all processLesson calls have resolved.
+    }
+
+    let finalMessage = `Content generation complete. ${completedCount - errorCount} of ${totalLessons} lessons successful.`;
+    if (errorCount > 0) {
+      finalMessage += ` ${errorCount} failed.`;
+      setGenerationError(`Some lessons failed. Check console for details. Failures: ${results.filter(r => !r.success).map(r => r.lessonTitle).join(', ')}`);
+    }
+    setGenerationStatus(finalMessage);
+    setIsGeneratingContent(false);
+    console.log('All lesson content generation attempts finished.', results);
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <header className="mb-6">
@@ -138,6 +276,19 @@ export default function BaseClassDetailPage() {
             <p className="text-muted-foreground mt-1">{baseClass.description}</p>
           </div>
           <div className="flex gap-2">
+            {/* New Button for Generating All Lesson Content */}
+            <Button 
+              variant="outline" 
+              onClick={handleGenerateAllLessonsContent}
+              disabled={isGeneratingContent}
+            >
+              {isGeneratingContent ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-2" />
+              )}
+              {isGeneratingContent ? generationStatus : 'Generate All Lesson Content'}
+            </Button>
             <Button variant="outline" asChild>
               <Link href="/teach/base-classes">Back to Classes</Link>
             </Button>
@@ -147,6 +298,17 @@ export default function BaseClassDetailPage() {
             </Button>
           </div>
         </div>
+        {/* Generation Status/Error Display */}
+        {isGeneratingContent && !generationError && (
+          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-sm">
+            {generationStatus}
+          </div>
+        )}
+        {generationError && (
+          <div className="mt-2 p-2 bg-destructive/10 border border-destructive/20 text-destructive rounded-md text-sm">
+            Error: {generationError}
+          </div>
+        )}
         <div className="flex flex-wrap gap-2 mt-2">
           {baseClass.subject && (
             <span className="bg-muted text-muted-foreground text-sm px-2 py-1 rounded">
