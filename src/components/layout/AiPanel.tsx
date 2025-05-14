@@ -6,11 +6,16 @@ import { X } from 'lucide-react';
 import { useUIContext } from '@/context/UIContext';
 import { LunaAIChat } from '@/components/LunaAIChat';
 import { cn } from '@/lib/utils';
+import type { UserRole } from "@/config/navConfig"; // Import UserRole
 
 // Reuse the same hover class for consistency across components
 const buttonHoverClass = "hover:bg-gradient-to-r hover:from-[#6B5DE5]/5 hover:to-[#6B5DE5]/10";
 
-const AiPanel = () => {
+interface AiPanelProps {
+  userRole: UserRole;
+}
+
+const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
   const { togglePanelVisible } = useUIContext();
   const [isMobile, setIsMobile] = useState(false);
 
@@ -55,7 +60,7 @@ const AiPanel = () => {
 
       {/* Luna AI Chat Component */}
       <div className="flex-1 overflow-y-auto py-4 px-2">
-        <LunaAIChat />
+        <LunaAIChat userRole={userRole} />
       </div>
     </aside>
   );

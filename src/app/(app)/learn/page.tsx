@@ -9,15 +9,16 @@ import ActiveCourseItem, { ActiveCourseItemProps } from "@/components/dashboard/
 async function getNextUpData(supabase: any, userId: string) {
   const { data: enrollments, error: enrollmentsError } = await supabase
     .from('rosters')
-    .select('class_instances (id, title, base_class_id)')
-    .eq('student_id', userId)
+    .select('class_instances (id, name, base_class_id)')
+    .eq('profile_id', userId)
+    .eq('role', 'student')
     .limit(1);
 
   if (enrollmentsError || !enrollments || enrollments.length === 0 || !enrollments[0].class_instances) {
     return { lessonTitle: undefined, courseTitle: undefined, lessonHref: undefined };
   }
   const currentInstance = enrollments[0].class_instances;
-  const courseTitle = currentInstance.title || "Unnamed Course";
+  const courseTitle = currentInstance.name || "Unnamed Course";
   const baseClassId = currentInstance.base_class_id;
 
   const { data: path, error: pathError } = await supabase
@@ -53,11 +54,15 @@ async function getActiveCoursesData(supabase: any, userId: string): Promise<Acti
     .select(`
       class_instances (
         id,
-        title,
-        base_classes ( id, subject ) 
+        name,
+        base_classes (
+          id,
+          settings
+        )
       )
     `)
-    .eq('student_id', userId)
+    .eq('profile_id', userId)
+    .eq('role', 'student')
     // .eq('class_instances.archived', false) // Add if you have an archived flag
     // .order('class_instances.last_accessed_at', { ascending: false }) // For most recent
     .limit(3); // Limit to 3 courses
@@ -69,10 +74,12 @@ async function getActiveCoursesData(supabase: any, userId: string): Promise<Acti
 
   return enrollments.map((enrollment: any) => {
     const instance = enrollment.class_instances;
+    // Access subject from settings
+    const subject = instance.base_classes?.settings?.subject || "General Subject"; 
     return {
       id: instance.id,
-      title: instance.title || "Unnamed Course",
-      // description: instance.base_classes?.subject || "General Subject", // Example description
+      title: instance.name || "Unnamed Course",
+      description: subject, // Use the extracted subject as description
       progress: Math.floor(Math.random() * 100), // Placeholder progress
       href: `/learn/courses/${instance.id}`,
     };

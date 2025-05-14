@@ -21,7 +21,7 @@ async function getActiveClassesData(supabase: ReturnType<typeof createSupabaseSe
   const { data: rosterEntries, error: rosterError } = await supabase
     .from('rosters')
     .select('class_instance_id')
-    .eq('member_id', userId)
+    .eq('profile_id', userId)
     .eq('role', 'teacher');
 
   if (rosterError) {
@@ -101,7 +101,7 @@ async function getRecentlyGradedData(supabase: ReturnType<typeof createSupabaseS
   const { data: rosterEntries, error: rosterError } = await supabase
     .from('rosters')
     .select('class_instance_id')
-    .eq('member_id', userId)
+    .eq('profile_id', userId)
     .eq('role', 'teacher');
 
   if (rosterError) {
@@ -228,8 +228,8 @@ async function getUpcomingDeadlinesData(supabase: ReturnType<typeof createSupaba
   const { data: rosterEntries, error: rosterError } = await supabase
     .from('rosters')
     .select('class_instance_id')
-    .eq('member_id', userId)
-    .eq('role', 'TEACHER');
+    .eq('profile_id', userId)
+    .eq('role', 'teacher');
   if (rosterError || !rosterEntries) return [];
   const classInstanceIds = rosterEntries.map(entry => entry.class_instance_id);
 
@@ -343,7 +343,7 @@ export default async function TeacherDashboardPage() {
     redirect("/login?error=profile");
   }
 
-  console.log(`TeacherDashboard: User ID: ${user.id}, Fetched Profile Role: ${profile?.role}`); // Log the fetched role
+  console.log(`TeacherDashboard: User ID: ${user.id}, Fetched Profile Role: ${profile?.role}`);
 
   if (profile.role !== 'teacher') {
     console.warn(`TeacherDashboard: Role mismatch. Actual: ${profile.role}, Expected: teacher. Redirecting to /dashboard?error=unauthorized`);
@@ -352,214 +352,158 @@ export default async function TeacherDashboardPage() {
 
   const userName = profile.first_name || 'Teacher';
 
-  // Fetch active classes data
-  let activeClasses: ActiveClassData[] = [];
-  let activeClassesError: string | null = null;
-  try {
-    activeClasses = await getActiveClassesData(supabase, user.id);
-  } catch (e: any) {
-    console.error("Failed to fetch active classes data:", e);
-    activeClassesError = e.message || "Could not load active classes.";
-  }
-
-  // Fetch recently graded data
-  let recentlyGraded: RecentlyGradedData[] = [];
-  let recentlyGradedFetchError: string | null = null;
-  try {
-    recentlyGraded = await getRecentlyGradedData(supabase, user.id);
-  } catch (e: any) {
-    console.error("Failed to fetch recently graded assignments:", e);
-    recentlyGradedFetchError = e.message || "Could not load recently graded assignments.";
-  }
-
-  // Fetch upcoming deadlines data
-  let upcomingDeadlines: UpcomingDeadlineData[] = [];
-  let upcomingDeadlinesFetchError: string | null = null;
-  try {
-    upcomingDeadlines = await getUpcomingDeadlinesData(supabase, user.id);
-  } catch (e: any) {
-    console.error("Failed to fetch upcoming deadlines:", e);
-    upcomingDeadlinesFetchError = e.message || "Could not load upcoming deadlines.";
-  }
-
-  // Fetch student performance data
-  let studentPerformance: StudentPerformanceData[] = [];
-  let studentPerformanceFetchError: string | null = null;
-  try {
-    studentPerformance = await getStudentPerformanceData(supabase, user.id);
-  } catch (e: any) {
-    console.error("Failed to fetch student performance data:", e);
-    studentPerformanceFetchError = e.message || "Could not load student performance data.";
-  }
+  const [activeClasses, recentlyGraded, upcomingDeadlines, studentPerformance] = await Promise.all([
+    getActiveClassesData(supabase, user.id),
+    getRecentlyGradedData(supabase, user.id),
+    getUpcomingDeadlinesData(supabase, user.id),
+    getStudentPerformanceData(supabase, user.id)
+  ]);
+  // Note: Error handling for individual data fetches can be added here if needed, 
+  // or keep as is if minor errors in one section shouldn't block the page.
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8">
+    <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6 md:space-y-8">
       <WelcomeCard userName={userName} userRole={profile.role} />
 
-      {/* Your Active Classes Section */}
-      <section aria-labelledby="active-classes-heading" className="mt-8">
-        <h2 id="active-classes-heading" className="text-2xl font-semibold mb-4 flex items-center">
-          <BookOpenCheck className="mr-3 h-7 w-7 text-primary" />
-          Your Active Classes
-        </h2>
-        {activeClassesError && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{activeClassesError}</AlertDescription>
-          </Alert>
-        )}
-        {!activeClassesError && activeClasses.length === 0 && (
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertTitle>No Active Classes</AlertTitle>
-            <AlertDescription>
-              You are not currently teaching any active classes, or there was an issue loading them.
-              You can create and manage your classes in the 'My Base Classes' and 'My Class Instances' sections.
-            </AlertDescription>
-          </Alert>
-        )}
-        {!activeClassesError && activeClasses.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            {activeClasses.map((course) => (
-              <ActiveClassItem
-                key={course.id}
-                id={course.id}
-                name={course.name}
-                baseClassName={course.baseClassName}
-                studentCount={course.studentCount}
-                manageClassUrl={course.manageClassUrl}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+      {/* Bento Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+        
+        {/* Card 1: Your Active Classes (Spans 2 columns on lg) */}
+        <div className="lg:col-span-2 bg-card p-4 md:p-6 rounded-lg shadow">
+          <h2 id="active-classes-heading" className="text-xl font-semibold mb-4 flex items-center">
+            <BookOpenCheck className="mr-3 h-6 w-6 text-primary" />
+            Your Active Classes
+          </h2>
+          {/* Error/Empty state handling for activeClasses can go here if activeClassesError was fetched */}
+          {activeClasses.length === 0 && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertTitle>No Active Classes</AlertTitle>
+              <AlertDescription>
+                You are not currently teaching any active classes. Create them in 'Base Classes' and 'Class Instances'.
+              </AlertDescription>
+            </Alert>
+          )}
+          {activeClasses.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {activeClasses.map((course) => (
+                <ActiveClassItem
+                  key={course.id}
+                  id={course.id}
+                  name={course.name}
+                  baseClassName={course.baseClassName}
+                  studentCount={course.studentCount}
+                  manageClassUrl={course.manageClassUrl}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
-      {/* Recently Graded Assignments Section */}
-      <section aria-labelledby="graded-assignments-heading" className="mt-12">
-        <h2 id="graded-assignments-heading" className="text-2xl font-semibold mb-4 flex items-center">
-          <ClipboardCheck className="mr-3 h-7 w-7 text-primary" />
-          Recently Graded Assignments
-        </h2>
-        {recentlyGradedFetchError && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Error Loading Graded Assignments</AlertTitle>
-            <AlertDescription>{recentlyGradedFetchError}</AlertDescription>
-          </Alert>
-        )}
-        {!recentlyGradedFetchError && recentlyGraded.length === 0 && (
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertTitle>No Recently Graded Assignments</AlertTitle>
-            <AlertDescription>
-              No assignments have been graded recently, or they could not be loaded.
-            </AlertDescription>
-          </Alert>
-        )}
-        {!recentlyGradedFetchError && recentlyGraded.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {recentlyGraded.map((item) => (
-              <RecentlyGradedItem
-                key={item.submissionId}
-                submissionId={item.submissionId}
-                assignmentName={item.assignmentName}
-                studentName={item.studentName}
-                studentInitials={item.studentInitials}
-                score={item.score}
-                maxScore={item.maxScore}
-                gradedAt={item.gradedAt}
-                viewSubmissionUrl={item.viewSubmissionUrl}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+        {/* Card 2: Upcoming Deadlines (Spans 1 column on lg) */}
+        <div className="lg:col-span-1 bg-card p-4 md:p-6 rounded-lg shadow">
+          <h2 id="upcoming-deadlines-heading" className="text-xl font-semibold mb-4 flex items-center">
+            <CalendarClock className="mr-3 h-6 w-6 text-primary" />
+            Upcoming Deadlines
+          </h2>
+          {upcomingDeadlines.length === 0 && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertTitle>No Upcoming Deadlines</AlertTitle>
+              <AlertDescription>
+                No deadlines in the next 30 days, or schema update needed for live data.
+              </AlertDescription>
+            </Alert>
+          )}
+          {upcomingDeadlines.length > 0 && (
+            <div className="space-y-3">
+              {upcomingDeadlines.map((item) => (
+                <UpcomingDeadlineItem
+                  key={item.id}
+                  id={item.id}
+                  assignmentName={item.assignmentName}
+                  className={item.className}
+                  dueDate={item.dueDate}
+                  detailsUrl={item.detailsUrl}
+                />
+              ))}
+            </div>
+          )}
+          <p className="mt-2 text-xs text-muted-foreground">
+            Note: Deadline data is currently illustrative.
+          </p>
+        </div>
 
-      {/* Upcoming Deadlines Section */}
-      <section aria-labelledby="upcoming-deadlines-heading" className="mt-12">
-        <h2 id="upcoming-deadlines-heading" className="text-2xl font-semibold mb-4 flex items-center">
-          <CalendarClock className="mr-3 h-7 w-7 text-primary" />
-          Upcoming Deadlines
-        </h2>
-        {upcomingDeadlinesFetchError && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Error Loading Deadlines</AlertTitle>
-            <AlertDescription>{upcomingDeadlinesFetchError}</AlertDescription>
-          </Alert>
-        )}
-        {!upcomingDeadlinesFetchError && upcomingDeadlines.length === 0 && (
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertTitle>No Upcoming Deadlines</AlertTitle>
-            <AlertDescription>
-              There are no upcoming deadlines in the next 30 days, or they could not be loaded.
-              Please ensure due dates are set for assignments if you expect to see them here.
-            </AlertDescription>
-          </Alert>
-        )}
-        {!upcomingDeadlinesFetchError && upcomingDeadlines.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {upcomingDeadlines.map((item) => (
-              <UpcomingDeadlineItem
-                key={item.id}
-                id={item.id}
-                assignmentName={item.assignmentName}
-                className={item.className}
-                dueDate={item.dueDate}
-                detailsUrl={item.detailsUrl}
-              />
-            ))}
-          </div>
-        )}
-         <p className="mt-2 text-sm text-muted-foreground">
-            Note: Deadline data is currently illustrative. Database schema update needed for live data.
-        </p>
-      </section>
+        {/* Card 3: Recently Graded Assignments (Spans 2 columns on lg) */}
+        <div className="lg:col-span-2 bg-card p-4 md:p-6 rounded-lg shadow">
+          <h2 id="graded-assignments-heading" className="text-xl font-semibold mb-4 flex items-center">
+            <ClipboardCheck className="mr-3 h-6 w-6 text-primary" />
+            Recently Graded
+          </h2>
+          {recentlyGraded.length === 0 && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertTitle>No Recently Graded Assignments</AlertTitle>
+              <AlertDescription>
+                No assignments have been graded recently.
+              </AlertDescription>
+            </Alert>
+          )}
+          {recentlyGraded.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {recentlyGraded.map((item) => (
+                <RecentlyGradedItem
+                  key={item.submissionId}
+                  submissionId={item.submissionId}
+                  assignmentName={item.assignmentName}
+                  studentName={item.studentName}
+                  studentInitials={item.studentInitials}
+                  score={item.score}
+                  maxScore={item.maxScore}
+                  gradedAt={item.gradedAt}
+                  viewSubmissionUrl={item.viewSubmissionUrl}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Card 4: Student Performance Overview (Spans 1 column on lg) */}
+        <div className="lg:col-span-1 bg-card p-4 md:p-6 rounded-lg shadow">
+          <h2 id="student-performance-heading" className="text-xl font-semibold mb-4 flex items-center">
+            <Users className="mr-3 h-6 w-6 text-primary" />
+            Student Performance
+          </h2>
+          {studentPerformance.length === 0 && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertTitle>Performance Data Not Available</AlertTitle>
+              <AlertDescription>
+                Aggregated student performance data is not yet available.
+              </AlertDescription>
+            </Alert>
+          )}
+          {studentPerformance.length > 0 && (
+            <div className="space-y-3">
+              {studentPerformance.map((item) => (
+                <StudentPerformanceItem
+                  key={item.id}
+                  id={item.id}
+                  name={item.name}
+                  studentCount={item.studentCount}
+                  averageScore={item.averageScore}
+                  studentsAtRiskCount={item.studentsAtRiskCount}
+                  detailsUrl={item.detailsUrl}
+                />
+              ))}
+            </div>
+          )}
+           <p className="mt-2 text-xs text-muted-foreground">
+            Note: Performance data is currently illustrative.
+          </p>
+        </div>
 
-      {/* Student Performance Overview Section */}
-      <section aria-labelledby="student-performance-heading" className="mt-12">
-        <h2 id="student-performance-heading" className="text-2xl font-semibold mb-4 flex items-center">
-          <Users className="mr-3 h-7 w-7 text-primary" />
-          Student Performance Overview
-        </h2>
-        {studentPerformanceFetchError && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Error Loading Performance Data</AlertTitle>
-            <AlertDescription>{studentPerformanceFetchError}</AlertDescription>
-          </Alert>
-        )}
-        {!studentPerformanceFetchError && studentPerformance.length === 0 && (
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertTitle>Student Performance Data Not Available</AlertTitle>
-            <AlertDescription>
-              Aggregated student performance data is not yet available or could not be loaded.
-              Detailed calculations and data models are required for this section.
-            </AlertDescription>
-          </Alert>
-        )}
-        {!studentPerformanceFetchError && studentPerformance.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            {studentPerformance.map((item) => (
-              <StudentPerformanceItem
-                key={item.id}
-                id={item.id}
-                name={item.name}
-                studentCount={item.studentCount}
-                averageScore={item.averageScore}
-                studentsAtRiskCount={item.studentsAtRiskCount}
-                detailsUrl={item.detailsUrl}
-              />
-            ))}
-          </div>
-        )}
-        <p className="mt-2 text-sm text-muted-foreground">
-            Note: Student performance data is currently illustrative. Complex data aggregation and schema review needed for live data.
-        </p>
-      </section>
+      </div>
     </div>
   );
 } 

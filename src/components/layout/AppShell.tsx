@@ -58,7 +58,7 @@ const AppShell: React.FC<AppShellProps> = ({ children, userRole }) => {
         {/* AI Panel for Desktop - Part of the flex layout to push content */}
         {!isMobile && isPanelVisible && (
           <div className="w-80 border-l border-[#E0E0E0] dark:border-[#333333] h-screen transition-all duration-300 ease-in-out">
-            <AiPanel />
+            <AiPanel userRole={userRole} />
           </div>
         )}
 
@@ -72,7 +72,7 @@ const AppShell: React.FC<AppShellProps> = ({ children, userRole }) => {
           className="fixed top-0 right-0 z-50 w-[90vw] max-w-[90vw] bg-background shadow-xl transition-all duration-300 ease-in-out"
           style={{ height: '100dvh' }} // Use dvh for better mobile height handling
         >
-          <AiPanel />
+          <AiPanel userRole={userRole} />
         </div>
       )}
 

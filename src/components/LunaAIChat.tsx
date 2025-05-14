@@ -6,10 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Bot, User, ExternalLink, Mic, MicOff, Wand2, Presentation, Wrench, Brain, MessageSquare } from 'lucide-react';
+import { 
+    Loader2, Bot, User, ExternalLink, Mic, MicOff, Wand2, Brain, MessageSquare, // Teacher & Student common
+    ClipboardCheck, // Student: Exam Coach
+    Wrench, BarChart3, Users, // Admin icons
+    SlidersHorizontal, CreditCard, ShieldCheck // Super Admin icons
+} from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/navigation';
 import { CourseOutlineMessage } from '@/components/luna/CourseOutlineMessage';
+import type { UserRole } from "@/config/navConfig"; // Import UserRole for the prop
 
 // Define a structure for the course outline from the API
 interface CourseOutlineModule {
@@ -31,7 +37,9 @@ interface GeneratedCourseOutline {
 // Updated Persona types to include teacher roles
 export type StudentPersonaType = 'tutor' | 'peer' | 'examCoach';
 export type TeacherPersonaType = 'lunaChat' | 'classCoPilot' | 'teachingCoach';
-export type PersonaType = StudentPersonaType | TeacherPersonaType;
+export type AdminPersonaType = 'adminSupport' | 'dataAnalyst' | 'userManager';
+export type SuperAdminPersonaType = 'platformAdmin' | 'billingSupport' | 'technicalSupport';
+export type PersonaType = StudentPersonaType | TeacherPersonaType | AdminPersonaType | SuperAdminPersonaType;
 
 // Message interface might need updates for different message types (e.g., outline)
 export interface Citation {
@@ -54,19 +62,33 @@ export interface ChatMessage {
   actions?: Array<{ label: string; action: () => void }>; // For buttons like "Save", "Open"
 }
 
+interface LunaAIChatProps {
+  userRole: UserRole;
+}
+
 /**
  * Luna AI Chat component - Updated for Teacher Personas
  */
-export function LunaAIChat() {
+export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userRole from props
   const router = useRouter();
   const [userMessage, setUserMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  // TODO: Determine user role (student/teacher) to set default persona
-  const [currentUserRole, setCurrentUserRole] = useState<'student' | 'teacher'>('teacher'); // Placeholder
-  const defaultPersona = currentUserRole === 'teacher' ? 'lunaChat' : 'tutor';
+  
+  // Use the passed userRole prop to set the initial currentUserRole state
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole>(userRole);
+  
+  const defaultPersona = (() => {
+    switch (currentUserRole) {
+      case 'student': return 'tutor';
+      case 'teacher': return 'lunaChat';
+      case 'admin': return 'adminSupport';
+      case 'super_admin': return 'platformAdmin';
+      default: return 'tutor'; // Fallback
+    }
+  })();
   const [currentPersona, setCurrentPersona] = useState<PersonaType>(defaultPersona);
   
   const messageHistory = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
@@ -96,31 +118,85 @@ export function LunaAIChat() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
 
+  useEffect(() => {
+    // When userRole prop changes (e.g., if AppShell re-renders with a different role for some reason),
+    // update the internal state and reset persona and messages.
+    if (userRole && userRole !== currentUserRole) {
+      setCurrentUserRole(userRole);
+      // Recalculate default persona based on new role
+      const newDefaultPersona = (() => {
+        switch (userRole) {
+          case 'student': return 'tutor';
+          case 'teacher': return 'lunaChat';
+          case 'admin': return 'adminSupport';
+          case 'super_admin': return 'platformAdmin';
+          default: return 'tutor'; // Fallback
+        }
+      })();
+      setCurrentPersona(newDefaultPersona);
+      setMessages([
+        {
+          id: 'welcome-reset',
+          role: 'assistant',
+          content: getWelcomeMessage(newDefaultPersona),
+          timestamp: new Date(),
+          persona: newDefaultPersona
+        }
+      ]);
+      messageHistory.current = [];
+    }
+  }, [userRole, currentUserRole]); // Add currentUserRole to dependencies to avoid stale closure issues if needed
+
   // Define Personas Data (including teacher ones)
   const studentPersonas = [
     { id: 'tutor', name: 'Tutor', icon: <Bot size={14} /> },
     { id: 'peer', name: 'Peer Buddy', icon: <User size={14} /> },
-    { id: 'examCoach', name: 'Exam Coach', icon: <Loader2 size={14} /> } // Re-using Loader2 for now
+    { id: 'examCoach', name: 'Exam Coach', icon: <ClipboardCheck size={14} /> } // Updated icon
   ];
   const teacherPersonas = [
     { id: 'lunaChat', name: 'Luna Chat', icon: <MessageSquare size={14} /> },
     { id: 'classCoPilot', name: 'Class Co-Pilot', icon: <Wand2 size={14} /> },
     { id: 'teachingCoach', name: 'Teaching Coach', icon: <Brain size={14} /> }
   ];
+  const adminPersonas = [
+    { id: 'adminSupport', name: 'Support Assistant', icon: <Wrench size={14} /> },
+    { id: 'dataAnalyst', name: 'Data Analyst', icon: <BarChart3 size={14} /> },
+    { id: 'userManager', name: 'User Manager', icon: <Users size={14} /> }
+  ];
+  const superAdminPersonas = [
+    { id: 'platformAdmin', name: 'Platform Admin', icon: <SlidersHorizontal size={14} /> },
+    { id: 'billingSupport', name: 'Billing Support', icon: <CreditCard size={14} /> },
+    { id: 'technicalSupport', name: 'Technical Support', icon: <ShieldCheck size={14} /> }
+  ];
 
-  // TODO: Filter personas based on currentUserRole
-  const availablePersonas = currentUserRole === 'teacher' ? teacherPersonas : studentPersonas;
+  const availablePersonas = (() => {
+    switch (currentUserRole) {
+      case 'student': return studentPersonas;
+      case 'teacher': return teacherPersonas;
+      case 'admin': return adminPersonas;
+      case 'super_admin': return superAdminPersonas;
+      default: return studentPersonas; // Fallback to student personas
+    }
+  })();
 
   const getWelcomeMessage = (persona: PersonaType): string => {
     switch (persona) {
       // Student Personas
       case 'tutor': return "Hello! I'm Luna, your AI tutor. How can I help?";
       case 'peer': return "Hi there! I'm Luna, your peer learning buddy. What are you working on?";
-      case 'examCoach': return "Welcome! I'm Luna, your exam coach. Ready to practice?";
+      case 'examCoach': return "Welcome! I'm Luna, your exam coach. Ready to practice for your exams?"; // Slightly updated
       // Teacher Personas
       case 'lunaChat': return "Hello! I'm Luna, your general AI assistant. How can I help you today?";
       case 'classCoPilot': return "Hello! I'm the Class Co-Pilot. Describe the course you want to design, and I'll help generate an outline.";
       case 'teachingCoach': return "Hi! As your Teaching Coach, I can help with teaching methods, differentiation, and lesson planning. What challenge can we tackle?";
+      // Admin Personas
+      case 'adminSupport': return "Hello! As your Admin Support assistant, I can help with platform features and troubleshooting. What do you need assistance with?";
+      case 'dataAnalyst': return "Hi! I'm your Data Analyst assistant. Ask me about school analytics, user engagement, or course performance.";
+      case 'userManager': return "Welcome! I can assist with user management, role assignments, and other user-related tasks. How can I help?";
+      // Super Admin Personas
+      case 'platformAdmin': return "Hello! As the Platform Admin assistant, I can help with global settings, institution management, and system configurations.";
+      case 'billingSupport': return "Hi! I'm your Billing Support assistant. Ask me about subscriptions, usage reports, or billing queries.";
+      case 'technicalSupport': return "Welcome! For advanced troubleshooting, system health checks, or integration support, I'm here to help.";
       default: return "Hello! I'm Luna. How can I assist?";
     }
   };
