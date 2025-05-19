@@ -1,4 +1,5 @@
-import type { LessonSection, LessonSectionVersion } from '@/types/teach';
+import type { LessonSection } from '@/types/lesson';
+import type { LessonSectionVersion } from '@/types/teach';
 
 const API_BASE_PATH = '/api/teach';
 

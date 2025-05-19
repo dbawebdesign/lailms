@@ -6,11 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { 
     Loader2, Bot, User, ExternalLink, Mic, MicOff, Wand2, Brain, MessageSquare, // Teacher & Student common
     ClipboardCheck, // Student: Exam Coach
     Wrench, BarChart3, Users, // Admin icons
-    SlidersHorizontal, CreditCard, ShieldCheck // Super Admin icons
+    SlidersHorizontal, CreditCard, ShieldCheck, // Super Admin icons
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/navigation';
@@ -82,11 +89,11 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
   
   const defaultPersona = (() => {
     switch (currentUserRole) {
-      case 'student': return 'tutor';
-      case 'teacher': return 'lunaChat';
-      case 'admin': return 'adminSupport';
-      case 'super_admin': return 'platformAdmin';
-      default: return 'tutor'; // Fallback
+      case 'student': return 'lunaChat' as PersonaType;
+      case 'teacher': return 'lunaChat' as PersonaType;
+      case 'admin': return 'lunaChat' as PersonaType;
+      case 'super_admin': return 'lunaChat' as PersonaType;
+      default: return 'lunaChat' as PersonaType;
     }
   })();
   const [currentPersona, setCurrentPersona] = useState<PersonaType>(defaultPersona);
@@ -126,11 +133,11 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
       // Recalculate default persona based on new role
       const newDefaultPersona = (() => {
         switch (userRole) {
-          case 'student': return 'tutor';
-          case 'teacher': return 'lunaChat';
-          case 'admin': return 'adminSupport';
-          case 'super_admin': return 'platformAdmin';
-          default: return 'tutor'; // Fallback
+          case 'student': return 'lunaChat' as PersonaType;
+          case 'teacher': return 'lunaChat' as PersonaType;
+          case 'admin': return 'lunaChat' as PersonaType;
+          case 'super_admin': return 'lunaChat' as PersonaType;
+          default: return 'lunaChat' as PersonaType;
         }
       })();
       setCurrentPersona(newDefaultPersona);
@@ -149,9 +156,10 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
 
   // Define Personas Data (including teacher ones)
   const studentPersonas = [
+    { id: 'lunaChat', name: 'Luna Chat', icon: <MessageSquare size={14} /> },
     { id: 'tutor', name: 'Tutor', icon: <Bot size={14} /> },
     { id: 'peer', name: 'Peer Buddy', icon: <User size={14} /> },
-    { id: 'examCoach', name: 'Exam Coach', icon: <ClipboardCheck size={14} /> } // Updated icon
+    { id: 'examCoach', name: 'Exam Coach', icon: <ClipboardCheck size={14} /> }
   ];
   const teacherPersonas = [
     { id: 'lunaChat', name: 'Luna Chat', icon: <MessageSquare size={14} /> },
@@ -159,11 +167,13 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
     { id: 'teachingCoach', name: 'Teaching Coach', icon: <Brain size={14} /> }
   ];
   const adminPersonas = [
+    { id: 'lunaChat', name: 'Luna Chat', icon: <MessageSquare size={14} /> },
     { id: 'adminSupport', name: 'Support Assistant', icon: <Wrench size={14} /> },
     { id: 'dataAnalyst', name: 'Data Analyst', icon: <BarChart3 size={14} /> },
     { id: 'userManager', name: 'User Manager', icon: <Users size={14} /> }
   ];
   const superAdminPersonas = [
+    { id: 'lunaChat', name: 'Luna Chat', icon: <MessageSquare size={14} /> },
     { id: 'platformAdmin', name: 'Platform Admin', icon: <SlidersHorizontal size={14} /> },
     { id: 'billingSupport', name: 'Billing Support', icon: <CreditCard size={14} /> },
     { id: 'technicalSupport', name: 'Technical Support', icon: <ShieldCheck size={14} /> }
@@ -479,20 +489,31 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
   return (
     <div className="flex flex-col h-full">
       {/* Persona Selector */}
-      <div className="flex border-b p-1 bg-muted/10 flex-wrap">
-        {availablePersonas.map((persona) => (
-          <Button
-            key={persona.id}
-            variant={currentPersona === persona.id ? "default" : "ghost"}
-            size="sm"
-            className={`flex-grow md:flex-1 text-xs gap-1 h-8 m-[1px] min-w-[100px] ${currentPersona === persona.id ? "" : "opacity-70"}`}
-            title={`Switch to ${persona.name} mode`}
-            onClick={() => handlePersonaChange(persona.id as PersonaType)}
-          >
-            {persona.icon}
-            <span className="truncate">{persona.name}</span>
-          </Button>
-        ))}
+      <div className="flex border-b p-2 bg-muted/10 items-center space-x-2">
+        <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Mode:</span>
+        <Select
+          value={currentPersona}
+          onValueChange={(value: string) => handlePersonaChange(value as PersonaType)}
+        >
+          <SelectTrigger className="flex-grow h-9 focus:ring-primary">
+            <SelectValue placeholder="Select a mode">
+              <div className="flex items-center gap-2">
+                {availablePersonas.find(p => p.id === currentPersona)?.icon}
+                <span>{availablePersonas.find(p => p.id === currentPersona)?.name}</span>
+              </div>
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {availablePersonas.map((persona) => (
+              <SelectItem key={persona.id} value={persona.id}>
+                <div className="flex items-center gap-2">
+                  {persona.icon}
+                  <span>{persona.name}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       
       {/* Chat Messages */}

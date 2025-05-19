@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import LessonEditor from '@/components/teach/designer/LessonEditor'; // We will create/update this component next
 import { getLessonSections } from '@/lib/services/teachService';
-import type { LessonSection } from '@/types/teach';
+import type { LessonSection } from '@/types/lesson';
 import { LoadingSpinner } from '@/components/ui/loading-spinner'; // Assuming a loading spinner component exists
 
 interface LessonPageProps {
@@ -72,6 +72,23 @@ const LessonPage: React.FC<LessonPageProps> = ({ params }) => {
         {lessonTitle}
       </h1>
       {error && <div className="text-red-500 bg-red-100 p-3 rounded mb-4">Error: {error}</div>}
+      
+      {/* Temporary display of section titles */}
+      {initialSections && initialSections.length > 0 && (
+        <div className="mb-4 p-4 border rounded bg-gray-50">
+          <h2 className="text-xl font-semibold mb-2">Fetched Sections (Debug):</h2>
+          <ul>
+            {initialSections.map((section) => (
+              <li key={section.id}>{section.title} (Type: {section.section_type}, Order: {section.order_index})</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {initialSections && initialSections.length === 0 && !isLoading && (
+        <div className="mb-4 p-4 border rounded bg-yellow-50 text-yellow-700">
+          <p>No sections found for this lesson. You can start by adding one.</p>
+        </div>
+      )}
       
       <LessonEditor 
         lessonIdParam={lessonIdParam} 

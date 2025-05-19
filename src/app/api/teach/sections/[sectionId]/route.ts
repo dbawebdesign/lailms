@@ -16,9 +16,15 @@ const supabaseRouteHandlerClient = () => {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) { return cookieStore.get(name)?.value; },
-        set(name: string, value: string, options: CookieOptions) { cookieStore.set(name, value, options); },
-        remove(name: string, options: CookieOptions) { cookieStore.delete(name, options); },
+        async get(name: string) { 
+          return (await cookieStore).get(name)?.value; 
+        },
+        async set(name: string, value: string, options: CookieOptions) { 
+          (await cookieStore).set(name, value, options); 
+        },
+        async remove(name: string, options: CookieOptions) { 
+          (await cookieStore).set(name, '', options); // Use set with empty value to remove
+        },
       },
     }
   );

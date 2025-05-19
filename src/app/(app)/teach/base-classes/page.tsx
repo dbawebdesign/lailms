@@ -1,11 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { BaseClass, BaseClassCreationData } from "@/types/teach";
+import { useRouter } from 'next/navigation';
+import { BaseClass, BaseClassCreationData, GeneratedOutline } from "@/types/teach";
 import { BaseClassCardGrid } from "@/components/teach/BaseClassCardGrid";
 import { CreateBaseClassModal } from "@/components/teach/CreateBaseClassModal";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, BookOpenText, Plus } from "lucide-react";
+import { PlusCircle, BookOpenText, Plus, Loader2 } from "lucide-react";
+import { createBrowserClient } from '@supabase/ssr'; // Import Supabase client
+import { Database } from '@learnologyai/types'; // Import Database types
 // import { toast } from "sonner"; // Consider adding toast notifications
 
 // --- Mock API --- (To be moved to a separate file e.g., src/lib/api/teach-mocks.ts later)
@@ -72,14 +75,62 @@ import { PlusCircle, BookOpenText, Plus } from "lucide-react";
 // --- End Mock API ---
 
 export default function TeachBaseClassesPage() {
+  const router = useRouter();
   const [baseClasses, setBaseClasses] = useState<BaseClass[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingPage, setIsLoadingPage] = useState(true); // For initial page load
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null); // For displaying errors
+  const [pageError, setPageError] = useState<string | null>(null); 
+  
+  const [isProcessingRequest, setIsProcessingRequest] = useState(false); // Overall request processing state
+  const [currentProcessStatus, setCurrentProcessStatus] = useState<string | null>(null); // Granular status for modal & page
+
+  const [userOrgId, setUserOrgId] = useState<string | null>(null);
+  const [isLoadingOrg, setIsLoadingOrg] = useState(true);
+
+  // Create Supabase client
+  const supabase = createBrowserClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  useEffect(() => {
+    async function fetchUserOrganisation() {
+      setIsLoadingOrg(true);
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw new Error('Authentication error: ' + sessionError.message);
+        if (!session) throw new Error('User not logged in. Please log in again.');
+        
+        // Query 'profiles' table instead of 'members'
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('organisation_id')
+          .eq('user_id', session.user.id) // Assuming 'user_id' is the column in profiles linking to auth.users.id
+          .single();
+        
+        if (profileError) {
+          console.error('Profile fetch error:', profileError);
+          throw new Error('Could not retrieve your profile information: ' + profileError.message);
+        }
+        if (!profileData || !profileData.organisation_id) {
+          throw new Error('Organisation ID not found in your profile. Please ensure your profile is complete.');
+        }
+        
+        setUserOrgId(profileData.organisation_id);
+      } catch (err: any) {
+        console.error("Failed to fetch user organisation from profile:", err);
+        setPageError((prevError) => prevError ? `${prevError}; ${err.message}` : err.message);
+        setUserOrgId(null);
+      } finally {
+        setIsLoadingOrg(false);
+      }
+    }
+    fetchUserOrganisation();
+  }, [supabase]);
 
   const loadBaseClasses = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    setIsLoadingPage(true);
+    setPageError(null);
     try {
       const response = await fetch("/api/teach/base-classes");
       if (!response.ok) {
@@ -90,53 +141,131 @@ export default function TeachBaseClassesPage() {
       setBaseClasses(data);
     } catch (err: any) {
       console.error("Failed to load base classes:", err);
-      setError(err.message || "An unexpected error occurred.");
+      setPageError(err.message || "An unexpected error occurred.");
       // toast.error("Failed to load base classes: " + err.message);
     } finally {
-      setIsLoading(false);
+      setIsLoadingPage(false);
     }
   }, []);
 
   useEffect(() => {
-    loadBaseClasses();
-  }, [loadBaseClasses]);
+    if (userOrgId) { // Only load base classes if org context is successfully loaded
+        loadBaseClasses();
+    }
+  }, [loadBaseClasses, userOrgId]);
 
-  const handleCreateBaseClassSubmit = async (data: BaseClassCreationData) => {
-    setIsLoading(true); // Indicate loading state for creation
-    setError(null);
+  const handleCreateBaseClassSubmit = async (formDataFromModal: BaseClassCreationData) => {
+    setIsModalOpen(true); // Ensure modal is open
+    setIsProcessingRequest(true);
+    setCurrentProcessStatus("Initiating creation process...");
+    setPageError(null);
+    let newBaseClassId: string | null = null;
+
     try {
-      const response = await fetch("/api/teach/base-classes", {
+      setCurrentProcessStatus("Step 1/4: Creating base class record...");
+      const createResponse = await fetch("/api/teach/base-classes", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formDataFromModal), 
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create base class");
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json().catch(() => ({error: "Failed to create base class record and parse server error"}));
+        throw new Error(errorData.error || "Failed to create base class record");
+      }
+      const createdBaseClass: BaseClass = await createResponse.json();
+      newBaseClassId = createdBaseClass.id;
+
+      setCurrentProcessStatus("Step 2/4: Generating course outline...");
+      const prompt = `Design a comprehensive course outline for a ${formDataFromModal.lengthInWeeks}-week course titled "${formDataFromModal.name}". Subject: ${createdBaseClass.subject || 'General'}. Grade Level: ${createdBaseClass.gradeLevel || 'Not specified'}. Course Description: ${formDataFromModal.description || 'No additional description provided.'}. Ensure the outline includes distinct modules, and for each module, suggest specific lesson titles.`;
+      
+      const outlineResponse = await fetch("/api/teach/generate-course-outline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+
+      if (!outlineResponse.ok) {
+        const errorData = await outlineResponse.json().catch(() => ({error: "Failed to generate outline and parse server error"}));
+        throw new Error(errorData.error || "Failed to generate course outline");
+      }
+      const generatedOutline: GeneratedOutline = await outlineResponse.json(); 
+
+      setCurrentProcessStatus("Step 3/4: Saving outline to base class...");
+      const updatedSettings = { 
+          ...(createdBaseClass?.settings || {}), 
+          generatedOutline: generatedOutline 
+      };
+
+      const updateSettingsResponse = await fetch(`/api/teach/base-classes/${newBaseClassId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ settings: updatedSettings }), 
+      });
+
+      if (!updateSettingsResponse.ok) {
+          const errorData = await updateSettingsResponse.json().catch(() => ({error: "Failed to save outline and parse server error"}));
+          throw new Error(errorData.error || "Failed to save generated outline");
       }
 
-      const newBaseClass: BaseClass = await response.json();
-      setBaseClasses((prevClasses) => [...prevClasses, newBaseClass].sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime()));
-      setIsModalOpen(false); // Close modal on success
-      // toast.success("Base Class created successfully!");
+      setCurrentProcessStatus("Step 4/4: Populating paths and lessons...");
+      const generateLessonsResponse = await fetch(`/api/teach/base-classes/${newBaseClassId}/generate-lessons`, {
+        method: "POST", 
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!generateLessonsResponse.ok) {
+        const errorData = await generateLessonsResponse.json().catch(() => ({error: "Failed to generate lessons and parse server error"}));
+        throw new Error(errorData.error || "Failed to populate lessons");
+      }
+
+      setCurrentProcessStatus("Finalizing... Almost there!");
+      await loadBaseClasses(); 
+      router.push(`/teach/base-classes/${newBaseClassId}`); 
+
     } catch (err: any) {
-      console.error("Failed to create base class:", err);
-      setError(err.message || "An unexpected error occurred during creation.");
-      // toast.error("Failed to create base class: " + err.message);
-      // Optionally, keep the modal open if creation fails and display error within modal
+      console.error("Multi-step base class creation failed:", err);
+      const detailedErrorMessage = err.message || "An unexpected error occurred during the creation process.";
+      setPageError(detailedErrorMessage); // Keep detailed error for page display if needed
+      setCurrentProcessStatus(`Error: Creation failed. Please try again.`); // More generic for modal
+      // Modal remains open. isProcessingRequest is set to false in finally to re-enable submit.
     } finally {
-      setIsLoading(false);
+      // Only set to false if not navigating away on success. 
+      // If error, this allows retry button in modal to re-enable.
+      // If newBaseClassId is set AND pageError is null, it means success and navigation is about to happen or has happened.
+      if (!(newBaseClassId && !pageError)) {
+        setIsProcessingRequest(false); // Set to false on error or if navigation didn't initiate
+      }
+      // If navigation happens, this component unmounts, so resetting status might not be visible.
+      // If an error occurred, currentProcessStatus already shows the error.
+      // If we are here due to an error, setIsProcessingRequest(false) above is key.
     }
+  };
+
+  const handleModalOpen = () => {
+    if (!userOrgId) {
+      setPageError(isLoadingOrg ? "Organisation context is still loading. Please wait." : "Organisation context could not be loaded. Please refresh or check your profile.");
+      return;
+    }
+    setIsModalOpen(true); 
+    setCurrentProcessStatus(null); 
+    setPageError(null); 
+  };
+
+  const handleModalClose = () => {
+    if (!isProcessingRequest) { // Only allow close if not actively processing
+        setIsModalOpen(false);
+        // Optionally clear status if user cancels
+        // setCurrentProcessStatus(null);
+        // setPageError(null);
+    }
+    // If processing, modal close is prevented by its internal onOpenChange logic
   };
 
   // Placeholder action handlers - these can be implemented later
   const handleViewDetails = (id: string) => {
     console.log("View Details:", id);
-    // Potentially navigate to /teach/base-classes/[id]
-    // router.push(`/teach/base-classes/${id}`); // Make sure to import and setup useRouter from 'next/navigation'
+    router.push(`/teach/base-classes/${id}`);
   };
   const handleEdit = (id: string) => {
     console.log("Edit:", id);
@@ -159,7 +288,7 @@ export default function TeachBaseClassesPage() {
     // Optimistically remove from UI, or wait for API response
     // const originalClasses = [...baseClasses];
     // setBaseClasses(prevClasses => prevClasses.filter(bc => bc.id !== id));
-    setError(null);
+    setPageError(null);
 
     try {
       const response = await fetch(`/api/teach/base-classes/${id}`, {
@@ -176,34 +305,55 @@ export default function TeachBaseClassesPage() {
       // toast.success("Base Class deleted successfully.");
     } catch (err: any) {
       console.error("Failed to delete base class:", err);
-      setError(err.message || "An unexpected error occurred during deletion.");
+      setPageError(err.message || "An unexpected error occurred during deletion.");
       // toast.error("Failed to delete base class: " + err.message);
     }
   };
 
-  if (isLoading && baseClasses.length === 0) {
-    return <div className="container mx-auto p-4 text-center">Loading base classes...</div>;
+  if ((isLoadingPage || isLoadingOrg) && baseClasses.length === 0 && !userOrgId) { 
+    return <div className="container mx-auto p-4 text-center flex flex-col items-center justify-center h-[calc(100vh-150px)]">
+      <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+      {isLoadingOrg ? "Loading your context..." : "Loading base classes..."}
+    </div>;
   }
   
-  // Display error message if any
-  if (error && baseClasses.length === 0) { // Only show full page error if no data loaded
-    return <div className="container mx-auto p-4 text-center text-red-600">Error: {error}</div>;
+  // Updated error display condition
+  if (pageError && (!userOrgId || baseClasses.length === 0) && !isLoadingOrg && !isLoadingPage) {
+    return <div className="container mx-auto p-4 text-center text-red-600">Error: {pageError} <Button onClick={() => window.location.reload()} variant="outline" className="ml-2">Refresh</Button></div>;
   }
-
 
   return (
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">My Base Classes</h1>
-        <Button onClick={() => setIsModalOpen(true)} variant="default" size="lg">
-          <PlusCircle className="mr-2 h-5 w-5" /> Create New Base Class
+        <Button 
+          onClick={handleModalOpen} 
+          variant="default" 
+          size="lg" 
+          disabled={isProcessingRequest || isLoadingOrg || !userOrgId}
+        >
+          {/* Button text logic updated slightly to reflect isProcessingRequest and currentProcessStatus */}
+          {isProcessingRequest && currentProcessStatus ? (
+            <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> {currentProcessStatus.length > 20 ? `${currentProcessStatus.substring(0,20)}...` : currentProcessStatus}</>
+          ) : isLoadingOrg ? (
+            <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading Context...</>
+          ) : !userOrgId ? (
+            <><PlusCircle className="mr-2 h-5 w-5" /> Org ID Missing</>
+          ) : (
+            <><PlusCircle className="mr-2 h-5 w-5" /> Create New Base Class</>
+          )}
         </Button>
       </div>
 
-      {/* Display general error here if some classes loaded but an error occurred later e.g. on delete */}
-      {error && baseClasses.length > 0 && (
-         <div className="mb-4 p-3 bg-red-100 text-red-700 border border-red-400 rounded">\
-           Error: {error}\
+      {pageError && (baseClasses.length > 0 || userOrgId) && (
+         <div className="mb-4 p-3 bg-red-100 text-red-700 border border-red-400 rounded">
+           Error: {pageError}
+         </div>
+      )}
+      {/* Show currentProcessStatus as a banner only if it's an error and modal is closed */}
+      {currentProcessStatus && currentProcessStatus.toLowerCase().startsWith('error') && !isModalOpen && (
+         <div className={`mb-4 p-3 border rounded bg-red-100 text-red-700 border-red-400`}>
+           Last Operation Status: {currentProcessStatus}
          </div>
       )}
 
@@ -214,33 +364,46 @@ export default function TeachBaseClassesPage() {
           onEdit={handleEdit}
           onClone={handleClone}
           onArchive={handleArchive}
-          onDelete={handleDelete} // Pass the real delete handler
+          onDelete={handleDelete}
         />
       ) : (
-        // This block is shown if not loading and no base classes (and no initial loading error)
-        !isLoading && !error && baseClasses.length === 0 && (
+        !isLoadingPage && !isLoadingOrg && !pageError && baseClasses.length === 0 && userOrgId && (
           <div className="text-center py-12">
             <BookOpenText className="mx-auto h-16 w-16 text-slate-400 dark:text-slate-500" />
-            <h3 className="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300\">No Base Classes Yet</h3>
+            <h3 className="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">No Base Classes Yet</h3>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Get started by creating your first base class. It will serve as a template for your course instances.
+              Get started by creating your first base class.
             </p>
-            <Button onClick={() => setIsModalOpen(true)} variant="outline" className="mt-6">
-              <Plus className="mr-2 h-4 w-4" /> Create Base Class
+            <Button 
+              onClick={handleModalOpen} 
+              variant="outline" 
+              className="mt-6" 
+              disabled={isProcessingRequest || isLoadingOrg || !userOrgId}
+            >
+              {isProcessingRequest && currentProcessStatus ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {currentProcessStatus.substring(0,18)}...</>
+              ) : isLoadingOrg ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Context...</>
+              ) : !userOrgId ? (
+                <><Plus className="mr-2 h-4 w-4" /> Org ID Missing</>
+              ) : (
+                <><Plus className="mr-2 h-4 w-4" /> Create Base Class</>
+              )}
             </Button>
           </div>
         )
       )}
       
-      <CreateBaseClassModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setError(null); // Clear error when closing modal
-        }}
-        onSubmit={handleCreateBaseClassSubmit}
-        // error={error} // Optionally pass error to be displayed within the modal
-      />
+      {isModalOpen && userOrgId && (
+        <CreateBaseClassModal
+          isOpen={isModalOpen}
+          onClose={handleModalClose} // Use new handler
+          onSubmit={handleCreateBaseClassSubmit}
+          organisationId={userOrgId} 
+          isProcessing={isProcessingRequest} // Pass processing state
+          currentStatusMessage={currentProcessStatus} // Pass status message
+        />
+      )}
     </div>
   );
 } 

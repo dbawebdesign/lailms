@@ -35,7 +35,7 @@ export async function GET(
     const selectQuery = `
       id,
       title,
-      paths!inner!(
+      paths!inner(
         base_class_id
       )
     `;

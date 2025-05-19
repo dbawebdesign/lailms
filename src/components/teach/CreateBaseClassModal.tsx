@@ -20,12 +20,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/use-toast";
+import { Loader2 } from "lucide-react";
 
 const PRESET_WEEKS = {
   QUARTER: 10,
   SEMESTER: 16, // Adjusted from 15 to 16 for common semester length
   FULL_YEAR: 38, // Adjusted from 36 to 38 for a typical school year
 };
+
+const initialDefaultWeeks = PRESET_WEEKS.SEMESTER; // Define initial default
 
 const baseClassFormSchema = z.object({
   name: z.string().min(3, { message: "Name must be at least 3 characters." }),
@@ -41,15 +44,21 @@ interface CreateBaseClassModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: BaseClassCreationData) => Promise<void>;
+  organisationId: string;
+  isProcessing: boolean;
+  currentStatusMessage: string | null;
 }
 
 export const CreateBaseClassModal: React.FC<CreateBaseClassModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  organisationId,
+  isProcessing,
+  currentStatusMessage,
 }) => {
   const { toast } = useToast();
-  const [currentLengthWeeks, setCurrentLengthWeeks] = useState(PRESET_WEEKS.SEMESTER); // Default to semester
+  const [currentLengthWeeks, setCurrentLengthWeeks] = useState(initialDefaultWeeks); // Use initial default
 
   const form = useForm<BaseClassFormValues>({
     resolver: zodResolver(baseClassFormSchema),
@@ -58,20 +67,22 @@ export const CreateBaseClassModal: React.FC<CreateBaseClassModalProps> = ({
       description: "",
       subject: "",
       gradeLevel: "",
-      lengthInWeeks: currentLengthWeeks,
+      lengthInWeeks: initialDefaultWeeks, // Use initial default for form
     },
   });
 
   useEffect(() => {
-    // Reset form and slider when modal opens/closes or default changes
-    form.reset({
-      name: "",
-      description: "",
-      subject: "",
-      gradeLevel: "",
-      lengthInWeeks: currentLengthWeeks,
-    });
-  }, [isOpen, currentLengthWeeks, form]);
+    if (isOpen && !isProcessing) {
+      form.reset({
+        name: "",
+        description: "",
+        subject: "",
+        gradeLevel: "",
+        lengthInWeeks: initialDefaultWeeks, // Reset form field to initial default
+      });
+      setCurrentLengthWeeks(initialDefaultWeeks); // Reset slider's controlling state to initial default
+    }
+  }, [isOpen, isProcessing, form]); // Dependency array includes isOpen, isProcessing, and form
 
   const handleSliderChange = (value: number[]) => {
     const weeks = value[0];
@@ -83,42 +94,59 @@ export const CreateBaseClassModal: React.FC<CreateBaseClassModalProps> = ({
     const weeks = PRESET_WEEKS[preset];
     setCurrentLengthWeeks(weeks);
     form.setValue("lengthInWeeks", weeks, { shouldValidate: true });
-    // Manually trigger focus/blur on slider to reflect change visually if needed, 
-    // though direct value set should be sufficient for react-hook-form.
   };
 
   const handleFormSubmit = async (values: BaseClassFormValues) => {
-    try {
-      await onSubmit(values); // BaseClassCreationData is compatible with BaseClassFormValues here
-      toast({
-        title: "Base Class Created!",
-        description: `Successfully created ${values.name}.`,
-      });
-      onClose(); // Close modal on success
-    } catch (error) {
-      console.error("Failed to create base class:", error);
+    if (!organisationId) {
       toast({
         title: "Error",
-        description: "Failed to create base class. Please try again.",
+        description: "Organisation ID is missing. Cannot create base class.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const dataToSubmit: BaseClassCreationData = {
+        ...values,
+        organisation_id: organisationId,
+      };
+      await onSubmit(dataToSubmit); 
+    } catch (error) {
+      console.error("Error during onSubmit call from modal:", error);
+      toast({
+        title: "Submission Failed",
+        description: "An unexpected error occurred while submitting the form. Check status messages.",
         variant: "destructive",
       });
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open && !isProcessing) {
+        onClose();
+      }
+    }}>
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
           <DialogTitle className="text-lg font-medium">Create New Base Class</DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground">
-            Fill in the details below to create a new base class.
-          </DialogDescription>
+          {!isProcessing && (
+            <DialogDescription className="text-sm text-muted-foreground">
+              Fill in the details below to create a new base class.
+            </DialogDescription>
+          )}
+          {isProcessing && currentStatusMessage && (
+            <div className="pt-2 text-sm text-blue-600 dark:text-blue-400 flex items-center">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                {currentStatusMessage}
+            </div>
+          )}
         </DialogHeader>
         <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6 py-2 pb-4">
           <div className="space-y-1.5">
             <Label htmlFor="name">Name</Label>
-            <Input id="name" {...form.register("name")} placeholder="e.g., Introduction to Algebra" />
-            {form.formState.errors.name && (
+            <Input id="name" {...form.register("name")} placeholder="e.g., Introduction to Algebra" disabled={isProcessing} />
+            {form.formState.errors.name && !isProcessing && (
               <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
             )}
           </div>
@@ -130,17 +158,18 @@ export const CreateBaseClassModal: React.FC<CreateBaseClassModalProps> = ({
               {...form.register("description")}
               placeholder="A brief overview of the class content and goals."
               rows={3}
+              disabled={isProcessing}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-x-6 gap-y-6">
             <div className="space-y-1.5">
               <Label htmlFor="subject">Subject (Optional)</Label>
-              <Input id="subject" {...form.register("subject")} placeholder="e.g., Mathematics" />
+              <Input id="subject" {...form.register("subject")} placeholder="e.g., Mathematics" disabled={isProcessing} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="gradeLevel">Grade Level (Optional)</Label>
-              <Input id="gradeLevel" {...form.register("gradeLevel")} placeholder="e.g., 9th Grade" />
+              <Input id="gradeLevel" {...form.register("gradeLevel")} placeholder="e.g., 9th Grade" disabled={isProcessing} />
             </div>
           </div>
 
@@ -154,8 +183,9 @@ export const CreateBaseClassModal: React.FC<CreateBaseClassModalProps> = ({
               value={[currentLengthWeeks]}
               onValueChange={handleSliderChange}
               className="my-3"
+              disabled={isProcessing}
             />
-            {form.formState.errors.lengthInWeeks && (
+            {form.formState.errors.lengthInWeeks && !isProcessing && (
               <p className="text-sm text-red-500">{form.formState.errors.lengthInWeeks.message}</p>
             )}
             <div className="flex justify-around space-x-2 pt-1">
@@ -166,6 +196,7 @@ export const CreateBaseClassModal: React.FC<CreateBaseClassModalProps> = ({
                   key={preset}
                   onClick={() => setPresetWeeks(preset)}
                   className="flex-1 text-xs px-2 py-1.5 h-auto"
+                  disabled={isProcessing}
                 >
                   {preset.charAt(0) + preset.slice(1).toLowerCase().replace("_", " ")} ({PRESET_WEEKS[preset]}w)
                 </Button>
@@ -174,11 +205,20 @@ export const CreateBaseClassModal: React.FC<CreateBaseClassModalProps> = ({
           </div>
 
           <DialogFooter className="pt-6">
-            <Button type="button" variant="outline" onClick={onClose} className="px-6 py-3">
+            <Button type="button" variant="outline" onClick={onClose} className="px-6 py-3" disabled={isProcessing}>
               Cancel
             </Button>
-            <Button type="submit" disabled={form.formState.isSubmitting} className="px-6 py-3">
-              {form.formState.isSubmitting ? "Creating..." : "Create Base Class"}
+            <Button type="submit" disabled={isProcessing || form.formState.isSubmitting} className="px-6 py-3 w-[180px]">
+              {isProcessing && currentStatusMessage ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                  {currentStatusMessage.length > 15 ? `${currentStatusMessage.substring(0,15)}...` : currentStatusMessage}
+                </>
+              ) : form.formState.isSubmitting ? (
+                "Submitting..."
+              ) : (
+                "Create Base Class"
+              )}
             </Button>
           </DialogFooter>
         </form>

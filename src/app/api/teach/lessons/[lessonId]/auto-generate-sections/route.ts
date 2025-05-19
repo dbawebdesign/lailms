@@ -80,8 +80,7 @@ export async function POST(
       .select(`
         id,
         title,
-        description, 
-        objective,
+        description,
         paths (
           id,
           title,
@@ -90,8 +89,6 @@ export async function POST(
             id,
             name,
             description,
-            subject,
-            grade_level,
             settings
           )
         )
@@ -110,12 +107,11 @@ export async function POST(
       return NextResponse.json({ error: errorMsg, details: lessonError?.message }, { status });
     }
 
-    // Type assertion for stricter type checking, assuming paths and base_classes are single objects due to .single() on lesson
+    // Type assertion for stricter type checking
     const typedLessonData = lessonData as unknown as {
       id: string;
       title: string;
       description: string | null;
-      objective: string | null;
       paths: {
         id: string;
         title: string | null;
@@ -124,11 +120,14 @@ export async function POST(
           id: string;
           name: string | null;
           description: string | null;
-          subject: string | null;
-          grade_level: string | null;
-          settings: { generatedOutline?: GeneratedOutline; [key: string]: any; } | null;
-        } | null; // base_classes could be null if path is not linked properly, though unlikely with FKs
-      } | null; // paths could be null if lesson is not linked properly
+          settings: { 
+            subject?: string; 
+            gradeLevel?: string; 
+            generatedOutline?: GeneratedOutline; 
+            [key: string]: any; 
+          } | null;
+        } | null;
+      } | null;
     };
 
     if (!typedLessonData.paths) {
@@ -144,13 +143,13 @@ export async function POST(
     const lessonContext: LessonContextForAI = {
       lesson_id: typedLessonData.id,
       lesson_title: typedLessonData.title,
-      lesson_objective: typedLessonData.objective || typedLessonData.description, // Prioritize objective
+      lesson_objective: typedLessonData.description,
       path_title: typedLessonData.paths.title,
       path_description: typedLessonData.paths.description,
       base_class_name: typedLessonData.paths.base_classes.name,
       base_class_description: typedLessonData.paths.base_classes.description,
-      base_class_subject: typedLessonData.paths.base_classes.subject,
-      base_class_gradeLevel: typedLessonData.paths.base_classes.grade_level, // Note: schema might use grade_level
+      base_class_subject: typedLessonData.paths.base_classes.settings?.subject,
+      base_class_gradeLevel: typedLessonData.paths.base_classes.settings?.gradeLevel,
       base_class_settings: typedLessonData.paths.base_classes.settings,
     };
 
