@@ -3,7 +3,7 @@
 import React, { useEffect, useState, use } from 'react';
 import { supabase } from '@/utils/supabase/browser'; // Corrected Supabase client import path
 import type { StudioBaseClass, Path, Lesson, LessonSection } from '@/types/lesson';
-import { Loader2 } from 'lucide-react'; // For loading indicator
+import { Loader2, Menu } from 'lucide-react'; // For loading indicator and menu icon
 import StudioNavigationTree from '@/components/teach/studio/StudioNavigationTree';
 import BaseClassEditor from '@/components/teach/studio/editors/BaseClassEditor'; // Added import
 import PathEditor from '@/components/teach/studio/editors/PathEditor'; // Added import
@@ -46,6 +46,8 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
 
   // NEW: State to track loading of individual lesson's sections
   const [isLoadingSections, setIsLoadingSections] = useState<Record<string, boolean>>({});
+
+  const [isNavOpen, setIsNavOpen] = useState(false); // State for mobile navigation
 
   useEffect(() => {
     if (!baseClassId) {
@@ -575,31 +577,68 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
   };
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Navigation Tree Panel - Approx 35% width */}
-      <div className="w-[35%] border-r border-border p-4 overflow-y-auto">
-        <StudioNavigationTree 
-          baseClass={studioBaseClass} 
-          onSelectItem={handleSelectItem} 
-          selectedItemId={selectedItem.id}
-          onToggleExpandPath={fetchLessonsForPath}
-          onToggleExpandLesson={fetchSectionsForLesson}
-          onReorderPaths={handleReorderPaths}
-          onReorderLessons={handleReorderLessons}
-          onReorderSections={handleReorderSections}
-        />
+    <div className="flex flex-col md:flex-row h-screen bg-background">
+      {/* Mobile Header Bar: Nav Toggle Button & Title */}
+      <div className="md:hidden p-4 border-b border-border flex items-center space-x-3">
+        <button 
+          onClick={() => setIsNavOpen(!isNavOpen)} 
+          className="p-2 rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring flex-shrink-0"
+        >
+          <Menu className="h-6 w-6" />
+          <span className="sr-only">Toggle Navigation</span>
+        </button>
+        <h2 className="text-lg font-semibold text-foreground truncate">
+          Class Structure Nav
+        </h2>
       </div>
-      {/* Main Content Editor Area - Approx 65% width */}
-      <main className="flex-1 p-6 overflow-auto"> {/* flex-1 will take remaining space */}
+
+      {/* Navigation Tree Panel */}
+      <div 
+        className={`
+          ${isNavOpen ? 'block' : 'hidden'} md:block 
+          w-full md:w-[300px] lg:w-[350px] xl:w-[400px] 
+          border-b md:border-b-0 md:border-r border-border 
+          p-4 overflow-y-auto 
+          flex-shrink-0 
+          h-auto md:h-screen
+        `}
+      >
+        {studioBaseClass && (
+          <StudioNavigationTree 
+            baseClass={studioBaseClass} 
+            onSelectItem={(type, itemData) => {
+              handleSelectItem(type, itemData);
+              if (window.innerWidth < 768) { // md breakpoint in Tailwind is usually 768px
+                setIsNavOpen(false); // Close nav on item selection on mobile
+              }
+            }}
+            selectedItemId={selectedItem.id}
+            onToggleExpandPath={fetchLessonsForPath}
+            onToggleExpandLesson={fetchSectionsForLesson}
+            onReorderPaths={handleReorderPaths}
+            onReorderLessons={handleReorderLessons}
+            onReorderSections={handleReorderSections}
+          />
+        )}
+      </div>
+
+      {/* Main Content Editor Area */}
+      {/* Takes remaining space, ensures it's visible even if nav is open on mobile (might be an issue if nav is not an overlay) */}
+      {/* For true mobile UX, nav might be an overlay. This stacks them for now. */}
+      <main 
+        className={`
+          flex-1 p-6 overflow-auto 
+          ${(isNavOpen && window.innerWidth < 768) ? 'hidden' : 'block'} md:block
+        `}
+      >
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground">Base Class Studio</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Base Class Studio</h1>
           {selectedItem && selectedItem.title && (
-            <p className="text-lg text-muted-foreground mt-1">Editing: {selectedItem.title}</p>
+            <p className="text-md md:text-lg text-muted-foreground mt-1">Editing: {selectedItem.title}</p>
           )}
         </div>
         
         {renderEditor()}
-
       </main>
     </div>
   );
