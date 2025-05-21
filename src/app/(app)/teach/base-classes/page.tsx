@@ -154,6 +154,38 @@ export default function TeachBaseClassesPage() {
     }
   }, [loadBaseClasses, userOrgId]);
 
+  // Skeleton Loader Components
+  const SkeletonBar: React.FC<{ width?: string; height?: string; className?: string }> = ({ width = 'w-full', height = 'h-4', className = '' }) => (
+    <div className={`bg-muted rounded ${width} ${height} ${className} overflow-hidden relative`}>
+      {/* Shimmer element */}
+      <div className="animate-shimmer absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-muted-foreground/10 to-transparent"></div>
+    </div>
+  );
+
+  const SkeletonCard: React.FC = () => (
+    <div className="bg-card border rounded-lg p-4 space-y-3 shadow">
+      <SkeletonBar height="h-6" width="w-3/4" />
+      <SkeletonBar height="h-4" width="w-full" />
+      <SkeletonBar height="h-4" width="w-5/6" />
+      <div className="flex justify-between items-center pt-2">
+        <SkeletonBar height="h-4" width="w-1/4" />
+        <SkeletonBar height="h-8" width="w-1/4" />
+      </div>
+    </div>
+  );
+
+  const renderPageSkeletonState = () => (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-8">
+        <SkeletonBar height="h-10" width="w-1/3" /> {/* Title: My Base Classes */}
+        <SkeletonBar height="h-10" width="w-36" /> {/* Create New Button */}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} />)}
+      </div>
+    </div>
+  );
+
   const handleCreateBaseClassSubmit = async (formDataFromModal: BaseClassCreationData) => {
     setIsModalOpen(true); // Ensure modal is open
     setIsProcessingRequest(true);
@@ -310,15 +342,12 @@ export default function TeachBaseClassesPage() {
     }
   };
 
-  if ((isLoadingPage || isLoadingOrg) && baseClasses.length === 0 && !userOrgId) { 
-    return <div className="container mx-auto p-4 text-center flex flex-col items-center justify-center h-[calc(100vh-150px)]">
-      <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-      {isLoadingOrg ? "Loading your context..." : "Loading base classes..."}
-    </div>;
+  // Main conditional rendering based on loading and error states
+  if (isLoadingOrg || (isLoadingPage && baseClasses.length === 0)) { // Show skeleton if org is loading OR page is loading AND no classes yet
+    return renderPageSkeletonState();
   }
-  
-  // Updated error display condition
-  if (pageError && (!userOrgId || baseClasses.length === 0) && !isLoadingOrg && !isLoadingPage) {
+
+  if (pageError && baseClasses.length === 0) { // Only show full page error if loading failed and no classes are available to show
     return <div className="container mx-auto p-4 text-center text-red-600">Error: {pageError} <Button onClick={() => window.location.reload()} variant="outline" className="ml-2">Refresh</Button></div>;
   }
 

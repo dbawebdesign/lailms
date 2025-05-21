@@ -49,6 +49,49 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
 
   const [isNavOpen, setIsNavOpen] = useState(false); // State for mobile navigation
 
+  // Skeleton Loader Component
+  const SkeletonBar: React.FC<{ width?: string; height?: string; className?: string }> = ({ width = 'w-full', height = 'h-4', className = '' }) => (
+    <div className={`bg-muted animate-pulse rounded ${width} ${height} ${className}`} />
+  );
+
+  // NEW: Function to render skeleton UI
+  const renderSkeletonState = () => {
+    return (
+      <div className="flex flex-col md:flex-row h-screen bg-background">
+        {/* Mobile Header Bar Skeleton (optional, can be simpler or match structure) */}
+        <div className="md:hidden p-4 border-b border-border flex items-center space-x-3">
+          <SkeletonBar width="w-6" height="h-6" />
+          <SkeletonBar width="w-32" height="h-6" />
+        </div>
+
+        {/* Navigation Tree Panel Skeleton */}
+        <div className={`hidden md:block w-full md:w-[300px] lg:w-[350px] xl:w-[400px] border-b md:border-b-0 md:border-r border-border p-4 overflow-y-auto flex-shrink-0 h-auto md:h-screen`}>
+          <SkeletonBar height="h-8" width="w-3/4" className="mb-6" /> {/* Base Class Title Placeholder */}
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="p-2 space-y-2">
+                <SkeletonBar height="h-6" width="w-5/6" /> {/* Path Title Placeholder */}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Main Content Editor Area Skeleton */}
+        <main className={`flex-1 p-6 overflow-auto ${(isNavOpen && typeof window !== 'undefined' && window.innerWidth < 768) ? 'hidden' : 'block'} md:block`}>
+          <div className="mb-6">
+            <SkeletonBar height="h-10" width="w-1/2" className="mb-2" /> {/* "Base Class Studio" Title Placeholder */}
+            <SkeletonBar height="h-6" width="w-1/3" /> {/* "Editing: ..." Subtitle Placeholder */}
+          </div>
+          <div className="space-y-4">
+            <SkeletonBar height="h-10" /> {/* Placeholder for form field/area */}
+            <SkeletonBar height="h-24" /> {/* Placeholder for larger form field/area (e.g. description) */}
+            <SkeletonBar height="h-10" width="w-1/4" /> {/* Placeholder for a button */}
+          </div>
+        </main>
+      </div>
+    );
+  };
+
   useEffect(() => {
     if (!baseClassId) {
       setError('Base Class ID is missing.');
@@ -177,12 +220,7 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
   };
   
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Loading Base Class Studio...</p>
-      </div>
-    );
+    return renderSkeletonState(); // Use the new skeleton loader
   }
   
   if (error) {
