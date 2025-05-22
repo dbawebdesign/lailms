@@ -8,13 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 interface PathEditorProps {
   path: Path;
   onSave: (updatedPath: Partial<Path>) => Promise<void>;
+  baseClassId: string;
+  lessons: Lesson[];
+  onReorderLessons: (pathId: string, activeLessonId: string, overLessonId: string) => Promise<void>;
+  fetchLessonsForPath: (pathId: string) => Promise<void>;
+  isLoadingLessons: boolean;
   // Future props for managing lessons:
   // onAddLesson: () => void;
   // onReorderLesson: (lessonId: string, newOrder: number) => void;
   // onDeleteLesson: (lessonId: string) => void;
 }
 
-const PathEditor: React.FC<PathEditorProps> = ({ path, onSave }) => {
+const PathEditor: React.FC<PathEditorProps> = ({ path, onSave, baseClassId, lessons, onReorderLessons, fetchLessonsForPath, isLoadingLessons }) => {
   const [title, setTitle] = useState(path.title);
   const [description, setDescription] = useState(path.description || '');
 

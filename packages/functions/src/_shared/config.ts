@@ -1,0 +1,1 @@
+export const LOGIN_REDIRECT_URL = Deno.env.get('LOGIN_REDIRECT_URL') || 'http://localhost:3000/'; 

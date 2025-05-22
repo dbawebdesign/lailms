@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import type { StudioBaseClass, Path, Lesson, LessonSection } from '@/types/lesson';
-import { ChevronRight, ChevronDown, FileText, GripVertical } from 'lucide-react';
+import { ChevronRight, ChevronDown, FileText, GripVertical, Info as InfoIcon } from 'lucide-react';
 
 // NEW: DND Kit imports
 import {
@@ -309,15 +309,22 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
   const [expandedLessons, setExpandedLessons] = useState<Set<string>>(new Set());
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), // Main DND context for paths
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }), // Require more movement for path drag
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   if (!baseClass) {
-    return <p className="text-muted-foreground">Loading navigation...</p>;
+    return <div className="p-4 text-muted-foreground">Loading navigation...</div>;
   }
+
+  const handleBaseClassClick = () => {
+    onSelectItem('baseclass', baseClass);
+  };
+
+  // NEW: Handler for Knowledge Base item click
+  const handleKnowledgeBaseClick = () => {
+    onSelectItem('knowledgebase', baseClass);
+  };
 
   const handlePathToggleExpand = async (path: Path) => {
     const newExpandedPaths = new Set(expandedPaths);
@@ -354,22 +361,33 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
   };
 
   return (
-    <nav className="space-y-1">
+    <div className="space-y-1 text-sm">
+      {/* Base Class Item - Not sortable */}
       <div 
-        className={`flex items-center justify-between text-lg font-semibold cursor-pointer p-2 rounded hover:bg-muted ${selectedItemId === baseClass.id ? 'bg-primary/10 text-primary' : ''}`}
-        onClick={() => onSelectItem('baseclass', baseClass)}
+        onClick={handleBaseClassClick}
+        className={`font-semibold text-lg p-3 cursor-pointer rounded-md transition-colors 
+          ${selectedItemId === baseClass.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
       >
         {baseClass.name} 
       </div>
 
+      {/* NEW: Knowledge Base Item - Not sortable */}
+      <div 
+        onClick={handleKnowledgeBaseClick} 
+        className={`flex items-center space-x-2 p-3 cursor-pointer rounded-md transition-colors 
+          ${selectedItemId === baseClass.id && onSelectItem.toString().includes("'knowledgebase'") /* Crude check for KB selection, improve if selectedItem type is 'knowledgebase' */ 
+            ? 'bg-primary/20 text-primary font-medium' 
+            : 'hover:bg-muted'}`}
+      >
+        <InfoIcon size={18} className="text-muted-foreground" />
+        <span>Knowledge Base</span>
+      </div>
+
+      {/* Paths List - Sortable */}
       {baseClass.paths && baseClass.paths.length > 0 && (
-        <DndContext
-          sensors={sensors} // Sensors for Path dragging
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEndPaths}
-        >
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndPaths}>
           <SortableContext 
-            items={baseClass.paths.map(p => p.id)} 
+            items={baseClass.paths.map(p => p.id)} // Safe now due to the check above
             strategy={verticalListSortingStrategy}
           >
             <ul className="pl-1 mt-1 space-y-0 list-none">
@@ -378,21 +396,24 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
                     key={path.id} 
                     path={path} 
                     isExpanded={expandedPaths.has(path.id)}
-                    selectedItemId={selectedItemId}
-                    onSelectItem={onSelectItem as (type: string, itemData: Path | Lesson | LessonSection) => void}
-                    handlePathHeaderClick={handlePathToggleExpand}
-                    lessons={path.lessons || []} // Pass lessons to SortablePathItem
-                    onToggleExpandLesson={handleLessonToggleExpandOverall} // Pass the overall toggle handler
-                    onReorderLessons={onReorderLessons} // Pass the reorder handler for lessons
-                    onReorderSections={onReorderSections} // Pass down
-                    expandedLessons={expandedLessons}
+                    selectedItemId={selectedItemId} // Ensure this is passed
+                    onSelectItem={onSelectItem as (type: string, itemData: Path | Lesson | LessonSection) => void} // Ensure this is passed
+                    handlePathHeaderClick={handlePathToggleExpand} // Ensure this is passed
+                    lessons={path.lessons || []} // Ensure this is passed (already was)
+                    onToggleExpandLesson={handleLessonToggleExpandOverall} // Ensure this is passed
+                    onReorderLessons={onReorderLessons} // Ensure this is passed
+                    onReorderSections={onReorderSections} // Ensure this is passed
+                    expandedLessons={expandedLessons} // Ensure this is passed
                   />
               ))}
             </ul>
           </SortableContext>
         </DndContext>
       )}
-    </nav>
+      {(!baseClass.paths || baseClass.paths.length === 0) && (
+        <p className="p-3 text-xs text-muted-foreground">No paths defined for this base class yet.</p>
+      )}
+    </div>
   );
 };
 

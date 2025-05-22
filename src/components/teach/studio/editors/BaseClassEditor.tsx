@@ -26,8 +26,8 @@ interface LessonProgressDetail {
 // Define a type for the summary message style
 type SummaryMessageType = 'success' | 'warning' | 'error' | 'info';
 
-// NEW: Type for the active tab
-type ActiveTab = 'details' | 'knowledgeBase';
+// REMOVED: Type for the active tab (no longer needed)
+// type ActiveTab = 'details' | 'knowledgeBase';
 
 const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) => {
   const [name, setName] = useState(baseClass.name);
@@ -44,8 +44,8 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
   // Updated state for final summary to include its type
   const [finalSummary, setFinalSummary] = useState<{ message: string; type: SummaryMessageType } | null>(null);
 
-  // NEW: State for active tab
-  const [activeTab, setActiveTab] = useState<ActiveTab>('details');
+  // REMOVED: State for active tab
+  // const [activeTab, setActiveTab] = useState<ActiveTab>('details');
 
   useEffect(() => {
     setName(baseClass.name);
@@ -216,33 +216,10 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
     <Card>
       <CardHeader>
         <CardTitle>{baseClass.name}</CardTitle>
-        {/* NEW: Tab Navigation */}
-        <div className="mt-2 border-b border-border">
-          <nav className="-mb-px flex space-x-4" aria-label="Tabs">
-            <button
-              onClick={() => setActiveTab('details')}
-              className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm 
-                ${activeTab === 'details' 
-                  ? 'border-primary text-primary' 
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'}`}
-            >
-              Details
-            </button>
-            <button
-              onClick={() => setActiveTab('knowledgeBase')}
-              className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm 
-                ${activeTab === 'knowledgeBase' 
-                  ? 'border-primary text-primary' 
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'}`}
-            >
-              Knowledge Base
-            </button>
-          </nav>
-        </div>
+        {/* REMOVED: Tab Navigation for Details/KnowledgeBase */}
       </CardHeader>
       <CardContent className="space-y-4 mt-4">
-        {/* NEW: Conditional rendering based on activeTab */}
-        {activeTab === 'details' && (
+        {/* Content is now always details */}
           <>
             <div>
               <label htmlFor="baseClassName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -300,51 +277,21 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
               </Button>
             </div>
 
-            {(isGeneratingContent || finalSummary) && (
-              <div className="mt-4 space-y-2">
-                {currentGeneratingMessage && isGeneratingContent && <p className="text-sm text-muted-foreground">{currentGeneratingMessage}</p>}
-                {isGeneratingContent && totalToProcessForStream > 0 && (
-                  <Progress value={generationProgress} className="w-full" />
-                )}
+          {/* Final summary message */}
                 {finalSummary && (
-                  <p className={_getSummaryMessageStyle(finalSummary.type)}>
+            <div className={`p-3 rounded-md text-sm ${getSummaryMessageStyle(finalSummary.type)}`}>
                     {finalSummary.message}
-                  </p>
-                )}
-                {progressDetailsForStream.length > 0 && (
-                  <div className="mt-2 p-2 border rounded-md max-h-60 overflow-y-auto text-xs">
-                    <p className="font-medium mb-1">Progress Details:</p>
-                    <ul>
-                      {progressDetailsForStream.map((detail) => (
-                        <li key={detail.lessonId} className={`mb-0.5 p-1 rounded-sm ${detail.status === 'success' ? 'bg-green-100 text-green-800' : detail.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-700'}`}>
-                          {detail.lessonTitle}: <span className="font-semibold">{detail.status}</span>
-                          {detail.status === 'failed' && detail.error && <span className="block text-xs italic">Error: {detail.error}</span>}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </div>
             )}
           </>
-        )}
-
-        {activeTab === 'knowledgeBase' && (
-          <div>
-            <h3 className="text-lg font-medium mb-2">Manage Knowledge Base</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              View, upload, and delete documents associated with this base class.
-            </p>
-            <BaseClassKnowledgeBaseManager baseClassId={baseClass.id} />
-          </div>
-        )}
+        {/* REMOVED: Conditional rendering for knowledgeBase tab */}
       </CardContent>
     </Card>
   );
 };
 
 // Helper function to get Tailwind classes based on summary type
-const _getSummaryMessageStyle = (type: SummaryMessageType): string => {
+const getSummaryMessageStyle = (type: SummaryMessageType): string => {
   switch (type) {
     case 'success':
       return 'text-sm font-medium text-green-600 dark:text-green-500';

@@ -4,6 +4,23 @@
 # working directory name when running `supabase init`.
 project_id = "learnologyai"
 
+[functions.kb-process-textfile]
+  entrypoint = "../packages/functions/src/kb-process-textfile/index.ts"
+
+[functions.sign-up-with-code]
+  entrypoint = "../packages/functions/src/sign-up-with-code/index.ts"
+
+[functions.process-document]
+  entrypoint = "../packages/functions/src/process-document/index.ts"
+
+[functions.summarize-chunks]
+  entrypoint = "../packages/functions/src/summarize-chunks/index.ts"
+
+#   # Try mapping the function slug directly to its configuration including the handler
+#   process-document = { handler = "./packages/functions/src/process-document/index.ts" }
+#   # If you have an import_map specific to your functions in this directory, you might add it here too:
+#   # process-document = { handler = "./packages/functions/src/process-document/index.ts", import_map = "./packages/functions/src/import_map.json" }
+
 [api]
 enabled = true
 # Port to use for the API URL.

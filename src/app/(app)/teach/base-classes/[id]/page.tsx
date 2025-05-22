@@ -3,12 +3,14 @@
 import React, { useEffect, useState, use } from 'react';
 import { supabase } from '@/utils/supabase/browser'; // Corrected Supabase client import path
 import type { StudioBaseClass, Path, Lesson, LessonSection } from '@/types/lesson';
-import { Loader2, Menu } from 'lucide-react'; // For loading indicator and menu icon
+import type { BaseClass } from '@/types/teach'; // NEW: Import BaseClass for casting
+import { Loader2, Menu, Info } from 'lucide-react'; // For loading indicator and menu icon, added Info for Knowledge Base
 import StudioNavigationTree from '@/components/teach/studio/StudioNavigationTree';
 import BaseClassEditor from '@/components/teach/studio/editors/BaseClassEditor'; // Added import
 import PathEditor from '@/components/teach/studio/editors/PathEditor'; // Added import
 import LessonEditor from '@/components/teach/studio/editors/LessonEditor'; // Added import
 import LessonSectionEditor from '@/components/teach/studio/editors/LessonSectionEditor'; // Added import
+import { KnowledgeBaseEditor } from '@/components/teach/studio/editors/KnowledgeBaseEditor'; // NEW: Import KnowledgeBaseEditor
 
 // NEW: DND Kit imports
 import { arrayMove } from '@dnd-kit/sortable';
@@ -38,7 +40,7 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // MODIFIED: selectedItem state to include title and data
+  // MODIFIED: selectedItem state to include title and data, and support 'knowledgebase' type
   const [selectedItem, setSelectedItem] = useState<{ type: string; id: string | null; title: string | null; data: StudioBaseClass | Path | Lesson | LessonSection | null }>({ type: 'baseclass', id: baseClassId, title: 'Loading...', data: null });
 
   // NEW: State to track loading of individual path's lessons
@@ -241,18 +243,54 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
     );
   }
   
-  // MODIFIED: handleSelectItem to include data
-  const handleSelectItem = (type: string, itemData: StudioBaseClass | Path | Lesson | LessonSection) => {
-    if (!itemData) {
+  // MODIFIED: handleSelectItem to include data and handle 'knowledgebase'
+  const handleSelectItem = (type: string, itemData: StudioBaseClass | Path | Lesson | LessonSection, itemId?: string, itemTitle?: string) => {
+    if (!itemData && type !== 'knowledgebase') { // Allow itemData to be null for knowledgebase if base class is the data
       console.warn('handleSelectItem called with null itemData for type:', type);
-      setSelectedItem({ type, id: null, title: 'Error: No data', data: null });
+      setSelectedItem({ type, id: itemId || null, title: itemTitle || 'Error: No data', data: null });
       return;
     }
-    // All items should have an id and name/title. For sections, 'title' might be section_title or similar.
-    // We'll need a consistent way to get a display 'title' for the header if itemData.title is not standard.
-    const displayTitle = (itemData as any).name || (itemData as any).title || (itemData as any).section_title || 'Untitled';
-    setSelectedItem({ type, id: itemData.id, title: displayTitle, data: itemData });
-    // console.log('Selected:', type, itemData.id, displayTitle, itemData);
+
+    let idToSet: string | null = null;
+    let titleToSet: string | null = null;
+    let dataToSet: any = itemData; // Allow 'any' for flexibility, will be typed in specific editors
+
+    switch (type) {
+      case 'baseclass':
+        idToSet = (itemData as StudioBaseClass).id;
+        titleToSet = (itemData as StudioBaseClass).name;
+        break;
+      case 'path':
+        idToSet = (itemData as Path).id;
+        titleToSet = (itemData as Path).title;
+        // Eagerly fetch lessons for the path when it's selected
+        if (idToSet) fetchLessonsForPath(idToSet);
+        break;
+      case 'lesson':
+        idToSet = (itemData as Lesson).id;
+        titleToSet = (itemData as Lesson).title;
+        // Eagerly fetch sections for the lesson when it's selected
+        if (idToSet) fetchSectionsForLesson(idToSet);
+        break;
+      case 'section':
+        idToSet = (itemData as LessonSection).id;
+        titleToSet = (itemData as LessonSection).title;
+        break;
+      case 'knowledgebase': // NEW: Handle knowledgebase selection
+        idToSet = (itemData as StudioBaseClass).id; // Uses baseClassId
+        titleToSet = 'Knowledge Base';
+        dataToSet = itemData; // Pass the whole baseClass object
+        break;
+      default:
+        console.warn('Unknown item type selected:', type);
+        setSelectedItem({ type, id: itemId || null, title: itemTitle || 'Unknown Item', data: itemData });
+        return;
+    }
+    
+    setSelectedItem({ type, id: idToSet, title: titleToSet, data: dataToSet });
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsNavOpen(false); // Close mobile nav on selection
+    }
   };
 
   // NEW: Placeholder save function for BaseClassEditor
@@ -370,20 +408,70 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
   // NEW: Placeholder save function for LessonSectionEditor
   const handleSaveLessonSection = async (updatedData: Partial<LessonSection>) => {
     console.log('Saving Lesson Section:', updatedData);
-    if (!selectedItem || selectedItem.type !== 'section' || !selectedItem.data) return;
+    if (!selectedItem || selectedItem.type !== 'section' || !selectedItem.data || !updatedData.id) {
+      console.error('No section selected or section ID missing for saving.');
+      alert('Error: No section selected or section ID missing.');
+      return;
+    }
+
+    const currentSectionId = updatedData.id;
 
     try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error(userError?.message || 'User not found. Cannot save version.');
+      }
+      const userId = user.id;
+
+      // 1. Determine the next version number
+      let nextVersionNumber = 1;
+      const { data: latestVersionData, error: latestVersionError } = await supabase
+        .from('lesson_section_versions')
+        .select('version_number')
+        .eq('lesson_section_id', currentSectionId)
+        .order('version_number', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (latestVersionError && latestVersionError.code !== 'PGRST116') { // PGRST116: no rows found, which is fine for the first version
+        console.error('Error fetching latest version number:', latestVersionError);
+        throw new Error(`Failed to determine version number: ${latestVersionError.message}`);
+      }
+
+      if (latestVersionData) {
+        nextVersionNumber = latestVersionData.version_number + 1;
+      }
+
+      // 2. Create a new version in lesson_section_versions
+      const { error: versionError } = await supabase
+        .from('lesson_section_versions')
+        .insert({
+          lesson_section_id: currentSectionId,
+          content: updatedData.content,
+          creator_user_id: userId, // Corrected to creator_user_id
+          version_number: nextVersionNumber, // Calculated version number
+        });
+
+      if (versionError) {
+        console.error('Failed to save lesson section version:', versionError);
+        throw new Error(`Failed to save version: ${versionError.message}`);
+      }
+      
+      // 3. Update the main lesson_sections table
       const { error: updateError } = await supabase
         .from('lesson_sections')
         .update({ 
           title: updatedData.title, 
           content: updatedData.content, 
           section_type: updatedData.section_type 
-          // Add other updatable fields
         })
-        .eq('id', selectedItem.data.id);
+        .eq('id', currentSectionId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Failed to update lesson section:', updateError);
+        // Potentially roll back version insert or mark it as orphaned if critical
+        throw new Error(`Failed to update section after versioning: ${updateError.message}`);
+      }
 
       // Update local state
       setStudioBaseClass(prevBaseClass => {
@@ -395,23 +483,24 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
             lessons: p.lessons?.map(l => ({
               ...l,
               sections: l.sections?.map(s => 
-                s.id === updatedData.id ? { ...s, ...updatedData } : s
+                s.id === currentSectionId ? { ...s, ...updatedData } : s
               ) || [],
             })) || [],
           })),
         };
       });
       setSelectedItem(prev => {
+        if (!prev.data || prev.data.id !== currentSectionId) return prev;
         const newTitle = updatedData.title || prev.title;
-        const newData = prev.data ? { ...prev.data, ...updatedData } : null;
+        const newData = { ...prev.data, ...updatedData };
         return { ...prev, data: newData as LessonSection, title: newTitle };
       });
 
-      alert('Lesson Section saved successfully!');
+      alert('Lesson Section saved successfully with versioning!');
     } catch (e: any) {
       console.error('Failed to save Lesson Section:', e);
       setError(`Failed to save Lesson Section: ${e.message}`);
-      alert('Failed to save Lesson Section.');
+      alert(`Failed to save Lesson Section: ${e.message}`);
     }
   };
 
@@ -593,24 +682,29 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
   };
 
   const renderEditor = () => {
-    if (!selectedItem || !selectedItem.data) {
-      if (selectedItem.type === 'baseclass' && studioBaseClass) {
-        return <BaseClassEditor baseClass={studioBaseClass as StudioBaseClass} onSave={handleSaveBaseClass} />;
-      } 
-      return <div className="text-center p-6 text-muted-foreground">Select an item from the navigation tree to edit.</div>;
+    if (!selectedItem || !selectedItem.data && selectedItem.type !== 'knowledgebase') { // Allow data to be null for knowledgebase if baseClass is passed
+      if (isLoading) return <p className="p-6 text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin inline-block"/>Loading editor...</p>;
+      return <p className="p-6 text-muted-foreground">Select an item from the navigation tree to start editing.</p>;
     }
 
     switch (selectedItem.type) {
       case 'baseclass':
         return <BaseClassEditor baseClass={selectedItem.data as StudioBaseClass} onSave={handleSaveBaseClass} />;
       case 'path':
-        return <PathEditor path={selectedItem.data as Path} onSave={handleSavePath} />;
+        return <PathEditor path={selectedItem.data as Path} onSave={handleSavePath} baseClassId={studioBaseClass!.id} lessons={studioBaseClass?.paths?.find(p => p.id === selectedItem.id)?.lessons || []} onReorderLessons={handleReorderLessons} fetchLessonsForPath={fetchLessonsForPath} isLoadingLessons={isLoadingLessons[selectedItem.id as string]}/>;
       case 'lesson':
-        return <LessonEditor lesson={selectedItem.data as Lesson} onSave={handleSaveLesson} />;
+        // Find the parent path for the lesson
+        const parentPathForLesson = studioBaseClass?.paths?.find(p => p.lessons?.some(l => l.id === selectedItem.id));
+        return <LessonEditor lesson={selectedItem.data as Lesson} onSave={handleSaveLesson} pathId={parentPathForLesson?.id || ''} sections={parentPathForLesson?.lessons?.find(l=> l.id === selectedItem.id)?.sections || []} onReorderSections={handleReorderSections} fetchSectionsForLesson={fetchSectionsForLesson} isLoadingSections={isLoadingSections[selectedItem.id as string]} />;
       case 'section':
         return <LessonSectionEditor section={selectedItem.data as LessonSection} onSave={handleSaveLessonSection} />;
+      case 'knowledgebase': // NEW: Render KnowledgeBaseEditor
+        if (studioBaseClass) { // Ensure studioBaseClass is loaded
+          return <KnowledgeBaseEditor baseClass={studioBaseClass} />;
+        }
+        return <p className="p-6 text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin inline-block"/>Loading Knowledge Base...</p>; // Fallback if studioBaseClass isn't ready
       default:
-        return <div className="text-center p-6 text-muted-foreground">Unknown item type selected.</div>;
+        return <p className="p-6 text-muted-foreground">Editor for type "{selectedItem.type}" not implemented yet.</p>;
     }
   };
 

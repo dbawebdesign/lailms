@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { Database } from '@learnologyai/types/db'
+import { Database } from '@/types/supabase'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -62,9 +62,11 @@ export async function GET(req: Request) {
       document_id,
       chunk_index,
       content,
-      section,
-      section_summary,
       chunk_summary,
+      summary_status,
+      section_identifier,
+      section_summary,
+      section_summary_status,
       citation_key,
       metadata,
       documents:document_id (
@@ -99,8 +101,8 @@ export async function GET(req: Request) {
   
   // Verify the user is in the same organization
   const { data: memberData, error: memberError } = await supabase
-    .from('organisation_members')
-    .select('id')
+    .from('profiles')
+    .select('user_id')
     .eq('user_id', session.user.id)
     .eq('organisation_id', documentData.organisation_id)
     .single();
@@ -118,7 +120,12 @@ export async function GET(req: Request) {
       id,
       chunk_index,
       content,
-      section,
+      chunk_summary,
+      summary_status,
+      section_identifier,
+      section_summary,
+      section_summary_status,
+      citation_key,
       metadata
     `)
     .eq('document_id', documentId)
@@ -134,28 +141,38 @@ export async function GET(req: Request) {
   const nextChunk = contextChunks?.find(c => c.chunk_index === chunkIndex + 1) || null;
   
   // Extract document title and other metadata
-  const documentTitle = chunk.documents?.file_name || 
-                        (chunk.metadata?.documentTitle as string) || 
-                        'Untitled Document';
+  const documentTitle = (chunk.metadata && typeof chunk.metadata === 'object' && 'documentTitle' in chunk.metadata && typeof chunk.metadata.documentTitle === 'string') 
+                        ? chunk.metadata.documentTitle 
+                        : chunk.documents?.file_name || 'Untitled Document';
   
   // Special handling for YouTube timestamps if available
   let timestampInfo = null;
-  if (chunk.metadata?.video_id && chunk.metadata?.offset) {
-    timestampInfo = {
-      videoId: chunk.metadata.video_id,
-      timestamp: parseInt(chunk.metadata.offset),
-      formattedTime: formatTimestamp(parseInt(chunk.metadata.offset))
-    };
+  if (chunk.metadata && 
+      typeof chunk.metadata === 'object' && 
+      'video_id' in chunk.metadata && 
+      typeof chunk.metadata.video_id === 'string' && 
+      'offset' in chunk.metadata && 
+      (typeof chunk.metadata.offset === 'number' || typeof chunk.metadata.offset === 'string')) {
+    const offsetValue = typeof chunk.metadata.offset === 'string' ? parseInt(chunk.metadata.offset, 10) : chunk.metadata.offset;
+    if (!isNaN(offsetValue)) {
+      timestampInfo = {
+        videoId: chunk.metadata.video_id as string, // Already checked it's a string
+        timestamp: offsetValue,
+        formattedTime: formatTimestamp(offsetValue)
+      };
+    }
   }
   
   return NextResponse.json({
     chunk: {
       id: chunk.id,
       content: chunk.content,
-      section: chunk.section,
-      sectionSummary: chunk.section_summary,
-      chunkSummary: chunk.chunk_summary,
-      citationKey: chunk.citation_key,
+      chunk_summary: chunk.chunk_summary,
+      summary_status: chunk.summary_status,
+      section_identifier: chunk.section_identifier,
+      section_summary: chunk.section_summary,
+      section_summary_status: chunk.section_summary_status,
+      citation_key: chunk.citation_key,
       metadata: chunk.metadata
     },
     documentId: documentId,

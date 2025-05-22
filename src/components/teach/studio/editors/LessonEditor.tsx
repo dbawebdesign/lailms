@@ -8,13 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 interface LessonEditorProps {
   lesson: Lesson;
   onSave: (updatedLesson: Partial<Lesson>) => Promise<void>;
+  pathId: string;
+  sections: LessonSection[];
+  onReorderSections: (lessonId: string, activeSectionId: string, overSectionId: string) => Promise<void>;
+  fetchSectionsForLesson: (lessonId: string) => Promise<void>;
+  isLoadingSections: boolean;
   // Future props for managing sections:
   // onAddSection: () => void;
   // onReorderSection: (sectionId: string, newOrder: number) => void;
   // onDeleteSection: (sectionId: string) => void;
 }
 
-const LessonEditor: React.FC<LessonEditorProps> = ({ lesson, onSave }) => {
+const LessonEditor: React.FC<LessonEditorProps> = ({ lesson, onSave, pathId, sections, onReorderSections, fetchSectionsForLesson, isLoadingSections }) => {
   const [title, setTitle] = useState(lesson.title);
   const [description, setDescription] = useState(lesson.description || '');
   // Add other fields from Lesson as needed, e.g., learning_objectives

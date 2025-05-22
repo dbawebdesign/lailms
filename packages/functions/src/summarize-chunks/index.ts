@@ -1,6 +1,14 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+// import { corsHeaders } from '../_shared/cors.ts'; // This file is deleted
+
+// Consistent, robust CORS headers (copied from process-document)
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-auth, referer, user-agent, accept',
+  'Access-Control-Max-Age': '86400',
+};
 
 console.log(`Function "summarize-chunks" up and running!`)
 
@@ -16,10 +24,13 @@ interface ChunkRecord {
   document_id: string;
   content: string;
   chunk_summary?: string | null;
-  summary_status?: string;
-  section?: string | null;
+  summary_status?: string; // For chunk_summary status
+  section_identifier?: string | null; // Changed from section to section_identifier
+  section_summary?: string | null; // Added for section_summary
+  section_summary_status?: string; // Added for section_summary status
   chunk_index: number;
   metadata: Record<string, any> | null;
+  organisation_id?: string; // Added to potentially fetch if needed for document_summaries
 }
 
 /**
@@ -68,9 +79,9 @@ async function summarizeChunk(content: string, apiKey: string): Promise<string> 
 /**
  * Creates a section summary from multiple chunk summaries
  */
-async function summarizeSection(chunkSummaries: string[], sectionName: string, apiKey: string): Promise<string> {
+async function summarizeSection(chunkContents: string[], sectionIdentifier: string, apiKey: string): Promise<string> {
   try {
-    const combinedSummaries = chunkSummaries.join('\n\n');
+    const combinedContents = chunkContents.join('\n\n'); // Combine original chunk contents for section summary
     
     const url = 'https://api.openai.com/v1/chat/completions';
     
@@ -89,7 +100,7 @@ async function summarizeSection(chunkSummaries: string[], sectionName: string, a
           },
           {
             role: 'user',
-            content: `These are summaries from the "${sectionName}" section of a document. Create a concise section summary that captures the key points (maximum 3-4 sentences):\n\n${combinedSummaries}`
+            content: `These are text segments from the "${sectionIdentifier}" section of a document. Create a concise section summary that captures the key points (maximum 3-4 sentences):\n\n${combinedContents}`
           }
         ],
         temperature: 0.3,
@@ -156,11 +167,13 @@ async function summarizeDocument(sectionSummaries: { section: string, summary: s
 }
 
 // Main function handler
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  let orgId: string | null = null; // Declare orgId here to ensure it's in scope
 
   try {
     // Parse the request body
@@ -187,9 +200,34 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
       global: { headers: { Authorization: `Bearer ${supabaseServiceRoleKey}` } }
     });
+
+    // Fetch document details to get organisation_id
+    const { data: documentData, error: docError } = await supabase
+      .from('documents')
+      .select('organisation_id, status')
+      .eq('id', documentId)
+      .single();
+
+    if (docError || !documentData) {
+      throw new Error(`Failed to fetch document details: ${docError?.message || 'Document not found'}`);
+    }
+    // Assign to the orgId declared in the broader scope
+    orgId = documentData.organisation_id; 
+    const currentDocumentStatus = documentData.status;
+
+
+    if (!orgId) { // Check if orgId was successfully fetched and assigned
+      throw new Error(`Organisation ID not found for document ${documentId} or was null.`);
+    }
     
     // Process based on the requested summarization level
-    let response: any = { success: true, message: '', summarized: 0 };
+    let response: { 
+      success: boolean; 
+      message: string; 
+      summarized: number; 
+      error?: string;
+      summary?: string; // Added optional summary field for document level
+    } = { success: true, message: '', summarized: 0 };
     
     if (summarizeLevel === 'chunk') {
       // Summarize a single chunk or all pending chunks in a document
@@ -205,7 +243,7 @@ serve(async (req) => {
       }
       
       // Fetch chunks to summarize
-      const { data: chunks, error: fetchError } = await query;
+      const { data: chunks, error: fetchError } = await query as { data: ChunkRecord[] | null, error: any };
       
       if (fetchError) {
         throw new Error(`Failed to fetch chunks: ${fetchError.message}`);
@@ -224,9 +262,9 @@ serve(async (req) => {
       console.log(`Found ${chunks.length} chunks to summarize for document ${documentId}`);
       
       // Process each chunk
-      for (const chunk of chunks) {
+      for (const chunk of chunks as ChunkRecord[]) {
         try {
-          console.log(`Summarizing chunk ${chunk.id} (${chunk.chunk_index})`);
+          console.log(`Summarizing chunk ${chunk.id} (${chunk.chunk_index}) for document ${documentId}`);
           const summary = await summarizeChunk(chunk.content, openaiApiKey);
           
           // Update the chunk with its summary
@@ -234,7 +272,8 @@ serve(async (req) => {
             .from('document_chunks')
             .update({
               chunk_summary: summary,
-              summary_status: 'completed'
+              summary_status: 'completed',
+              section_summary_status: chunk.section_identifier ? 'pending' : null 
             })
             .eq('id', chunk.id);
           
@@ -243,164 +282,231 @@ serve(async (req) => {
           } else {
             response.summarized++;
           }
-        } catch (error) {
+        } catch (error: any) { // Typed error
           console.error(`Error summarizing chunk ${chunk.id}:`, error);
-          
-          // Mark the chunk as error
           await supabase
             .from('document_chunks')
-            .update({
-              summary_status: 'error'
-            })
+            .update({ summary_status: 'error' })
             .eq('id', chunk.id);
         }
       }
       
-      response.message = `Successfully summarized ${response.summarized} of ${chunks.length} chunks.`;
-      
-      // Check if all chunks for this document are now summarized
-      const { count: pendingCount, error: countError } = await supabase
+      response.message = `Successfully summarized ${response.summarized} chunk(s).`;
+
+      // After all selected chunks are summarized (or if no chunks were selected but we need to check sections)
+      // Proceed to summarize sections if applicable
+      console.log(`Checking for section summarization for document ${documentId}`);
+      const { data: completedChunksForSections, error: fetchCompletedError } = await supabase
         .from('document_chunks')
-        .select('*', { count: 'exact', head: true })
-        .eq('document_id', documentId)
-        .eq('summary_status', 'pending');
-      
-      if (!countError && pendingCount === 0) {
-        // All chunks are summarized, trigger section summaries
-        response.nextStep = 'section';
-      }
-    } else if (summarizeLevel === 'section') {
-      // Get all completed chunks grouped by section
-      const { data: chunks, error: fetchError } = await supabase
-        .from('document_chunks')
-        .select('*')
+        .select('id, content, chunk_summary, section_identifier, section_summary_status')
         .eq('document_id', documentId)
         .eq('summary_status', 'completed')
+        .neq('section_identifier', null)
+        .order('section_identifier')
         .order('chunk_index');
-      
-      if (fetchError || !chunks || chunks.length === 0) {
-        throw new Error(`Failed to fetch completed chunks: ${fetchError?.message || 'No completed chunks found'}`);
-      }
-      
-      // Group chunks by section
-      const sectionMap: Record<string, ChunkRecord[]> = {};
-      
-      chunks.forEach(chunk => {
-        const sectionKey = chunk.section || 'default';
-        if (!sectionMap[sectionKey]) {
-          sectionMap[sectionKey] = [];
-        }
-        sectionMap[sectionKey].push(chunk);
-      });
-      
-      // Generate summary for each section
-      const sectionResults = [];
-      
-      for (const [sectionName, sectionChunks] of Object.entries(sectionMap)) {
-        try {
-          const chunkSummaries = sectionChunks
-            .map(chunk => chunk.chunk_summary)
-            .filter(Boolean) as string[];
-          
-          if (chunkSummaries.length === 0) continue;
-          
-          const sectionSummary = await summarizeSection(chunkSummaries, sectionName, openaiApiKey);
-          
-          // Update all chunks in this section with the section summary
-          const { error: updateError } = await supabase
-            .from('document_chunks')
-            .update({
-              section_summary: sectionSummary
-            })
-            .eq('document_id', documentId)
-            .eq('section', sectionName);
-          
-          if (updateError) {
-            console.error(`Failed to update section ${sectionName}:`, updateError);
-          } else {
-            sectionResults.push({
-              section: sectionName,
-              chunks: sectionChunks.length,
-              summary: sectionSummary
-            });
-            response.summarized++;
+
+      if (fetchCompletedError) {
+        console.error(`Error fetching completed chunks for section summarization: ${fetchCompletedError.message}`);
+      } else if (completedChunksForSections && completedChunksForSections.length > 0) {
+        const sections: { [key: string]: ChunkRecord[] } = {};
+        for (const ch of completedChunksForSections) {
+          if (ch.section_identifier) {
+            if (!sections[ch.section_identifier]) {
+              sections[ch.section_identifier] = [];
+            }
+            sections[ch.section_identifier].push(ch as ChunkRecord);
           }
-        } catch (error) {
-          console.error(`Error summarizing section ${sectionName}:`, error);
         }
+
+        let sectionsSummarizedCount = 0;
+        for (const sectionId in sections) {
+          const sectionChunks = sections[sectionId];
+          // Check if any chunk in this section is pending section summary
+          if (sectionChunks.length > 0 && sectionChunks.some(sc => sc.section_summary_status === 'pending')) {
+            console.log(`Summarizing section: ${sectionId} with ${sectionChunks.length} chunks.`);
+            const sectionChunkContents = sectionChunks.map(sc => sc.content);
+            
+            try {
+              const sectionSummaryText = await summarizeSection(sectionChunkContents, sectionId, openaiApiKey);
+              const chunkIdsInSection = sectionChunks.map(sc => sc.id);
+              const { error: updateSectionError } = await supabase
+                .from('document_chunks')
+                .update({
+                  section_summary: sectionSummaryText,
+                  section_summary_status: 'completed'
+                })
+                .in('id', chunkIdsInSection);
+
+              if (updateSectionError) {
+                console.error(`Failed to update section summary for section ${sectionId}:`, updateSectionError);
+                await supabase.from('document_chunks').update({ section_summary_status: 'error' }).in('id', chunkIdsInSection);
+              } else {
+                sectionsSummarizedCount++;
+                console.log(`Successfully summarized section ${sectionId}`);
+              }
+            } catch (sectionSummarizeErr: any) { // Typed error
+              console.error(`Error generating summary for section ${sectionId}:`, sectionSummarizeErr);
+              const chunkIdsInSection = sectionChunks.map(sc => sc.id);
+              await supabase.from('document_chunks').update({ section_summary_status: 'error' }).in('id', chunkIdsInSection);
+            }
+          }
+        }
+        if (sectionsSummarizedCount > 0) {
+            response.message += ` ${sectionsSummarizedCount} section(s) also summarized.`;
+        }
+        console.log(`Completed section summarization checks. ${sectionsSummarizedCount} sections newly processed for document ${documentId}.`);
+      } else {
+        console.log(`No completed chunks with pending section identifiers found for section summarization for document ${documentId}.`);
       }
-      
-      response.message = `Successfully summarized ${response.summarized} sections.`;
-      response.sections = sectionResults;
-      response.nextStep = 'document';
+
+      // After chunk and section summaries are done for summarizeLevel 'chunk', finalize by creating document summary.
+      // This assumes that a 'chunk' level request implies the full pipeline up to document summary for that document.
+      console.log(`Proceeding to finalize document processing after chunk/section summarization for document ${documentId}`);
+      const finalizeResult = await finalizeDocumentProcessing(documentId, orgId, supabase, openaiApiKey);
+      if (!finalizeResult.success) {
+         response.success = false;
+         response.message = finalizeResult.message; // Overwrite or append? Let's append for more context.
+         response.error = finalizeResult.message;
+      } else {
+         response.message += ` ${finalizeResult.message}`; // Append success message
+         // If finalizeDocumentProcessing returns the summary, add it to response.
+         // The finalizeDocumentProcessing current return type doesn't include the summary text itself.
+         // We might want to adjust finalizeDocumentProcessing to return { success, message, summaryText? }
+         // For now, the document summary is stored in document_summaries, not returned in this main response directly.
+      }
+      // The document status is updated within finalizeDocumentProcessing
+
     } else if (summarizeLevel === 'document') {
-      // Get all section summaries
-      const { data: chunks, error: fetchError } = await supabase
-        .from('document_chunks')
-        .select('section, section_summary')
-        .eq('document_id', documentId)
-        .not('section_summary', 'is', null)
-        .order('chunk_index');
+      // This level now directly triggers the full finalization, including document summary generation and storage.
+      console.log(`Direct request for document level summary for ${documentId}. Finalizing document processing.`);
+      const finalizeResult = await finalizeDocumentProcessing(documentId, orgId, supabase, openaiApiKey);
       
-      if (fetchError) {
-        throw new Error(`Failed to fetch section summaries: ${fetchError.message}`);
+      response.success = finalizeResult.success;
+      response.message = finalizeResult.message;
+      if (!finalizeResult.success) {
+        response.error = finalizeResult.message;
       }
-      
-      if (!chunks || chunks.length === 0) {
-        throw new Error('No section summaries found');
-      }
-      
-      // Deduplicate sections (we only need one summary per section)
-      const sections = Array.from(
-        new Map(chunks.map(c => [c.section, { section: c.section || 'Unnamed section', summary: c.section_summary }]))
-        .values()
-      );
-      
-      try {
-        // Generate document summary
-        const documentSummary = await summarizeDocument(sections, documentId, openaiApiKey);
-        
-        // Update the document with its summary
-        const { error: updateError } = await supabase
-          .from('documents')
-          .update({
-            document_summary: documentSummary,
-            summary_status: 'completed'
-          })
-          .eq('id', documentId);
-        
-        if (updateError) {
-          throw new Error(`Failed to update document: ${updateError.message}`);
-        }
-        
-        response.message = 'Successfully generated document summary.';
-        response.summary = documentSummary;
-      } catch (error) {
-        console.error('Error generating document summary:', error);
-        
-        // Mark the document as error
-        await supabase
-          .from('documents')
-          .update({
-            summary_status: 'error'
-          })
-          .eq('id', documentId);
-          
-        throw error;
+      // Potentially, if finalizeDocumentProcessing returned the summary text, add it to response.summary
+      // For now, the document summary is stored in document_summaries.
+      // The 'summarized' count for 'document' level can be 1 if successful.
+      if (finalizeResult.success) {
+        response.summarized = 1; 
       }
     }
     
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+      status: response.success ? 200 : 500,
     });
-  } catch (err) {
-    console.error('Function error:', err);
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    
-    return new Response(JSON.stringify({ error: errorMessage }), {
+  } catch (error: any) { // Typed error
+    console.error('Overall error in summarize-chunks function:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      message: error instanceof Error ? error.message : String(error), 
+      error: error instanceof Error ? error.stack : undefined 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
   }
-}); 
+});
+
+// Helper function to finalize document processing
+async function finalizeDocumentProcessing(
+  documentId: string,
+  orgId: string,
+  supabase: any,
+  openaiApiKey: string
+) {
+  console.log(`Finalizing document processing for document ${documentId}`);
+  // 1. Fetch all relevant summaries (section or chunk)
+  const { data: allProcessedChunks, error: fetchProcessedError } = await supabase
+    .from('document_chunks')
+    .select('section_identifier, section_summary, chunk_summary, summary_status, section_summary_status')
+    .eq('document_id', documentId)
+    .or('summary_status.eq.completed,section_summary_status.eq.completed'); // Ensure we only get completed summaries
+
+  if (fetchProcessedError) {
+    console.error(`Failed to fetch processed chunks for document summary generation: ${fetchProcessedError.message}`);
+    return { success: false, message: `Failed to fetch processed chunks: ${fetchProcessedError.message}` };
+  }
+
+  if (!allProcessedChunks || allProcessedChunks.length === 0) {
+    console.log(`No completed chunk/section summaries found for document ${documentId}. Skipping document summary.`);
+    // Optionally update document status to something like 'no_content_to_summarize'
+    await supabase.from('documents').update({ status: 'processing_failed', updated_at: new Date().toISOString() }).eq('id', documentId);
+    return { success: true, message: 'No completed summaries to generate document summary from.' };
+  }
+  
+  const uniqueSectionSummaries: { section: string; summary: string }[] = [];
+  const seenSections = new Set<string>();
+
+  allProcessedChunks.forEach((c: { section_identifier: string | null; section_summary: string | null; chunk_summary: string | null; section_summary_status: string | null; summary_status: string | null }) => {
+    if (c.section_identifier && c.section_summary && c.section_summary_status === 'completed' && !seenSections.has(c.section_identifier)) {
+      uniqueSectionSummaries.push({ section: c.section_identifier, summary: c.section_summary });
+      seenSections.add(c.section_identifier);
+    } else if (!c.section_identifier && c.chunk_summary && c.summary_status === 'completed') {
+      // Fallback for documents that might not have sections, or if section summary failed
+      // To avoid too many small "sections", we can group these or handle them carefully
+      // For now, let's assume if chunk_summary is present, it can contribute if no section summary exists for it
+      const pseudoSectionName = `Chunk ${uniqueSectionSummaries.length + 1}`;
+      if (!seenSections.has(pseudoSectionName)) { // This check might not be ideal for chunk-level
+         uniqueSectionSummaries.push({ section: pseudoSectionName, summary: c.chunk_summary });
+         // seenSections.add(pseudoSectionName); // Avoid adding to seenSections if we want all chunk summaries
+      }
+    }
+  });
+
+  if (uniqueSectionSummaries.length === 0) {
+    console.log(`No valid section or chunk summaries to form a document summary for ${documentId}.`);
+    await supabase.from('documents').update({ status: 'processing_failed', updated_at: new Date().toISOString() }).eq('id', documentId);
+    return { success: true, message: 'No valid summaries available for document summary.' };
+  }
+
+  // 2. Generate document summary
+  try {
+    console.log(`Generating document summary for ${documentId} from ${uniqueSectionSummaries.length} section/chunk summaries.`);
+    const documentSummaryText = await summarizeDocument(uniqueSectionSummaries, documentId, openaiApiKey);
+    
+    // 3. Store document summary
+    const { error: summaryInsertError } = await supabase
+      .from('document_summaries')
+      .upsert({
+        document_id: documentId,
+        organisation_id: orgId,
+        summary: documentSummaryText,
+        summary_level: 'document',
+        status: 'completed',
+        model_used: 'gpt-4.1-nano', // Assuming this model is used by summarizeDocument
+        updated_at: new Date().toISOString(), 
+      }, { onConflict: 'document_id, summary_level' });
+
+    if (summaryInsertError) {
+      console.error(`Failed to store document summary: ${summaryInsertError.message}`);
+      await supabase.from('documents').update({ status: 'processing_failed', updated_at: new Date().toISOString() }).eq('id', documentId);
+      return { success: false, message: `Failed to store document summary: ${summaryInsertError.message}` };
+    }
+    console.log(`Document summary stored successfully for ${documentId}.`);
+
+    // 4. Update main document status
+    const { error: docUpdateError } = await supabase
+      .from('documents')
+      .update({ status: 'completed', updated_at: new Date().toISOString() }) // Or a more specific status like 'summaries_completed'
+      .eq('id', documentId);
+
+    if (docUpdateError) {
+      console.error(`Failed to update document status to completed: ${docUpdateError.message}`);
+      // This is not ideal, as summary is stored but document status isn't updated.
+      // Manual intervention might be needed or a retry mechanism.
+      return { success: false, message: `Document summary stored, but failed to update main document status: ${docUpdateError.message}` };
+    }
+    console.log(`Document ${documentId} status updated to completed.`);
+    return { success: true, message: 'Document processing and summarization finalized successfully.', summaryText: documentSummaryText };
+
+  } catch (error: any) { // Typed error
+    console.error(`Error during document summary generation or storage for ${documentId}:`, error);
+    await supabase.from('documents').update({ status: 'processing_failed', updated_at: new Date().toISOString() }).eq('id', documentId);
+    // Ensure message from error is passed
+    return { success: false, message: `Error finalizing document processing: ${error instanceof Error ? error.message : String(error)}` };
+  }
+} 
