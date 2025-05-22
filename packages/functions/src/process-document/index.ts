@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { YoutubeTranscript } from 'npm:youtube-transcript'; // Added for YouTube
-import { pdfText } from 'jsr:@pdf/pdftext@1.3.2'; // Added for PDF text extraction
+import { getDocument } from 'https://esm.sh/pdf.mjs'; // PDF text extraction compatible with edge runtime
 // import { corsHeaders } from '../_shared/cors.ts'; // Path issue, define locally for now
 
 // Consistent, robust CORS headers (copied from kb-process-textfile)
@@ -76,16 +76,19 @@ async function extractTextFromPdf(filePath: string, supabase: SupabaseClient, bu
     }
 
     const pdfBuffer = await pdfFileData.arrayBuffer();
-    const pages: { [pageno: number]: string } = await pdfText(new Uint8Array(pdfBuffer));
+    const uint8 = new Uint8Array(pdfBuffer);
 
-    if (Object.keys(pages).length === 0) {
-      console.warn(`No text extracted from PDF ${filePath}. It might be an image-based PDF or empty.`);
-      return ""; // Return empty if no text found
+    const loadingTask = getDocument({ data: uint8 });
+    const pdfDoc = await loadingTask.promise;
+
+    let allText = '';
+    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+      const page = await pdfDoc.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageStrings = textContent.items.map((itm: any) => itm.str || '').join(' ');
+      allText += pageStrings + '\n\n';
     }
 
-    // Concatenate text from all pages
-    const allText = Object.values(pages).join('\n\n'); // Separate pages with double newline
-    
     console.log(`Successfully extracted ~${allText.length} characters from PDF ${filePath}.`);
     return allText;
   } catch (error) {
@@ -141,25 +144,47 @@ async function extractTextFromUrl(url: string): Promise<string> {
   }
 }
 
-async function extractTranscriptFromYouTube(url: string): Promise<string> {
+async function extractTranscriptFromYouTube(url: string): Promise<{ transcript?: string; error?: boolean; message?: string }> {
   console.log(`Attempting to fetch transcript for YouTube URL: ${url}`);
   try {
-    const transcriptResponse = await YoutubeTranscript.fetchTranscript(url);
+    // First attempt: Default language
+    let transcriptResponse = await YoutubeTranscript.fetchTranscript(url);
+
+    // If default fails or is empty, try explicitly with English
     if (!transcriptResponse || transcriptResponse.length === 0) {
-      console.warn(`No transcript found or empty transcript for YouTube URL: ${url}`);
-      // Consider throwing an error or returning a specific message if no transcript is a hard failure
-      return ""; // Return empty string if no transcript found
+      console.warn(`No transcript found with default language for ${url}. Retrying with lang: 'en'.`);
+      try {
+        transcriptResponse = await YoutubeTranscript.fetchTranscript(url, { lang: 'en' });
+      } catch (langErr) {
+        // If fetching with lang: 'en' also errors, log it but proceed to main error handling with original error potentially
+        console.warn(`Fetching with lang: 'en' also failed for ${url}:`, langErr instanceof Error ? langErr.message : String(langErr));
+        // We will fall through to the main catch block if transcriptResponse is still null/empty 
+        // or if the initial fetchTranscript threw an error that wasn't just an empty response.
+      }
+    }
+
+    if (!transcriptResponse || transcriptResponse.length === 0) {
+      const warnMsg = `No transcript found or empty transcript for YouTube URL: ${url} (tried default and English).`;
+      console.warn(warnMsg);
+      return { error: true, message: warnMsg }; 
     }
     const fullTranscript = transcriptResponse.map(t => t.text).join(' ');
     console.log(`Successfully fetched transcript of ~${fullTranscript.length} characters for ${url}.`);
-    return fullTranscript;
+    return { transcript: fullTranscript, error: false };
   } catch (error) {
-    console.error(`Error fetching YouTube transcript for ${url}:`, error instanceof Error ? error.message : String(error));
-    // Check for common errors like video not found or transcripts disabled
-    if (error instanceof Error && (error.message.includes('transcriptsDisabled') || error.message.includes('video not found'))) {
-        throw new Error(`Could not retrieve transcript for ${url}: Transcripts may be disabled or the video is unavailable.`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Error fetching YouTube transcript for ${url}:`, errorMessage);
+    // Specific check for transcript disabled or video not found errors
+    if (errorMessage.includes('Transcript is disabled on this video') || 
+        errorMessage.includes('transcriptsDisabled') || 
+        errorMessage.includes('video not found') ||
+        errorMessage.includes('No transcript found') // Catching the library's own specific error for this
+      ) {
+      const userFriendlyMessage = `Transcripts are disabled or unavailable for this video: ${url}`;
+      return { error: true, message: userFriendlyMessage };
     }
-    throw new Error(`Failed to fetch YouTube transcript from ${url}: ${error instanceof Error ? error.message : String(error)}`);
+    // For other types of errors, still return an error object but with the original message
+    return { error: true, message: `Failed to fetch YouTube transcript from ${url}: ${errorMessage}` };
   }
 }
 
@@ -427,8 +452,18 @@ serve(async (req: Request) => {
     console.log(`Processing document: ${document.file_name || documentId}, Type: ${fileType}, URL: ${sourceUrl}, Path: ${storagePath}`);
 
     if (sourceUrl && (sourceUrl.includes('youtube.com') || sourceUrl.includes('youtu.be'))) {
-      extractedText = await extractTranscriptFromYouTube(sourceUrl);
-      docMetadata.source_type = 'youtube_transcript';
+      const transcriptResult = await extractTranscriptFromYouTube(sourceUrl);
+      if (transcriptResult.error) {
+        console.error(`PROCESS-DOCUMENT: YouTube transcript error for doc ${documentId}: ${transcriptResult.message}`);
+        await updateDocumentStatus(supabaseClient, documentId, 'error', { processing_error: transcriptResult.message, processed_at: new Date().toISOString() });
+        return new Response(JSON.stringify({ message: "Processing initiated, but transcript unavailable.", errorDetail: transcriptResult.message }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      } else {
+        extractedText = transcriptResult.transcript || '';
+        docMetadata.source_type = 'youtube_transcript';
+      }
     } else if (sourceUrl) {
       extractedText = await extractTextFromUrl(sourceUrl);
       docMetadata.source_type = 'url_scrape';

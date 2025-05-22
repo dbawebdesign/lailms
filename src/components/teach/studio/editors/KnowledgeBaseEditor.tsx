@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UploadCloud, Link, Mic, FileText, Youtube, Globe, Trash2, AlertCircle, CheckCircle2, Hourglass } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import MinimalSpinner from '@/components/ui/MinimalSpinner';
 
 interface KnowledgeBaseEditorProps {
   baseClass: StudioBaseClass;
@@ -150,6 +151,7 @@ export const KnowledgeBaseEditor: React.FC<KnowledgeBaseEditorProps> = ({ baseCl
             });
           } else if (payload.eventType === 'UPDATE') {
             const updatedItem = mapPayloadToKnowledgeBaseItem(payload.new);
+            console.log('Realtime UPDATE, mapped updatedItem:', updatedItem);
             setKnowledgeBaseItems(prevItems =>
               prevItems.map(item => (item.id === updatedItem.id ? updatedItem : item))
                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -411,9 +413,10 @@ export const KnowledgeBaseEditor: React.FC<KnowledgeBaseEditorProps> = ({ baseCl
             id: newDocId,
             organisation_id: baseClass.organisation_id,
             base_class_id: baseClass.id,
-            user_id: user.id,
+            uploaded_by: user.id,
             file_name: `URL - ${originalPasteInput.substring(0, 50)}${originalPasteInput.length > 50 ? '...' : ''}`,
             file_type: 'application/json', // Special type to indicate URL source for process-document
+            storage_path: `URL_SOURCE_${newDocId}`, // Make storage_path unique for URLs
             metadata: { 
               originalUrl: originalPasteInput,
               source: typeForUi === 'youtube' ? 'youtube_url' : 'pasted_url', 
@@ -449,7 +452,7 @@ export const KnowledgeBaseEditor: React.FC<KnowledgeBaseEditorProps> = ({ baseCl
             id: newDocId,
             organisation_id: baseClass.organisation_id,
             base_class_id: baseClass.id,
-            user_id: user.id,
+            uploaded_by: user.id,
             file_name: 'Pasted Text Snippet',
             file_type: 'text/plain',
             storage_path: filePath,
@@ -654,16 +657,16 @@ export const KnowledgeBaseEditor: React.FC<KnowledgeBaseEditorProps> = ({ baseCl
 
   const getStatusIcon = (status: KnowledgeBaseItem['status']) => {
     switch (status) {
+      case 'pending':
+      case 'queued':
+      case 'processing':
+        return <MinimalSpinner size={18} color="text-blue-500" />;
       case 'completed':
         return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-      case 'processing':
-        return <Hourglass className="h-5 w-5 text-blue-500 animate-spin" />;
-      case 'pending':
-        return <Hourglass className="h-5 w-5 text-gray-500" />;
       case 'error':
         return <AlertCircle className="h-5 w-5 text-red-500" />;
       default:
-        return null;
+        return <Hourglass className="h-5 w-5 text-gray-400" />;
     }
   };
 
