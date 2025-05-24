@@ -695,7 +695,7 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
       case 'lesson':
         // Find the parent path for the lesson
         const parentPathForLesson = studioBaseClass?.paths?.find(p => p.lessons?.some(l => l.id === selectedItem.id));
-        return <LessonEditor lesson={selectedItem.data as Lesson} onSave={handleSaveLesson} pathId={parentPathForLesson?.id || ''} sections={parentPathForLesson?.lessons?.find(l=> l.id === selectedItem.id)?.sections || []} onReorderSections={handleReorderSections} fetchSectionsForLesson={fetchSectionsForLesson} isLoadingSections={isLoadingSections[selectedItem.id as string]} />;
+        return <LessonEditor lesson={selectedItem.data as Lesson} onSave={handleSaveLesson} pathId={parentPathForLesson?.id || ''} sections={parentPathForLesson?.lessons?.find(l=> l.id === selectedItem.id)?.sections || []} onReorderSections={handleReorderSections} fetchSectionsForLesson={fetchSectionsForLesson} isLoadingSections={isLoadingSections[selectedItem.id as string]} baseClass={studioBaseClass} />;
       case 'section':
         return <LessonSectionEditor section={selectedItem.data as LessonSection} onSave={handleSaveLessonSection} />;
       case 'knowledgebase': // NEW: Render KnowledgeBaseEditor

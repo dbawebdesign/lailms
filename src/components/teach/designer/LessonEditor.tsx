@@ -16,7 +16,7 @@ import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
 
-import type { LessonSection } from '@/types/teach'; // LessonSectionVersion might be needed later for history UI
+import type { LessonSection } from '@/types/lesson'; // Using lesson.ts for consistency
 import {
   getLessonSections, // For re-fetching if needed
   addLessonSection,
@@ -28,7 +28,9 @@ import {
 import { Button } from '@/components/ui/button'; // Assuming Button component exists
 import { Input } from '@/components/ui/input';   // Assuming Input component exists
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { PlusCircle, Trash2, Edit3, History, CheckCircle, XCircle, Save } from 'lucide-react'; // Icons
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PlusCircle, Trash2, Edit3, History, CheckCircle, XCircle, Save, Brain, FileText } from 'lucide-react'; // Icons
+import MediaAssetsPanel from '@/components/teach/studio/editors/MediaAssetsPanel';
 
 // Define a basic toolbar component (can be expanded significantly)
 const TiptapToolbar: React.FC<{ editor: Editor | null }> = ({ editor }) => {

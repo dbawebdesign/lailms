@@ -183,9 +183,9 @@ async function extractTranscriptFromYouTube(url: string): Promise<{ transcript?:
     }
 
     if (transcriptResponse && transcriptResponse.length > 0) {
-      const fullTranscript = transcriptResponse.map(t => t.text).join(' ');
+    const fullTranscript = transcriptResponse.map(t => t.text).join(' ');
       console.log(`Strategy 1 SUCCESS: Fetched transcript of ~${fullTranscript.length} characters for ${url}.`);
-      return { transcript: fullTranscript, error: false };
+    return { transcript: fullTranscript, error: false };
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
