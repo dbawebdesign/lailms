@@ -36,8 +36,8 @@ import {
 import { toast } from 'sonner'
 import type { Database } from 'packages/types/supabase'
 
-// Document status type
-export type DocumentStatus = 'queued' | 'processing' | 'completed' | 'error'
+// Document status type - updated to match database enum
+export type DocumentStatus = 'queued' | 'processing' | 'summarizing_chunks' | 'summarizing_document' | 'completed' | 'error' | 'completed_with_errors'
 
 type Document = Database['public']['Tables']['documents']['Row']
 
@@ -53,13 +53,12 @@ export function FileListTable({ organisationId }: FileListTableProps) {
 
   useEffect(() => {
     async function fetchDocuments() {
-      if (!organisationId) return; // Redundant check now, but harmless
+      if (!organisationId) return;
 
       setIsLoading(true);
       setError(null);
       try {
-        // Fetch documents from the new API endpoint
-        const response = await fetch(`/api/knowledge-base/documents`); // No need to pass orgId, API infers it
+        const response = await fetch(`/api/knowledge-base/documents`);
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
@@ -78,7 +77,7 @@ export function FileListTable({ organisationId }: FileListTableProps) {
     }
 
     fetchDocuments();
-  }, [organisationId]); // Refetch when organisationId changes
+  }, [organisationId]);
 
   // Get status badge based on document status
   const getStatusBadge = (status: DocumentStatus) => {
@@ -97,11 +96,32 @@ export function FileListTable({ organisationId }: FileListTableProps) {
             <span>Processing</span>
           </Badge>
         )
+      case 'summarizing_chunks':
+        return (
+          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>Summarizing</span>
+          </Badge>
+        )
+      case 'summarizing_document':
+        return (
+          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>Finalizing</span>
+          </Badge>
+        )
       case 'completed':
         return (
           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 flex items-center gap-1">
             <CheckCircle className="h-3 w-3" />
             <span>Completed</span>
+          </Badge>
+        )
+      case 'completed_with_errors':
+        return (
+          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            <span>Partial</span>
           </Badge>
         )
       case 'error':
@@ -120,15 +140,44 @@ export function FileListTable({ organisationId }: FileListTableProps) {
     }
   }
 
-  // File type icon or generic file icon
-  const getFileIcon = (fileType: string | null) => {
-    // This could be expanded to include more file type specific icons
-    return <FileIcon className="h-4 w-4 text-primary" />
+  // Get file type display name
+  const getFileTypeDisplay = (fileType: string | null, fileName: string | null) => {
+    if (!fileType) return 'Unknown';
+    
+    // Special handling for URLs
+    if (fileName?.startsWith('URL -')) {
+      if (fileName.includes('youtube.com') || fileName.includes('youtu.be')) {
+        return 'YouTube Video';
+      }
+      return 'Web Page';
+    }
+    
+    // Handle common file types
+    switch (fileType) {
+      case 'application/pdf':
+        return 'PDF';
+      case 'text/plain':
+        return 'Text';
+      case 'audio/wav':
+      case 'audio/mp3':
+      case 'audio/mpeg':
+        return 'Audio';
+      case 'video/mp4':
+      case 'video/quicktime':
+        return 'Video';
+      default:
+        return fileType.split('/')[1]?.toUpperCase() || 'File';
+    }
   }
 
-  // Handle document deletion
-  const handleDelete = async (docId: string) => {
+  // Handle document deletion with confirmation
+  const handleDelete = async (docId: string, fileName: string | null) => {
     if (deletingId) return; // Prevent multiple deletes
+    
+    // Show confirmation dialog
+    if (!confirm(`Are you sure you want to delete "${fileName || 'this document'}"? This action cannot be undone.`)) {
+      return;
+    }
 
     setDeletingId(docId);
     try {
@@ -154,65 +203,87 @@ export function FileListTable({ organisationId }: FileListTableProps) {
     }
   }
 
-  if (isLoading) return <p>Loading documents...</p>
-  if (error) return <p className="text-red-500">{error}</p>
+  // Format file size
+  const formatFileSize = (bytes: number | null) => {
+    if (!bytes) return '0 B';
+    return formatBytes(bytes);
+  }
+
+  if (isLoading) return <div className="p-4 text-center">Loading documents...</div>
+  if (error) return <div className="p-4 text-center text-red-500">{error}</div>
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Size</TableHead>
-          <TableHead>Uploaded</TableHead>
-          <TableHead>Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {documents.length === 0 ? (
+    <div className="space-y-4">
+      <Table>
+        <TableHeader>
           <TableRow>
-            <TableCell colSpan={6} className="text-center">
-              No documents uploaded for this organisation yet.
-            </TableCell>
+            <TableHead>Name</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Size</TableHead>
+            <TableHead>Uploaded</TableHead>
+            <TableHead className="w-[50px]">Actions</TableHead>
           </TableRow>
-        ) : (
-          documents.map((doc) => (
-            <TableRow key={doc.id}>
-              <TableCell className="font-medium">{doc.name}</TableCell>
-              <TableCell><Badge variant={doc.status === 'processed' ? 'default' : 'secondary'}>{doc.status}</Badge></TableCell>
-              <TableCell>{doc.file_type}</TableCell>
-              <TableCell>{formatBytes(doc.file_size ?? 0)}</TableCell>
-              <TableCell>{doc.created_at ? format(new Date(doc.created_at), 'PPpp') : 'N/A'}</TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={!!deletingId}>
-                      <span className="sr-only">Open menu</span>
-                      {deletingId === doc.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <MoreHorizontal className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {/* <DropdownMenuItem>View Details</DropdownMenuItem> */}
-                    {/* <DropdownMenuItem>Process</DropdownMenuItem> */}
-                    <DropdownMenuItem 
-                      onClick={() => handleDelete(doc.id)} 
-                      className="text-red-600" 
-                      disabled={!!deletingId}
-                    >
-                      {deletingId === doc.id ? 'Deleting...' : 'Delete'}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+        </TableHeader>
+        <TableBody>
+          {documents.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                No documents uploaded yet. Upload your first document above.
               </TableCell>
             </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
+          ) : (
+            documents.map((doc) => (
+              <TableRow key={doc.id}>
+                <TableCell className="font-medium max-w-[300px]">
+                  <div className="flex items-center gap-2">
+                    <FileIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="truncate" title={doc.file_name || 'Unnamed document'}>
+                      {doc.file_name || 'Unnamed document'}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {getStatusBadge(doc.status as DocumentStatus)}
+                </TableCell>
+                <TableCell>
+                  {getFileTypeDisplay(doc.file_type, doc.file_name)}
+                </TableCell>
+                <TableCell>
+                  {formatFileSize(doc.file_size)}
+                </TableCell>
+                <TableCell>
+                  {doc.created_at ? format(new Date(doc.created_at), 'MMM d, yyyy') : 'Unknown'}
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0" disabled={!!deletingId}>
+                        <span className="sr-only">Open menu</span>
+                        {deletingId === doc.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <MoreHorizontal className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem 
+                        onClick={() => handleDelete(doc.id, doc.file_name)} 
+                        className="text-red-600 focus:text-red-600" 
+                        disabled={!!deletingId}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {deletingId === doc.id ? 'Deleting...' : 'Delete'}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
   )
 } 

@@ -67,17 +67,17 @@ export async function GET(
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const { data: member, error: memberError } = await supabase
-      .from('members')
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
       .select('organisation_id')
       .eq('user_id', user.id)
       .single();
 
-    if (memberError || !member) {
-      console.error('Error fetching member organisation:', memberError);
+    if (profileError || !profile) {
+      console.error('Error fetching profile organisation:', profileError);
       return NextResponse.json({ error: 'User not associated with an organisation' }, { status: 403 });
     }
-    const organisationId = member.organisation_id;
+    const organisationId = profile.organisation_id;
 
     // First, verify access to the base class
     const { data: baseClassOrg, error: baseClassOrgError } = await supabase
@@ -144,17 +144,17 @@ export async function PUT(
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const { data: member, error: memberError } = await supabase
-      .from('members')
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
       .select('organisation_id')
       .eq('user_id', user.id)
       .single();
 
-    if (memberError || !member) {
-      console.error('Error fetching member organisation:', memberError);
+    if (profileError || !profile) {
+      console.error('Error fetching profile organisation:', profileError);
       return NextResponse.json({ error: 'User not associated with an organisation' }, { status: 403 });
     }
-    const organisationId = member.organisation_id;
+    const organisationId = profile.organisation_id;
 
     // Verify access to the base class (and that it belongs to the org)
     const { data: baseClass, error: baseClassError } = await supabase
@@ -232,17 +232,17 @@ export async function DELETE(
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const { data: member, error: memberError } = await supabase
-      .from('members')
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
       .select('organisation_id')
       .eq('user_id', user.id)
       .single();
 
-    if (memberError || !member) {
-      console.error('Error fetching member organisation:', memberError);
+    if (profileError || !profile) {
+      console.error('Error fetching profile organisation:', profileError);
       return NextResponse.json({ error: 'User not associated with an organisation' }, { status: 403 });
     }
-    const organisationId = member.organisation_id;
+    const organisationId = profile.organisation_id;
 
     // Verify access to the base class
     const { data: baseClass, error: baseClassError } = await supabase

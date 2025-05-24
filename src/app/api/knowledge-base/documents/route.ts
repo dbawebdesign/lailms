@@ -14,30 +14,30 @@ export async function GET(request: Request) {
   }
 
   try {
-    // 1. Get the user's organisation ID from their membership record
-    const { data: member, error: memberError } = await supabase
-      .from('members')
+    // 1. Get the user's organisation ID from their profile record
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
       .select('organisation_id')
-      .eq('auth_id', session.user.id)
+      .eq('user_id', session.user.id)
       .single(); // Use single() as a user should belong to exactly one org in this context
 
-    if (memberError) {
-      console.error('Error fetching member record:', memberError);
-      // If memberError indicates "Row level security violation", it might mean the user exists but has no org
+    if (profileError) {
+      console.error('Error fetching profile record:', profileError);
+      // If profileError indicates "Row level security violation", it might mean the user exists but has no org
       // or RLS prevents access. If it indicates "JSON object requested, multiple (or no) rows returned", 
-      // it means the user has multiple/no member records.
-      if (memberError.code === 'PGRST116') { // Check for specific error code for no rows
-         return NextResponse.json({ error: 'User membership not found.' }, { status: 404 });
+      // it means the user has multiple/no profile records.
+      if (profileError.code === 'PGRST116') { // Check for specific error code for no rows
+         return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
       }
       return NextResponse.json({ error: 'Could not verify user organisation membership.' }, { status: 500 });
     }
 
-    if (!member || !member.organisation_id) {
+    if (!profile || !profile.organisation_id) {
       // This case might be redundant if single() throws an error for no rows, but good for clarity
       return NextResponse.json({ error: 'User is not associated with an organisation.' }, { status: 403 });
     }
 
-    const userOrganisationId = member.organisation_id;
+    const userOrganisationId = profile.organisation_id;
 
     // 2. Fetch documents for that organisation
     const { data: documents, error: documentsError } = await supabase
@@ -81,18 +81,18 @@ export async function DELETE(request: Request) {
 
   try {
     // 1. Get the user's organisation ID (reuse logic from GET or fetch again)
-    const { data: member, error: memberError } = await supabase
-      .from('members')
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
       .select('organisation_id')
-      .eq('auth_id', session.user.id)
+      .eq('user_id', session.user.id)
       .single();
 
-    if (memberError || !member || !member.organisation_id) {
+    if (profileError || !profile || !profile.organisation_id) {
       // Handle errors similar to GET
-      console.error('Error fetching member for delete:', memberError);
-      return NextResponse.json({ error: 'Could not verify user organisation membership for deletion.' }, { status: memberError?.code === 'PGRST116' ? 404 : 500 });
+      console.error('Error fetching profile for delete:', profileError);
+      return NextResponse.json({ error: 'Could not verify user organisation membership for deletion.' }, { status: profileError?.code === 'PGRST116' ? 404 : 500 });
     }
-    const userOrganisationId = member.organisation_id;
+    const userOrganisationId = profile.organisation_id;
 
     // 2. Fetch the document to verify ownership and get storage_path
     const { data: document, error: docFetchError } = await supabase

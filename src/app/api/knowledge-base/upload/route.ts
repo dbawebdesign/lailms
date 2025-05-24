@@ -18,23 +18,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // --- Get Organisation ID from user's membership --- 
-  const { data: member, error: memberError } = await supabase
-    .from('members') // Use the members table
+  // --- Get Organisation ID from user's profile --- 
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles') // Use the profiles table
     .select('organisation_id')
-    .eq('auth_id', session.user.id) // Match using the auth_id column
+    .eq('user_id', session.user.id) // Match using the user_id column
     .maybeSingle();
 
-  if (memberError) {
-    console.error('Error fetching member record:', memberError);
+  if (profileError) {
+    console.error('Error fetching profile record:', profileError);
     return NextResponse.json({ error: 'Could not verify user organisation membership.' }, { status: 500 });
   }
 
-  if (!member || !member.organisation_id) {
-    return NextResponse.json({ error: 'User membership not found or not associated with an organisation.' }, { status: 403 }); // Forbidden
+  if (!profile || !profile.organisation_id) {
+    return NextResponse.json({ error: 'User profile not found or not associated with an organisation.' }, { status: 403 }); // Forbidden
   }
 
-  const userOrganisationId = member.organisation_id;
+  const userOrganisationId = profile.organisation_id;
   // --- End Get Organisation ID --- 
 
   const formData = await request.formData();

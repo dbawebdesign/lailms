@@ -9,10 +9,15 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { UploadCloud, Link, Mic, FileText, Youtube, Globe, Trash2, AlertCircle, CheckCircle2, Hourglass } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { UploadCloud, Link, Mic, FileText, Youtube, Globe, Trash2, AlertCircle, CheckCircle2, Hourglass, ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import MinimalSpinner from '@/components/ui/MinimalSpinner';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface KnowledgeBaseEditorProps {
   baseClass: StudioBaseClass;
@@ -63,19 +68,34 @@ export const KnowledgeBaseEditor: React.FC<KnowledgeBaseEditorProps> = ({ baseCl
           const mappedItems: KnowledgeBaseItem[] = data.map((doc: any) => {
             let itemType: KnowledgeBaseItem['type'] = 'file';
             let sourceInfo = doc.file_type || 'Unknown file type';
-
-            if (doc.file_type === 'application/json' && doc.metadata?.originalUrl) {
-              sourceInfo = doc.metadata.originalUrl;
-              if (doc.metadata.originalUrl.includes('youtube.com') || doc.metadata.originalUrl.includes('youtu.be')) {
-                itemType = 'youtube';
-              } else {
-                itemType = 'url';
-              }
+            
+            // Better type detection based on file_type and metadata
+            if (doc.file_type === 'video/youtube' || 
+                (doc.file_type === 'application/json' && doc.metadata?.originalUrl?.includes('youtube'))) {
+              itemType = 'youtube';
+              sourceInfo = doc.metadata?.originalUrl || 'YouTube video';
+            } else if (doc.file_type === 'text/html' || 
+                       (doc.file_type === 'application/json' && doc.metadata?.originalUrl && !doc.metadata.originalUrl.includes('youtube'))) {
+              itemType = 'url';
+              sourceInfo = doc.metadata?.originalUrl || 'Web page';
             } else if (doc.file_type?.startsWith('audio/')) {
               itemType = 'audio_recording';
+              sourceInfo = 'Audio recording';
             } else if (doc.file_type === 'text/plain' && doc.metadata?.source === 'pasted_text') {
               itemType = 'text';
               sourceInfo = 'Pasted text snippet';
+            } else {
+              // Regular file upload
+              sourceInfo = doc.file_type || 'File upload';
+            }
+
+            // Extract error message from metadata with better error handling
+            let errorMessage = undefined;
+            if (doc.status === 'error') {
+              errorMessage = doc.metadata?.processing_error || 
+                           doc.metadata?.error_message ||
+                           doc.metadata?.error ||
+                           'Processing failed - unknown error';
             }
 
             return {
@@ -85,8 +105,8 @@ export const KnowledgeBaseEditor: React.FC<KnowledgeBaseEditorProps> = ({ baseCl
               status: doc.status as KnowledgeBaseItem['status'],
               createdAt: new Date(doc.created_at),
               sourceInfo: sourceInfo,
-              errorMessage: doc.metadata?.processing_error || undefined
-            } as KnowledgeBaseItem; // Added explicit cast
+              errorMessage: errorMessage
+            } as KnowledgeBaseItem;
           });
           setKnowledgeBaseItems(mappedItems);
         }
@@ -120,15 +140,36 @@ export const KnowledgeBaseEditor: React.FC<KnowledgeBaseEditorProps> = ({ baseCl
           const mapPayloadToKnowledgeBaseItem = (doc: any): KnowledgeBaseItem => {
             let itemType: KnowledgeBaseItem['type'] = 'file';
             let sourceInfo = doc.file_type || 'Unknown file type';
-            if (doc.file_type === 'application/json' && doc.metadata?.originalUrl) {
-              sourceInfo = doc.metadata.originalUrl;
-              itemType = (doc.metadata.originalUrl.includes('youtube.com') || doc.metadata.originalUrl.includes('youtu.be')) ? 'youtube' : 'url';
+            
+            // Better type detection based on file_type and metadata
+            if (doc.file_type === 'video/youtube' || 
+                (doc.file_type === 'application/json' && doc.metadata?.originalUrl?.includes('youtube'))) {
+              itemType = 'youtube';
+              sourceInfo = doc.metadata?.originalUrl || 'YouTube video';
+            } else if (doc.file_type === 'text/html' || 
+                       (doc.file_type === 'application/json' && doc.metadata?.originalUrl && !doc.metadata.originalUrl.includes('youtube'))) {
+              itemType = 'url';
+              sourceInfo = doc.metadata?.originalUrl || 'Web page';
             } else if (doc.file_type?.startsWith('audio/')) {
               itemType = 'audio_recording';
+              sourceInfo = 'Audio recording';
             } else if (doc.file_type === 'text/plain' && doc.metadata?.source === 'pasted_text') {
               itemType = 'text';
               sourceInfo = 'Pasted text snippet';
+            } else {
+              // Regular file upload
+              sourceInfo = doc.file_type || 'File upload';
             }
+
+            // Extract error message from metadata with better error handling
+            let errorMessage = undefined;
+            if (doc.status === 'error') {
+              errorMessage = doc.metadata?.processing_error || 
+                           doc.metadata?.error_message ||
+                           doc.metadata?.error ||
+                           'Processing failed - unknown error';
+            }
+
             return {
               id: doc.id,
               name: doc.file_name || 'Untitled',
@@ -136,7 +177,7 @@ export const KnowledgeBaseEditor: React.FC<KnowledgeBaseEditorProps> = ({ baseCl
               status: doc.status as KnowledgeBaseItem['status'],
               createdAt: new Date(doc.created_at),
               sourceInfo: sourceInfo,
-              errorMessage: doc.metadata?.processing_error || undefined
+              errorMessage: errorMessage
             } as KnowledgeBaseItem;
           };
 
@@ -649,10 +690,62 @@ export const KnowledgeBaseEditor: React.FC<KnowledgeBaseEditorProps> = ({ baseCl
     }
   };
 
-  const handleRemoveItem = (itemId: string) => {
-    // TODO: Call API to delete item from backend
-    setKnowledgeBaseItems(prev => prev.filter(item => item.id !== itemId));
-    toast({ title: 'Item Removed' });
+  const handleRemoveItem = async (itemId: string) => {
+    if (!baseClass.id || !itemId) return;
+    
+    // Add confirmation dialog
+    const confirmed = window.confirm('Are you sure you want to delete this document? This action cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      // Optimistically update UI - mark as processing
+      setKnowledgeBaseItems(prev => 
+        prev.map(item => 
+          item.id === itemId 
+            ? { ...item, status: 'processing' as KnowledgeBaseItem['status'] }
+            : item
+        )
+      );
+
+      const response = await fetch(`/api/teach/base-classes/${baseClass.id}/documents/${itemId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete document');
+      }
+
+      // Remove from UI state immediately
+      setKnowledgeBaseItems(prev => prev.filter(item => item.id !== itemId));
+      
+      toast({ 
+        title: 'Document Deleted', 
+        description: 'The document has been successfully removed from your knowledge base.',
+        variant: 'default' 
+      });
+
+    } catch (error: any) {
+      console.error('Error deleting document:', error);
+      
+      // Revert the item status if deletion failed
+      setKnowledgeBaseItems(prev => 
+        prev.map(item => 
+          item.id === itemId 
+            ? { ...item, status: 'error' as KnowledgeBaseItem['status'], errorMessage: error.message }
+            : item
+        )
+      );
+
+      toast({
+        title: 'Delete Failed',
+        description: error.message || 'An unexpected error occurred while deleting the document.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const getStatusIcon = (status: KnowledgeBaseItem['status']) => {
@@ -660,68 +753,153 @@ export const KnowledgeBaseEditor: React.FC<KnowledgeBaseEditorProps> = ({ baseCl
       case 'pending':
       case 'queued':
       case 'processing':
-        return <MinimalSpinner size={18} color="text-blue-500" />;
+        return <MinimalSpinner size={16} color="text-blue-500" />;
       case 'completed':
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case 'error':
-        return <AlertCircle className="h-5 w-5 text-red-500" />;
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
       default:
-        return <Hourglass className="h-5 w-5 text-gray-400" />;
+        return <Hourglass className="h-4 w-4 text-gray-400" />;
     }
   };
 
-   const getItemIcon = (type: KnowledgeBaseItem['type']) => {
+  const getItemIcon = (type: KnowledgeBaseItem['type']) => {
     switch (type) {
       case 'file':
-        return <FileText className="h-5 w-5 mr-2 text-blue-500" />;
+        return <FileText className="h-4 w-4 text-blue-500" />;
       case 'url':
-        return <Globe className="h-5 w-5 mr-2 text-green-500" />;
+        return <Globe className="h-4 w-4 text-green-500" />;
       case 'youtube':
-        return <Youtube className="h-5 w-5 mr-2 text-red-500" />;
+        return <Youtube className="h-4 w-4 text-red-500" />;
       case 'text':
-        return <FileText className="h-5 w-5 mr-2 text-gray-500" />;
+        return <FileText className="h-4 w-4 text-gray-500" />;
       case 'audio_recording':
-        return <Mic className="h-5 w-5 mr-2 text-purple-500" />;
+        return <Mic className="h-4 w-4 text-purple-500" />;
       default:
-        return null;
+        return <FileText className="h-4 w-4 text-gray-400" />;
     }
+  };
+
+  const getStatusBadge = (status: KnowledgeBaseItem['status']) => {
+    const variants = {
+      'pending': 'secondary',
+      'queued': 'secondary', 
+      'processing': 'default',
+      'completed': 'default',
+      'error': 'destructive'
+    } as const;
+    
+    const labels = {
+      'pending': 'Pending',
+      'queued': 'Queued',
+      'processing': 'Processing',
+      'completed': 'Completed',
+      'error': 'Error'
+    };
+
+    return (
+      <Badge variant={variants[status]} className="text-xs">
+        {labels[status]}
+      </Badge>
+    );
+  };
+
+  // New component for error messages
+  const ErrorMessage: React.FC<{ item: KnowledgeBaseItem }> = ({ item }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    
+    if (!item.errorMessage) return null;
+
+    const getErrorSuggestion = (message: string) => {
+      const lowerMessage = message.toLowerCase();
+      if (lowerMessage.includes('transcript')) {
+        return 'Try a different video or check if transcripts are enabled.';
+      }
+      if (lowerMessage.includes('access') || lowerMessage.includes('private')) {
+        return 'The video might be private or restricted in your region.';
+      }
+      if (lowerMessage.includes('storage')) {
+        return 'File upload failed. Try uploading again or contact support.';
+      }
+      return 'Please try again or contact support if the issue persists.';
+    };
+
+    return (
+      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+        <CollapsibleTrigger className="flex items-center space-x-1 text-xs text-red-600 hover:text-red-800 w-full">
+          <AlertCircle className="h-3 w-3 flex-shrink-0" />
+          <span className="font-medium">Processing Failed</span>
+          {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-1">
+          <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 space-y-1">
+            <div className="break-words">{item.errorMessage}</div>
+            <div className="text-blue-600 font-medium">
+              💡 {getErrorSuggestion(item.errorMessage)}
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    );
   };
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader>
-        <CardTitle>Knowledge Base for: {baseClass.name}</CardTitle>
-        <CardDescription>
-          Manage documents, links, and recordings that form the knowledge base for this base class.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex-grow flex flex-col space-y-4 overflow-hidden">
+    <div className="h-full flex flex-col space-y-4 p-4 md:p-6">
+      {/* Header */}
+      <div className="space-y-2">
+        <h2 className="text-xl md:text-2xl font-semibold">Knowledge Base</h2>
+        <p className="text-sm text-muted-foreground">
+          Manage documents, links, and recordings for <span className="font-medium">{baseClass.name}</span>
+        </p>
+      </div>
+
+      {/* Upload Tabs */}
+      <div className="w-full">
         <Tabs defaultValue="upload" className="w-full" onValueChange={setActiveTab} value={activeTab}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="upload"><UploadCloud className="mr-2 h-4 w-4" /> Upload Files</TabsTrigger>
-            <TabsTrigger value="paste"><Link className="mr-2 h-4 w-4" /> Paste Link/Text</TabsTrigger>
-            <TabsTrigger value="record"><Mic className="mr-2 h-4 w-4" /> Record Audio</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 h-auto p-1">
+            <TabsTrigger value="upload" className="text-xs md:text-sm p-2 md:p-3">
+              <UploadCloud className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Upload Files</span>
+              <span className="sm:hidden">Upload</span>
+            </TabsTrigger>
+            <TabsTrigger value="paste" className="text-xs md:text-sm p-2 md:p-3">
+              <Link className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Paste Link/Text</span>
+              <span className="sm:hidden">Paste</span>
+            </TabsTrigger>
+            <TabsTrigger value="record" className="text-xs md:text-sm p-2 md:p-3">
+              <Mic className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Record Audio</span>
+              <span className="sm:hidden">Record</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="upload" className="mt-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Upload Files</CardTitle>
-                <CardDescription>Upload documents, PDFs, audio, or video files.</CardDescription>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Upload Files</CardTitle>
+                <CardDescription className="text-sm">
+                  Upload documents, PDFs, audio, or video files.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Input 
                   type="file" 
                   multiple 
                   onChange={handleFileChange} 
-                  accept=".pdf,.doc,.docx,.txt,.md,.pptx,.xls,.xlsx,.csv,.mp3,.wav,.mp4,.mov,.webm" // Common types
+                  accept=".pdf,.doc,.docx,.txt,.md,.pptx,.xls,.xlsx,.csv,.mp3,.wav,.mp4,.mov,.webm"
+                  className="cursor-pointer"
                 />
                 {filesToUpload && (
                   <div className="text-sm text-muted-foreground">
                     Selected {filesToUpload.length} file(s).
                   </div>
                 )}
-                <Button onClick={handleUpload} disabled={!filesToUpload || filesToUpload.length === 0}>
+                <Button 
+                  onClick={handleUpload} 
+                  disabled={!filesToUpload || filesToUpload.length === 0}
+                  className="w-full sm:w-auto"
+                >
                   <UploadCloud className="mr-2 h-4 w-4" /> Upload Selected
                 </Button>
               </CardContent>
@@ -730,19 +908,26 @@ export const KnowledgeBaseEditor: React.FC<KnowledgeBaseEditorProps> = ({ baseCl
 
           <TabsContent value="paste" className="mt-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Paste Link or Text</CardTitle>
-                <CardDescription>Paste a YouTube URL, website link, or raw text content.</CardDescription>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Paste Link or Text</CardTitle>
+                <CardDescription className="text-sm">
+                  Paste a YouTube URL, website link, or raw text content.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Textarea 
                   placeholder="Paste URL (e.g., YouTube, website) or text here..." 
                   value={pasteInput} 
                   onChange={(e) => setPasteInput(e.target.value)} 
-                  rows={5}
+                  rows={4}
+                  className="resize-none"
                 />
-                <Button onClick={handlePasteSubmit} disabled={!pasteInput.trim()}>
-                  <Link className="mr-2 h-4 w-4" /> Process Pasted Content
+                <Button 
+                  onClick={handlePasteSubmit} 
+                  disabled={!pasteInput.trim()}
+                  className="w-full sm:w-auto"
+                >
+                  <Link className="mr-2 h-4 w-4" /> Process Content
                 </Button>
               </CardContent>
             </Card>
@@ -750,80 +935,126 @@ export const KnowledgeBaseEditor: React.FC<KnowledgeBaseEditorProps> = ({ baseCl
 
           <TabsContent value="record" className="mt-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Record Audio</CardTitle>
-                <CardDescription>Record lectures or voice notes directly.</CardDescription>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Record Audio</CardTitle>
+                <CardDescription className="text-sm">
+                  Record lectures or voice notes directly.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {!isRecording ? (
-                  <Button onClick={startRecording}>
+                  <Button onClick={startRecording} className="w-full sm:w-auto">
                     <Mic className="mr-2 h-4 w-4" /> Start Recording
                   </Button>
                 ) : (
-                  <Button onClick={stopRecording} variant="destructive">
+                  <Button onClick={stopRecording} variant="destructive" className="w-full sm:w-auto">
                     <Mic className="mr-2 h-4 w-4" /> Stop Recording
                   </Button>
                 )}
                 {audioBlob && (
-                  <div className="mt-2">
+                  <div className="mt-2 p-3 bg-muted rounded-lg">
                     <p className="text-sm font-medium">Recording complete. Ready to process.</p>
-                    {/* <audio controls src={URL.createObjectURL(audioBlob)} /> May not be needed if uploaded immediately */}
                   </div>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+      </div>
 
-        <div className="flex-grow flex flex-col overflow-hidden pt-4">
-          <h3 className="text-lg font-semibold mb-2">Existing Knowledge Base Items ({knowledgeBaseItems.length})</h3>
-          {isLoadingItems && (
-            <div className="flex items-center justify-center py-4">
-              <Hourglass className="h-8 w-8 text-muted-foreground animate-spin mr-2" />
+      {/* Items List */}
+      <div className="flex-1 min-h-0">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold">Items ({knowledgeBaseItems.length})</h3>
+        </div>
+        
+        {isLoadingItems && (
+          <div className="flex items-center justify-center py-8">
+            <div className="flex items-center space-x-2">
+              <MinimalSpinner size={20} color="text-muted-foreground" />
               <p className="text-muted-foreground">Loading items...</p>
             </div>
-          )}
-          {errorLoadingItems && (
-            <div className="flex flex-col items-center justify-center py-4 text-red-600">
-              <AlertCircle className="h-8 w-8 mb-2" />
-              <p className="font-semibold">Error loading items</p>
-              <p className="text-sm">{errorLoadingItems}</p>
-            </div>
-          )}
-          {!isLoadingItems && !errorLoadingItems && knowledgeBaseItems.length === 0 && (
-            <p className="text-muted-foreground text-center py-4">No knowledge base items yet. Add some using the tabs above.</p>
-          )}
-          {!isLoadingItems && !errorLoadingItems && knowledgeBaseItems.length > 0 && (
-            <ScrollArea className="flex-grow border rounded-md h-[300px] min-h-0">
-              <div className="p-4 space-y-3">
-                {knowledgeBaseItems.map(item => (
-                  <Card key={item.id} className="flex items-center justify-between p-3 hover:shadow-md transition-shadow">
-                    <div className="flex items-center overflow-hidden mr-2">
-                      {getItemIcon(item.type)}
-                      <div className="flex flex-col truncate">
-                        <span className="font-medium truncate" title={item.name}>{item.name}</span>
-                        <span className="text-xs text-muted-foreground truncate" title={item.sourceInfo}>{item.sourceInfo || 'N/A'}</span>
-                        <span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</span>
+          </div>
+        )}
+        
+        {errorLoadingItems && (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <AlertCircle className="h-8 w-8 mb-2 text-red-500" />
+            <p className="font-semibold text-red-600">Error loading items</p>
+            <p className="text-sm text-red-500 max-w-md">{errorLoadingItems}</p>
+          </div>
+        )}
+        
+        {!isLoadingItems && !errorLoadingItems && knowledgeBaseItems.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <FileText className="h-12 w-12 mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground text-lg mb-2">No knowledge base items yet</p>
+            <p className="text-sm text-muted-foreground">Add some using the tabs above</p>
+          </div>
+        )}
+        
+        {!isLoadingItems && !errorLoadingItems && knowledgeBaseItems.length > 0 && (
+          <div className="space-y-3 h-full overflow-y-auto pr-2">
+            {knowledgeBaseItems.map(item => (
+              <Card key={item.id} className="transition-shadow hover:shadow-md">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between space-x-3">
+                    {/* Main content */}
+                    <div className="flex items-start space-x-3 min-w-0 flex-1">
+                      {/* Icon */}
+                      <div className="flex-shrink-0 mt-0.5">
+                        {getItemIcon(item.type)}
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-start justify-between">
+                          <h4 className="font-medium text-sm leading-tight break-words">{item.name}</h4>
+                          <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+                            {getStatusIcon(item.status)}
+                            {getStatusBadge(item.status)}
+                          </div>
+                        </div>
+                        
+                        <p className="text-xs text-muted-foreground break-words">
+                          {item.sourceInfo || 'N/A'}
+                        </p>
+                        
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(item.createdAt).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                        
+                        {/* Error Message */}
+                        {item.status === 'error' && <ErrorMessage item={item} />}
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2 flex-shrink-0">
-                      {getStatusIcon(item.status)}
-                      {item.status === 'error' && item.errorMessage && (
-                        <span title={item.errorMessage}>
-                          <AlertCircle className="h-5 w-5 text-red-500 cursor-pointer" />
-                        </span>
-                      )}
-                      <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} title="Remove Item">
-                        <Trash2 className="h-4 w-4 text-red-600" />
+                    
+                    {/* Actions */}
+                    <div className="flex-shrink-0">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleRemoveItem(item.id)} 
+                        disabled={item.status === 'processing'}
+                        className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Delete item</span>
                       </Button>
                     </div>
-                  </Card>
-                ))}
-              </div>
-            </ScrollArea>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }; 

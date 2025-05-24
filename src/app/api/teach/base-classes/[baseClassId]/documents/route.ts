@@ -12,17 +12,34 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const { baseClassId } = awaitedParams; // Destructure from awaited params
   const supabase = await createSupabaseServerClient();
 
-  // TODO: Add logic to fetch user/org details if needed for RLS or filtering
-
   try {
     if (!baseClassId) {
       return NextResponse.json({ error: 'Base Class ID is required' }, { status: 400 });
     }
 
+    // Get user and verify organization access
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get user's organization
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('organisation_id')
+      .eq('user_id', user.id) // Use user_id instead of id
+      .single();
+
+    if (profileError || !profile || !profile.organisation_id) {
+      console.error('Error fetching profile or organisation_id:', profileError);
+      return NextResponse.json({ error: 'Could not verify user organisation membership.' }, { status: 500 });
+    }
+
     const { data: documents, error } = await supabase
       .from('documents')
-      .select('id, file_name, file_type, file_size, status, created_at')
+      .select('id, file_name, file_type, file_size, status, created_at, metadata')
       .eq('base_class_id', baseClassId)
+      .eq('organisation_id', profile.organisation_id) // Filter by organization
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -59,7 +76,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { data: profile, error: profileError } = await supabase
         .from('profiles') // Or 'members' if that's the table name
         .select('organisation_id')
-        .eq('id', user.id) // Assuming profile PK is user.id
+        .eq('user_id', user.id) // Use user_id instead of id
         .single();
 
     if (profileError || !profile || !profile.organisation_id) {

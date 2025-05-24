@@ -31,12 +31,11 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
   try {
     // 1. Get the user's organisation ID
-    // Assuming 'profiles' table links auth.users.id to an organisation_id
-    // Adjust if using 'members' table or other structure
+    // Use the correct table and column names
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organisation_id')
-      .eq('id', session.user.id) // Assuming profile PK is user.id
+      .eq('user_id', session.user.id) // Use user_id instead of id
       .single();
 
     if (profileError || !profile || !profile.organisation_id) {

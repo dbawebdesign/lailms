@@ -249,28 +249,16 @@ export function FileUploadDropzone({
     try {
       setIsUploading(true);
       
-      // Create metadata to store URL information
-      const metadata = {
-        originalUrl: trimmedUrl,
-        type: detectedType,
-        timestamp: new Date().toISOString()
-      };
-      
-      // Create JSON file with URL metadata
-      const jsonContent = JSON.stringify(metadata);
-      const jsonBlob = new Blob([jsonContent], { type: 'application/json' });
-      const fileName = `${detectedType}_${Date.now()}.json`;
-      const file = new File([jsonBlob], fileName, { type: 'application/json' });
-      
-      // Prepare form data
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('organisation_id', organisationId);
-      
-      // Send to API
-      const response = await fetch('/api/knowledge-base/upload', {
+      // Create a document record directly via API with URL in metadata
+      const response = await fetch('/api/knowledge-base/url', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: trimmedUrl,
+          type: detectedType,
+        }),
       });
       
       if (!response.ok) {
