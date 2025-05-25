@@ -165,59 +165,71 @@ export async function POST(
       base_class_gradeLevel 
     } = lessonContext;
 
-    const aiPrompt = `
-      You are an expert curriculum designer and subject matter specialist tasked with creating detailed, engaging, and comprehensive lesson sections for an online learning platform.
-      Your goal is to generate the actual teaching content that will take a learner from beginner to mastery for the specified grade level and lesson objective.
+    const aiPrompt = `# Role & Objective
+You are an expert curriculum designer and subject matter specialist. Your task is to create detailed, engaging lesson sections that will take learners from beginner to mastery for the specified grade level and lesson objective.
 
-      **Lesson Context:**
-      - Base Class Name: ${base_class_name || 'N/A'}
-      - Subject: ${base_class_subject || 'N/A'}
-      - Grade Level: ${base_class_gradeLevel || 'N/A'}
-      - Path (Module) Title: ${path_title || 'N/A'}
-      - Lesson Title: ${lesson_title}
-      - Lesson Objective: ${lesson_objective || 'No specific objective provided, infer from title and context.'}
+# Lesson Context
+- **Base Class**: ${base_class_name || 'N/A'}
+- **Subject**: ${base_class_subject || 'N/A'}
+- **Grade Level**: ${base_class_gradeLevel || 'N/A'}
+- **Module Title**: ${path_title || 'N/A'}
+- **Lesson Title**: ${lesson_title}
+- **Lesson Objective**: ${lesson_objective || 'No specific objective provided, infer from title and context.'}
 
-      **Instructions for Generating Lesson Sections:**
-      1.  **Output Format:** STRICTLY provide your response as a single JSON array. Each element in the array must be an object representing a lesson section, adhering to the following TypeScript interface:
-          \`\`\`typescript
-          interface AISection {
-            title: string; // Clear, descriptive title for the section.
-            section_type: 'introduction' | 'core_concept' | 'example' | 'activity' | 'media_suggestion' | 'quiz' | 'summary' | 'other'; // Type of the section.
-            content_text: string; // The FULL educational content for this section. Write as if directly teaching the student. Make it comprehensive and clear for the grade level.
-            media_description?: string; // Optional. If relevant, describe a suggested visual aid (e.g., "[IMAGE: Diagram of the water cycle with labels]", "[VIDEO: Short animation of cell division]").
-            quiz_questions?: { // Required if section_type is 'quiz'.
-              question_text: string;
-              options: string[]; // Array of 2-4 answer options.
-              correct_option_index: number; // 0-indexed integer indicating the correct option.
-              explanation?: string; // Optional. Brief explanation for why the answer is correct.
-            }[];
-          }
-          \`\`\`
-          Your entire response must be ONLY this JSON array, starting with '[' and ending with ']'.
+# Instructions
 
-      2.  **Number of Sections:** Generate approximately 5-8 detailed sections for this lesson to ensure thorough coverage.
+## Output Requirements
+1. **Format**: Return ONLY a valid JSON array
+2. **Structure**: Each array element must be a lesson section object
+3. **Validation**: Ensure all required fields are present and properly formatted
 
-      3.  **Content Quality & Pedagogy:**
-          *   **Comprehensive Content:** The \`content_text\` for each section must be the actual, complete teaching material. Do not provide outlines or summaries instead of full content.
-          *   **Progressive Learning:** Structure the sections to logically guide the learner from foundational concepts to more advanced understanding, achieving the lesson objective.
-          *   **Engagement:** Write in an engaging, clear, and age-appropriate tone for the specified \`${base_class_gradeLevel || 'target'}\` grade level.
-          *   **Clarity:** Explain concepts thoroughly. Use examples where appropriate ('example' section_type).
-          *   **Active Learning:** Subtly embed questions or brief interactive prompts within the \`content_text\` of relevant sections to encourage student thinking, even if not a formal quiz section.
-          *   **Multimedia Integration:** For \`media_suggestion\` sections, or when appropriate in other sections, provide a \`media_description\` for relevant images, diagrams, or video ideas that would enhance understanding. Use placeholders like "[IMAGE: Description]" or "[VIDEO: Description]".
-          *   **Assessment:** Include AT LEAST ONE section with \`section_type: 'quiz'\'. This quiz should assess understanding of key concepts from the lesson. Provide 2-4 questions, each with options, the correct answer index, and optionally an explanation.
+## TypeScript Interface
+\`\`\`typescript
+interface AISection {
+  title: string; // Clear, descriptive section title
+  section_type: 'introduction' | 'core_concept' | 'example' | 'activity' | 'media_suggestion' | 'quiz' | 'summary' | 'other';
+  content_text: string; // Complete educational content - write as if directly teaching the student
+  media_description?: string; // Optional visual aid description (e.g., "[IMAGE: Diagram of water cycle]")
+  quiz_questions?: { // Required only if section_type is 'quiz'
+    question_text: string;
+    options: string[]; // 2-4 answer options
+    correct_option_index: number; // 0-indexed correct answer
+    explanation?: string; // Optional explanation for correct answer
+  }[];
+}
+\`\`\`
 
-      4.  **Section Types:** Utilize a mix of \`section_type\` values to create a well-rounded lesson. Essential types include:
-          *   \`introduction\`: Overview of the lesson, what students will learn, and its importance.
-          *   \`core_concept\`: Detailed explanation of key theories, ideas, or information.
-          *   \`example\`: Illustrative examples to clarify core concepts.
-          *   \`activity\` (optional): Suggest a simple activity students can do.
-          *   \`media_suggestion\` (optional): Specifically call out a point where media would be highly beneficial.
-          *   \`quiz\`: A set of questions to assess understanding.
-          *   \`summary\`: Recap of key takeaways from the lesson.
+## Content Development Guidelines
+1. **Comprehensive Content**: Write complete teaching material in \`content_text\`, not outlines or summaries
+2. **Progressive Learning**: Structure sections to build from foundational to advanced concepts
+3. **Grade Appropriateness**: Use clear, age-appropriate language for ${base_class_gradeLevel || 'target'} grade level
+4. **Engagement**: Include interactive prompts and questions within content to encourage thinking
+5. **Multimedia Integration**: Suggest relevant visual aids using \`media_description\` when beneficial
+6. **Assessment Integration**: Include at least one quiz section with 2-4 well-crafted questions
 
-      Provide ONLY the JSON array of lesson sections as your response.
-      Based on the lesson title "${lesson_title}" and objective "${lesson_objective || 'N/A'}" for a ${base_class_gradeLevel || 'N/A'} ${base_class_subject || 'N/A'} class, generate the lesson sections now.
-    `;
+## Section Structure Requirements
+1. **Number of Sections**: Generate 5-8 detailed sections for thorough coverage
+2. **Required Section Types**:
+   - \`introduction\`: Lesson overview and learning objectives
+   - \`core_concept\`: Detailed explanation of key theories/information (use multiple if needed)
+   - \`example\`: Illustrative examples to clarify concepts
+   - \`quiz\`: Assessment questions (at least one section)
+   - \`summary\`: Key takeaways and lesson recap
+3. **Optional Section Types**:
+   - \`activity\`: Hands-on learning exercises
+   - \`media_suggestion\`: Specific multimedia recommendations
+
+## Quality Standards
+- **Clarity**: Explain concepts thoroughly with appropriate examples
+- **Depth**: Provide substantial content that achieves the lesson objective
+- **Interactivity**: Embed questions and prompts to maintain engagement
+- **Assessment**: Create meaningful quiz questions that test understanding
+- **Visual Support**: Suggest diagrams, images, or videos where they enhance learning
+
+# Output Format
+Return ONLY the JSON array starting with '[' and ending with ']'. No additional text, explanations, or formatting.
+
+Based on the lesson "${lesson_title}" with objective "${lesson_objective || 'N/A'}" for ${base_class_gradeLevel || 'N/A'} ${base_class_subject || 'N/A'}, generate the lesson sections now.`;
 
     console.log("[auto-generate-sections] Generated AI Prompt:", aiPrompt);
 
@@ -230,18 +242,23 @@ export async function POST(
         messages: [
           { 
             role: 'system', 
-            content: 'You are an expert curriculum designer. Your response MUST be a valid JSON array of lesson sections, adhering to the structure previously defined. Do not include any text outside of this JSON array.' 
+            content: `# Role & Objective
+You are an expert curriculum designer who creates comprehensive lesson sections for online learning platforms.
+
+# Instructions
+- Return ONLY a valid JSON array of lesson sections
+- Follow the exact structure specified in the user prompt
+- Ensure all content is grade-appropriate and educationally sound
+- Create engaging, complete teaching material that achieves learning objectives
+- CRITICAL: Output must be valid JSON only, no additional text or formatting` 
           },
           { 
             role: 'user', 
             content: aiPrompt 
           }
         ],
-        // Some OpenAI models support a response_format parameter for JSON output, e.g., response_format: { type: "json_object" }
-        // However, for complex array structures, it's often more reliable to instruct via prompt and parse, as we are doing.
-        // If gpt-4.1-mini specifically supports a JSON mode that guarantees array output, that could be used.
         temperature: 0.7, // Adjust for creativity vs. determinism
-        // max_tokens: 4000, // Adjust as needed, ensure it's enough for detailed sections
+        max_tokens: 4000, // Ensure enough tokens for detailed sections
       });
 
       const aiResponseContent = completion.choices[0]?.message?.content;

@@ -218,20 +218,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate mind map structure using OpenAI
-    const prompt = `Create a hierarchical mind map structure for the following educational content, appropriate for grade ${gradeLevel} students:
+    const prompt = `# Role and Objective
+Create a hierarchical mind map structure for educational content, appropriate for grade ${gradeLevel} students.
 
+# Content Context
 ${comprehensiveContent}
 
-Return a JSON structure representing a mind map with the following requirements:
-- Root node should be the main lesson topic
-- 3-5 main branches representing key concepts from the lesson sections
-- Each main branch can have 2-4 sub-branches covering important details
-- Use clear, student-friendly language appropriate for grade ${gradeLevel}
-- Include colors for visual appeal (use hex colors)
-- Limit to 3 levels deep maximum
-- Organize content logically based on the lesson structure provided
+# Instructions
 
-Return only valid JSON in this format:
+## Mind Map Requirements
+1. **Hierarchy**: Create a clear 3-level hierarchy (root → main branches → sub-branches)
+2. **Content Organization**: 3-5 main branches representing key concepts from the lesson sections
+3. **Detail Level**: Each main branch should have 2-4 sub-branches covering important details
+4. **Grade Appropriateness**: Use clear, student-friendly language appropriate for grade ${gradeLevel}
+5. **Visual Appeal**: Include colors for visual appeal using hex color codes
+6. **Logical Structure**: Organize content logically based on the lesson structure provided
+
+## Design Guidelines
+- **Root Node**: Should be the main lesson topic
+- **Main Branches**: Key concepts that students need to understand
+- **Sub-branches**: Supporting details, examples, or applications
+- **Language**: Simple, clear terminology appropriate for the grade level
+- **Colors**: Use a diverse palette of hex colors for visual distinction
+
+## JSON Structure Requirements
+Return ONLY valid JSON in this exact format:
+
+\`\`\`json
 {
   "root": {
     "id": "root",
@@ -256,14 +269,31 @@ Return only valid JSON in this format:
     ]
   },
   "title": "Lesson Mind Map Title"
-}`;
+}
+\`\`\`
+
+# Output Requirements
+- Return only valid JSON, no additional text
+- Ensure all nodes have unique IDs
+- Use descriptive labels that help students understand the concepts
+- Apply appropriate colors for visual hierarchy
+- Maintain the exact JSON structure specified above`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4.1-mini',
       messages: [
         {
           role: 'system',
-          content: 'You are an expert educational designer who creates clear, engaging mind maps for students. Always return valid JSON only, no additional text.'
+          content: `# Role and Objective
+You are an expert educational designer who creates clear, engaging mind maps for students.
+
+# Instructions
+- Always return valid JSON only, no additional text
+- Focus on creating logical, educational hierarchies
+- Use student-friendly language appropriate for the specified grade level
+- Ensure visual appeal through strategic color choices
+- Maintain clear conceptual relationships between nodes
+- CRITICAL: Return only the JSON structure, no markdown formatting or explanatory text`
         },
         {
           role: 'user',

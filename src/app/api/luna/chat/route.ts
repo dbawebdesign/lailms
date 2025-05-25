@@ -235,7 +235,7 @@ interface CourseModule {
 }
 
 // --- Refined System Prompt Construction ---
-function constructSystemPrompt(context: SerializedUIContext): string {
+function constructSystemPrompt(context: SerializedUIContext, persona: string, message: string): string {
   // Generate UI pattern analysis
   const patternInsights = analyzeUIPatterns(context);
 
@@ -275,44 +275,104 @@ function constructSystemPrompt(context: SerializedUIContext): string {
     .slice(0, 10) // Keep the limit for overall summary brevity
     .join('\\n');
 
-  return `You are Luna, a helpful and context-aware AI assistant embedded within the LearnologyAI learning platform.
-Your primary function is to assist users based on their direct queries and the current UI context, inferring their intent and suggesting appropriate actions.
+  return `# Role & Objective
+You are Luna, an intelligent AI assistant integrated into the LearnologyAI platform. Your role is to provide contextual help, insights, and assistance based on what the user is currently viewing and working with on their screen.
 
-## Current UI Context
-*   **Route:** ${context.route || 'N/A'}
-*   **Focused Element ID:** ${context.focused || 'None'}
-*   **Last User Action:** ${context.lastUserAction ? `${context.lastUserAction.actionType} (on component: ${context.lastUserAction.componentId})` : 'None'}
-*   **UI Pattern Analysis:** ${patternInsights}
-*   **Visible Components Summary (Max 10):**
-${componentSummary || '    *   (No components registered or visible)'}
-${context.components.length > 10 ? '    *   ... (more components present but not listed)' : ''}
+# Current UI Context
+${context ? `
+**Current Page**: ${context.route}
+**Active Components**: ${context.components?.length || 0} UI elements detected
+**Focused Element**: ${context.focused ? 'Yes' : 'None'}
+**Last User Action**: ${context.lastUserAction ? `${context.lastUserAction.actionType} on ${context.lastUserAction.componentId}` : 'None'}
 
-## Intent Inference Instructions
-1.  Analyze the user's message combined with the UI context (especially any detailed component content provided in the summary above) to infer their intent. Common intents include:
-    - Wanting information about content currently visible
-    - Looking to navigate to a different section
-    - Trying to perform an action on a specific component
-    - Seeking to modify content they're currently viewing
-    - Requesting a search for information not currently visible
+## Page Content Analysis
+${context.components?.map(comp => {
+  let analysis = `- **${comp.type}** (${comp.role}): `;
+  
+  // Provide specific analysis based on component type and content
+  if (comp.type === 'base-class-studio-page' && comp.content) {
+    analysis += `User is in the Base Class Studio editing "${comp.content.baseClassName || 'a class'}"`;
+    if (comp.content.baseClassSubject) analysis += ` (${comp.content.baseClassSubject})`;
+    if (comp.content.baseClassGradeLevel) analysis += ` for ${comp.content.baseClassGradeLevel}`;
+    if (comp.content.selectedItemType && comp.content.selectedItemTitle) {
+      analysis += `. Currently editing ${comp.content.selectedItemType}: "${comp.content.selectedItemTitle}"`;
+    }
+    if (comp.content.totalPaths) analysis += `. Contains ${comp.content.totalPaths} learning paths`;
+    if (comp.content.totalLessons) analysis += ` with ${comp.content.totalLessons} total lessons`;
+  } else if (comp.type === 'navigation-tree' && comp.content) {
+    analysis += `Navigation showing class structure`;
+    if (comp.content.baseClassName) analysis += ` for "${comp.content.baseClassName}"`;
+    if (comp.content.paths) {
+      analysis += ` with ${comp.content.paths.length} paths: ${comp.content.paths.map((p: any) => p.title).join(', ')}`;
+    }
+  } else if (comp.type === 'content-editor' && comp.content) {
+    analysis += `Editor for ${comp.content.editorType}`;
+    if (comp.content.itemTitle) analysis += `: "${comp.content.itemTitle}"`;
+    if (comp.content.itemData) {
+      const data = comp.content.itemData;
+      if (data.description) analysis += `. Description: ${data.description.substring(0, 100)}${data.description.length > 100 ? '...' : ''}`;
+      if (data.subject) analysis += `. Subject: ${data.subject}`;
+      if (data.gradeLevel) analysis += `. Grade Level: ${data.gradeLevel}`;
+      if (data.sectionType) analysis += `. Section Type: ${data.sectionType}`;
+    }
+  } else if (comp.content && typeof comp.content === 'object') {
+    // Generic content analysis
+    const contentKeys = Object.keys(comp.content);
+    if (contentKeys.length > 0) {
+      analysis += `Contains: ${contentKeys.slice(0, 3).join(', ')}${contentKeys.length > 3 ? '...' : ''}`;
+    }
+  }
+  
+  return analysis;
+}).join('\n') || 'No detailed content available'}
+` : 'No UI context available - user may be on a page without context registration'}
 
-2.  Based on the inferred intent, determine if a tool action is needed:
-    - For information requests: Use the 'search' tool to find knowledge base content. **If the search tool returns results, prioritize them. If it returns a message indicating no specific information was found or an error occurred, acknowledge this in your response and use your general knowledge along with the provided UI context to answer the user's query. Clearly state if your answer is based on general knowledge rather than platform-specific documents.**
-    - For content modifications: Use the 'updateContent' tool to update lesson sections
-    - For UI interactions: Use the 'uiAction' tool to simulate clicks, navigation, etc.
+# Instructions
 
-3.  Extract necessary parameters from the UI context when possible:
-    - Component IDs for UI actions
-    - Section IDs for content updates
-    - Relevant terms for knowledge base searches: **Crucially, use the course name, subject, and existing topics from the context (e.g., from 'course-structure' component metadata and content) to formulate specific search queries. Example: For a query about missing topics in 'Finance 101', search for 'additional topics for introductory finance course, besides X, Y, Z'. Avoid generic queries.**
+## Context-Aware Response Guidelines
+1. **Always acknowledge what you can see**: Start by confirming what page/content the user is currently viewing
+2. **Be specific about the current context**: Reference the actual class name, lesson title, or content they're working with
+3. **Provide relevant suggestions**: Offer help that's directly applicable to their current task
+4. **Use the actual data**: When discussing their content, use the real titles, descriptions, and data you can see
 
-4.  If you can't determine the parameters but an action seems appropriate, ask the user for clarification.
+## Response Approach Based on Context
+- **Base Class Studio**: Help with course design, curriculum structure, lesson planning, content organization
+- **Lesson/Path Editing**: Assist with educational content creation, learning objectives, assessment strategies
+- **Knowledge Base**: Help with document management, content organization, search strategies
+- **General Navigation**: Guide users to relevant features and explain platform capabilities
 
-5.  When no tool is needed, provide a helpful text response that:
-    - Acknowledges the user's context ("I see you're looking at...")
-    - Directly addresses their question
-    - Is concise yet informative
+## Persona-Specific Behavior
+**Current Persona**: ${persona}
 
-Always be helpful, but prioritize actions and responses that are most relevant to the user's current context and immediate needs. If you use general knowledge because the KB search was uninformative, make that clear to the user (e.g., "Based on my general understanding of [topic]..." or "While I couldn't find specific documents on this in our knowledge base...").`;
+${persona === 'lunaChat' ? `
+- Provide general assistance and platform guidance
+- Help users understand features and navigate the interface
+- Offer suggestions for improving their educational content
+` : persona === 'classCoPilot' ? `
+- Focus on curriculum design and course structure
+- Suggest learning paths and lesson organization
+- Help with educational best practices and pedagogy
+` : persona === 'teachingCoach' ? `
+- Provide pedagogical guidance and teaching strategies
+- Help with differentiation and student engagement
+- Suggest assessment methods and learning activities
+` : `
+- Provide assistance appropriate to the ${persona} role
+- Focus on the specific needs of this persona
+`}
+
+## Response Format
+- Be conversational and helpful
+- Use bullet points for lists or multiple suggestions
+- Reference specific content the user is working with
+- Provide actionable advice when possible
+- Keep responses concise but comprehensive
+
+# User Message
+"${message}"
+
+# Response
+Provide a helpful, context-aware response that acknowledges what the user is currently viewing and offers relevant assistance based on their specific situation and the persona they've selected.`;
 }
 
 // Process tool results to extract citations for the frontend
@@ -399,7 +459,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid JSON in request' }, { status: 400 });
     }
     
-    const { message, context, messages: history = [] } = requestBody;
+    const { message, context, messages: history = [], persona = 'lunaChat' } = requestBody;
 
     // Validate input
     if (!message || typeof message !== 'string') {
@@ -418,7 +478,7 @@ export async function POST(request: Request) {
     const forwardedCookies = request.headers.get('cookie');
 
     // Prepare messages for the FIRST API call
-    const systemMessage = constructSystemPrompt(context as SerializedUIContext);
+    const systemMessage = constructSystemPrompt(context as SerializedUIContext, persona, message);
     const userMessagesForFirstCall: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: "system", content: systemMessage },
       ...history.map((msg: { role: string, content: string }) => ({ 

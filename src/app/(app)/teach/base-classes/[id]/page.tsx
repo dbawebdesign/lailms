@@ -11,6 +11,7 @@ import PathEditor from '@/components/teach/studio/editors/PathEditor'; // Added 
 import LessonEditor from '@/components/teach/studio/editors/LessonEditor'; // Added import
 import LessonSectionEditor from '@/components/teach/studio/editors/LessonSectionEditor'; // Added import
 import { KnowledgeBaseEditor } from '@/components/teach/studio/editors/KnowledgeBaseEditor'; // NEW: Import KnowledgeBaseEditor
+import LunaContextElement from '@/components/luna/LunaContextElement'; // NEW: Import Luna context
 
 // NEW: DND Kit imports
 import { arrayMove } from '@dnd-kit/sortable';
@@ -709,70 +710,160 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-background">
-      {/* Mobile Header Bar: Nav Toggle Button & Title */}
-      <div className="md:hidden p-4 border-b border-border flex items-center space-x-3">
-        <button 
-          onClick={() => setIsNavOpen(!isNavOpen)} 
-          className="p-2 rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring flex-shrink-0"
-        >
-          <Menu className="h-6 w-6" />
-          <span className="sr-only">Toggle Navigation</span>
-        </button>
-        <h2 className="text-lg font-semibold text-foreground truncate">
-          Class Structure Nav
-        </h2>
-      </div>
-
-      {/* Navigation Tree Panel */}
-      <div 
-        className={`
-          ${isNavOpen ? 'block' : 'hidden'} md:block 
-          w-full md:w-[300px] lg:w-[350px] xl:w-[400px] 
-          border-b md:border-b-0 md:border-r border-border 
-          p-4 overflow-y-auto 
-          flex-shrink-0 
-          h-auto md:h-screen
-        `}
-      >
-        {studioBaseClass && (
-          <StudioNavigationTree 
-            baseClass={studioBaseClass} 
-            onSelectItem={(type, itemData) => {
-              handleSelectItem(type, itemData);
-              if (window.innerWidth < 768) { // md breakpoint in Tailwind is usually 768px
-                setIsNavOpen(false); // Close nav on item selection on mobile
-              }
-            }}
-            selectedItemId={selectedItem.id}
-            onToggleExpandPath={fetchLessonsForPath}
-            onToggleExpandLesson={fetchSectionsForLesson}
-            onReorderPaths={handleReorderPaths}
-            onReorderLessons={handleReorderLessons}
-            onReorderSections={handleReorderSections}
-          />
-        )}
-      </div>
-
-      {/* Main Content Editor Area */}
-      {/* Takes remaining space, ensures it's visible even if nav is open on mobile (might be an issue if nav is not an overlay) */}
-      {/* For true mobile UX, nav might be an overlay. This stacks them for now. */}
-      <main 
-        className={`
-          flex-1 p-6 overflow-auto 
-          ${(isNavOpen && window.innerWidth < 768) ? 'hidden' : 'block'} md:block
-        `}
-      >
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Base Class Studio</h1>
-          {selectedItem && selectedItem.title && (
-            <p className="text-md md:text-lg text-muted-foreground mt-1">Editing: {selectedItem.title}</p>
-          )}
+    <LunaContextElement
+      type="base-class-studio-page"
+      role="main-content"
+      content={{
+        pageTitle: "Base Class Studio",
+        baseClassName: studioBaseClass?.name || "Loading...",
+        baseClassId: baseClassId,
+        baseClassDescription: studioBaseClass?.description,
+        baseClassSubject: studioBaseClass?.settings?.subject,
+        baseClassGradeLevel: studioBaseClass?.settings?.gradeLevel,
+        selectedItemType: selectedItem.type,
+        selectedItemTitle: selectedItem.title,
+        selectedItemId: selectedItem.id,
+        totalPaths: studioBaseClass?.paths?.length || 0,
+        totalLessons: studioBaseClass?.paths?.reduce((acc, path) => acc + (path.lessons?.length || 0), 0) || 0,
+        currentRoute: `/teach/base-classes/${baseClassId}`
+      }}
+      metadata={{
+        baseClassId,
+        selectedItemType: selectedItem.type,
+        selectedItemId: selectedItem.id,
+        isLoading,
+        hasError: !!error
+      }}
+      actionable={true}
+    >
+      <div className="flex flex-col md:flex-row h-screen bg-background">
+        {/* Mobile Header Bar: Nav Toggle Button & Title */}
+        <div className="md:hidden p-4 border-b border-border flex items-center space-x-3">
+          <button 
+            onClick={() => setIsNavOpen(!isNavOpen)} 
+            className="p-2 rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring flex-shrink-0"
+          >
+            <Menu className="h-6 w-6" />
+            <span className="sr-only">Toggle Navigation</span>
+          </button>
+          <h2 className="text-lg font-semibold text-foreground truncate">
+            Class Structure Nav
+          </h2>
         </div>
-        
-        {renderEditor()}
-      </main>
-    </div>
+
+        {/* Navigation Tree Panel */}
+        <LunaContextElement
+          type="navigation-tree"
+          role="navigation"
+          content={{
+            baseClassName: studioBaseClass?.name,
+            paths: studioBaseClass?.paths?.map(path => ({
+              id: path.id,
+              title: path.title,
+              description: path.description,
+              lessonsCount: path.lessons?.length || 0,
+              lessons: path.lessons?.map(lesson => ({
+                id: lesson.id,
+                title: lesson.title,
+                description: lesson.description,
+                sectionsCount: lesson.sections?.length || 0
+              })) || []
+            })) || []
+          }}
+          metadata={{
+            selectedItemId: selectedItem.id,
+            selectedItemType: selectedItem.type
+          }}
+          actionable={true}
+        >
+          <div 
+            className={`
+              ${isNavOpen ? 'block' : 'hidden'} md:block 
+              w-full md:w-[300px] lg:w-[350px] xl:w-[400px] 
+              border-b md:border-b-0 md:border-r border-border 
+              p-4 overflow-y-auto 
+              flex-shrink-0 
+              h-auto md:h-screen
+            `}
+          >
+            {studioBaseClass && (
+              <StudioNavigationTree 
+                baseClass={studioBaseClass} 
+                onSelectItem={(type, itemData) => {
+                  handleSelectItem(type, itemData);
+                  if (window.innerWidth < 768) { // md breakpoint in Tailwind is usually 768px
+                    setIsNavOpen(false); // Close nav on item selection on mobile
+                  }
+                }}
+                selectedItemId={selectedItem.id}
+                onToggleExpandPath={fetchLessonsForPath}
+                onToggleExpandLesson={fetchSectionsForLesson}
+                onReorderPaths={handleReorderPaths}
+                onReorderLessons={handleReorderLessons}
+                onReorderSections={handleReorderSections}
+              />
+            )}
+          </div>
+        </LunaContextElement>
+
+        {/* Main Content Editor Area */}
+        <LunaContextElement
+          type="content-editor"
+          role="editor"
+          content={{
+            editorType: selectedItem.type,
+            itemTitle: selectedItem.title,
+            itemId: selectedItem.id,
+            itemData: selectedItem.data ? {
+              // Safely extract relevant data based on type
+              ...(selectedItem.type === 'baseclass' && selectedItem.data ? {
+                name: (selectedItem.data as StudioBaseClass).name,
+                description: (selectedItem.data as StudioBaseClass).description,
+                subject: (selectedItem.data as StudioBaseClass).settings?.subject,
+                gradeLevel: (selectedItem.data as StudioBaseClass).settings?.gradeLevel
+              } : {}),
+              ...(selectedItem.type === 'path' && selectedItem.data ? {
+                title: (selectedItem.data as Path).title,
+                description: (selectedItem.data as Path).description
+              } : {}),
+              ...(selectedItem.type === 'lesson' && selectedItem.data ? {
+                title: (selectedItem.data as Lesson).title,
+                description: (selectedItem.data as Lesson).description
+              } : {}),
+              ...(selectedItem.type === 'section' && selectedItem.data ? {
+                title: (selectedItem.data as LessonSection).title,
+                content: (selectedItem.data as LessonSection).content,
+                sectionType: (selectedItem.data as LessonSection).section_type
+              } : {})
+            } : null
+          }}
+          metadata={{
+            baseClassId,
+            selectedItemType: selectedItem.type,
+            selectedItemId: selectedItem.id,
+            canEdit: true,
+            hasUnsavedChanges: false // You could track this with state
+          }}
+          actionable={true}
+        >
+          <main 
+            className={`
+              flex-1 p-6 overflow-auto 
+              ${(isNavOpen && window.innerWidth < 768) ? 'hidden' : 'block'} md:block
+            `}
+          >
+            <div className="mb-6">
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Base Class Studio</h1>
+              {selectedItem && selectedItem.title && (
+                <p className="text-md md:text-lg text-muted-foreground mt-1">Editing: {selectedItem.title}</p>
+              )}
+            </div>
+            
+            {renderEditor()}
+          </main>
+        </LunaContextElement>
+      </div>
+    </LunaContextElement>
   );
 };
 
