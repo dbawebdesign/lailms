@@ -10,6 +10,7 @@ import BaseClassEditor from '@/components/teach/studio/editors/BaseClassEditor';
 import PathEditor from '@/components/teach/studio/editors/PathEditor'; // Added import
 import LessonEditor from '@/components/teach/studio/editors/LessonEditor'; // Added import
 import LessonSectionEditor from '@/components/teach/studio/editors/LessonSectionEditor'; // Added import
+import ContentRenderer from '@/components/teach/studio/editors/ContentRenderer';
 import { KnowledgeBaseEditor } from '@/components/teach/studio/editors/KnowledgeBaseEditor'; // NEW: Import KnowledgeBaseEditor
 import LunaContextElement from '@/components/luna/LunaContextElement'; // NEW: Import Luna context
 

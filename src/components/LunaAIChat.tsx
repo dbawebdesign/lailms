@@ -248,43 +248,12 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
     try {
       let assistantResponse: ChatMessage;
 
-      if (currentPersona === 'classCoPilot') {
-        // --- Class Co-Pilot Logic --- 
-        const response = await fetch('/api/teach/generate-course-outline', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: currentInput }),
-        });
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `API Error: ${response.status}`);
-        }
-        const outlineData: GeneratedCourseOutline = await response.json();
-        
-        // Store outline and prepare message with actions
-        assistantResponse = {
-          id: uuidv4(),
-          role: 'assistant',
-          content: `Okay, I've generated a draft outline for "${outlineData.baseClassName || 'your course'}". You can save this as a base class or open it in the designer for more detailed editing.`,
-          timestamp: new Date(),
-          persona: currentPersona,
-          isOutline: true,
-          outlineData: outlineData,
-          // Actions defined here will be rendered with the message
-          actions: [
-            { label: 'Save Outline', action: () => handleSaveOutline(outlineData) },
-            { label: 'Open in Designer', action: () => handleOpenInDesigner(outlineData) },
-          ]
-        };
-        // Note: messageHistory is NOT updated for this specific API call currently
-
-      } else {
-        // --- Default Persona Logic (Tutor, Peer, Coach, etc.) --- 
-        messageHistory.current.push({ role: 'user', content: currentInput });
+      // --- All Personas Use Luna Chat API --- 
+      messageHistory.current.push({ role: 'user', content: currentInput });
       const response = await fetch('/api/luna/chat', {
         method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: currentInput, context, messages: messageHistory.current, persona: currentPersona }), // Pass persona to backend
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: currentInput, context, messages: messageHistory.current, persona: currentPersona }), // Pass persona to backend
       });
 
       let data;
@@ -305,15 +274,14 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
       }
       messageHistory.current.push({ role: 'assistant', content: data.response });
       
-        assistantResponse = {
-            id: uuidv4(),
-            role: 'assistant',
-            content: data.response,
-            timestamp: new Date(),
-            persona: currentPersona,
-            citations: data.citations || []
-        };
-          }
+      assistantResponse = {
+        id: uuidv4(),
+        role: 'assistant',
+        content: data.response,
+        timestamp: new Date(),
+        persona: currentPersona,
+        citations: data.citations || []
+      };
 
       // Update messages state with the final assistant response
       setMessages(prev => prev.filter(msg => msg.id !== tempBotMessageId).concat(assistantResponse));

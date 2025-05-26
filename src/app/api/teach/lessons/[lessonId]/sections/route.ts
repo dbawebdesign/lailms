@@ -33,7 +33,7 @@ const supabaseRouteHandlerClient = async () => {
 // GET all sections for a lesson
 export async function GET(request: Request, { params }: SectionsParams) {
   try {
-    const { lessonId } = params;
+    const { lessonId } = await params;
     if (!lessonId) {
       return NextResponse.json({ error: 'Lesson ID is required' }, { status: 400 });
     }
@@ -60,7 +60,7 @@ export async function GET(request: Request, { params }: SectionsParams) {
 // POST a new section to a lesson
 export async function POST(request: Request, { params }: SectionsParams) {
   try {
-    const { lessonId } = params;
+    const { lessonId } = await params;
     if (!lessonId) {
       return NextResponse.json({ error: 'Lesson ID is required' }, { status: 400 });
     }
@@ -88,13 +88,14 @@ export async function POST(request: Request, { params }: SectionsParams) {
     }
     
     // Call the PostgreSQL function to create section and initial version
+    // Parameters must match the function signature: (p_lesson_id, p_title, p_content, p_order_index, p_section_type, p_creator_user_id)
     const { data: newSectionData, error: sectionError } = await supabase.rpc('create_lesson_section_with_initial_version', {
         p_lesson_id: lessonId,
         p_title: title,
         p_content: content,
-        p_order_index: order_index,
+        p_order_index: order_index || null, // Allow null for auto-ordering
         p_section_type: section_type,
-        p_creator_user_id: creatorUserId // Pass auth.uid() directly
+        p_creator_user_id: creatorUserId
     }).select().single();
 
     if (sectionError) {

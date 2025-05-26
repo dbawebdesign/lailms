@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ContentRenderer from './ContentRenderer';
 
 // Tiptap imports
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
@@ -19,7 +20,7 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { createLowlight } from 'lowlight';
 import javascript from 'highlight.js/lib/languages/javascript';
 import Placeholder from '@tiptap/extension-placeholder';
-import { Bold, Italic, Strikethrough, Code, Pilcrow, List, ListOrdered, Quote, Minus, Image as ImageIcon, Link as LinkIcon, Columns, Trash2, Palette, Highlighter } from 'lucide-react'; // Icons
+import { Bold, Italic, Strikethrough, Code, Pilcrow, List, ListOrdered, Quote, Minus, Image as ImageIcon, Link as LinkIcon, Columns, Trash2, Palette, Highlighter, Edit, Eye } from 'lucide-react'; // Icons
 
 interface LessonSectionEditorProps {
   section: LessonSection;
@@ -84,6 +85,7 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
   const [sectionType, setSectionType] = useState(section.section_type || 'text'); // Default to 'text'
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const lowlightInstance = createLowlight();
   lowlightInstance.register('javascript', javascript);
@@ -114,7 +116,7 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
       }),
     ],
     content: section.content || '', // Initialize with section content (should be JSON for Tiptap)
-    editable: sectionType === 'text', // Only editable if sectionType is 'text'
+    editable: sectionType === 'text' && isEditing, // Only editable if sectionType is 'text' and in editing mode
     onUpdate: ({ editor }) => {
       // Debounced save or auto-save logic could go here
       // For now, content is updated on manual save.
@@ -143,9 +145,16 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
             editor.commands.setContent(section.content || { type: 'doc', content: [{ type: 'paragraph' }] }, false);
         }
       }
-      editor.setEditable(section.section_type === 'text');
+      editor.setEditable(section.section_type === 'text' && isEditing);
     }
   }, [section, editor]);
+
+  // Update editor editability when editing mode changes
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(sectionType === 'text' && isEditing);
+    }
+  }, [editor, sectionType, isEditing]);
 
   // Define setLink for BubbleMenu
   const setLinkBubble = useCallback(() => {
@@ -264,44 +273,103 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
             </Select>
         </div>
         
-        {sectionType === 'text' && editor && (
+        {sectionType === 'text' && (
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              Content Editor
-            </label>
-            <EditorToolbar editor={editor} />
-            <EditorContent editor={editor} className="mt-0 border border-input rounded-b-md min-h-[200px] p-2 focus:outline-none focus:ring-2 focus:ring-ring prose dark:prose-invert max-w-full" />
-             {editor && (
-                <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }} className="bg-background border border-input rounded-md shadow-xl p-1 flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()} className={editor.isActive('bold') ? 'is-active bg-muted' : ''}><Bold className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleItalic().run()} className={editor.isActive('italic') ? 'is-active bg-muted' : ''}><Italic className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="sm" onClick={setLinkBubble}><LinkIcon className="h-4 w-4" /></Button>
-                </BubbleMenu>
-              )}
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-foreground">
+                Content
+              </label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(!isEditing)}
+                className="flex items-center gap-2"
+              >
+                {isEditing ? (
+                  <>
+                    <Eye className="h-4 w-4" />
+                    Preview
+                  </>
+                ) : (
+                  <>
+                    <Edit className="h-4 w-4" />
+                    Edit
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            {isEditing && editor ? (
+              <div>
+                <EditorToolbar editor={editor} />
+                <EditorContent editor={editor} className="mt-0 border border-input rounded-b-md min-h-[200px] p-2 focus:outline-none focus:ring-2 focus:ring-ring prose dark:prose-invert max-w-full" />
+                {editor && (
+                  <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }} className="bg-background border border-input rounded-md shadow-xl p-1 flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()} className={editor.isActive('bold') ? 'is-active bg-muted' : ''}><Bold className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleItalic().run()} className={editor.isActive('italic') ? 'is-active bg-muted' : ''}><Italic className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={setLinkBubble}><LinkIcon className="h-4 w-4" /></Button>
+                  </BubbleMenu>
+                )}
+              </div>
+            ) : (
+              <div className="border border-input rounded-md min-h-[200px] p-4 bg-background">
+                <ContentRenderer content={section.content} className="prose dark:prose-invert max-w-none" />
+              </div>
+            )}
           </div>
         )}
 
         {sectionType !== 'text' && (
         <div>
-            <label htmlFor="nonTextContent" className="block text-sm font-medium text-foreground mb-1">
+          <div className="flex items-center justify-between mb-2">
+            <label htmlFor="nonTextContent" className="block text-sm font-medium text-foreground">
               {sectionType === 'video_url' && "Video URL"}
               {sectionType === 'quiz' && "Quiz JSON Data"}
               {sectionType === 'document_embed' && "Document Embed URL"}
               {/* Add other labels as needed */}
-          </label>
-          <Textarea
+            </label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditing(!isEditing)}
+              className="flex items-center gap-2"
+            >
+              {isEditing ? (
+                <>
+                  <Eye className="h-4 w-4" />
+                  Preview
+                </>
+              ) : (
+                <>
+                  <Edit className="h-4 w-4" />
+                  Edit
+                </>
+              )}
+            </Button>
+          </div>
+          
+          {isEditing ? (
+            <Textarea
               id="nonTextContent"
               value={contentInput}
               onChange={(e) => setContentInput(e.target.value)}
               placeholder={`Enter ${sectionType.replace('_', ' ')} content here`}
               rows={sectionType === 'quiz' ? 10 : 3}
-            className="font-mono text-sm"
-          />
-          </div>
+              className="font-mono text-sm"
+            />
+          ) : (
+            <div className="border border-input rounded-md min-h-[100px] p-4 bg-background">
+              <ContentRenderer content={section.content} />
+            </div>
+          )}
+        </div>
         )}
 
         <div className="flex items-center justify-between mt-6">
-            <Button onClick={handleManualSave} disabled={isSaving}>
+            <Button 
+              onClick={handleManualSave} 
+              disabled={isSaving || (sectionType === 'text' && !isEditing)}
+            >
                 {isSaving ? 'Saving...' : 'Save Section'}
             </Button>
             {lastSaved && (
