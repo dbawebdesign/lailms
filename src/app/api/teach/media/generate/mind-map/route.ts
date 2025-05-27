@@ -219,27 +219,54 @@ export async function POST(request: NextRequest) {
 
     // Generate mind map structure using OpenAI
     const prompt = `# Role and Objective
-Create a hierarchical mind map structure for educational content, appropriate for grade ${gradeLevel} students.
+You are an expert educational designer and visual information architect creating premium, professional mind maps for grade ${gradeLevel} students. Your goal is to create clean, modern, and visually appealing educational content that clearly shows hierarchy and proper alignment.
 
 # Content Context
 ${comprehensiveContent}
 
-# Instructions
+# Critical Design Requirements
 
-## Mind Map Requirements
-1. **Hierarchy**: Create a clear 3-level hierarchy (root → main branches → sub-branches)
-2. **Content Organization**: 3-5 main branches representing key concepts from the lesson sections
-3. **Detail Level**: Each main branch should have 2-4 sub-branches covering important details
-4. **Grade Appropriateness**: Use clear, student-friendly language appropriate for grade ${gradeLevel}
-5. **Visual Appeal**: Include colors for visual appeal using hex color codes
-6. **Logical Structure**: Organize content logically based on the lesson structure provided
+## Visual Hierarchy & Structure
+1. **Root Node**: Single, clear main topic (2-4 words maximum)
+2. **Main Branches**: 3-5 key concepts, each representing a major theme
+3. **Sub-branches**: 2-4 supporting details per main branch
+4. **Label Quality**: Concise, descriptive labels (avoid long sentences)
+5. **Logical Flow**: Organize content from general to specific
 
-## Design Guidelines
-- **Root Node**: Should be the main lesson topic
-- **Main Branches**: Key concepts that students need to understand
-- **Sub-branches**: Supporting details, examples, or applications
-- **Language**: Simple, clear terminology appropriate for the grade level
-- **Colors**: Use a diverse palette of hex colors for visual distinction
+## Professional Styling Guidelines
+- **Consistency**: All nodes at the same level should have similar length labels
+- **Clarity**: Use simple, grade-appropriate terminology
+- **Balance**: Distribute content evenly across branches
+- **Hierarchy**: Clear visual distinction between levels
+- **Alignment**: Ensure proper spacing and professional appearance
+
+## Content Organization Rules
+- **Root**: Main lesson topic (e.g., "Life in the Colonies")
+- **Main Branches**: Core concepts (e.g., "Social Structure", "Economic Activities")
+- **Sub-branches**: Specific details (e.g., "Colonial Classes", "Trade Routes")
+- **Language**: Student-friendly but academically appropriate for grade ${gradeLevel}
+
+## Color Scheme Requirements
+Use a professional, cohesive color palette:
+- **Root**: Deep blue (#2563EB) - authority and focus
+- **Main Branches**: Complementary colors from a curated palette
+- **Sub-branches**: Lighter variations of parent colors
+- **Ensure**: High contrast and accessibility
+
+## Professional Color Palette
+Main Branch Colors (use these exactly):
+- "#10B981" (Emerald Green)
+- "#8B5CF6" (Purple)
+- "#F59E0B" (Amber)
+- "#EF4444" (Red)
+- "#06B6D4" (Cyan)
+
+Sub-branch Colors (lighter variants):
+- "#34D399" (Light Emerald)
+- "#A78BFA" (Light Purple)
+- "#FBBF24" (Light Amber)
+- "#F87171" (Light Red)
+- "#22D3EE" (Light Cyan)
 
 ## JSON Structure Requirements
 Return ONLY valid JSON in this exact format:
@@ -250,34 +277,62 @@ Return ONLY valid JSON in this exact format:
     "id": "root",
     "label": "Main Topic",
     "type": "root",
-    "color": "#4A90E2",
+    "color": "#2563EB",
     "children": [
       {
         "id": "main1",
         "label": "Key Concept 1",
         "type": "main",
-        "color": "#7ED321",
+        "color": "#10B981",
         "children": [
           {
-            "id": "sub1",
-            "label": "Sub-concept",
+            "id": "sub1_1",
+            "label": "Supporting Detail",
             "type": "sub",
-            "color": "#F5A623"
+            "color": "#34D399"
+          },
+          {
+            "id": "sub1_2",
+            "label": "Another Detail",
+            "type": "sub",
+            "color": "#34D399"
+          }
+        ]
+      },
+      {
+        "id": "main2",
+        "label": "Key Concept 2",
+        "type": "main",
+        "color": "#8B5CF6",
+        "children": [
+          {
+            "id": "sub2_1",
+            "label": "Supporting Detail",
+            "type": "sub",
+            "color": "#A78BFA"
           }
         ]
       }
     ]
   },
-  "title": "Lesson Mind Map Title"
+  "title": "Professional Lesson Mind Map Title"
 }
 \`\`\`
 
+# Quality Standards
+- **Professional**: Clean, modern appearance suitable for educational presentations
+- **Balanced**: Even distribution of content across branches
+- **Consistent**: Uniform styling and spacing throughout
+- **Clear**: Easy to read and understand at a glance
+- **Educational**: Supports learning objectives for grade ${gradeLevel}
+
 # Output Requirements
-- Return only valid JSON, no additional text
-- Ensure all nodes have unique IDs
-- Use descriptive labels that help students understand the concepts
-- Apply appropriate colors for visual hierarchy
-- Maintain the exact JSON structure specified above`;
+- Return ONLY valid JSON, no additional text or formatting
+- Use the exact color codes provided above
+- Ensure all node IDs are unique and descriptive
+- Keep labels concise but informative (2-6 words per label)
+- Maintain the exact JSON structure specified
+- Focus on creating a premium, professional educational tool`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4.1-mini',
@@ -285,15 +340,23 @@ Return ONLY valid JSON in this exact format:
         {
           role: 'system',
           content: `# Role and Objective
-You are an expert educational designer who creates clear, engaging mind maps for students.
+You are a premium educational designer and visual information architect specializing in creating professional, modern mind maps for educational institutions. Your designs are used in high-quality educational presentations and must meet the highest standards of visual design and educational effectiveness.
 
-# Instructions
-- Always return valid JSON only, no additional text
-- Focus on creating logical, educational hierarchies
-- Use student-friendly language appropriate for the specified grade level
-- Ensure visual appeal through strategic color choices
-- Maintain clear conceptual relationships between nodes
-- CRITICAL: Return only the JSON structure, no markdown formatting or explanatory text`
+# Core Design Principles
+- **Professional Excellence**: Every element must look polished and premium
+- **Visual Hierarchy**: Clear, consistent hierarchy that guides the eye naturally
+- **Educational Impact**: Support learning through strategic visual organization
+- **Modern Aesthetics**: Clean, contemporary design that appeals to students
+- **Accessibility**: High contrast, readable fonts, logical structure
+
+# Critical Requirements
+- Return ONLY valid JSON, no additional text, markdown, or explanations
+- Use EXACT color codes as specified in the prompt
+- Create concise, impactful labels (2-6 words maximum)
+- Ensure perfect balance and symmetry in content distribution
+- Maintain consistent styling across all elements
+- Focus on premium, professional appearance suitable for educational presentations
+- NEVER include explanatory text or formatting - JSON ONLY`
         },
         {
           role: 'user',
@@ -403,13 +466,16 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
             color: white;
             overflow: hidden;
             height: 100vh;
             margin: 0;
             padding: 0;
+            font-feature-settings: 'kern' 1, 'liga' 1;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
         
         .mind-map-container {
@@ -432,13 +498,18 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
         
         .mind-map-title {
             position: absolute;
-            top: 30px;
+            top: 32px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 24px;
-            font-weight: 600;
+            font-size: 28px;
+            font-weight: 700;
             color: #ffffff;
             z-index: 10;
+            text-align: center;
+            letter-spacing: -0.025em;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            max-width: 80%;
+            line-height: 1.2;
         }
         
         .mind-map-node {
@@ -446,71 +517,90 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 50px;
             cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            font-weight: 500;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 600;
             text-align: center;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
             user-select: none;
-            padding: 8px 16px;
+            padding: 12px 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
+            letter-spacing: -0.01em;
+            line-height: 1.3;
+            word-wrap: break-word;
+            hyphens: auto;
         }
         
         .mind-map-node:hover {
-            transform: scale(1.05);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transform: scale(1.08) translateY(-2px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
         }
         
         .root-node {
-            width: 180px;
-            height: 180px;
-            background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
-            font-size: 18px;
-            font-weight: 600;
+            width: 200px;
+            height: 200px;
+            background: linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%);
+            font-size: 20px;
+            font-weight: 700;
             z-index: 5;
             border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(37, 99, 235, 0.3), 0 4px 16px rgba(0, 0, 0, 0.2);
         }
         
         .main-node {
-            width: 140px;
-            height: 50px;
-            background: linear-gradient(135deg, #5C6BC0 0%, #3F51B5 100%);
-            font-size: 14px;
-            border-radius: 25px;
+            width: 160px;
+            height: 56px;
+            font-size: 15px;
+            border-radius: 28px;
             z-index: 4;
             position: relative;
+            min-width: 140px;
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .sub-node {
-            width: 120px;
-            height: 40px;
-            background: linear-gradient(135deg, #66BB6A 0%, #4CAF50 100%);
-            font-size: 12px;
-            border-radius: 20px;
+            width: 130px;
+            height: 44px;
+            font-size: 13px;
+            border-radius: 22px;
             z-index: 3;
             opacity: 0;
             transform: scale(0);
+            min-width: 110px;
+            max-width: 160px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .sub-node.visible {
             opacity: 1;
             transform: scale(1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .connection-line {
             position: absolute;
-            background: linear-gradient(90deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
+            background: linear-gradient(90deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.15) 100%);
             transform-origin: left center;
             z-index: 1;
-            height: 2px;
+            height: 3px;
+            border-radius: 1.5px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
         
         .sub-connection-line {
-            height: 1.5px;
-            background: linear-gradient(90deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%);
+            height: 2px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.08) 100%);
             opacity: 0;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.4s ease;
+            border-radius: 1px;
         }
         
         .sub-connection-line.visible {
@@ -608,9 +698,9 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             nodePositions.clear();
             
             // Create root node
-            const rootNodeElement = createNode(mindMapData, 'root-node', centerX - 90, centerY - 90);
+            const rootNodeElement = createNode(mindMapData, 'root-node', centerX - 100, centerY - 100);
             container.appendChild(rootNodeElement);
-            nodePositions.set(mindMapData.id, { x: centerX, y: centerY, width: 180, height: 180 });
+            nodePositions.set(mindMapData.id, { x: centerX, y: centerY, width: 200, height: 200 });
             
             // Create main branches with improved layout
             if (mindMapData.children) {
@@ -621,7 +711,7 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
                     const { x, y, angle } = nodeLayout;
                     
                     // Create connection line
-                    const line = createConnectionLine(centerX, centerY, x + 70, y + 25);
+                    const line = createConnectionLine(centerX, centerY, x + 80, y + 28);
                     container.appendChild(line);
                     
                     // Create main node
@@ -632,20 +722,20 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
                         indicator.textContent = '▶';
                         mainNode.appendChild(indicator);
                         
-                        mainNode.addEventListener('click', () => toggleSubNodes(child, x + 70, y + 25, angle, mainNode));
+                        mainNode.addEventListener('click', () => toggleSubNodes(child, x + 80, y + 28, angle, mainNode));
                     }
                     container.appendChild(mainNode);
                     
                     // Store position for collision detection
-                    nodePositions.set(child.id, { x: x + 70, y: y + 25, width: 140, height: 50 });
+                    nodePositions.set(child.id, { x: x + 80, y: y + 28, width: 160, height: 56 });
                 });
             }
         }
         
         function layoutMainNodes(children, centerX, centerY) {
             const nodes = [];
-            const baseDistance = 350; // Increased base distance
-            const minAngularSeparation = Math.PI / 4; // Minimum 45 degrees between nodes
+            const baseDistance = 380; // Increased base distance for better spacing
+            const minAngularSeparation = Math.PI / 3.5; // Minimum ~51 degrees between nodes for better spacing
             
             if (children.length <= 4) {
                 // Use optimized circular layout for 4 or fewer nodes
@@ -664,8 +754,8 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
                         distance += 30;
                     }
                     
-                    const x = centerX + Math.cos(angle) * distance - 70;
-                    const y = centerY + Math.sin(angle) * distance - 25;
+                    const x = centerX + Math.cos(angle) * distance - 80;
+                    const y = centerY + Math.sin(angle) * distance - 28;
                     
                     nodes.push({ x, y, angle });
                 });
@@ -730,7 +820,38 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             node.style.top = y + 'px';
             node.textContent = nodeData.label;
             node.setAttribute('data-id', nodeData.id);
+            
+            // Apply color from node data if available
+            if (nodeData.color) {
+                if (className === 'root-node') {
+                    node.style.background = \`linear-gradient(135deg, \${nodeData.color} 0%, \${adjustBrightness(nodeData.color, -20)} 100%)\`;
+                } else {
+                    node.style.background = \`linear-gradient(135deg, \${nodeData.color} 0%, \${adjustBrightness(nodeData.color, -15)} 100%)\`;
+                }
+            }
+            
             return node;
+        }
+        
+        function adjustBrightness(hex, percent) {
+            // Remove # if present
+            hex = hex.replace('#', '');
+            
+            // Parse RGB values
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            
+            // Adjust brightness
+            const newR = Math.max(0, Math.min(255, r + (r * percent / 100)));
+            const newG = Math.max(0, Math.min(255, g + (g * percent / 100)));
+            const newB = Math.max(0, Math.min(255, b + (b * percent / 100)));
+            
+            // Convert back to hex
+            return '#' + 
+                Math.round(newR).toString(16).padStart(2, '0') +
+                Math.round(newG).toString(16).padStart(2, '0') +
+                Math.round(newB).toString(16).padStart(2, '0');
         }
         
         function createConnectionLine(x1, y1, x2, y2) {
@@ -777,7 +898,7 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
                     const { x: subX, y: subY } = subNodePositions[index];
                     
                     // Create sub connection line
-                    const subLine = createConnectionLine(parentX, parentY, subX + 60, subY + 20);
+                    const subLine = createConnectionLine(parentX, parentY, subX + 65, subY + 22);
                     subLine.className += ' sub-connection-line';
                     subLine.setAttribute('data-parent', parentNode.id);
                     document.getElementById('mindMap').appendChild(subLine);
@@ -798,15 +919,15 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
         
         function layoutSubNodes(children, parentX, parentY, parentAngle) {
             const positions = [];
-            const subDistance = 200; // Increased distance
-            const minSubAngle = Math.PI / 5; // Minimum 36 degrees between sub-nodes
-            const maxSpread = Math.PI; // Maximum 180 degrees spread
+            const subDistance = 220; // Increased distance for better spacing
+            const minSubAngle = Math.PI / 4.5; // Minimum ~40 degrees between sub-nodes
+            const maxSpread = Math.PI * 0.8; // Maximum 144 degrees spread for tighter grouping
             
             if (children.length === 1) {
                 // Single sub-node: place directly away from center
                 const angle = parentAngle;
-                const x = parentX + Math.cos(angle) * subDistance - 60;
-                const y = parentY + Math.sin(angle) * subDistance - 20;
+                const x = parentX + Math.cos(angle) * subDistance - 65;
+                const y = parentY + Math.sin(angle) * subDistance - 22;
                 positions.push({ x, y });
             } else if (children.length <= 4) {
                 // Few sub-nodes: use symmetric arc

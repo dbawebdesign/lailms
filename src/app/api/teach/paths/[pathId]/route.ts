@@ -11,7 +11,7 @@ interface PathParams {
 // PATCH - Update a path
 export async function PATCH(request: NextRequest, { params }: PathParams) {
   const supabase = await createSupabaseServerClient();
-  const { pathId } = params;
+  const { pathId } = await params;
 
   const {
     data: { session },
@@ -60,7 +60,7 @@ export async function PATCH(request: NextRequest, { params }: PathParams) {
 // DELETE - Delete a path
 export async function DELETE(request: NextRequest, { params }: PathParams) {
   const supabase = await createSupabaseServerClient();
-  const { pathId } = params;
+  const { pathId } = await params;
 
   const {
     data: { session },

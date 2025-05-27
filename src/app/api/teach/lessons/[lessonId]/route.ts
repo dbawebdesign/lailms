@@ -11,7 +11,7 @@ interface LessonParams {
 // PATCH - Update a lesson
 export async function PATCH(request: NextRequest, { params }: LessonParams) {
   const supabase = await createSupabaseServerClient();
-  const { lessonId } = params;
+  const { lessonId } = await params;
 
   const {
     data: { session },
@@ -60,7 +60,7 @@ export async function PATCH(request: NextRequest, { params }: LessonParams) {
 // DELETE - Delete a lesson
 export async function DELETE(request: NextRequest, { params }: LessonParams) {
   const supabase = await createSupabaseServerClient();
-  const { lessonId } = params;
+  const { lessonId } = await params;
 
   const {
     data: { session },

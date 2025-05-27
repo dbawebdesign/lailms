@@ -190,6 +190,7 @@ async function performCourseOutlineGeneration(prompt: string, gradeLevel?: strin
       success: true,
       message: `I've generated a course outline for "${outlineData.baseClassName || 'your course'}". You can save this as a base class or open it in the designer for detailed editing.`,
       outlineData: outlineData,
+      isOutline: true, // Flag to indicate this should be displayed as an outline
       actions: [
         { type: 'saveOutline', label: 'Save as Base Class' },
         { type: 'openInDesigner', label: 'Open in Designer' }
@@ -500,7 +501,11 @@ async function performCreateLesson(pathId: string, title: string, description: s
     const response = await fetch(createURL, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ title, description, objectives, order_index: orderIndex }),
+      body: JSON.stringify({ 
+        title, 
+        description: objectives ? `${description}\n\nLearning Objectives:\n${objectives}` : description, 
+        order_index: orderIndex 
+      }),
     });
 
     if (!response.ok) {
@@ -1466,7 +1471,7 @@ export async function POST(request: Request) {
               pathId: { type: "string", description: "The ID of the path to add the lesson to. Extract from UI context." },
               title: { type: "string", description: "The title of the new lesson" },
               description: { type: "string", description: "Description of what this lesson will cover" },
-              objectives: { type: "string", description: "Learning objectives for this lesson (optional)" },
+              objectives: { type: "string", description: "Learning objectives for this lesson (optional) - will be appended to the description" },
               orderIndex: { type: "number", description: "Position where to insert the lesson (optional, defaults to end)" }
             },
             required: ["pathId", "title", "description"]
@@ -1477,14 +1482,13 @@ export async function POST(request: Request) {
         type: "function",
         function: {
           name: "updateLesson",
-          description: "Update specific properties of a lesson (title, description, objectives, etc.).",
+          description: "Update specific properties of a lesson (title, description, etc.). Note: objectives should be included in the description field.",
           parameters: {
             type: "object",
             properties: {
               lessonId: { type: "string", description: "The ID of the lesson to update. Extract from UI context." },
               title: { type: "string", description: "New title for the lesson (optional)" },
-              description: { type: "string", description: "New description (optional)" },
-              objectives: { type: "string", description: "New learning objectives (optional)" }
+              description: { type: "string", description: "New description including any learning objectives (optional)" }
             },
             required: ["lessonId"]
           }
@@ -1681,11 +1685,24 @@ export async function POST(request: Request) {
         // Citations are extracted from the results gathered *before* the second call
         const citations = extractCitationsFromToolResults(toolExecutionResults);
         
+        // Check if any tool result contains course outline data
+        let outlineData = null;
+        let isOutline = false;
+        for (const toolResult of toolExecutionResults) {
+          if (toolResult.name === 'generateCourseOutline' && toolResult.args?.success && toolResult.args?.outlineData) {
+            outlineData = toolResult.args.outlineData;
+            isOutline = true;
+            break;
+          }
+        }
+        
         console.log("[Luna Chat API] Second call complete. Final response generated.");
         return NextResponse.json({
           response: responseMessage.content || "", // Final text response
           citations,
           hasToolResults: toolExecutionResults.length > 0,
+          isOutline,
+          outlineData
         });
         
       } else {

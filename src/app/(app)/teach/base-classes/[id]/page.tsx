@@ -13,6 +13,7 @@ import LessonSectionEditor from '@/components/teach/studio/editors/LessonSection
 import ContentRenderer from '@/components/teach/studio/editors/ContentRenderer';
 import { KnowledgeBaseEditor } from '@/components/teach/studio/editors/KnowledgeBaseEditor'; // NEW: Import KnowledgeBaseEditor
 import LunaContextElement from '@/components/luna/LunaContextElement'; // NEW: Import Luna context
+import { RealTimeUpdater, useRealTimeContentUpdates } from '@/components/ui/real-time-updater';
 
 // NEW: DND Kit imports
 import { arrayMove } from '@dnd-kit/sortable';
@@ -52,6 +53,20 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
   const [isLoadingSections, setIsLoadingSections] = useState<Record<string, boolean>>({});
 
   const [isNavOpen, setIsNavOpen] = useState(false); // State for mobile navigation
+
+  // Real-time updates hook
+  const { lastUpdate } = useRealTimeContentUpdates((entity, entityId) => {
+    console.log('Content update received in studio:', { entity, entityId });
+    
+    // Refresh data based on the entity type
+    if (entity === 'baseClass' && entityId === baseClassId) {
+      // Refetch base class data
+      window.location.reload();
+    } else if (entity === 'path' || entity === 'lesson' || entity === 'section') {
+      // Refetch the entire studio data to ensure consistency
+      window.location.reload();
+    }
+  });
 
   // Skeleton Loader Component
   const SkeletonBar: React.FC<{ width?: string; height?: string; className?: string }> = ({ width = 'w-full', height = 'h-4', className = '' }) => (
@@ -711,7 +726,9 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
   };
 
   return (
-    <LunaContextElement
+    <>
+      <RealTimeUpdater />
+      <LunaContextElement
       type="base-class-studio-page"
       role="main-content"
       content={{
@@ -865,6 +882,7 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
         </LunaContextElement>
       </div>
     </LunaContextElement>
+    </>
   );
 };
 

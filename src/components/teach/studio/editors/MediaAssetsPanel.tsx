@@ -304,8 +304,8 @@ export default function MediaAssetsPanel({
     <div className={`space-y-6 ${className}`}>
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">AI Media Generation</h2>
-          <p className="text-sm text-gray-600">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">AI Media Generation</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
             Generate educational content based on your lesson
           </p>
         </div>
@@ -341,19 +341,19 @@ export default function MediaAssetsPanel({
                 {mindMapAsset.status === 'generating' && (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-gray-600">Generating mind map...</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">Generating mind map...</span>
                   </>
                 )}
                 {mindMapAsset.status === 'completed' && (
                   <>
                     <CheckCircle className="h-4 w-4 text-green-600" />
-                    <span className="text-sm text-gray-600">Mind map ready</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">Mind map ready</span>
                   </>
                 )}
                 {mindMapAsset.status === 'error' && (
                   <>
                     <AlertCircle className="h-4 w-4 text-red-600" />
-                    <span className="text-sm text-gray-600">Generation failed</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">Generation failed</span>
                   </>
                 )}
               </div>
@@ -433,13 +433,13 @@ export default function MediaAssetsPanel({
                 {podcastAsset.status === 'generating' && (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-gray-600">Generating podcast...</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">Generating podcast...</span>
                   </>
                 )}
                 {podcastAsset.status === 'completed' && (
                   <>
                     <CheckCircle className="h-4 w-4 text-green-600" />
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-gray-600 dark:text-gray-300">
                       Podcast ready {podcastAsset.duration && `(${Math.round(podcastAsset.duration / 60)} min)`}
                     </span>
                   </>
@@ -447,7 +447,7 @@ export default function MediaAssetsPanel({
                 {podcastAsset.status === 'error' && (
                   <>
                     <AlertCircle className="h-4 w-4 text-red-600" />
-                    <span className="text-sm text-gray-600">Generation failed</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">Generation failed</span>
                   </>
                 )}
               </div>

@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useRef, ChangeEvent, KeyboardEvent } from 'react';
 import { useLunaContext } from '@/hooks/useLunaContext';
+import { useRealTimeUpdates } from '@/hooks/useRealTimeUpdates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { PremiumAnimation, AILoadingAnimation, SuccessNotification } from '@/components/ui/premium-animations';
 import {
     Select,
     SelectContent,
@@ -83,6 +85,9 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [aiGeneratedContent, setAiGeneratedContent] = useState<Set<string>>(new Set());
   
   // Use the passed userRole prop to set the initial currentUserRole state
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>(userRole);
@@ -102,6 +107,30 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { context, isReady } = useLunaContext();
+
+  // Real-time updates hook
+  const { triggerUpdate } = useRealTimeUpdates({
+    onUpdate: (event) => {
+      console.log('Real-time update received:', event);
+      if (event.isAIGenerated) {
+        setSuccessMessage(`${event.type === 'create' ? 'Created' : 'Updated'} ${event.entity} successfully!`);
+        setShowSuccessNotification(true);
+        setTimeout(() => setShowSuccessNotification(false), 3000);
+      }
+    },
+    enableAnimations: true,
+    onRefreshNeeded: (entity, entityId) => {
+      // Trigger page refresh or component re-render
+      console.log(`Refresh needed for ${entity}: ${entityId}`);
+      // You can add specific refresh logic here based on the current page
+      if (typeof window !== 'undefined') {
+        // Broadcast refresh event to other components
+        window.dispatchEvent(new CustomEvent('lunaContentUpdate', {
+          detail: { entity, entityId }
+        }));
+      }
+    }
+  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -280,8 +309,60 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
         content: data.response,
         timestamp: new Date(),
         persona: currentPersona,
-        citations: data.citations || []
+        citations: data.citations || [],
+        isOutline: data.isOutline || false,
+        outlineData: data.outlineData || undefined,
+        // Add action buttons for course outlines
+        actions: data.isOutline && data.outlineData ? [
+          { 
+            label: 'Save as Base Class', 
+            action: () => handleSaveOutline(data.outlineData) 
+          },
+          { 
+            label: 'Open in Designer', 
+            action: () => handleOpenInDesigner(data.outlineData) 
+          }
+        ] : undefined
       };
+
+      // Check if Luna performed any actions that need real-time updates
+      if (data.hasToolResults && data.citations) {
+        // Mark this content as AI-generated for animations
+        setAiGeneratedContent(prev => new Set([...prev, assistantResponse.id]));
+        
+        // Trigger real-time updates based on citations
+        data.citations.forEach((citation: Citation) => {
+          if (citation.id && citation.title) {
+            // Determine entity type and trigger update
+            let entityType: 'baseClass' | 'path' | 'lesson' | 'section' = 'section';
+            let updateType: 'create' | 'update' | 'delete' = 'create';
+            
+            if (citation.title.includes('Base Class')) {
+              entityType = 'baseClass';
+            } else if (citation.title.includes('Path')) {
+              entityType = 'path';
+            } else if (citation.title.includes('Lesson')) {
+              entityType = 'lesson';
+            } else if (citation.title.includes('Section')) {
+              entityType = 'section';
+            }
+            
+            if (citation.title.includes('Updated')) {
+              updateType = 'update';
+            } else if (citation.title.includes('Deleted')) {
+              updateType = 'delete';
+            }
+            
+            triggerUpdate({
+              type: updateType,
+              entity: entityType,
+              entityId: citation.id,
+              data: citation,
+              isAIGenerated: true
+            });
+          }
+        });
+      }
 
       // Update messages state with the final assistant response
       setMessages(prev => prev.filter(msg => msg.id !== tempBotMessageId).concat(assistantResponse));
@@ -488,25 +569,30 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
       <div className="flex-grow overflow-hidden">
         <ScrollArea className="h-full px-2 py-3">
           <div className="space-y-4">
-            {messages.map((message) => (
-              <div 
-                key={message.id}
-                className={`flex gap-2 ${message.role === 'user' ? 'justify-end' : message.role === 'system' ? 'justify-center' : 'justify-start'}`}
-              >
-                {message.role === 'assistant' && (
-                  <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground flex-shrink-0">
-                    <Bot size={16} />
-                  </div>
-                )}
-                
-                {message.role === 'system' ? (
-                  <div className="text-center w-full">
-                    <span className="text-xs text-muted-foreground italic px-2 py-1 bg-muted rounded-full">{message.content}</span>
-                  </div>
-                ) : (
-                <div 
-                    className={`max-w-[85%] rounded-lg p-3 ${ message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground' } ${message.isLoading ? 'opacity-50 pointer-events-none' : ''}`}
+            {messages.map((message) => {
+              const isAIGenerated = aiGeneratedContent.has(message.id);
+              
+              return (
+                <PremiumAnimation
+                  key={message.id}
+                  type={isAIGenerated ? 'glow' : 'slideUp'}
+                  isAIGenerated={isAIGenerated}
+                  className={`flex gap-2 ${message.role === 'user' ? 'justify-end' : message.role === 'system' ? 'justify-center' : 'justify-start'}`}
                 >
+                  {message.role === 'assistant' && (
+                    <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground flex-shrink-0">
+                      <Bot size={16} />
+                    </div>
+                  )}
+                  
+                  {message.role === 'system' ? (
+                    <div className="text-center w-full">
+                      <span className="text-xs text-muted-foreground italic px-2 py-1 bg-muted rounded-full">{message.content}</span>
+                    </div>
+                  ) : (
+                  <div 
+                      className={`max-w-[85%] rounded-lg p-3 ${ message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground' } ${message.isLoading ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
                   <div className="text-sm">
                       {message.isLoading ? (
                         <div className="flex space-x-1.5">
@@ -569,8 +655,9 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
                     <User size={16} />
                   </div>
                 )}
-              </div>
-            ))}
+                </PremiumAnimation>
+              );
+            })}
             {error && (
               <div className="flex justify-start">
                 <div className="p-3 rounded-lg bg-destructive text-destructive-foreground max-w-[80%]">
@@ -583,6 +670,20 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
         </ScrollArea>
       </div>
       
+      {/* AI Loading Animation */}
+      {isLoading && (
+        <div className="p-2">
+          <AILoadingAnimation message="Luna is working on your request..." />
+        </div>
+      )}
+
+      {/* Success Notification */}
+      <SuccessNotification
+        message={successMessage}
+        isVisible={showSuccessNotification}
+        onClose={() => setShowSuccessNotification(false)}
+      />
+
       {/* Input Area */}
       <div className="p-2 border-t">
         <div className="flex w-full items-center space-x-2">

@@ -11,7 +11,7 @@ interface PathLessonsParams {
 // POST - Create a new lesson within a path
 export async function POST(request: NextRequest, { params }: PathLessonsParams) {
   const supabase = await createSupabaseServerClient();
-  const { pathId } = params;
+  const { pathId } = await params;
 
   const {
     data: { session },

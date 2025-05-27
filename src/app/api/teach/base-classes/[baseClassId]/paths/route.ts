@@ -11,7 +11,7 @@ interface BaseClassPathsParams {
 // POST - Create a new path within a base class
 export async function POST(request: NextRequest, { params }: BaseClassPathsParams) {
   const supabase = await createSupabaseServerClient();
-  const { baseClassId } = params;
+  const { baseClassId } = await params;
 
   const {
     data: { session },
