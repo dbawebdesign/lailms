@@ -8,15 +8,18 @@ interface MindMapViewModalProps {
   onClose: () => void;
   mindMapId: string;
   title: string;
+  urlPath?: string; // Optional custom URL path, defaults to lesson mind map path
 }
 
 export default function MindMapViewModal({
   isOpen,
   onClose,
   mindMapId,
-  title
+  title,
+  urlPath
 }: MindMapViewModalProps) {
-  const mindMapUrl = `/api/teach/media/mind-map/${mindMapId}`;
+  // Use custom URL path if provided, otherwise default to lesson mind map path
+  const mindMapUrl = urlPath || `/api/teach/media/mind-map/${mindMapId}`;
 
   const handleDownload = () => {
     const link = document.createElement('a');

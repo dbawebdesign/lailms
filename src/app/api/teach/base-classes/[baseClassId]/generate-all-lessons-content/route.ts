@@ -204,4 +204,98 @@ export async function POST(
     console.error(`[STREAMING:generate-all-lessons-content] Outer catch error for baseClassId ${baseClassId}:`, error);
     return new Response(JSON.stringify({ error: 'An unexpected server error occurred before streaming could start.', details: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
+}
+
+// GET method to check if content already exists
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { baseClassId: string } }
+) {
+  const { baseClassId } = params;
+  const url = new URL(request.url);
+  const isCheck = url.searchParams.get('check') === 'true';
+
+  if (!isCheck) {
+    return new Response(JSON.stringify({ error: 'Invalid request' }), { 
+      status: 400, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+
+  if (!baseClassId) {
+    return new Response(JSON.stringify({ error: 'Base Class ID is required' }), { 
+      status: 400, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+
+  const supabase = createSupabaseServerClient();
+
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return new Response(JSON.stringify({ 
+        error: 'Authentication required', 
+        details: userError?.message || 'No user session found.' 
+      }), { 
+        status: 401, 
+        headers: { 'Content-Type': 'application/json' } 
+      });
+    }
+
+    const { data: pathsData, error: pathsError } = await supabase
+      .from('paths')
+      .select(`id, title, lessons (id, title, lesson_sections (count))`)
+      .eq('base_class_id', baseClassId);
+
+    if (pathsError) {
+      return new Response(JSON.stringify({ 
+        error: 'Failed to fetch paths and lessons', 
+        details: pathsError.message 
+      }), { 
+        status: 500, 
+        headers: { 'Content-Type': 'application/json' } 
+      });
+    }
+
+    let lessonsWithContent = 0;
+    let totalLessons = 0;
+
+    if (pathsData) {
+      for (const path of pathsData) {
+        if (path.lessons) {
+          for (const lesson of path.lessons as any[]) {
+            totalLessons++;
+            if (lesson.lesson_sections && lesson.lesson_sections[0] && lesson.lesson_sections[0].count > 0) {
+              lessonsWithContent++;
+            }
+          }
+        }
+      }
+    }
+
+    const hasExistingContent = lessonsWithContent > 0;
+    const allLessonsHaveContent = totalLessons > 0 && lessonsWithContent === totalLessons;
+
+    return new Response(JSON.stringify({
+      hasExistingContent,
+      allLessonsHaveContent,
+      totalLessons,
+      lessonsWithContent,
+      lessonsNeedingContent: totalLessons - lessonsWithContent
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+  } catch (error: any) {
+    console.error(`[CHECK:generate-all-lessons-content] Error for baseClassId ${baseClassId}:`, error);
+    return new Response(JSON.stringify({ 
+      error: 'An unexpected error occurred', 
+      details: error.message 
+    }), { 
+      status: 500, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
 } 

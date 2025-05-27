@@ -9,6 +9,8 @@ import { Progress } from '@/components/ui/progress'; // Import Progress componen
 
 // NEW: Import for the Knowledge Base Manager
 import BaseClassKnowledgeBaseManager from './BaseClassKnowledgeBaseManager';
+// NEW: Import for the Mind Map Modal
+import MindMapViewModal from './MindMapViewModal';
 
 interface BaseClassEditorProps {
   baseClass: StudioBaseClass;
@@ -33,6 +35,15 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
   const [name, setName] = useState(baseClass.name);
   const [description, setDescription] = useState(baseClass.description || '');
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [isGeneratingMindMap, setIsGeneratingMindMap] = useState(false);
+  const [hasGeneratedContent, setHasGeneratedContent] = useState(false);
+  const [isCheckingContent, setIsCheckingContent] = useState(true);
+  const [existingMindMap, setExistingMindMap] = useState<{ id: string; url: string } | null>(null);
+  const [isCheckingMindMap, setIsCheckingMindMap] = useState(false);
+  
+  // NEW: State for mind map modal
+  const [mindMapModalOpen, setMindMapModalOpen] = useState(false);
+  const [selectedMindMap, setSelectedMindMap] = useState<{ id: string; title: string; url: string } | null>(null);
   
   // State for streaming progress
   const [generationProgress, setGenerationProgress] = useState(0); // Percentage 0-100
@@ -47,11 +58,108 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
   // REMOVED: State for active tab
   // const [activeTab, setActiveTab] = useState<ActiveTab>('details');
 
+  // Check for existing base class mind map
+  const checkForExistingMindMap = useCallback(async () => {
+    if (!baseClass?.id) {
+      setIsCheckingMindMap(false);
+      return;
+    }
+
+    try {
+      setIsCheckingMindMap(true);
+      
+      const response = await fetch(`/api/teach/base-classes/${baseClass.id}/mind-map`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.asset) {
+          setExistingMindMap({
+            id: result.asset.id,
+            url: result.asset.url
+          });
+        } else {
+          setExistingMindMap(null);
+        }
+      } else {
+        setExistingMindMap(null);
+      }
+    } catch (error) {
+      console.error('Error checking for existing mind map:', error);
+      setExistingMindMap(null);
+    } finally {
+      setIsCheckingMindMap(false);
+    }
+  }, [baseClass?.id]);
+
+  // Check for lesson section content on component mount
+  const checkForGeneratedContent = useCallback(async () => {
+    if (!baseClass?.id) {
+      setIsCheckingContent(false);
+      return;
+    }
+
+    try {
+      setIsCheckingContent(true);
+      
+      // First, check if the baseClass prop already has the data we need
+      const hasContentFromProps = baseClass.paths?.some((path: any) => 
+        path.lessons?.some((lesson: any) => 
+          lesson.lesson_sections && lesson.lesson_sections.length > 0
+        )
+      );
+
+      if (hasContentFromProps) {
+        setHasGeneratedContent(true);
+        setIsCheckingContent(false);
+        return;
+      }
+
+      // Add a small delay to avoid flickering for very fast responses
+      const [response] = await Promise.all([
+        fetch(`/api/teach/base-classes/${baseClass.id}/generate-all-lessons-content?check=true`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }),
+        new Promise(resolve => setTimeout(resolve, 300)) // Minimum 300ms delay
+      ]);
+      
+      if (response.ok) {
+        const result = await response.json();
+        // If the check returns that there are lessons to process, it means no content exists
+        // If it returns that all lessons are skipped, it means content already exists
+        setHasGeneratedContent(result.hasExistingContent || false);
+      } else {
+        // Fallback to checking the prop data if the API call fails
+        setHasGeneratedContent(hasContentFromProps || false);
+      }
+    } catch (error) {
+      console.error('Error checking for generated content:', error);
+      // Fallback to checking the prop data
+      const hasContentFromProps = baseClass.paths?.some((path: any) => 
+        path.lessons?.some((lesson: any) => 
+          lesson.lesson_sections && lesson.lesson_sections.length > 0
+        )
+      );
+      setHasGeneratedContent(hasContentFromProps || false);
+    } finally {
+      setIsCheckingContent(false);
+    }
+  }, [baseClass?.id, baseClass.paths]);
+
   useEffect(() => {
     setName(baseClass.name);
     setDescription(baseClass.description || '');
-    // Update other fields when baseClass prop changes
-  }, [baseClass]);
+    // Check for content when component mounts or baseClass changes
+    checkForGeneratedContent();
+    checkForExistingMindMap();
+  }, [baseClass, checkForGeneratedContent, checkForExistingMindMap]);
 
   const handleSave = async () => {
     const updatedData: Partial<StudioBaseClass> = {
@@ -192,6 +300,12 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
                 });
                 setGenerationProgress(100);
                 setIsGeneratingContent(false); // Generation process is fully done
+                
+                // Refresh content check to update button state
+                if (messageType === 'success' || (eventData.successfulCount && eventData.successfulCount > 0)) {
+                  checkForGeneratedContent();
+                }
+                
                 reader.releaseLock(); 
                 streamLoopActive = false; // Signal to exit outer while loop
                 break; // Exit for...loop over parts
@@ -210,6 +324,72 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
       setFinalSummary({ message: `Error: ${error.message}`, type: 'error' });
       setIsGeneratingContent(false); 
     } 
+  };
+
+  const handleGenerateBaseClassMindMap = async () => {
+    if (!baseClass || !baseClass.id) {
+      setFinalSummary({ message: 'Error: Base class ID is missing.', type: 'error' });
+      return;
+    }
+
+    setIsGeneratingMindMap(true);
+    setFinalSummary(null);
+
+    try {
+      const response = await fetch(`/api/teach/base-classes/${baseClass.id}/mind-map`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorResult = await response.json().catch(() => ({ error: 'Failed to generate mind map.' }));
+        throw new Error(errorResult.error || `Failed to generate mind map (status: ${response.status})`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.asset) {
+        setFinalSummary({ 
+          message: `Mind map generated successfully!`, 
+          type: 'success' 
+        });
+        
+        // Update the existing mind map state
+        setExistingMindMap({
+          id: result.asset.id,
+          url: result.asset.url
+        });
+        
+        // Open the mind map in the modal instead of new tab
+        setSelectedMindMap({
+          id: result.asset.id,
+          title: result.asset.title || 'Base Class Mind Map',
+          url: result.asset.url
+        });
+        setMindMapModalOpen(true);
+      } else {
+        throw new Error('Failed to generate mind map');
+      }
+
+    } catch (error: any) {
+      console.error('Error generating base class mind map:', error);
+      setFinalSummary({ message: `Error: ${error.message}`, type: 'error' });
+    } finally {
+      setIsGeneratingMindMap(false);
+    }
+  };
+
+  const handleViewBaseClassMindMap = () => {
+    if (existingMindMap) {
+      setSelectedMindMap({
+        id: existingMindMap.id,
+        title: 'Base Class Mind Map',
+        url: existingMindMap.url
+      });
+      setMindMapModalOpen(true);
+    }
   };
 
   return (
@@ -259,22 +439,46 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
             </div>
             */}
             <div className="flex space-x-2">
-              <Button onClick={handleSave} disabled={isGeneratingContent}>Save Changes</Button>
-              <Button onClick={handleCreateAllLessonContent} disabled={isGeneratingContent}>
-                {isGeneratingContent && totalToProcessForStream > 0 && processedSoFarForStream < totalToProcessForStream ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {`Generating (${processedSoFarForStream}/${totalToProcessForStream})`}
-                  </>
-                ) : isGeneratingContent ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {currentGeneratingMessage || 'Initializing...'}
-                  </>
+              <Button onClick={handleSave} disabled={isGeneratingContent || isGeneratingMindMap || isCheckingContent || isCheckingMindMap}>Save Changes</Button>
+              {isCheckingContent || isCheckingMindMap ? (
+                <Button disabled>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isCheckingContent ? 'Checking content...' : 'Checking mind map...'}
+                </Button>
+              ) : hasGeneratedContent ? (
+                existingMindMap ? (
+                  <Button onClick={handleViewBaseClassMindMap} disabled={isGeneratingContent || isGeneratingMindMap}>
+                    View Base Class Mind Map
+                  </Button>
                 ) : (
-                  'Create all lesson content'
-                )}
-              </Button>
+                  <Button onClick={handleGenerateBaseClassMindMap} disabled={isGeneratingContent || isGeneratingMindMap}>
+                    {isGeneratingMindMap ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating Mind Map...
+                      </>
+                    ) : (
+                      'Generate Base Class Mind Map'
+                    )}
+                  </Button>
+                )
+              ) : (
+                <Button onClick={handleCreateAllLessonContent} disabled={isGeneratingContent || isGeneratingMindMap}>
+                  {isGeneratingContent && totalToProcessForStream > 0 && processedSoFarForStream < totalToProcessForStream ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {`Generating (${processedSoFarForStream}/${totalToProcessForStream})`}
+                    </>
+                  ) : isGeneratingContent ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {currentGeneratingMessage || 'Initializing...'}
+                    </>
+                  ) : (
+                    'Create all lesson content'
+                  )}
+                </Button>
+              )}
             </div>
 
           {/* Final summary message */}
@@ -286,6 +490,20 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
           </>
         {/* REMOVED: Conditional rendering for knowledgeBase tab */}
       </CardContent>
+      
+      {/* Mind Map View Modal */}
+      {selectedMindMap && (
+        <MindMapViewModal
+          isOpen={mindMapModalOpen}
+          onClose={() => {
+            setMindMapModalOpen(false);
+            setSelectedMindMap(null);
+          }}
+          mindMapId={selectedMindMap.id}
+          title={selectedMindMap.title}
+          urlPath={selectedMindMap.url}
+        />
+      )}
     </Card>
   );
 };
