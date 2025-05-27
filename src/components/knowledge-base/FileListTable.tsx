@@ -34,10 +34,10 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from 'sonner'
-import type { Database } from 'packages/types/supabase'
+import type { Database } from '@learnologyai/types'
 
 // Document status type - updated to match database enum
-export type DocumentStatus = 'queued' | 'processing' | 'summarizing_chunks' | 'summarizing_document' | 'completed' | 'error' | 'completed_with_errors'
+export type DocumentStatus = 'queued' | 'processing' | 'completed' | 'error'
 
 type Document = Database['public']['Tables']['documents']['Row']
 
@@ -79,8 +79,10 @@ export function FileListTable({ organisationId }: FileListTableProps) {
     fetchDocuments();
   }, [organisationId]);
 
-  // Get status badge based on document status
-  const getStatusBadge = (status: DocumentStatus) => {
+  // Get status badge based on document status and processing stage
+  const getStatusBadge = (status: DocumentStatus, metadata: any) => {
+    const processingStage = metadata?.processing_stage;
+    
     switch (status) {
       case 'queued':
         return (
@@ -90,38 +92,41 @@ export function FileListTable({ organisationId }: FileListTableProps) {
           </Badge>
         )
       case 'processing':
-        return (
-          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 flex items-center gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            <span>Processing</span>
-          </Badge>
-        )
-      case 'summarizing_chunks':
-        return (
-          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 flex items-center gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            <span>Summarizing</span>
-          </Badge>
-        )
-      case 'summarizing_document':
-        return (
-          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 flex items-center gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            <span>Finalizing</span>
-          </Badge>
-        )
+        // Check processing stage for more specific status
+        if (processingStage === 'summarizing_chunks') {
+          return (
+            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Summarizing</span>
+            </Badge>
+          )
+        } else if (processingStage === 'chunking') {
+          return (
+            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Chunking</span>
+            </Badge>
+          )
+        } else if (processingStage === 'transcript_extraction') {
+          return (
+            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Extracting</span>
+            </Badge>
+          )
+        } else {
+          return (
+            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Processing</span>
+            </Badge>
+          )
+        }
       case 'completed':
         return (
           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 flex items-center gap-1">
             <CheckCircle className="h-3 w-3" />
             <span>Completed</span>
-          </Badge>
-        )
-      case 'completed_with_errors':
-        return (
-          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3" />
-            <span>Partial</span>
           </Badge>
         )
       case 'error':
@@ -244,7 +249,7 @@ export function FileListTable({ organisationId }: FileListTableProps) {
                   </div>
                 </TableCell>
                 <TableCell>
-                  {getStatusBadge(doc.status as DocumentStatus)}
+                  {getStatusBadge(doc.status as DocumentStatus, doc.metadata)}
                 </TableCell>
                 <TableCell>
                   {getFileTypeDisplay(doc.file_type, doc.file_name)}

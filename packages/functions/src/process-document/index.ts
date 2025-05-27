@@ -31,7 +31,7 @@ interface DocumentRecord {
   base_class_id?: string | null; // For context
 }
 
-type DocumentStatus = 'queued' | 'processing' | 'summarizing_chunks' | 'summarizing_document' | 'completed' | 'error' | 'completed_with_errors';
+type DocumentStatus = 'queued' | 'processing' | 'completed' | 'error';
 
 // Helper: Update document status and metadata
 async function updateDocumentStatus(
@@ -824,7 +824,8 @@ serve(async (req: Request) => {
     
     await updateDocumentStatus(supabaseClient, documentId, 'processing', { 
       extracted_text_length: extractedText.length,
-      source_type: docMetadata.source_type 
+      source_type: docMetadata.source_type,
+      processing_stage: 'chunking'
     });
 
     const processedChunks: Chunk[] = await chunkText(extractedText, fileType as DocumentType, { chunkSize: 1500, overlap: 200 });
@@ -859,7 +860,10 @@ serve(async (req: Request) => {
     console.log(`Successfully chunked and embedded ${processedChunks.length} chunks for document ${documentId}.`);
     
     // Trigger chunk summarization
-    await updateDocumentStatus(supabaseClient, documentId, 'summarizing_chunks', { chunks_created: processedChunks.length });
+    await updateDocumentStatus(supabaseClient, documentId, 'processing', { 
+      chunks_created: processedChunks.length,
+      processing_stage: 'summarizing_chunks'
+    });
     const { error: summarizeChunksError } = await supabaseClient.functions.invoke('summarize-chunks', {
       body: { documentId: document.id, summarizeLevel: 'chunk' }
     });
@@ -876,7 +880,8 @@ serve(async (req: Request) => {
     
     // Tentatively mark as completed, actual "completed" might be after document summary
     await updateDocumentStatus(supabaseClient, documentId, 'completed', { 
-      processing_completed_at: new Date().toISOString() 
+      processing_completed_at: new Date().toISOString(),
+      processing_stage: 'completed'
     });
     console.log(`PROCESS-DOCUMENT: Successfully processed document ID: ${documentId}`);
 

@@ -22,7 +22,7 @@ interface DocumentRecord {
 }
 
 // Match DocumentStatus from process-document for consistency
-type DocumentStatus = 'queued' | 'processing' | 'summarizing_chunks' | 'summarizing_document' | 'completed' | 'error' | 'completed_with_errors';
+type DocumentStatus = 'queued' | 'processing' | 'completed' | 'error';
 
 // --- Chunking Function (shared logic, could be in _shared) ---
 interface Chunk {
@@ -190,7 +190,8 @@ serve(async (req: Request) => {
     };
 
     if (chunksProcessedCount > 0) {
-      await updateDocumentStatus(supabaseAdminClient, documentId, 'summarizing_chunks', updatedDocMetadata);
+      updatedDocMetadata.processing_stage = 'summarizing_chunks';
+      await updateDocumentStatus(supabaseAdminClient, documentId, 'processing', updatedDocMetadata);
       console.log(`kb-process-textfile: Invoking summarize-chunks (chunk level) for ${documentId}`);
       const { error: summarizeChunksError } = await supabaseAdminClient.functions.invoke('summarize-chunks', {
         body: { documentId: document.id, summarizeLevel: 'chunk' }
@@ -198,17 +199,19 @@ serve(async (req: Request) => {
       if (summarizeChunksError) {
         console.error(`kb-process-textfile: Error invoking summarize-chunks (chunk level) for ${documentId}:`, summarizeChunksError.message);
         updatedDocMetadata.summarization_error = `Chunk summarization trigger failed: ${summarizeChunksError.message}`;
-        // Decide if status should be error or completed_with_errors
-        await updateDocumentStatus(supabaseAdminClient, documentId, 'completed_with_errors', updatedDocMetadata);
+        updatedDocMetadata.processing_stage = 'error';
+        // Mark as error since summarization failed
+        await updateDocumentStatus(supabaseAdminClient, documentId, 'error', updatedDocMetadata);
       } else {
-        console.log(`kb-process-textfile: Invoked summarize-chunks (chunk level). Document currently in 'summarizing_chunks' state.`);
+        console.log(`kb-process-textfile: Invoked summarize-chunks (chunk level). Document currently in processing state with summarizing_chunks stage.`);
         // The overall document completion will be handled by the summarization flow or a separate poller.
         // For now, this function's primary job (text processing) is done.
       }
     } else {
        // No chunks processed (empty file or all chunks failed)
       updatedDocMetadata.processing_completed_at = new Date().toISOString();
-      await updateDocumentStatus(supabaseAdminClient, documentId, chunks.length > 0 ? 'completed_with_errors' : 'completed', updatedDocMetadata);
+      updatedDocMetadata.processing_stage = chunks.length > 0 ? 'error' : 'completed';
+      await updateDocumentStatus(supabaseAdminClient, documentId, chunks.length > 0 ? 'error' : 'completed', updatedDocMetadata);
     }
     
     return new Response(JSON.stringify({ 
