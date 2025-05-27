@@ -16,6 +16,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { triggerChatLogout } from "@/utils/chatPersistence";
 
 // Custom hover class for consistent brand styling
 const buttonHoverClass = "hover:bg-gradient-to-r hover:from-[#6B5DE5]/5 hover:to-[#6B5DE5]/10";
@@ -40,6 +41,9 @@ const Header = () => {
   }, [supabase]);
 
   const handleLogout = async () => {
+    // Trigger chat history cleanup before logout
+    triggerChatLogout();
+    
     await supabase.auth.signOut();
     router.push("/login");
   };

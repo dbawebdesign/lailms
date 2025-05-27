@@ -34,63 +34,84 @@ export function CourseOutlineMessage({ outline }: CourseOutlineMessageProps) {
   if (!outline) return null;
 
   return (
-    <div className="space-y-3 text-sm">
+    <div className="space-y-3 text-sm w-full max-w-full overflow-hidden min-w-0">
       {/* Display basic course info if available */}
-      {outline.baseClassName && <p><strong className="font-medium">Course Title:</strong> {outline.baseClassName}</p>}
-      {outline.description && <p><strong className="font-medium">Description:</strong> {outline.description}</p>}
+      {outline.baseClassName && (
+        <div className="break-words text-wrap overflow-hidden">
+          <strong className="font-medium">Course Title:</strong> {outline.baseClassName}
+        </div>
+      )}
+      {outline.description && (
+        <div className="break-words text-wrap overflow-hidden">
+          <strong className="font-medium">Description:</strong> {outline.description}
+        </div>
+      )}
       {(outline.subject || outline.gradeLevel || outline.lengthInWeeks) && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          {outline.subject && <span>Subject: {outline.subject}</span>}
-          {outline.gradeLevel && <span>Grade: {outline.gradeLevel}</span>}
-          {outline.lengthInWeeks && <span>Length: {outline.lengthInWeeks} weeks</span>}
+        <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground overflow-hidden">
+          {outline.subject && <span className="break-words text-wrap">Subject: {outline.subject}</span>}
+          {outline.gradeLevel && <span className="break-words text-wrap">Grade: {outline.gradeLevel}</span>}
+          {outline.lengthInWeeks && <span className="break-words text-wrap">Length: {outline.lengthInWeeks} weeks</span>}
         </div>
       )}
 
       {/* Display Modules using Accordion */}
       {outline.modules && outline.modules.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-muted-foreground/20">
-          <h4 className="font-semibold mb-2">Course Modules:</h4>
-          <Accordion type="single" collapsible className="w-full">
+        <div className="mt-3 pt-3 border-t border-muted-foreground/20 w-full min-w-0">
+          <h4 className="font-semibold mb-2 break-words text-wrap">Course Modules:</h4>
+          <Accordion type="single" collapsible className="w-full min-w-0">
             {outline.modules.map((module, index) => (
-              <AccordionItem key={`module-${index}`} value={`item-${index}`}>
-                <AccordionTrigger className="text-sm font-medium hover:no-underline py-2">
-                  {module.title || `Module ${index + 1}`}
+              <AccordionItem key={`module-${index}`} value={`item-${index}`} className="border-b border-muted-foreground/10 min-w-0">
+                <AccordionTrigger className="text-sm font-medium hover:no-underline py-2 text-left break-words text-wrap min-w-0">
+                  <span className="break-words text-wrap pr-2 min-w-0 overflow-hidden">{module.title || `Module ${index + 1}`}</span>
                 </AccordionTrigger>
-                <AccordionContent className="pl-4 pt-2 pb-3 text-xs space-y-2 overflow-x-hidden break-words">
+                <AccordionContent className="pl-1 pt-2 pb-3 text-xs space-y-2 w-full max-w-full overflow-hidden min-w-0">
                   {/* Topics */}
                   {module.topics && module.topics.length > 0 && (
-                    <div>
-                      <strong className="font-medium text-foreground/90">Topics:</strong>
-                      <ul className="list-disc list-outside pl-5 mt-1 space-y-0.5">
+                    <div className="w-full min-w-0 overflow-hidden">
+                      <strong className="font-medium text-foreground/90 block mb-1 break-words text-wrap">Topics:</strong>
+                      <ul className="space-y-1 pl-2">
                         {module.topics.map((topic, tIndex) => (
-                          <li key={`topic-${index}-${tIndex}`} className="break-words">{topic}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {/* Suggested Lessons */}
-                  {module.suggestedLessons && module.suggestedLessons.length > 0 && (
-                    <div className="mt-2">
-                      <strong className="font-medium text-foreground/90">Suggested Lessons:</strong>
-                      <ul className="list-disc list-outside pl-5 mt-1 space-y-0.5">
-                        {module.suggestedLessons.map((lesson, lIndex) => (
-                          <li key={`lesson-${index}-${lIndex}`} className="break-words">
-                            {lesson.title}
-                            {lesson.objective && <span className="italic text-muted-foreground block text-wrap"> - Obj: {lesson.objective}</span>}
+                          <li key={`topic-${index}-${tIndex}`} className="break-words text-wrap leading-relaxed relative before:content-['•'] before:absolute before:-left-2 before:text-muted-foreground overflow-hidden">
+                            {topic}
                           </li>
                         ))}
                       </ul>
                     </div>
                   )}
+                  
+                  {/* Suggested Lessons */}
+                  {module.suggestedLessons && module.suggestedLessons.length > 0 && (
+                    <div className="w-full min-w-0 overflow-hidden">
+                      <strong className="font-medium text-foreground/90 block mb-1 break-words text-wrap">Suggested Lessons:</strong>
+                      <ul className="space-y-1 pl-2">
+                        {module.suggestedLessons.map((lesson, lIndex) => (
+                          <li key={`lesson-${index}-${lIndex}`} className="break-words text-wrap leading-relaxed relative before:content-['•'] before:absolute before:-left-2 before:text-muted-foreground overflow-hidden">
+                            <div className="font-medium break-words text-wrap overflow-hidden">{lesson.title}</div>
+                            {lesson.objective && (
+                              <div className="italic text-muted-foreground text-xs mt-1 break-words text-wrap overflow-hidden">
+                                Objective: {lesson.objective}
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
                   {/* Suggested Assessments */}
                   {module.suggestedAssessments && module.suggestedAssessments.length > 0 && (
-                    <div className="mt-2">
-                      <strong className="font-medium text-foreground/90">Suggested Assessments:</strong>
-                      <div className="flex flex-wrap gap-1 mt-1">
+                    <div className="w-full min-w-0 overflow-hidden">
+                      <strong className="font-medium text-foreground/90 block mb-1 break-words text-wrap">Suggested Assessments:</strong>
+                      <div className="space-y-1">
                         {module.suggestedAssessments.map((assessment, aIndex) => (
-                          <Badge key={`assessment-${index}-${aIndex}`} variant="secondary" className="break-words">
-                            {assessment.type}: {assessment.description}
-                          </Badge>
+                          <div key={`assessment-${index}-${aIndex}`} className="break-words text-wrap overflow-hidden">
+                            <Badge variant="secondary" className="text-xs px-1 py-0.5 break-words max-w-full inline-block overflow-hidden">
+                              <span className="break-words text-wrap">{assessment.type}</span>
+                              {assessment.description && (
+                                <span className="break-words text-wrap">: {assessment.description}</span>
+                              )}
+                            </Badge>
+                          </div>
                         ))}
                       </div>
                     </div>

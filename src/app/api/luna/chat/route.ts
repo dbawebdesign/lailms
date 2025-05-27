@@ -342,6 +342,61 @@ Generate detailed educational content that fulfills these requirements. Structur
   }
 }
 
+// Fetch complete base class structure with all lesson IDs
+async function performFetchBaseClassStructure(baseClassId: string, forwardedCookies?: string | null): Promise<any> {
+  console.log(`---> FETCHING BASE CLASS STRUCTURE for ${baseClassId}`);
+  
+  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const fetchURL = `${baseURL}/api/teach/base-classes/${baseClassId}`;
+
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (forwardedCookies) headers['Cookie'] = forwardedCookies;
+
+  try {
+    const response = await fetch(fetchURL, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to fetch base class: ${response.status}`);
+    }
+
+    const baseClassData = await response.json();
+    
+    // Extract all lesson IDs and organize them by path
+    const lessonsByPath: Record<string, any[]> = {};
+    const allLessonIds: string[] = [];
+    
+    if (baseClassData.paths) {
+      baseClassData.paths.forEach((path: any) => {
+        if (path.lessons) {
+          lessonsByPath[path.id] = path.lessons;
+          path.lessons.forEach((lesson: any) => {
+            allLessonIds.push(lesson.id);
+          });
+        }
+      });
+    }
+    
+    return {
+      success: true,
+      message: `Retrieved base class structure with ${baseClassData.paths?.length || 0} paths and ${allLessonIds.length} lessons`,
+      baseClass: baseClassData,
+      lessonsByPath,
+      allLessonIds,
+      pathIds: baseClassData.paths?.map((p: any) => p.id) || []
+    };
+  } catch (error) {
+    console.error('Error fetching base class structure:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error fetching base class structure'
+    };
+  }
+}
+
 // Update base class properties
 async function performUpdateBaseClass(baseClassId: string, updates: any, forwardedCookies?: string | null): Promise<any> {
   console.log(`---> UPDATING BASE CLASS ${baseClassId}:`, updates);
@@ -419,6 +474,16 @@ async function performCreatePath(baseClassId: string, title: string, description
 // Update path properties
 async function performUpdatePath(pathId: string, updates: any, forwardedCookies?: string | null): Promise<any> {
   console.log(`---> UPDATING PATH ${pathId}:`, updates);
+  
+  // Validate that pathId is a valid UUID format
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(pathId)) {
+    console.error(`Invalid path ID format: ${pathId}. Path IDs must be valid UUIDs.`);
+    return {
+      success: false,
+      error: `Invalid path ID format: ${pathId}. Path IDs must be valid UUIDs, not module identifiers.`
+    };
+  }
   
   const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   const updateURL = `${baseURL}/api/teach/paths/${pathId}`;
@@ -547,13 +612,23 @@ async function performUpdateLesson(lessonId: string, updates: any, forwardedCook
 
     if (!response.ok) {
       const errorData = await response.json();
+      
+      // Handle specific error cases
+      if (response.status === 500 && errorData.details?.includes('PGRST116')) {
+        return {
+          success: false,
+          error: `Lesson with ID ${lessonId} not found. This lesson may have been deleted or the ID may be incorrect.`,
+          notFound: true
+        };
+      }
+      
       throw new Error(errorData.error || `Failed to update lesson: ${response.status}`);
     }
 
     const result = await response.json();
     return {
       success: true,
-      message: `Lesson updated successfully`,
+      message: `Lesson "${result.title || 'Untitled'}" updated successfully`,
       lesson: result
     };
   } catch (error) {
@@ -910,7 +985,15 @@ ${context.components?.map(comp => {
     analysis += `Navigation showing class structure`;
     if (comp.content.baseClassName) analysis += ` for "${comp.content.baseClassName}"`;
     if (comp.content.paths) {
-      analysis += ` with ${comp.content.paths.length} paths: ${comp.content.paths.map((p: any) => p.title).join(', ')}`;
+      const totalLessons = comp.content.paths.reduce((acc: number, path: any) => acc + (path.lessons?.length || 0), 0);
+      analysis += ` with ${comp.content.paths.length} paths and ${totalLessons} total lessons`;
+      
+      // Add detailed path and lesson information
+      const pathDetails = comp.content.paths.map((path: any) => {
+        const lessonCount = path.lessons?.length || 0;
+        return `"${path.title}" (${lessonCount} lessons)`;
+      }).join(', ');
+      analysis += `. Paths: ${pathDetails}`;
     }
   } else if (comp.type === 'content-editor' && comp.content) {
     analysis += `Editor for ${comp.content.editorType}`;
@@ -953,12 +1036,27 @@ ${(() => {
     if (comp.content?.selectedItemId && comp.content?.selectedItemType === 'lesson') {
       ids.push(`Selected Lesson ID: ${comp.content.selectedItemId}`);
     }
+    if (comp.content?.selectedItemId && comp.content?.selectedItemType === 'path') {
+      ids.push(`Selected Path ID: ${comp.content.selectedItemId}`);
+    }
     if (comp.content?.itemData?.id && comp.type === 'content-editor') {
       ids.push(`Editor Item ID: ${comp.content.itemData.id}`);
     }
     // Extract base class IDs
     if (comp.content?.baseClassId || comp.content?.base_class_id) {
       ids.push(`Base Class ID: ${comp.content.baseClassId || comp.content.base_class_id}`);
+    }
+    // Extract path IDs and lesson IDs from navigation tree
+    if (comp.type === 'navigation-tree' && comp.content?.paths) {
+      comp.content.paths.forEach((path: any) => {
+        ids.push(`Path "${path.title}": ${path.id}`);
+        // Extract lesson IDs from each path
+        if (path.lessons && Array.isArray(path.lessons)) {
+          path.lessons.forEach((lesson: any) => {
+            ids.push(`Lesson "${lesson.title}" (in ${path.title}): ${lesson.id}`);
+          });
+        }
+      });
     }
   });
   return ids.length > 0 ? ids.join(', ') : 'No specific IDs detected in current context';
@@ -1053,6 +1151,32 @@ Analyze the current UI context to determine the appropriate level of educational
 3. **Actionable Recommendations**: Provide concrete, implementable suggestions
 4. **Pedagogical Rationale**: Briefly explain why each suggestion improves learning
 5. **Prioritized Suggestions**: Order recommendations by impact and feasibility
+
+### CRITICAL: ID Usage Rules
+
+**Path IDs:**
+**NEVER create or assume path IDs by appending suffixes to base class IDs.** Path IDs are unique UUIDs that must be extracted from the current UI context. 
+
+- ❌ WRONG: Using IDs like "baseClassId_module_1" or "baseClassId_module_2"
+- ✅ CORRECT: Using actual path IDs from the navigation tree context (e.g., "a9f0dd67-d510-4fcd-8809-2989fe96aaa4")
+
+**When updating paths:**
+1. Only use path IDs that are explicitly provided in the "Available Context IDs for Tools" section
+2. If you cannot find the specific path ID you need, ask the user to select the path first
+3. Course outline modules are NOT the same as existing paths - they are suggestions for new content structure
+
+**Lesson IDs:**
+**ONLY use lesson IDs that are explicitly visible in the current UI context.** Do not assume lesson IDs exist based on course structure or module names.
+
+- ❌ WRONG: Assuming lesson IDs exist for all modules in a course outline
+- ✅ CORRECT: Only updating lessons whose IDs are explicitly shown in the navigation tree or current context
+
+**When updating multiple lessons:**
+1. First check if lesson IDs are available in the "Available Context IDs for Tools" section
+2. If lesson IDs are not visible in the current context, use the fetchBaseClassStructure tool to get all lesson IDs
+3. Verify each lesson ID exists before attempting updates
+4. If some lesson IDs fail, acknowledge the successful updates and explain which ones failed
+5. Use the fetchBaseClassStructure tool when the user asks to update "all lessons" or lessons across multiple modules
 
 ### Content Quality Standards:
 - **Evidence-Based**: Ground suggestions in established educational research
@@ -1165,6 +1289,18 @@ function extractCitationsFromToolResults(toolResults: any[]): { id: string; titl
           if (id && title) {
             citations.push({ id, title, url });
           }
+        }
+      }
+      
+      // For fetch base class structure tool results
+      if (toolResult.type === 'function' && toolResult.name === 'fetchBaseClassStructure') {
+        const fetchResult = toolResult.args;
+        if (fetchResult?.success && fetchResult?.baseClass) {
+          citations.push({
+            id: fetchResult.baseClass.id,
+            title: `Base Class Structure: ${fetchResult.baseClass.name || 'Class'} (${fetchResult.allLessonIds?.length || 0} lessons)`,
+            url: undefined
+          });
         }
       }
       
@@ -1398,6 +1534,20 @@ export async function POST(request: Request) {
       {
         type: "function",
         function: {
+          name: "fetchBaseClassStructure",
+          description: "Fetch the complete structure of a base class including all paths and lesson IDs. Use this when you need to access lesson IDs that aren't visible in the current UI context.",
+          parameters: {
+            type: "object",
+            properties: {
+              baseClassId: { type: "string", description: "The ID of the base class to fetch. Extract from UI context." }
+            },
+            required: ["baseClassId"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
           name: "updateBaseClass",
           description: "Update specific properties of a base class (name, description, subject, grade level, etc.).",
           parameters: {
@@ -1434,11 +1584,11 @@ export async function POST(request: Request) {
         type: "function",
         function: {
           name: "updatePath",
-          description: "Update specific properties of a learning path (title, description, etc.).",
+          description: "Update specific properties of a learning path (title, description, etc.). CRITICAL: Only use actual path IDs from the UI context, never create IDs by appending suffixes to base class IDs.",
           parameters: {
             type: "object",
             properties: {
-              pathId: { type: "string", description: "The ID of the path to update. Extract from UI context." },
+              pathId: { type: "string", description: "The exact UUID of the path to update. Must be extracted from the 'Available Context IDs for Tools' section. NEVER use constructed IDs like 'baseClassId_module_X'." },
               title: { type: "string", description: "New title for the path (optional)" },
               description: { type: "string", description: "New description (optional)" }
             },
@@ -1482,11 +1632,11 @@ export async function POST(request: Request) {
         type: "function",
         function: {
           name: "updateLesson",
-          description: "Update specific properties of a lesson (title, description, etc.). Note: objectives should be included in the description field.",
+          description: "Update specific properties of a lesson (title, description, etc.). IMPORTANT: Only use lesson IDs that are explicitly visible in the current UI context. If updating multiple lessons, be aware that some lesson IDs may not exist.",
           parameters: {
             type: "object",
             properties: {
-              lessonId: { type: "string", description: "The ID of the lesson to update. Extract from UI context." },
+              lessonId: { type: "string", description: "The exact ID of the lesson to update. Must be extracted from the current UI context - do not assume or construct lesson IDs." },
               title: { type: "string", description: "New title for the lesson (optional)" },
               description: { type: "string", description: "New description including any learning objectives (optional)" }
             },
@@ -1623,6 +1773,8 @@ export async function POST(request: Request) {
                 result = await performCourseOutlineGeneration(functionArgs.prompt, functionArgs.gradeLevel, functionArgs.lengthInWeeks, forwardedCookies);
               } else if (functionName === 'addLessonSection') {
                 result = await performAddLessonSection(functionArgs.lessonId, functionArgs.title, functionArgs.contentDescription, functionArgs.sectionType, functionArgs.orderIndex, forwardedCookies);
+              } else if (functionName === 'fetchBaseClassStructure') {
+                result = await performFetchBaseClassStructure(functionArgs.baseClassId, forwardedCookies);
               } else if (functionName === 'updateBaseClass') {
                 result = await performUpdateBaseClass(functionArgs.baseClassId, functionArgs, forwardedCookies);
               } else if (functionName === 'createPath') {

@@ -10,7 +10,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "deploy:functions": "npx supabase functions deploy",
+    "deploy:process-document": "npx supabase functions deploy process-document"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^0.0.17",

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, ChangeEvent, KeyboardEvent } from 'react';
 import { useLunaContext } from '@/hooks/useLunaContext';
 import { useRealTimeUpdates } from '@/hooks/useRealTimeUpdates';
+import { useChatPersistence } from '@/hooks/useChatPersistence';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -108,6 +109,9 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
   const inputRef = useRef<HTMLInputElement>(null);
   const { context, isReady } = useLunaContext();
 
+  // Chat persistence hook
+  const { loadChatHistory, saveChatHistory, clearChatHistory, isLoaded } = useChatPersistence();
+
   // Real-time updates hook
   const { triggerUpdate } = useRealTimeUpdates({
     onUpdate: (event) => {
@@ -136,23 +140,68 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Auto-save messages whenever they change (but not on initial load)
+  useEffect(() => {
+    if (isLoaded && messages.length > 0) {
+      // Don't save if we're just loading persisted messages
+      const isInitialLoad = messages.length === 1 && messages[0].id === 'welcome';
+      if (!isInitialLoad) {
+        saveChatHistory(messages, currentPersona);
+      }
+    }
+  }, [messages, currentPersona, saveChatHistory, isLoaded]);
+
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  // Add initial welcome message
+  // Listen for logout events to clear chat history
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([{
-        id: 'welcome',
-        role: 'assistant',
-        content: getWelcomeMessage(currentPersona),
-        timestamp: new Date(),
-        persona: currentPersona
-      }]);
+    const handleLogout = () => {
+      clearChatHistory();
+      setMessages([]);
+      messageHistory.current = [];
+    };
+
+    // Listen for custom logout events
+    window.addEventListener('user-logout', handleLogout);
+    
+    return () => {
+      window.removeEventListener('user-logout', handleLogout);
+    };
+  }, [clearChatHistory]);
+
+  // Load persisted chat history and add welcome message if needed
+  useEffect(() => {
+    if (isLoaded && messages.length === 0) {
+      const { messages: persistedMessages, persona: persistedPersona } = loadChatHistory();
+      
+      if (persistedMessages.length > 0) {
+        // Load persisted messages
+        setMessages(persistedMessages);
+        
+        // Update persona if it was persisted and different from default
+        if (persistedPersona && persistedPersona !== currentPersona) {
+          setCurrentPersona(persistedPersona);
+        }
+        
+        // Rebuild message history for API calls
+        messageHistory.current = persistedMessages
+          .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+          .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
+      } else {
+        // No persisted messages, add welcome message
+        const welcomeMessage: ChatMessage = {
+          id: 'welcome',
+          role: 'assistant',
+          content: getWelcomeMessage(currentPersona),
+          timestamp: new Date(),
+          persona: currentPersona
+        };
+        setMessages([welcomeMessage]);
+      }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run only once on mount
+  }, [isLoaded, loadChatHistory, currentPersona, messages.length]); // Added dependencies
 
   useEffect(() => {
     // When userRole prop changes (e.g., if AppShell re-renders with a different role for some reason),
@@ -242,23 +291,27 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
 
   const handlePersonaChange = (persona: PersonaType) => {
     setCurrentPersona(persona);
-    setMessages(prev => [
-      ...prev,
+    const newMessages = [
+      ...messages,
       {
         id: uuidv4(),
-        role: 'system', // Use system role for persona change notification
+        role: 'system' as const, // Use system role for persona change notification
         content: `Switched to ${availablePersonas.find(p => p.id === persona)?.name ?? 'assistant'} mode.`,
         timestamp: new Date(),
       },
       {
         id: uuidv4(),
-        role: 'assistant',
+        role: 'assistant' as const,
         content: getWelcomeMessage(persona),
         timestamp: new Date(),
         persona
       }
-    ]);
+    ];
+    setMessages(newMessages);
     messageHistory.current = []; // Clear history on persona change
+    
+    // Save the updated messages with new persona
+    saveChatHistory(newMessages, persona);
   };
   
   const handleSendMessage = async () => {
@@ -528,7 +581,7 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
   const formatMessageContent = (content: string) => {
     // This is a placeholder - ideally use a markdown parser like react-markdown
     return content.split('\n').map((line, i) => (
-      <p key={i} className={i > 0 ? 'mt-2' : ''}>
+      <p key={i} className={`${i > 0 ? 'mt-2' : ''} break-words text-wrap overflow-hidden`}>
         {line}
       </p>
     ));
@@ -591,9 +644,9 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
                     </div>
                   ) : (
                   <div 
-                      className={`max-w-[85%] rounded-lg p-3 ${ message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground' } ${message.isLoading ? 'opacity-50 pointer-events-none' : ''}`}
+                      className={`max-w-[92%] min-w-0 rounded-lg p-3 overflow-hidden ${ message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground' } ${message.isLoading ? 'opacity-50 pointer-events-none' : ''}`}
                   >
-                  <div className="text-sm">
+                  <div className="text-sm min-w-0 overflow-hidden">
                       {message.isLoading ? (
                         <div className="flex space-x-1.5">
                           <div className="h-2 w-2 rounded-full bg-current animate-bounce"></div>
@@ -611,9 +664,9 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
                   
                     {/* Render Action Buttons (Displayed below content/outline) */}
                     {message.actions && message.actions.length > 0 && (
-                      <div className="mt-3 pt-2 border-t border-muted-foreground/20 flex flex-wrap gap-2">
+                      <div className="mt-3 pt-2 border-t border-muted-foreground/20 flex flex-wrap gap-2 min-w-0 overflow-hidden">
                         {message.actions.map((action, index) => (
-                          <Button key={index} size="sm" variant="outline" onClick={action.action} disabled={isLoading}>
+                          <Button key={index} size="sm" variant="outline" onClick={action.action} disabled={isLoading} className="text-xs px-2 py-1 break-words">
                             {action.label}
                           </Button>
                         ))}
@@ -622,22 +675,22 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
 
                     {/* Citations (Displayed below content/outline and actions) */}
                   {message.citations && message.citations.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-muted-foreground/20 text-xs">
-                      <p className="font-semibold mb-1">Sources:</p>
+                    <div className="mt-2 pt-2 border-t border-muted-foreground/20 text-xs min-w-0 overflow-hidden">
+                      <p className="font-semibold mb-1 break-words text-wrap">Sources:</p>
                       <div className="flex flex-wrap gap-1">
                         {message.citations.map((citation) => (
                           <Badge 
                             key={citation.id} 
                             variant="outline"
-                            className="flex items-center gap-1 text-xs"
+                            className="flex items-center gap-1 text-xs break-words max-w-full"
                           >
-                            {citation.title}
+                            <span className="break-words text-wrap">{citation.title}</span>
                             {citation.url && (
                               <a 
                                 href={citation.url} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="inline-flex"
+                                className="inline-flex flex-shrink-0"
                               >
                                 <ExternalLink size={10} />
                               </a>
@@ -660,7 +713,7 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
             })}
             {error && (
               <div className="flex justify-start">
-                <div className="p-3 rounded-lg bg-destructive text-destructive-foreground max-w-[80%]">
+                <div className="p-3 rounded-lg bg-destructive text-destructive-foreground max-w-[92%]">
                   {error}
                 </div>
               </div>

@@ -99,49 +99,153 @@ async function extractTextFromPdf(filePath: string, supabase: SupabaseClient, bu
 
 async function extractTextFromUrl(url: string): Promise<string> {
   console.log(`Attempting to scrape content from URL: ${url}`);
-  try {
-    const response = await fetch(url, {
-      headers: {
-        // Try to mimic a browser to avoid simple bot blocks
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
+  
+  // Try multiple strategies to fetch the URL
+  const strategies = [
+    // Strategy 1: Standard fetch with browser-like headers
+    {
+      name: 'Standard Browser Headers',
+      options: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'DNT': '1',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+        }
       }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch URL ${url}. Status: ${response.status}`);
+    },
+    // Strategy 2: Simplified headers
+    {
+      name: 'Simplified Headers',
+      options: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; LearnologyAI/1.0; +https://learnologyai.com)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        }
+      }
+    },
+    // Strategy 3: Minimal headers
+    {
+      name: 'Minimal Headers',
+      options: {
+        headers: {
+          'User-Agent': 'LearnologyAI-Bot/1.0',
+        }
+      }
     }
+  ];
 
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('text/html')) {
-      console.warn(`URL ${url} did not return HTML. Content-Type: ${contentType}. Attempting to read as text anyway.`);
-      // Potentially handle other text types or throw error if binary
+  let lastError: Error | null = null;
+
+  for (const strategy of strategies) {
+    try {
+      console.log(`Trying strategy: ${strategy.name} for URL: ${url}`);
+      
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const response = await fetch(url, {
+        ...strategy.options,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      console.log(`Content-Type: ${contentType}`);
+      
+      if (!contentType || !contentType.includes('text/html')) {
+        console.warn(`URL ${url} did not return HTML. Content-Type: ${contentType}. Attempting to read as text anyway.`);
+      }
+
+      const html = await response.text();
+      console.log(`Successfully fetched ${html.length} characters of HTML from ${url}`);
+
+      // Enhanced HTML to text conversion
+      let text = html;
+      
+      // Remove script and style blocks
+      text = text.replace(/<script[^>]*>.*?<\/script>/gis, '');
+      text = text.replace(/<style[^>]*>.*?<\/style>/gis, '');
+      text = text.replace(/<noscript[^>]*>.*?<\/noscript>/gis, '');
+      
+      // Remove comments
+      text = text.replace(/<!--.*?-->/gs, '');
+      
+      // Convert common HTML entities
+      text = text.replace(/&nbsp;/g, ' ');
+      text = text.replace(/&amp;/g, '&');
+      text = text.replace(/&lt;/g, '<');
+      text = text.replace(/&gt;/g, '>');
+      text = text.replace(/&quot;/g, '"');
+      text = text.replace(/&#39;/g, "'");
+      
+      // Remove all HTML tags, replacing with space
+      text = text.replace(/<[^>]+>/g, ' ');
+      
+      // Clean up whitespace
+      text = text.replace(/\s+/g, ' ');
+      text = text.trim();
+
+      if (!text || text.length < 50) {
+        console.warn(`Extracted very little text from URL: ${url}. Text length: ${text.length}. HTML length was ${html.length}.`);
+        if (text.length === 0) {
+          throw new Error('No readable text content found on the page');
+        }
+      }
+      
+      console.log(`Successfully scraped ~${text.length} characters from ${url} using strategy: ${strategy.name}`);
+      console.log(`First 200 characters: ${text.substring(0, 200)}...`);
+      return text;
+      
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.warn(`Strategy "${strategy.name}" failed for ${url}:`, lastError.message);
+      
+      // If this is an abort error, it was a timeout
+      if (lastError.name === 'AbortError') {
+        console.warn(`Request timed out after 30 seconds for ${url}`);
+      }
+      
+      // Continue to next strategy
+      continue;
     }
-
-    const html = await response.text();
-
-    // Basic HTML to text conversion (very naive)
-    // A more robust solution would use a proper HTML parsing library and content extraction (like Readability.js)
-    // For Deno, one might need to find or adapt such a library.
-    // This regex approach is a simple starting point and will miss a lot of nuances.
-    let text = html.replace(/<style[^>]*>.*?<\/style>/gis, ''); // Remove style blocks
-    text = text.replace(/<script[^>]*>.*?<\/script>/gis, ''); // Remove script blocks
-    text = text.replace(/<[^>]+>/g, ' '); // Remove all other tags, replacing with space
-    text = text.replace(/\s\s+/g, ' '); // Collapse multiple spaces
-    text = text.trim();
-
-    if (!text) {
-      console.warn(`Extracted empty text from URL: ${url}. HTML length was ${html.length}.`);
-      // Consider returning a snippet of raw HTML or a specific error message if text is critical
-    }
-    
-    console.log(`Successfully scraped ~${text.length} characters from ${url}. (First 100: ${text.substring(0,100)}...)`);
-    return text;
-  } catch (error) {
-    console.error(`Error scraping URL ${url}:`, error instanceof Error ? error.message : String(error));
-    throw new Error(`Failed to extract text from URL ${url}: ${error instanceof Error ? error.message : String(error)}`);
   }
+
+  // All strategies failed
+  const errorMessage = `Failed to extract text from URL ${url} after trying ${strategies.length} different approaches. Last error: ${lastError?.message || 'Unknown error'}`;
+  console.error(errorMessage);
+  
+  // Provide helpful error message based on the type of error
+  let userFriendlyMessage = `Unable to access the website at ${url}. `;
+  
+  if (lastError?.message.includes('timeout') || lastError?.name === 'AbortError') {
+    userFriendlyMessage += 'The website took too long to respond (timeout after 30 seconds).';
+  } else if (lastError?.message.includes('HTTP 403') || lastError?.message.includes('HTTP 401')) {
+    userFriendlyMessage += 'The website is blocking automated access (403/401 error).';
+  } else if (lastError?.message.includes('HTTP 404')) {
+    userFriendlyMessage += 'The page was not found (404 error). Please check the URL.';
+  } else if (lastError?.message.includes('HTTP 500') || lastError?.message.includes('HTTP 502') || lastError?.message.includes('HTTP 503')) {
+    userFriendlyMessage += 'The website is experiencing server issues. Please try again later.';
+  } else if (lastError?.message.includes('SSL') || lastError?.message.includes('TLS') || lastError?.message.includes('certificate')) {
+    userFriendlyMessage += 'There was an SSL/security certificate issue with the website.';
+  } else if (lastError?.message.includes('network') || lastError?.message.includes('connection')) {
+    userFriendlyMessage += 'There was a network connectivity issue.';
+  } else {
+    userFriendlyMessage += 'The website may be blocking automated access or experiencing technical issues.';
+  }
+  
+  userFriendlyMessage += '\n\nSuggestions:\n• Verify the URL is correct and publicly accessible\n• Try again in a few minutes\n• Contact the website owner if the issue persists\n• Consider copying and pasting the content manually as a text file';
+  
+  throw new Error(userFriendlyMessage);
 }
 
 async function extractTranscriptFromYouTube(url: string): Promise<{ transcript?: string; error?: boolean; message?: string }> {
