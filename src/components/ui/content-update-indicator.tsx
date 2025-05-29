@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, CheckCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, AlertCircle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ContentUpdateIndicatorProps {
@@ -8,13 +8,17 @@ interface ContentUpdateIndicatorProps {
   status: 'updating' | 'success' | 'error';
   message?: string;
   className?: string;
+  entity?: string;
+  entityName?: string;
 }
 
 export const ContentUpdateIndicator: React.FC<ContentUpdateIndicatorProps> = ({
   isVisible,
   status,
   message,
-  className
+  className,
+  entity,
+  entityName
 }) => {
   const getIcon = () => {
     switch (status) {
@@ -39,17 +43,30 @@ export const ContentUpdateIndicator: React.FC<ContentUpdateIndicatorProps> = ({
   const getStatusColor = () => {
     switch (status) {
       case 'updating':
-        return 'border-blue-200 bg-blue-50 text-blue-700';
+        return 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300';
       case 'success':
-        return 'border-green-200 bg-green-50 text-green-700';
+        return 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300';
       case 'error':
-        return 'border-red-200 bg-red-50 text-red-700';
+        return 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300';
       default:
-        return 'border-gray-200 bg-gray-50 text-gray-700';
+        return 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300';
     }
   };
 
   const getDefaultMessage = () => {
+    if (entity && entityName) {
+      switch (status) {
+        case 'updating':
+          return `Luna is updating ${entity}: ${entityName}...`;
+        case 'success':
+          return `${entity.charAt(0).toUpperCase() + entity.slice(1)} "${entityName}" updated successfully!`;
+        case 'error':
+          return `Failed to update ${entity}: ${entityName}`;
+        default:
+          return '';
+      }
+    }
+    
     switch (status) {
       case 'updating':
         return 'Luna is updating content...';
@@ -73,13 +90,13 @@ export const ContentUpdateIndicator: React.FC<ContentUpdateIndicatorProps> = ({
           className={cn(
             "fixed top-4 left-1/2 transform -translate-x-1/2 z-50",
             "flex items-center gap-2 px-4 py-2 rounded-lg border shadow-lg",
-            "backdrop-blur-sm",
+            "backdrop-blur-sm max-w-md",
             getStatusColor(),
             className
           )}
         >
           {getIcon()}
-          <span className="text-sm font-medium">
+          <span className="text-sm font-medium truncate">
             {message || getDefaultMessage()}
           </span>
           
@@ -107,6 +124,30 @@ export const ContentUpdateIndicator: React.FC<ContentUpdateIndicatorProps> = ({
         </motion.div>
       )}
     </AnimatePresence>
+  );
+};
+
+// Component to add a subtle pulse animation to updated content
+export const UpdatedContentWrapper: React.FC<{
+  children: React.ReactNode;
+  isUpdated: boolean;
+  className?: string;
+}> = ({ children, isUpdated, className }) => {
+  return (
+    <motion.div
+      className={className}
+      animate={isUpdated ? {
+        scale: [1, 1.02, 1],
+        boxShadow: [
+          "0 0 0 0 rgba(59, 130, 246, 0)",
+          "0 0 0 4px rgba(59, 130, 246, 0.1)",
+          "0 0 0 0 rgba(59, 130, 246, 0)"
+        ]
+      } : {}}
+      transition={{ duration: 0.6, ease: "easeOut" }}
+    >
+      {children}
+    </motion.div>
   );
 };
 

@@ -66,6 +66,13 @@ export interface ChatMessage {
   persona?: PersonaType; // Track which persona generated the message
   // Specific data payloads for different message types
   citations?: Citation[];
+  actionButtons?: Array<{ 
+    id: string; 
+    label: string; 
+    action: 'confirm' | 'deny' | 'select' | 'navigate' | 'complete' | 'cancel' | 'skip' | 'edit'; 
+    data: Record<string, any>; 
+    style: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' 
+  }>; // Dynamic action buttons from Luna
   isLoading?: boolean;
   isOutline?: boolean; // Flag to indicate this message contains an outline
   outlineData?: GeneratedCourseOutline; // The actual outline data
@@ -314,13 +321,37 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
     saveChatHistory(newMessages, persona);
   };
   
-  const handleSendMessage = async () => {
-    if (!userMessage.trim() || isLoading || (currentUserRole === 'student' && !isReady)) return; // Student needs context ready
+  const handleSendMessage = async (overrideMessage?: string, overrideButtonData?: any) => {
+    // Use override message if provided, otherwise use the input field
+    const currentInput = overrideMessage || userMessage.trim();
     
-    const currentInput = userMessage.trim();
-    const userMsg: ChatMessage = { id: uuidv4(), role: 'user', content: currentInput, timestamp: new Date() };
+    if (!currentInput || isLoading || (currentUserRole === 'student' && !isReady)) return; // Student needs context ready
+    
+    // Parse message if it's a button response
+    let actualMessage = currentInput;
+    let parsedButtonData = overrideButtonData;
+    
+    // Only try to parse JSON if no override button data was provided
+    if (!overrideButtonData) {
+      try {
+        const parsed = JSON.parse(currentInput);
+        if (parsed.text && parsed.buttonData) {
+          actualMessage = parsed.text;
+          parsedButtonData = parsed.buttonData;
+        }
+      } catch {
+        // Not a JSON message, use as-is
+      }
+    }
+    
+    const userMsg: ChatMessage = { id: uuidv4(), role: 'user', content: actualMessage, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
-    setUserMessage('');
+    
+    // Only clear the input field if we're not using an override message (i.e., if this is from the input field)
+    if (!overrideMessage) {
+      setUserMessage('');
+    }
+    
     setIsLoading(true);
     setError(null);
     
@@ -331,11 +362,25 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
       let assistantResponse: ChatMessage;
 
       // --- All Personas Use Luna Chat API --- 
-      messageHistory.current.push({ role: 'user', content: currentInput });
+      messageHistory.current.push({ role: 'user', content: actualMessage });
+      
+      // Prepare request body
+      const requestBody: any = {
+        message: actualMessage,
+        context,
+        messages: messageHistory.current,
+        persona: currentPersona
+      };
+      
+      // Include button data if available
+      if (parsedButtonData) {
+        requestBody.buttonData = parsedButtonData;
+      }
+      
       const response = await fetch('/api/luna/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: currentInput, context, messages: messageHistory.current, persona: currentPersona }), // Pass persona to backend
+        body: JSON.stringify(requestBody),
       });
 
       let data;
@@ -363,6 +408,7 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
         timestamp: new Date(),
         persona: currentPersona,
         citations: data.citations || [],
+        actionButtons: data.actionButtons || [],
         isOutline: data.isOutline || false,
         outlineData: data.outlineData || undefined,
         // Add action buttons for course outlines
@@ -554,27 +600,24 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
 
   // --- Voice Recording Placeholder --- 
   const toggleRecording = () => {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      alert('Your browser does not support voice recording');
-      return;
-    }
+    // Voice recording functionality would go here
+    setIsRecording(!isRecording);
+    // Add voice recording logic
+    // Once audio is captured, append it to the user message
+    // For now, just toggle the state
+  };
 
-    if (isRecording) {
-      setIsRecording(false);
-      // Stop recording logic would go here
-    } else {
-      setIsRecording(true);
-      // Start recording logic would go here
-      navigator.mediaDevices.getUserMedia({ audio: true })
-        .then((stream) => {
-          // Voice recording implementation would go here
-          console.log('Recording started', stream);
-        })
-        .catch((err) => {
-          console.error('Error accessing microphone:', err);
-          setIsRecording(false);
-        });
-    }
+  // Handle action button clicks
+  const handleActionButtonClick = async (button: { id: string; label: string; action: string; data: Record<string, any> }) => {
+    // Create a message that includes the button data
+    const buttonResponse = `[Action: ${button.action}] ${button.label}`;
+    
+    // Send the button response directly with the button data
+    await handleSendMessage(buttonResponse, {
+      buttonAction: button.action,
+      buttonId: button.id,
+      ...button.data
+    });
   };
 
   // --- Message Formatting --- 
@@ -661,6 +704,45 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
                         )
                       )}
                   </div>
+                  
+                    {/* Render Dynamic Action Buttons from Luna */}
+                    {message.actionButtons && message.actionButtons.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {message.actionButtons.map((button) => {
+                          const getButtonVariant = (style: string) => {
+                            switch (style) {
+                              case 'primary': return 'default';
+                              case 'secondary': return 'secondary';
+                              case 'success': return 'default';
+                              case 'warning': return 'secondary';
+                              case 'danger': return 'destructive';
+                              default: return 'secondary';
+                            }
+                          };
+
+                          const getButtonClassName = (style: string) => {
+                            switch (style) {
+                              case 'success': return 'bg-green-600 hover:bg-green-700 text-white';
+                              case 'warning': return 'bg-yellow-600 hover:bg-yellow-700 text-white';
+                              default: return '';
+                            }
+                          };
+
+                          return (
+                            <Button
+                              key={button.id}
+                              variant={getButtonVariant(button.style)}
+                              size="sm"
+                              onClick={() => handleActionButtonClick(button)}
+                              disabled={isLoading}
+                              className={`transition-all duration-200 hover:scale-105 ${getButtonClassName(button.style)}`}
+                            >
+                              {button.label}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
                   
                     {/* Render Action Buttons (Displayed below content/outline) */}
                     {message.actions && message.actions.length > 0 && (
@@ -763,7 +845,7 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
           />
           
           <Button 
-            onClick={handleSendMessage} 
+            onClick={() => handleSendMessage()} 
             disabled={isLoading || !isReady || !userMessage.trim() || isRecording}
             className="h-10 w-10 rounded-full flex-shrink-0 p-0"
           >

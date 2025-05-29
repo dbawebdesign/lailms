@@ -2,7 +2,9 @@
 
 import React, { useState } from 'react';
 import type { StudioBaseClass, Path, Lesson, LessonSection } from '@/types/lesson';
-import { ChevronRight, ChevronDown, FileText, GripVertical, Info as InfoIcon } from 'lucide-react';
+import { ChevronRight, ChevronDown, FileText, GripVertical, Info as InfoIcon, FoldVertical, UnfoldVertical } from 'lucide-react';
+import { UpdatedContentWrapper } from '@/components/ui/content-update-indicator';
+import { Button } from '@/components/ui/button';
 
 // NEW: DND Kit imports
 import {
@@ -35,6 +37,8 @@ interface StudioNavigationTreeProps {
   onReorderLessons: (pathId: string, activeLessonId: string, overLessonId: string) => Promise<void>;
   // NEW: Prop for reordering sections
   onReorderSections: (lessonId: string, activeSectionId: string, overSectionId: string) => Promise<void>;
+  // NEW: Prop for recently updated items
+  recentlyUpdatedItems?: Set<string>;
 }
 
 // NEW: SortableItem component for Paths
@@ -50,6 +54,7 @@ const SortablePathItem: React.FC<{
   onReorderLessons: (pathId: string, activeLessonId: string, overLessonId: string) => Promise<void>;
   onReorderSections: (lessonId: string, activeSectionId: string, overSectionId: string) => Promise<void>; // Pass down
   expandedLessons: Set<string>; // To manage lesson expansion state
+  recentlyUpdatedItems?: Set<string>; // NEW: For visual feedback
 }> = ({ 
   path, 
   isExpanded, 
@@ -60,7 +65,8 @@ const SortablePathItem: React.FC<{
   onToggleExpandLesson,
   onReorderLessons,
   onReorderSections,
-  expandedLessons
+  expandedLessons,
+  recentlyUpdatedItems
 }) => {
   const { 
     attributes,
@@ -90,62 +96,67 @@ const SortablePathItem: React.FC<{
     }
   };
 
+  const isRecentlyUpdated = recentlyUpdatedItems?.has(path.id) || false;
+
   return (
-    <li ref={setNodeRef} style={style} className="py-0.5 bg-background rounded-md shadow-sm mb-1 list-none">
-      <div className="flex items-center justify-between hover:bg-muted/50 rounded-t-md">
-        <div className="flex items-center flex-grow">
-          <button 
-            {...attributes} 
-            {...listeners} 
-            className="p-2 cursor-grab touch-none text-muted-foreground hover:text-foreground"
-            aria-label="Drag to reorder path"
-          >
-            <GripVertical size={18} />
-          </button>
-          <div 
-            className={`flex-grow text-md cursor-pointer p-2 ${selectedItemId === path.id ? 'bg-primary/20 text-primary font-medium' : 'hover:bg-muted/80'}`}
-            onClick={() => onSelectItem('path', path)}
-          >
-            {path.title}
+    <UpdatedContentWrapper isUpdated={isRecentlyUpdated}>
+      <li ref={setNodeRef} style={style} className="py-0.5 bg-background rounded-md shadow-sm mb-1 list-none">
+        <div className="flex items-center justify-between hover:bg-muted/50 rounded-t-md">
+          <div className="flex items-center flex-grow">
+            <button 
+              {...attributes} 
+              {...listeners} 
+              className="p-2 cursor-grab touch-none text-muted-foreground hover:text-foreground"
+              aria-label="Drag to reorder path"
+            >
+              <GripVertical size={18} />
+            </button>
+            <div 
+              className={`flex-grow text-md cursor-pointer p-2 ${selectedItemId === path.id ? 'bg-primary/20 text-primary font-medium' : 'hover:bg-muted/80'}`}
+              onClick={() => onSelectItem('path', path)}
+            >
+              {path.title}
+            </div>
           </div>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePathHeaderClick(path);
+            }}
+            className="p-1 rounded hover:bg-muted-foreground/20 focus:outline-none mr-2"
+            aria-label={isExpanded ? 'Collapse path' : 'Expand path'}
+          >
+            {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+          </button>
         </div>
-        <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            handlePathHeaderClick(path);
-          }}
-          className="p-1 rounded hover:bg-muted-foreground/20 focus:outline-none mr-2"
-          aria-label={isExpanded ? 'Collapse path' : 'Expand path'}
-        >
-          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-        </button>
-      </div>
-      {isExpanded && (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndLessons}>
-          <SortableContext items={lessons.map(l => l.id)} strategy={verticalListSortingStrategy}>
-            <ul className="pl-3 mt-1 space-y-0.5 border-l border-border ml-2">
-              {lessons.map((lesson) => (
-                <SortableLessonItem
-                  key={lesson.id}
-                  lesson={lesson}
-                  pathId={path.id} // Pass pathId for context if needed by SortableLessonItem or its interactions
-                  isExpanded={expandedLessons.has(lesson.id)}
-                  selectedItemId={selectedItemId}
-                  onSelectItem={onSelectItem as (type: string, itemData: Lesson | LessonSection) => void}
-                  handleLessonHeaderClick={onToggleExpandLesson} // Pass the main toggle handler
-                  onReorderSections={onReorderSections}
-                  expandedSections={new Set()} // Placeholder for when sections are sortable
-                  onToggleExpandSection={() => {}} // Placeholder
-                />
-              ))}
-              {lessons.length === 0 && (
-                <p className="pl-1 pt-1 text-xs text-muted-foreground">No lessons in this path yet, or still loading.</p>
-              )}
-            </ul>
-          </SortableContext>
-        </DndContext>
-      )}
-    </li>
+        {isExpanded && (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndLessons}>
+            <SortableContext items={lessons.map(l => l.id)} strategy={verticalListSortingStrategy}>
+              <ul className="pl-3 mt-1 space-y-0.5 border-l border-border ml-2">
+                {lessons.map((lesson) => (
+                  <SortableLessonItem
+                    key={lesson.id}
+                    lesson={lesson}
+                    pathId={path.id} // Pass pathId for context if needed by SortableLessonItem or its interactions
+                    isExpanded={expandedLessons.has(lesson.id)}
+                    selectedItemId={selectedItemId}
+                    onSelectItem={onSelectItem as (type: string, itemData: Lesson | LessonSection) => void}
+                    handleLessonHeaderClick={onToggleExpandLesson} // Pass the main toggle handler
+                    onReorderSections={onReorderSections}
+                    expandedSections={new Set()} // Placeholder for when sections are sortable
+                    onToggleExpandSection={() => {}} // Placeholder
+                    recentlyUpdatedItems={recentlyUpdatedItems}
+                  />
+                ))}
+                {lessons.length === 0 && (
+                  <p className="pl-1 pt-1 text-xs text-muted-foreground">No lessons in this path yet, or still loading.</p>
+                )}
+              </ul>
+            </SortableContext>
+          </DndContext>
+        )}
+      </li>
+    </UpdatedContentWrapper>
   );
 };
 
@@ -162,7 +173,8 @@ const SortableLessonItem: React.FC<{
   // Props for section reordering and expansion (to be added later)
   expandedSections: Set<string>;
   onToggleExpandSection: (section: LessonSection) => void;
-}> = ({ lesson, pathId, isExpanded, selectedItemId, onSelectItem, handleLessonHeaderClick, onReorderSections, expandedSections, onToggleExpandSection }) => {
+  recentlyUpdatedItems?: Set<string>; // NEW: For visual feedback
+}> = ({ lesson, pathId, isExpanded, selectedItemId, onSelectItem, handleLessonHeaderClick, onReorderSections, expandedSections, onToggleExpandSection, recentlyUpdatedItems }) => {
   const { 
     attributes,
     listeners,
@@ -193,58 +205,62 @@ const SortableLessonItem: React.FC<{
     }
   };
 
+  const isRecentlyUpdated = recentlyUpdatedItems?.has(lesson.id) || false;
+
   return (
-    <li ref={setNodeRef} style={style} className="py-0.5 rounded-md mb-0.5 list-none bg-background">
+    <UpdatedContentWrapper isUpdated={isRecentlyUpdated}>
+      <li ref={setNodeRef} style={style} className="py-0.5 rounded-md mb-0.5 list-none bg-background">
         <div className="flex items-center justify-between hover:bg-muted/30 rounded-t-md">
-            <div className="flex items-center flex-grow">
-                <button 
-                    {...attributes} 
-                    {...listeners} 
-                    className="p-1.5 cursor-grab touch-none text-muted-foreground/80 hover:text-foreground"
-                    aria-label="Drag to reorder lesson"
-                >
-                    <GripVertical size={16} />
-                </button>
-                <div 
-                    className={`flex-grow text-sm cursor-pointer p-1.5 ${selectedItemId === lesson.id ? 'bg-accent text-accent-foreground font-medium' : 'hover:bg-muted/60'}`}
-                    onClick={() => onSelectItem('lesson', lesson)}
-                >
-                    {lesson.title}
-                </div>
-            </div>
+          <div className="flex items-center flex-grow">
             <button 
-                onClick={(e) => {
-                    e.stopPropagation();
-                    handleLessonHeaderClick(lesson);
-                }}
-                className="p-1 rounded hover:bg-muted-foreground/20 focus:outline-none mr-1.5"
-                aria-label={isExpanded ? 'Collapse lesson' : 'Expand lesson'}
+              {...attributes} 
+              {...listeners} 
+              className="p-1.5 cursor-grab touch-none text-muted-foreground/80 hover:text-foreground"
+              aria-label="Drag to reorder lesson"
             >
-                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              <GripVertical size={16} />
             </button>
+            <div 
+              className={`flex-grow text-sm cursor-pointer p-1.5 ${selectedItemId === lesson.id ? 'bg-accent text-accent-foreground font-medium' : 'hover:bg-muted/60'}`}
+              onClick={() => onSelectItem('lesson', lesson)}
+            >
+              {lesson.title}
+            </div>
+          </div>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleLessonHeaderClick(lesson);
+            }}
+            className="p-1 rounded hover:bg-muted-foreground/20 focus:outline-none mr-1.5"
+            aria-label={isExpanded ? 'Collapse lesson' : 'Expand lesson'}
+          >
+            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </button>
         </div>
-      {/* Placeholder for rendering sections if lesson is expanded */}
-      {isExpanded && lesson.sections && lesson.sections.length > 0 && (
-        <DndContext sensors={sectionSensors} collisionDetection={closestCenter} onDragEnd={handleDragEndSections}>
-          <SortableContext items={lesson.sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
-            <ul className="pl-3 mt-1 space-y-0.5 border-l border-border ml-1">
-              {lesson.sections.map((section) => (
-                <SortableSectionItem
-                  key={section.id}
-                  section={section}
-                  lessonId={lesson.id}
-                  selectedItemId={selectedItemId}
-                  onSelectItem={onSelectItem}
-                />
-              ))}
-            </ul>
-          </SortableContext>
-        </DndContext>
-      )}
-      {isExpanded && (!lesson.sections || lesson.sections.length === 0) && (
+        {/* Placeholder for rendering sections if lesson is expanded */}
+        {isExpanded && lesson.sections && lesson.sections.length > 0 && (
+          <DndContext sensors={sectionSensors} collisionDetection={closestCenter} onDragEnd={handleDragEndSections}>
+            <SortableContext items={lesson.sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+              <ul className="pl-3 mt-1 space-y-0.5 border-l border-border ml-1">
+                {lesson.sections.map((section) => (
+                  <SortableSectionItem
+                    key={section.id}
+                    section={section}
+                    lessonId={lesson.id}
+                    selectedItemId={selectedItemId}
+                    onSelectItem={onSelectItem}
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
+        )}
+        {isExpanded && (!lesson.sections || lesson.sections.length === 0) && (
           <p className="pl-5 pt-1 text-xs text-muted-foreground">No sections in this lesson yet, or still loading.</p>
-      )}
-    </li>
+        )}
+      </li>
+    </UpdatedContentWrapper>
   );
 };
 
@@ -304,6 +320,7 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
   onReorderPaths,
   onReorderLessons, // This is the main handler for lesson REORDERING
   onReorderSections, // NEW: Main handler for section REORDERING
+  recentlyUpdatedItems,
 }) => {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [expandedLessons, setExpandedLessons] = useState<Set<string>>(new Set());
@@ -360,6 +377,62 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
     }
   };
 
+  // Collapse all and expand all handlers
+  const handleCollapseAll = () => {
+    setExpandedPaths(new Set());
+    setExpandedLessons(new Set());
+  };
+
+  const handleExpandAll = async () => {
+    if (!baseClass.paths) return;
+    
+    // Expand all paths
+    const allPathIds = new Set(baseClass.paths.map(path => path.id));
+    setExpandedPaths(allPathIds);
+    
+    // Fetch lessons for paths that don't have them yet and expand all lessons
+    const allLessonIds = new Set<string>();
+    
+    for (const path of baseClass.paths) {
+      // Fetch lessons if they don't exist
+      if (!path.lessons || path.lessons.length === 0) {
+        await onToggleExpandPath(path.id);
+      }
+      
+      // Add all lesson IDs to be expanded
+      if (path.lessons) {
+        path.lessons.forEach(lesson => {
+          allLessonIds.add(lesson.id);
+          // Fetch sections if they don't exist
+          if (!lesson.sections || lesson.sections.length === 0) {
+            onToggleExpandLesson(lesson.id);
+          }
+        });
+      }
+    }
+    
+    setExpandedLessons(allLessonIds);
+  };
+
+  // Determine if any items are currently expanded
+  const getMostlyExpandedState = () => {
+    if (!baseClass.paths || baseClass.paths.length === 0) return false;
+    
+    // Return true if ANY paths or lessons are expanded
+    return expandedPaths.size > 0 || expandedLessons.size > 0;
+  };
+
+  // Toggle between expand all and collapse all
+  const handleToggleExpandCollapse = async () => {
+    const isMostlyExpanded = getMostlyExpandedState();
+    
+    if (isMostlyExpanded) {
+      handleCollapseAll();
+    } else {
+      await handleExpandAll();
+    }
+  };
+
   return (
     <div className="space-y-1 text-sm">
       {/* Base Class Item - Not sortable */}
@@ -383,6 +456,26 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
         <span>Knowledge Base</span>
       </div>
 
+      {/* Collapse/Expand All Controls */}
+      {baseClass.paths && baseClass.paths.length > 0 && (
+        <div className="flex items-center justify-between px-3 py-2">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Learning Paths
+          </span>
+          <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleExpandCollapse}
+              className="h-7 w-7 p-0 hover:bg-muted/80"
+              title={getMostlyExpandedState() ? "Collapse All Paths" : "Expand All Paths"}
+            >
+              {getMostlyExpandedState() ? <FoldVertical size={14} className="text-muted-foreground" /> : <UnfoldVertical size={14} className="text-muted-foreground" />}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Paths List - Sortable */}
       {baseClass.paths && baseClass.paths.length > 0 && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndPaths}>
@@ -404,6 +497,7 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
                     onReorderLessons={onReorderLessons} // Ensure this is passed
                     onReorderSections={onReorderSections} // Ensure this is passed
                     expandedLessons={expandedLessons} // Ensure this is passed
+                    recentlyUpdatedItems={recentlyUpdatedItems}
                   />
               ))}
             </ul>

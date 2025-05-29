@@ -25,7 +25,7 @@ export async function PATCH(request: NextRequest, { params }: LessonParams) {
     const updates = await request.json();
 
     // Remove any fields that shouldn't be updated directly
-    const allowedFields = ['title', 'description', 'objectives'];
+    const allowedFields = ['title', 'description'];
     const filteredUpdates = Object.keys(updates)
       .filter(key => allowedFields.includes(key))
       .reduce((obj: any, key) => {

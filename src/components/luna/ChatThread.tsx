@@ -4,7 +4,17 @@ import React, { useEffect, useRef } from 'react';
 import { PersonaType } from './PersonaSelector';
 import { useLunaContext } from '@/hooks/useLunaContext';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Bot, User, ExternalLink } from 'lucide-react';
+
+// Action button interface
+interface ActionButton {
+  id: string;
+  label: string;
+  action: 'confirm' | 'deny' | 'select' | 'navigate' | 'complete' | 'cancel' | 'skip' | 'edit';
+  data: Record<string, any>;
+  style: 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
+}
 
 // Message interfaces
 interface Citation {
@@ -19,6 +29,7 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   citations?: Citation[];
+  actionButtons?: ActionButton[];
   isLoading?: boolean;
   persona?: PersonaType;
 }
@@ -27,14 +38,122 @@ interface ChatThreadProps {
   persona: PersonaType;
 }
 
-const ChatThread: React.FC<ChatThreadProps> = ({ persona }) => {
-  const { messages, isLoading } = useLunaContext();
+// Action Buttons Component
+const ActionButtons: React.FC<{ buttons: ActionButton[]; onButtonClick: (button: ActionButton) => void; isLoading: boolean }> = ({ 
+  buttons, 
+  onButtonClick, 
+  isLoading 
+}) => {
+  console.log('[ActionButtons] Rendering with buttons:', {
+    buttonsLength: buttons?.length || 0,
+    buttons: buttons,
+    isLoading
+  });
+
+  if (!buttons || buttons.length === 0) {
+    console.log('[ActionButtons] No buttons to render');
+    return null;
+  }
+
+  const getButtonVariant = (style: ActionButton['style']) => {
+    switch (style) {
+      case 'primary': return 'default';
+      case 'secondary': return 'secondary';
+      case 'success': return 'default';
+      case 'warning': return 'secondary';
+      case 'danger': return 'destructive';
+      default: return 'secondary';
+    }
+  };
+
+  const getButtonClassName = (style: ActionButton['style']) => {
+    switch (style) {
+      case 'success': return 'bg-green-600 hover:bg-green-700 text-white';
+      case 'warning': return 'bg-yellow-600 hover:bg-yellow-700 text-white';
+      default: return '';
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2 mt-3">
+      {/* Temporary debug indicator */}
+      <div className="text-xs text-red-500 bg-red-100 px-2 py-1 rounded">
+        DEBUG: {buttons.length} buttons detected
+      </div>
+      
+      {buttons.map((button) => {
+        const variant = getButtonVariant(button.style);
+        console.log('[ActionButtons] Rendering button:', button);
+        
+        return (
+          <Button
+            key={button.id}
+            variant={variant}
+            size="sm"
+            onClick={() => onButtonClick(button)}
+            disabled={isLoading}
+            className="transition-all duration-200 hover:scale-105"
+          >
+            {button.label}
+          </Button>
+        );
+      })}
+    </div>
+  );
+};
+
+export default function ChatThread({ persona }: ChatThreadProps) {
+  const { messages, sendMessage, isLoading } = useLunaContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Debug: Log messages to see if action buttons are present
+  console.log('[ChatThread] Current messages:', messages.map(msg => ({
+    id: msg.id,
+    role: msg.role,
+    hasActionButtons: !!msg.actionButtons,
+    actionButtonsLength: msg.actionButtons?.length || 0,
+    actionButtons: msg.actionButtons,
+    isLoading: msg.isLoading,
+    contentLength: msg.content?.length || 0
+  })));
+
+  console.log('[ChatThread] Full messages array length:', messages.length);
+  console.log('[ChatThread] Messages with action buttons:', messages.filter(msg => msg.actionButtons && msg.actionButtons.length > 0).length);
+
+  // Check if we have any recent non-loading messages with action buttons
+  const recentMessagesWithButtons = messages.filter(msg => 
+    !msg.isLoading && 
+    msg.actionButtons && 
+    msg.actionButtons.length > 0
+  );
+  console.log('[ChatThread] Recent messages with action buttons:', recentMessagesWithButtons.length, recentMessagesWithButtons);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   // Auto scroll to the bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollToBottom();
   }, [messages]);
+
+  // Handle action button clicks
+  const handleActionButtonClick = async (button: ActionButton) => {
+    // Create a message that includes the button data
+    const buttonResponse = `[Action: ${button.action}] ${button.label}`;
+    
+    // Add the button data to the message context
+    const messageWithButtonData = {
+      text: buttonResponse,
+      buttonData: button.data,
+      buttonAction: button.action,
+      buttonId: button.id
+    };
+
+    // Send the button response as a message
+    // The backend will receive this and can use the button data to continue the workflow
+    await sendMessage(JSON.stringify(messageWithButtonData), persona);
+  };
 
   // Placeholder messages if no real messages yet
   const placeholderMessages: ChatMessage[] = [
@@ -112,6 +231,36 @@ const ChatThread: React.FC<ChatThreadProps> = ({ persona }) => {
                 </div>
               </div>
             )}
+
+            {/* Action Buttons */}
+            {(() => {
+              const hasActionButtons = message.actionButtons && message.actionButtons.length > 0;
+              console.log('[ChatThread] Checking action buttons for message:', {
+                messageId: message.id,
+                role: message.role,
+                hasActionButtons,
+                actionButtonsArray: message.actionButtons,
+                actionButtonsLength: message.actionButtons?.length || 0,
+                isLoading: message.isLoading
+              });
+              
+              if (hasActionButtons) {
+                console.log('[ChatThread] RENDERING action buttons for message:', message.id);
+                return (
+                  <ActionButtons
+                    buttons={message.actionButtons!}
+                    onButtonClick={handleActionButtonClick}
+                    isLoading={isLoading}
+                  />
+                );
+              } else {
+                console.log('[ChatThread] NOT rendering action buttons for message:', message.id, 'Reason:', 
+                  !message.actionButtons ? 'No actionButtons property' : 
+                  message.actionButtons.length === 0 ? 'Empty actionButtons array' : 'Unknown'
+                );
+                return null;
+              }
+            })()}
           </div>
           
           {/* Avatar/Icon for the user */}
@@ -143,6 +292,4 @@ const ChatThread: React.FC<ChatThreadProps> = ({ persona }) => {
       <div ref={messagesEndRef} />
     </div>
   );
-};
-
-export default ChatThread; 
+} 

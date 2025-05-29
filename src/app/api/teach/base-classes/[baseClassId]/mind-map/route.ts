@@ -303,106 +303,54 @@ export async function POST(
     const gradeLevel = (baseClass.settings as any)?.gradeLevel || 'college';
 
     // Generate comprehensive mind map structure using OpenAI
-    const prompt = `# Role and Objective
-You are an expert educational designer creating a comprehensive, master mind map for an entire educational base class. This mind map should provide a complete visual overview of ALL content within the class, including modules, lessons, and key concepts. Your goal is to create a hierarchical, well-organized visualization that shows the full scope and structure of the educational program.
+    const prompt = `Create a comprehensive mind map for this educational base class. Return ONLY valid JSON.
 
-# Content Context
+CONTENT:
 ${comprehensiveContent}
 
-# Critical Design Requirements for Base Class Mind Map
+REQUIREMENTS:
+- Grade level: ${gradeLevel}
+- 5-level hierarchy: Root → Modules → Lessons → Concepts → Details
+- Professional color scheme with semantic meaning
+- Complete coverage of all course content
 
-## Comprehensive Hierarchy & Structure
-1. **Root Node**: Base class name (2-4 words maximum)
-2. **Main Branches**: Course modules/paths (3-8 major learning areas)
-3. **Sub-branches**: Individual lessons within each module (2-6 per module)
-4. **Detail Level**: Key concepts and learning objectives from lessons (1-4 per lesson)
-5. **Micro-details**: Specific topics or skills when content is rich (1-3 per concept)
-6. **Complete Coverage**: Ensure ALL modules and lessons are represented
+STRUCTURE:
+Root: Base class title (2-4 words)
+Main branches: Course modules/paths (3-8 major areas)
+Sub-branches: Individual lessons (2-6 per module)
+Details: Key concepts (1-4 per lesson)
+Micro-details: Specific topics (1-3 per concept)
 
-## Professional Styling Guidelines
-- **Comprehensive**: Include all major content areas and learning objectives
-- **Balanced**: Distribute content evenly across the visual space
-- **Hierarchical**: Clear progression from course overview to specific topics
-- **Educational**: Support understanding of the complete learning journey
-- **Scalable**: Organized to handle extensive content without clutter
+COLORS (use exactly):
+Main: ["#2563EB", "#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#06B6D4", "#84CC16", "#F97316"]
+Sub: ["#3B82F6", "#34D399", "#A78BFA", "#FBBF24", "#F87171", "#22D3EE", "#A3E635", "#FB923C"]
+Detail: ["#60A5FA", "#6EE7B7", "#C4B5FD", "#FCD34D", "#FCA5A5", "#67E8F9", "#BEF264", "#FDBA74"]
 
-## Content Organization Rules
-- **Root**: Base class title (e.g., "American History", "Biology Fundamentals")
-- **Main Branches**: Course modules/units (e.g., "Colonial Period", "Revolutionary War")
-- **Sub-branches**: Individual lessons (e.g., "Life in Jamestown", "Boston Tea Party")
-- **Details**: Key learning objectives (e.g., "Economic Systems", "Political Tensions")
-- **Micro-details**: Specific concepts (e.g., "Tobacco Trade", "Taxation Policies")
-- **Language**: Student-friendly but academically appropriate for grade ${gradeLevel}
-
-## Enhanced Color Scheme for Comprehensive Content
-Use a rich, professional color palette that can handle extensive content:
-
-Main Branch Colors (modules):
-- "#2563EB" (Deep Blue) - Primary subjects
-- "#10B981" (Emerald Green) - Science/Nature topics
-- "#8B5CF6" (Purple) - Arts/Literature
-- "#F59E0B" (Amber) - History/Social Studies
-- "#EF4444" (Red) - Critical concepts
-- "#06B6D4" (Cyan) - Technology/Modern topics
-- "#84CC16" (Lime) - Health/Life skills
-- "#F97316" (Orange) - Creative/Practical subjects
-
-Sub-branch Colors (lessons):
-- "#3B82F6" (Blue) - Lighter blue variants
-- "#34D399" (Light Emerald)
-- "#A78BFA" (Light Purple)
-- "#FBBF24" (Light Amber)
-- "#F87171" (Light Red)
-- "#22D3EE" (Light Cyan)
-- "#A3E635" (Light Lime)
-- "#FB923C" (Light Orange)
-
-Detail Colors (concepts):
-- "#60A5FA" (Lighter blue)
-- "#6EE7B7" (Very Light Emerald)
-- "#C4B5FD" (Very Light Purple)
-- "#FCD34D" (Very Light Amber)
-- "#FCA5A5" (Very Light Red)
-- "#67E8F9" (Very Light Cyan)
-- "#BEF264" (Very Light Lime)
-- "#FDBA74" (Very Light Orange)
-
-## JSON Structure Requirements
-Return ONLY valid JSON in this exact format, ensuring comprehensive coverage:
-
-\`\`\`json
+JSON FORMAT:
 {
   "root": {
     "id": "root",
-    "label": "Base Class Name",
+    "label": "Course Title",
     "type": "root",
     "color": "#1E40AF",
     "children": [
       {
-        "id": "module1",
-        "label": "Module/Path 1",
+        "id": "mod1",
+        "label": "Module Name",
         "type": "main",
         "color": "#2563EB",
         "children": [
           {
-            "id": "lesson1_1",
+            "id": "les1_1",
             "label": "Lesson Title",
             "type": "sub",
             "color": "#3B82F6",
             "children": [
               {
-                "id": "concept1_1_1",
+                "id": "con1_1_1",
                 "label": "Key Concept",
                 "type": "detail",
-                "color": "#60A5FA",
-                "children": [
-                  {
-                    "id": "micro1_1_1_1",
-                    "label": "Specific Topic",
-                    "type": "micro",
-                    "color": "#93C5FD"
-                  }
-                ]
+                "color": "#60A5FA"
               }
             ]
           }
@@ -410,57 +358,44 @@ Return ONLY valid JSON in this exact format, ensuring comprehensive coverage:
       }
     ]
   },
-  "title": "Comprehensive Base Class Mind Map"
+  "title": "Base Class Mind Map"
 }
-\`\`\`
 
-# Quality Standards for Base Class Mind Maps
-- **Comprehensive**: Include ALL modules, lessons, and major concepts
-- **Organized**: Logical flow from general course structure to specific topics
-- **Balanced**: Even distribution of content across all modules
-- **Educational**: Clear learning progression and relationships
-- **Professional**: Suitable for educational presentations and course overviews
-- **Complete**: Represent the full scope of the educational program
-
-# Output Requirements
-- Return ONLY valid JSON, no additional text or formatting
-- Use the exact color codes provided above
-- Ensure all node IDs are unique and descriptive
-- Keep labels concise but informative (2-6 words per label)
-- Maintain the exact JSON structure specified
-- Include ALL content from the base class, modules, and lessons
-- Create a comprehensive educational overview tool`;
+CONSTRAINTS:
+- Maximum 4 levels deep
+- Labels: 2-6 words each
+- Include ALL modules and lessons
+- Use exact color codes provided
+- Return only JSON, no explanations`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini',
       messages: [
         {
           role: 'system',
-          content: `You are a premium educational designer specializing in comprehensive mind maps for entire educational programs. Your designs provide complete visual overviews of educational content, showing the full scope and structure of learning programs. You create hierarchical visualizations that help educators and students understand the complete learning journey.
+          content: `You are an educational mind map designer. Create comprehensive visual overviews of educational programs using hierarchical JSON structures.
 
-# Core Design Principles
-- **Comprehensive Coverage**: Include ALL content areas and learning objectives
-- **Educational Hierarchy**: Clear progression from course overview to specific concepts
-- **Visual Organization**: Logical structure that supports learning comprehension
-- **Professional Quality**: Suitable for educational institutions and presentations
-- **Scalable Design**: Handle extensive content without visual clutter
+CORE PRINCIPLES:
+- Complete coverage of all course content
+- Clear educational hierarchy and progression  
+- Professional visual organization
+- Student-appropriate language
 
-# Critical Requirements
-- Return ONLY valid JSON, no additional text, markdown, or explanations
-- Use EXACT color codes as specified in the prompt
-- Create comprehensive coverage of all course content
-- Ensure perfect balance and logical organization
-- Maintain consistent styling across all elements
-- Focus on educational value and complete program overview
-- NEVER include explanatory text or formatting - JSON ONLY`
+CRITICAL REQUIREMENTS:
+- Return ONLY valid JSON, no explanations
+- Use EXACT color codes from prompt
+- Ensure proper JSON structure with all brackets closed
+- Maximum 4 levels deep to avoid complexity
+- Include ALL course modules and lessons
+- Keep labels concise (2-6 words)`
         },
         {
           role: 'user',
           content: prompt
         }
       ],
-      max_tokens: 4000,
-      temperature: 0.7,
+      max_tokens: 12000,
+      temperature: 0.3,
     });
 
     const mindMapData = completion.choices[0]?.message?.content;
@@ -482,7 +417,83 @@ Return ONLY valid JSON in this exact format, ensuring comprehensive coverage:
         cleanedData = jsonMatch[0];
       }
       
+      // Advanced JSON repair for truncated responses
+      if (!cleanedData.endsWith('}')) {
+        console.log('JSON appears truncated, attempting advanced repair...');
+        
+        // Find the last complete object or array
+        let lastValidPosition = cleanedData.length;
+        let braceCount = 0;
+        let bracketCount = 0;
+        let inString = false;
+        let escapeNext = false;
+        
+        for (let i = cleanedData.length - 1; i >= 0; i--) {
+          const char = cleanedData[i];
+          
+          if (escapeNext) {
+            escapeNext = false;
+            continue;
+          }
+          
+          if (char === '\\') {
+            escapeNext = true;
+            continue;
+          }
+          
+          if (char === '"' && !escapeNext) {
+            inString = !inString;
+            continue;
+          }
+          
+          if (!inString) {
+            if (char === '}') braceCount++;
+            else if (char === '{') braceCount--;
+            else if (char === ']') bracketCount++;
+            else if (char === '[') bracketCount--;
+            
+            // If we have balanced braces and brackets, this might be a good cut point
+            if (braceCount === 0 && bracketCount === 0) {
+              lastValidPosition = i;
+              break;
+            }
+          }
+        }
+        
+        // Try to repair by cutting at the last valid position
+        if (lastValidPosition < cleanedData.length) {
+          cleanedData = cleanedData.substring(0, lastValidPosition);
+          
+          // Add missing closing braces/brackets
+          const openBraces = (cleanedData.match(/\{/g) || []).length;
+          const closeBraces = (cleanedData.match(/\}/g) || []).length;
+          const openBrackets = (cleanedData.match(/\[/g) || []).length;
+          const closeBrackets = (cleanedData.match(/\]/g) || []).length;
+          
+          const missingBraces = openBraces - closeBraces;
+          const missingBrackets = openBrackets - closeBrackets;
+          
+          if (missingBrackets > 0) {
+            cleanedData += ']'.repeat(missingBrackets);
+          }
+          if (missingBraces > 0) {
+            cleanedData += '}'.repeat(missingBraces);
+          }
+          
+          console.log(`Repaired JSON: cut at position ${lastValidPosition}, added ${missingBrackets} brackets and ${missingBraces} braces`);
+        }
+        
+        // Remove any trailing commas that might cause issues
+        cleanedData = cleanedData.replace(/,(\s*[}\]])/g, '$1');
+        
+        // Remove incomplete property names or values at the end
+        cleanedData = cleanedData.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*"?\s*$/, '');
+        cleanedData = cleanedData.replace(/,\s*"[^"]*"?\s*$/, '');
+      }
+      
       console.log('Attempting to parse base class mind map JSON:', cleanedData.substring(0, 500));
+      console.log('JSON ends with:', cleanedData.slice(-100));
+      
       parsedMindMap = JSON.parse(cleanedData);
       
       // Validate the structure
@@ -490,10 +501,40 @@ Return ONLY valid JSON in this exact format, ensuring comprehensive coverage:
         throw new Error('Base class mind map missing required root or title');
       }
       
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to parse base class mind map JSON:', e);
-      console.error('Raw response:', mindMapData);
-      throw new Error('Invalid base class mind map structure generated');
+      console.error('Raw response length:', mindMapData.length);
+      console.error('Raw response (first 1000 chars):', mindMapData.substring(0, 1000));
+      console.error('Raw response (last 500 chars):', mindMapData.slice(-500));
+      
+      // If parsing still failed, create a simplified fallback structure
+      const errorMessage = e instanceof Error ? e.message : 'Unknown parsing error';
+      
+      // Try to create a minimal valid structure as fallback
+      console.log('Creating fallback mind map structure...');
+      parsedMindMap = {
+        root: {
+          id: "root",
+          label: baseClass.name || "Base Class",
+          type: "root",
+          color: "#1E40AF",
+          children: baseClass.paths?.slice(0, 6).map((path: any, index: number) => ({
+            id: `mod${index + 1}`,
+            label: path.title.substring(0, 20),
+            type: "main",
+            color: ["#2563EB", "#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#06B6D4"][index % 6],
+            children: path.lessons?.slice(0, 4).map((lesson: any, lessonIndex: number) => ({
+              id: `les${index + 1}_${lessonIndex + 1}`,
+              label: lesson.title.substring(0, 20),
+              type: "sub",
+              color: ["#3B82F6", "#34D399", "#A78BFA", "#FBBF24"][lessonIndex % 4]
+            })) || []
+          })) || []
+        },
+        title: `${baseClass.name} Mind Map`
+      };
+      
+      console.log('Using fallback structure with', parsedMindMap.root.children.length, 'modules');
     }
 
     // Generate interactive HTML mind map using the same function as lesson mind maps
@@ -555,7 +596,7 @@ Return ONLY valid JSON in this exact format, ensuring comprehensive coverage:
     }
 
     // Generate a public URL for the mind map
-    const mindMapUrl = `/api/teach/media/base-class-mind-map/${assetData.id}`;
+    const mindMapUrl = '/api/teach/media/base-class-mind-map/' + assetData.id;
 
     return NextResponse.json({
       success: true,
@@ -580,8 +621,6 @@ Return ONLY valid JSON in this exact format, ensuring comprehensive coverage:
 
 // Import the mind map generation function from the lesson mind map route
 function generateInteractiveMindMap(rootNode: MindMapNode, title: string): string {
-  // This would be the same function as in the lesson mind map route
-  // For now, I'll import it or duplicate it here
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -616,6 +655,11 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            cursor: grab;
+        }
+        
+        .mind-map-container:active {
+            cursor: grabbing;
         }
         
         #mindMap {
@@ -648,7 +692,7 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             font-weight: 600;
             text-align: center;
             border: 2px solid rgba(255, 255, 255, 0.15);
@@ -659,9 +703,6 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             letter-spacing: -0.01em;
             line-height: 1.3;
             word-wrap: break-word;
-            hyphens: auto;
-            min-width: 80px;
-            max-width: 280px;
             white-space: normal;
             overflow: visible;
         }
@@ -681,10 +722,6 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             border-radius: 50%;
             border: 3px solid rgba(255, 255, 255, 0.2);
             box-shadow: 0 8px 32px rgba(30, 64, 175, 0.3), 0 4px 16px rgba(0, 0, 0, 0.2);
-            min-width: 160px;
-            min-height: 160px;
-            max-width: 240px;
-            max-height: 240px;
             padding: 20px;
         }
         
@@ -693,9 +730,6 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             border-radius: 20px;
             z-index: 4;
             position: relative;
-            min-width: 120px;
-            max-width: 220px;
-            min-height: 40px;
             padding: 12px 16px;
         }
         
@@ -705,16 +739,13 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             z-index: 3;
             opacity: 0;
             transform: scale(0);
-            min-width: 100px;
-            max-width: 180px;
-            min-height: 32px;
-            padding: 8px 12px;
+            padding: 10px 14px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .sub-node.visible {
             opacity: 1;
             transform: scale(1);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .detail-node {
@@ -723,34 +754,13 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             z-index: 2;
             opacity: 0;
             transform: scale(0);
-            min-width: 90px;
-            max-width: 160px;
-            min-height: 30px;
-            padding: 6px 10px;
+            padding: 8px 12px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .detail-node.visible {
             opacity: 1;
             transform: scale(1);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .micro-node {
-            font-size: 10px;
-            border-radius: 12px;
-            z-index: 1;
-            opacity: 0;
-            transform: scale(0);
-            min-width: 70px;
-            max-width: 120px;
-            min-height: 26px;
-            padding: 4px 8px;
-        }
-        
-        .micro-node.visible {
-            opacity: 1;
-            transform: scale(1);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .connection-line {
@@ -759,42 +769,30 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             z-index: 1;
             height: 3px;
             border-radius: 1.5px;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.1) 100%);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
         }
         
-        .connection-line.primary {
-            background: linear-gradient(90deg, rgba(37, 99, 235, 0.8) 0%, rgba(37, 99, 235, 0.3) 100%);
-            height: 4px;
-        }
-        
-        .connection-line.secondary {
-            background: linear-gradient(90deg, rgba(16, 185, 129, 0.6) 0%, rgba(16, 185, 129, 0.2) 100%);
-            height: 3px;
-        }
-        
-        .connection-line.tertiary {
-            background: linear-gradient(90deg, rgba(139, 92, 246, 0.5) 0%, rgba(139, 92, 246, 0.15) 100%);
+        .sub-connection {
             height: 2px;
-        }
-        
-        .connection-line.related {
-            background: linear-gradient(90deg, rgba(245, 158, 11, 0.6) 0%, rgba(245, 158, 11, 0.2) 100%);
-            height: 2px;
-            stroke-dasharray: 5,5;
-            border-top: 2px dashed rgba(245, 158, 11, 0.4);
-            background: none;
-        }
-        
-        .sub-connection-line {
-            height: 2px;
-            background: linear-gradient(90deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.08) 100%);
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.08) 100%);
             opacity: 0;
-            transition: opacity 0.4s ease;
-            border-radius: 1px;
+            transition: opacity 0.3s ease;
         }
         
-        .sub-connection-line.visible {
+        .sub-connection.visible {
+            opacity: 1;
+        }
+        
+        .detail-connection {
+            height: 1px;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .detail-connection.visible {
             opacity: 1;
         }
         
@@ -803,7 +801,7 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             right: 8px;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 14px;
+            font-size: 12px;
             transition: transform 0.3s ease;
             opacity: 0.7;
         }
@@ -853,11 +851,6 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             transform: translateY(-1px);
         }
         
-        .control-btn.active {
-            background: rgba(37, 99, 235, 0.3);
-            border-color: rgba(37, 99, 235, 0.5);
-        }
-        
         .help-text {
             position: absolute;
             bottom: 20px;
@@ -869,7 +862,7 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             font-size: 13px;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            max-width: 300px;
+            max-width: 280px;
         }
         
         @media (max-width: 768px) {
@@ -889,7 +882,7 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
                 left: 10px;
                 font-size: 11px;
                 padding: 8px 12px;
-                max-width: 250px;
+                max-width: 220px;
             }
         }
     </style>
@@ -898,23 +891,25 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
     <div class="mind-map-container">
         <h1 class="mind-map-title">${title}</h1>
         
+        <!-- Simplified Controls -->
         <div class="controls">
             <div class="control-group">
-                <button class="control-btn" id="zoomIn" title="Zoom In">🔍+</button>
-                <button class="control-btn" id="zoomOut" title="Zoom Out">🔍-</button>
-                <button class="control-btn" id="resetView" title="Reset View">⌂</button>
+                <button id="zoomIn" class="control-btn" title="Zoom In">+</button>
+                <button id="zoomOut" class="control-btn" title="Zoom Out">−</button>
+                <button id="resetView" class="control-btn" title="Reset View">⌂</button>
             </div>
             <div class="control-group">
-                <button class="control-btn" id="expandAll" title="Expand All">⤢</button>
-                <button class="control-btn" id="collapseAll" title="Collapse All">⤡</button>
+                <button id="expandAll" class="control-btn" title="Expand All">⊞</button>
+                <button id="collapseAll" class="control-btn" title="Collapse All">⊟</button>
             </div>
         </div>
         
+        <!-- Clean Help Text -->
         <div class="help-text">
-            <div style="font-weight: 600; margin-bottom: 8px;">Base Class Overview</div>
+            <div style="font-weight: 600; margin-bottom: 8px;">Course Overview</div>
             <div style="font-size: 11px; opacity: 0.8;">
-                Click nodes to expand • Drag to pan • Scroll to zoom<br>
-                Complete course structure with all modules and lessons
+                <strong>Navigate:</strong> Click to expand • Drag to pan • Scroll to zoom<br>
+                <strong>Structure:</strong> Course → Modules → Lessons → Concepts
             </div>
         </div>
         
@@ -927,7 +922,49 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
         let expandedNodes = new Set();
         let nodePositions = new Map();
         
-        // Simplified version for base class mind maps
+        // Drag and pan variables
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let currentTransform = { x: 0, y: 0 };
+        
+        // Clean layout configuration
+        const LAYOUT_CONFIG = {
+            MAIN_RADIUS: 300,
+            SUB_RADIUS: 200,
+            DETAIL_RADIUS: 140,
+            ANGLE_SPREAD: Math.PI * 1.4, // 252 degrees
+        };
+        
+        function measureText(text, fontSize = 14, maxWidth = 200) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            context.font = \`600 \${fontSize}px Inter, sans-serif\`;
+            
+            const words = text.split(' ');
+            const lines = [];
+            let currentLine = words[0] || '';
+            
+            for (let i = 1; i < words.length; i++) {
+                const testLine = currentLine + ' ' + words[i];
+                const metrics = context.measureText(testLine);
+                if (metrics.width > maxWidth - 32) {
+                    lines.push(currentLine);
+                    currentLine = words[i];
+                } else {
+                    currentLine = testLine;
+                }
+            }
+            lines.push(currentLine);
+            
+            const width = Math.max(
+                Math.min(maxWidth, Math.max(...lines.map(line => context.measureText(line).width)) + 32),
+                100
+            );
+            const height = Math.max(lines.length * (fontSize * 1.4) + 16, 40);
+            
+            return { width, height };
+        }
+        
         function createMindMap() {
             const container = document.getElementById('mindMap');
             const centerX = window.innerWidth / 2;
@@ -935,49 +972,263 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             
             container.innerHTML = '';
             nodePositions.clear();
+            expandedNodes.clear();
             
             // Create root node
-            const rootNode = createNode(mindMapData, 'root-node', centerX - 120, centerY - 80, 240, 160);
-            container.appendChild(rootNode);
+            const rootSize = measureText(mindMapData.label, 18, 280);
+            const rootWidth = Math.max(rootSize.width, 180);
+            const rootHeight = Math.max(rootSize.height, 180);
+            
+            const rootElement = createNode(
+                mindMapData, 
+                'root-node', 
+                centerX - rootWidth/2, 
+                centerY - rootHeight/2, 
+                rootWidth, 
+                rootHeight
+            );
+            container.appendChild(rootElement);
+            
             nodePositions.set(mindMapData.id, { 
                 x: centerX, 
                 y: centerY, 
-                element: rootNode,
-                type: 'root'
+                width: rootWidth,
+                height: rootHeight,
+                element: rootElement
             });
             
-            // Create main branches
-            if (mindMapData.children) {
-                const angleStep = (2 * Math.PI) / mindMapData.children.length;
-                const distance = 350;
+            // Layout main nodes
+            if (mindMapData.children && mindMapData.children.length > 0) {
+                layoutMainNodes(mindMapData.children, centerX, centerY);
+            }
+        }
+        
+        function layoutMainNodes(children, centerX, centerY) {
+            const container = document.getElementById('mindMap');
+            const angleStep = LAYOUT_CONFIG.ANGLE_SPREAD / Math.max(children.length - 1, 1);
+            const startAngle = -LAYOUT_CONFIG.ANGLE_SPREAD / 2;
+            
+            children.forEach((child, index) => {
+                const angle = children.length === 1 ? 0 : startAngle + (index * angleStep);
                 
-                mindMapData.children.forEach((child, index) => {
-                    const angle = -Math.PI / 2 + index * angleStep;
-                    const x = centerX + Math.cos(angle) * distance - 110;
-                    const y = centerY + Math.sin(angle) * distance - 25;
+                const nodeSize = measureText(child.label, 14, 220);
+                const nodeWidth = nodeSize.width;
+                const nodeHeight = Math.max(nodeSize.height, 50);
+                
+                const nodeX = centerX + Math.cos(angle) * LAYOUT_CONFIG.MAIN_RADIUS - nodeWidth/2;
+                const nodeY = centerY + Math.sin(angle) * LAYOUT_CONFIG.MAIN_RADIUS - nodeHeight/2;
+                const nodeCenterX = nodeX + nodeWidth/2;
+                const nodeCenterY = nodeY + nodeHeight/2;
+                
+                // Create connection line
+                const line = createConnectionLine(centerX, centerY, nodeCenterX, nodeCenterY);
+                container.appendChild(line);
+                
+                // Create the node
+                const nodeElement = createNode(child, 'main-node', nodeX, nodeY, nodeWidth, nodeHeight);
+                
+                if (child.children && child.children.length > 0) {
+                    const indicator = document.createElement('span');
+                    indicator.className = 'expand-indicator';
+                    indicator.textContent = '▶';
+                    nodeElement.appendChild(indicator);
                     
-                    const line = createConnectionLine(centerX, centerY, x + 110, y + 25, 'primary');
-                    container.appendChild(line);
+                    nodeElement.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        toggleSubNodes(child, nodeCenterX, nodeCenterY, angle, nodeElement);
+                    });
+                }
+                
+                container.appendChild(nodeElement);
+                
+                nodePositions.set(child.id, { 
+                    x: nodeCenterX,
+                    y: nodeCenterY,
+                    width: nodeWidth,
+                    height: nodeHeight,
+                    element: nodeElement,
+                    angle: angle
+                });
+            });
+        }
+        
+        function toggleSubNodes(parentNode, parentX, parentY, parentAngle, domNode) {
+            const indicator = domNode.querySelector('.expand-indicator');
+            const isExpanded = indicator.classList.contains('expanded');
+            const container = document.getElementById('mindMap');
+            
+            if (isExpanded) {
+                // Collapse
+                expandedNodes.delete(parentNode.id);
+                
+                // Remove sub-nodes and their connections
+                parentNode.children.forEach(child => {
+                    const subElement = document.querySelector(\`[data-id="\${child.id}"]\`);
+                    const connections = document.querySelectorAll(\`[data-parent="\${parentNode.id}"]\`);
                     
-                    const mainNode = createNode(child, 'main-node', x, y, 220, 50);
-                    if (child.children && child.children.length > 0) {
-                        const indicator = document.createElement('span');
-                        indicator.className = 'expand-indicator';
-                        indicator.textContent = '▶';
-                        mainNode.appendChild(indicator);
-                        
-                        mainNode.addEventListener('click', () => toggleSubNodes(child, x + 110, y + 25, angle, mainNode));
+                    if (subElement) {
+                        subElement.classList.remove('visible');
+                        setTimeout(() => subElement.remove(), 300);
+                        nodePositions.delete(child.id);
                     }
-                    container.appendChild(mainNode);
                     
-                    nodePositions.set(child.id, { 
-                        x: x + 110, 
-                        y: y + 25, 
-                        element: mainNode,
-                        type: child.type
+                    connections.forEach(conn => {
+                        conn.classList.remove('visible');
+                        setTimeout(() => conn.remove(), 300);
                     });
                 });
+                
+                indicator.classList.remove('expanded');
+                indicator.textContent = '▶';
+            } else {
+                // Expand
+                expandedNodes.add(parentNode.id);
+                layoutSubNodes(parentNode.children, parentX, parentY, parentAngle, parentNode.id);
+                indicator.classList.add('expanded');
+                indicator.textContent = '▼';
             }
+        }
+        
+        function layoutSubNodes(children, parentX, parentY, parentAngle, parentId) {
+            const container = document.getElementById('mindMap');
+            const subAngleSpread = Math.PI * 0.6; // 108 degrees
+            const startAngle = parentAngle - subAngleSpread / 2;
+            
+            children.forEach((child, index) => {
+                const angle = children.length === 1 ? 
+                    parentAngle : 
+                    startAngle + (index * subAngleSpread / (children.length - 1));
+                
+                const nodeSize = measureText(child.label, 12, 180);
+                const nodeWidth = nodeSize.width;
+                const nodeHeight = Math.max(nodeSize.height, 40);
+                
+                const nodeX = parentX + Math.cos(angle) * LAYOUT_CONFIG.SUB_RADIUS - nodeWidth/2;
+                const nodeY = parentY + Math.sin(angle) * LAYOUT_CONFIG.SUB_RADIUS - nodeHeight/2;
+                const nodeCenterX = nodeX + nodeWidth/2;
+                const nodeCenterY = nodeY + nodeHeight/2;
+                
+                // Create connection line
+                const line = createConnectionLine(parentX, parentY, nodeCenterX, nodeCenterY);
+                line.setAttribute('data-parent', parentId);
+                line.classList.add('sub-connection');
+                container.appendChild(line);
+                
+                // Create the node
+                const nodeElement = createNode(child, 'sub-node', nodeX, nodeY, nodeWidth, nodeHeight);
+                nodeElement.setAttribute('data-parent', parentId);
+                
+                if (child.children && child.children.length > 0) {
+                    const indicator = document.createElement('span');
+                    indicator.className = 'expand-indicator';
+                    indicator.textContent = '▶';
+                    nodeElement.appendChild(indicator);
+                    
+                    nodeElement.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        toggleDetailNodes(child, nodeCenterX, nodeCenterY, angle, nodeElement);
+                    });
+                }
+                
+                container.appendChild(nodeElement);
+                
+                nodePositions.set(child.id, { 
+                    x: nodeCenterX,
+                    y: nodeCenterY,
+                    width: nodeWidth,
+                    height: nodeHeight,
+                    element: nodeElement,
+                    angle: angle
+                });
+                
+                // Animate in
+                setTimeout(() => {
+                    nodeElement.classList.add('visible');
+                    line.classList.add('visible');
+                }, 50);
+            });
+        }
+        
+        function toggleDetailNodes(parentNode, parentX, parentY, parentAngle, domNode) {
+            const indicator = domNode.querySelector('.expand-indicator');
+            const isExpanded = indicator.classList.contains('expanded');
+            const container = document.getElementById('mindMap');
+            
+            if (isExpanded) {
+                // Collapse
+                expandedNodes.delete(parentNode.id);
+                
+                parentNode.children.forEach(child => {
+                    const detailElement = document.querySelector(\`[data-id="\${child.id}"]\`);
+                    const connections = document.querySelectorAll(\`[data-parent="\${parentNode.id}"]\`);
+                    
+                    if (detailElement) {
+                        detailElement.classList.remove('visible');
+                        setTimeout(() => detailElement.remove(), 300);
+                        nodePositions.delete(child.id);
+                    }
+                    
+                    connections.forEach(conn => {
+                        conn.classList.remove('visible');
+                        setTimeout(() => conn.remove(), 300);
+                    });
+                });
+                
+                indicator.classList.remove('expanded');
+                indicator.textContent = '▶';
+            } else {
+                // Expand
+                expandedNodes.add(parentNode.id);
+                layoutDetailNodes(parentNode.children, parentX, parentY, parentAngle, parentNode.id);
+                indicator.classList.add('expanded');
+                indicator.textContent = '▼';
+            }
+        }
+        
+        function layoutDetailNodes(children, parentX, parentY, parentAngle, parentId) {
+            const container = document.getElementById('mindMap');
+            const detailAngleSpread = Math.PI * 0.4; // 72 degrees
+            const startAngle = parentAngle - detailAngleSpread / 2;
+            
+            children.forEach((child, index) => {
+                const angle = children.length === 1 ? 
+                    parentAngle : 
+                    startAngle + (index * detailAngleSpread / (children.length - 1));
+                
+                const nodeSize = measureText(child.label, 11, 150);
+                const nodeWidth = nodeSize.width;
+                const nodeHeight = Math.max(nodeSize.height, 32);
+                
+                const nodeX = parentX + Math.cos(angle) * LAYOUT_CONFIG.DETAIL_RADIUS - nodeWidth/2;
+                const nodeY = parentY + Math.sin(angle) * LAYOUT_CONFIG.DETAIL_RADIUS - nodeHeight/2;
+                const nodeCenterX = nodeX + nodeWidth/2;
+                const nodeCenterY = nodeY + nodeHeight/2;
+                
+                // Create connection line
+                const line = createConnectionLine(parentX, parentY, nodeCenterX, nodeCenterY);
+                line.setAttribute('data-parent', parentId);
+                line.classList.add('detail-connection');
+                container.appendChild(line);
+                
+                // Create the node
+                const nodeElement = createNode(child, 'detail-node', nodeX, nodeY, nodeWidth, nodeHeight);
+                nodeElement.setAttribute('data-parent', parentId);
+                container.appendChild(nodeElement);
+                
+                nodePositions.set(child.id, { 
+                    x: nodeCenterX,
+                    y: nodeCenterY,
+                    width: nodeWidth,
+                    height: nodeHeight,
+                    element: nodeElement
+                });
+                
+                // Animate in
+                setTimeout(() => {
+                    nodeElement.classList.add('visible');
+                    line.classList.add('visible');
+                }, 50);
+            });
         }
         
         function createNode(nodeData, className, x, y, width, height) {
@@ -997,9 +1248,9 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             return node;
         }
         
-        function createConnectionLine(x1, y1, x2, y2, type = 'primary') {
+        function createConnectionLine(x1, y1, x2, y2) {
             const line = document.createElement('div');
-            line.className = \`connection-line \${type}\`;
+            line.className = 'connection-line';
             
             const deltaX = x2 - x1;
             const deltaY = y2 - y1;
@@ -1010,52 +1261,9 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
             line.style.left = x1 + 'px';
             line.style.top = y1 + 'px';
             line.style.transform = \`rotate(\${angle}deg)\`;
+            line.style.transformOrigin = '0 50%';
             
             return line;
-        }
-        
-        function toggleSubNodes(parentNode, parentX, parentY, parentAngle, domNode) {
-            // Simplified expansion for base class mind maps
-            const indicator = domNode.querySelector('.expand-indicator');
-            const isExpanded = indicator.classList.contains('expanded');
-            
-            if (isExpanded) {
-                // Hide sub-nodes
-                parentNode.children.forEach(child => {
-                    const subNode = document.querySelector(\`[data-id="\${child.id}"]\`);
-                    if (subNode) {
-                        subNode.remove();
-                        nodePositions.delete(child.id);
-                    }
-                });
-                indicator.classList.remove('expanded');
-            } else {
-                // Show sub-nodes
-                const subDistance = 200;
-                const angleSpread = Math.PI / 3;
-                const startAngle = parentAngle - angleSpread / 2;
-                
-                parentNode.children.forEach((child, index) => {
-                    const angle = startAngle + (index * angleSpread / Math.max(1, parentNode.children.length - 1));
-                    const x = parentX + Math.cos(angle) * subDistance - 90;
-                    const y = parentY + Math.sin(angle) * subDistance - 20;
-                    
-                    const subLine = createConnectionLine(parentX, parentY, x + 90, y + 20, 'secondary');
-                    document.getElementById('mindMap').appendChild(subLine);
-                    
-                    const subNode = createNode(child, 'sub-node', x, y, 180, 40);
-                    subNode.classList.add('visible');
-                    document.getElementById('mindMap').appendChild(subNode);
-                    
-                    nodePositions.set(child.id, {
-                        x: x + 90,
-                        y: y + 20,
-                        element: subNode,
-                        type: child.type
-                    });
-                });
-                indicator.classList.add('expanded');
-            }
         }
         
         function adjustBrightness(hex, percent) {
@@ -1074,68 +1282,57 @@ function generateInteractiveMindMap(rootNode: MindMapNode, title: string): strin
                 Math.round(newB).toString(16).padStart(2, '0');
         }
         
-        // Control functions
+        function applyTransform() {
+            const mindMap = document.getElementById('mindMap');
+            mindMap.style.transform = \`scale(\${currentZoom}) translate(\${currentTransform.x}px, \${currentTransform.y}px)\`;
+        }
+        
+        function expandAllNodes() {
+            const mainNodes = document.querySelectorAll('.main-node .expand-indicator');
+            mainNodes.forEach((indicator, index) => {
+                if (!indicator.classList.contains('expanded')) {
+                    setTimeout(() => {
+                        indicator.parentElement.click();
+                    }, index * 200);
+                }
+            });
+        }
+        
+        function collapseAllNodes() {
+            const expandedIndicators = document.querySelectorAll('.expand-indicator.expanded');
+            expandedIndicators.forEach((indicator, index) => {
+                setTimeout(() => {
+                    indicator.parentElement.click();
+                }, index * 100);
+            });
+        }
+        
+        // Control event listeners
         document.getElementById('zoomIn').addEventListener('click', () => {
             currentZoom = Math.min(currentZoom * 1.2, 3);
-            applyZoom();
+            applyTransform();
         });
         
         document.getElementById('zoomOut').addEventListener('click', () => {
             currentZoom = Math.max(currentZoom / 1.2, 0.3);
-            applyZoom();
+            applyTransform();
         });
         
         document.getElementById('resetView').addEventListener('click', () => {
             currentZoom = 1;
-            const mindMap = document.getElementById('mindMap');
-            mindMap.style.transform = 'scale(1) translate(0, 0)';
+            currentTransform = { x: 0, y: 0 };
+            applyTransform();
         });
         
-        document.getElementById('expandAll').addEventListener('click', () => {
-            const mainNodes = document.querySelectorAll('.main-node');
-            mainNodes.forEach(node => {
-                const indicator = node.querySelector('.expand-indicator');
-                if (indicator && !indicator.classList.contains('expanded')) {
-                    node.click();
-                }
-            });
-        });
+        document.getElementById('expandAll').addEventListener('click', expandAllNodes);
+        document.getElementById('collapseAll').addEventListener('click', collapseAllNodes);
         
-        document.getElementById('collapseAll').addEventListener('click', () => {
-            const mainNodes = document.querySelectorAll('.main-node');
-            mainNodes.forEach(node => {
-                const indicator = node.querySelector('.expand-indicator');
-                if (indicator && indicator.classList.contains('expanded')) {
-                    node.click();
-                }
-            });
-        });
-        
-        function applyZoom() {
-            const mindMap = document.getElementById('mindMap');
-            mindMap.style.transform = \`scale(\${currentZoom})\`;
-        }
-        
-        // Mouse wheel zoom
-        document.addEventListener('wheel', (e) => {
-            if (e.target.closest('.mind-map-container')) {
-                e.preventDefault();
-                if (e.deltaY < 0) {
-                    currentZoom = Math.min(currentZoom * 1.1, 3);
-                } else {
-                    currentZoom = Math.max(currentZoom / 1.1, 0.3);
-                }
-                applyZoom();
-            }
-        });
-        
-        // Initialize mind map
+        // Initialize the mind map
         createMindMap();
         
         // Handle window resize
         window.addEventListener('resize', () => {
-            document.getElementById('mindMap').innerHTML = '';
-            createMindMap();
+            setTimeout(createMindMap, 100);
         });
     </script>
 </body>
@@ -1189,7 +1386,7 @@ export async function GET(
 
     if (existingAssets && existingAssets.length > 0) {
       const asset = existingAssets[0];
-      const mindMapUrl = `/api/teach/media/base-class-mind-map/${asset.id}`;
+      const mindMapUrl = '/api/teach/media/base-class-mind-map/' + asset.id;
       
       return NextResponse.json({
         exists: true,

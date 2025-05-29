@@ -22,7 +22,7 @@ export async function POST(request: NextRequest, { params }: PathLessonsParams) 
   }
 
   try {
-    const { title, description, objectives, order_index } = await request.json();
+    const { title, description, order_index } = await request.json();
 
     if (!title || !description) {
       return NextResponse.json({ error: 'title and description are required' }, { status: 400 });
@@ -31,7 +31,6 @@ export async function POST(request: NextRequest, { params }: PathLessonsParams) 
     const lessonData = {
       title,
       description,
-      objectives: objectives || null,
       path_id: pathId,
       creator_user_id: session.user.id,
       order_index: order_index || 0,

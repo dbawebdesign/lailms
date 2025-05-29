@@ -54,17 +54,187 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
 
   const [isNavOpen, setIsNavOpen] = useState(false); // State for mobile navigation
 
+  // State to track recently updated items for visual feedback
+  const [recentlyUpdatedItems, setRecentlyUpdatedItems] = useState<Set<string>>(new Set());
+
   // Real-time updates hook
-  const { lastUpdate } = useRealTimeContentUpdates((entity, entityId) => {
-    console.log('Content update received in studio:', { entity, entityId });
+  const { lastUpdate } = useRealTimeContentUpdates((entity, entityId, updatedData, eventType = 'update') => {
+    console.log('Content update received in studio:', { entity, entityId, updatedData, eventType });
     
-    // Refresh data based on the entity type
+    if (!updatedData) {
+      console.warn('No updated data received for entity:', entity, entityId);
+      return;
+    }
+
+    // Add item to recently updated set for visual feedback
+    setRecentlyUpdatedItems(prev => new Set([...prev, entityId]));
+    
+    // Remove from recently updated after 3 seconds
+    setTimeout(() => {
+      setRecentlyUpdatedItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(entityId);
+        return newSet;
+      });
+    }, 3000);
+    
+    // Update local state based on the entity type and event type
     if (entity === 'baseClass' && entityId === baseClassId) {
-      // Refetch base class data
-      window.location.reload();
-    } else if (entity === 'path' || entity === 'lesson' || entity === 'section') {
-      // Refetch the entire studio data to ensure consistency
-      window.location.reload();
+      // Update base class data
+      setStudioBaseClass(prevBaseClass => {
+        if (!prevBaseClass) return null;
+        const updatedBaseClass = { ...prevBaseClass, ...updatedData };
+        
+        // Update selected item if it's the base class
+        if (selectedItem.type === 'baseclass' && selectedItem.id === entityId) {
+          setSelectedItem(prev => ({
+            ...prev,
+            title: updatedData.name || prev.title,
+            data: updatedBaseClass
+          }));
+        }
+        
+        return updatedBaseClass;
+      });
+    } else if (entity === 'path') {
+      if (eventType === 'create') {
+        // Add new path to the list
+        setStudioBaseClass(prevBaseClass => {
+          if (!prevBaseClass) return null;
+          
+          const newPath = { ...updatedData, lessons: [] };
+          const updatedPaths = [...(prevBaseClass.paths || []), newPath];
+          
+          return { ...prevBaseClass, paths: updatedPaths };
+        });
+      } else {
+        // Update existing path data
+        setStudioBaseClass(prevBaseClass => {
+          if (!prevBaseClass || !prevBaseClass.paths) return prevBaseClass;
+          
+          const updatedPaths = prevBaseClass.paths.map(path => 
+            path.id === entityId ? { ...path, ...updatedData } : path
+          );
+          
+          // Update selected item if it's this path
+          if (selectedItem.type === 'path' && selectedItem.id === entityId) {
+            const updatedPath = updatedPaths.find(p => p.id === entityId);
+            if (updatedPath) {
+              setSelectedItem(prev => ({
+                ...prev,
+                title: updatedPath.title || prev.title,
+                data: updatedPath
+              }));
+            }
+          }
+          
+          return { ...prevBaseClass, paths: updatedPaths };
+        });
+      }
+    } else if (entity === 'lesson') {
+      if (eventType === 'create') {
+        // Add new lesson to the appropriate path
+        setStudioBaseClass(prevBaseClass => {
+          if (!prevBaseClass || !prevBaseClass.paths) return prevBaseClass;
+          
+          const updatedPaths = prevBaseClass.paths.map(path => {
+            // Find the path this lesson belongs to
+            if (updatedData.path_id === path.id) {
+              const newLesson = { ...updatedData, sections: [] };
+              return {
+                ...path,
+                lessons: [...(path.lessons || []), newLesson]
+              };
+            }
+            return path;
+          });
+          
+          return { ...prevBaseClass, paths: updatedPaths };
+        });
+      } else {
+        // Update existing lesson data
+        setStudioBaseClass(prevBaseClass => {
+          if (!prevBaseClass || !prevBaseClass.paths) return prevBaseClass;
+          
+          const updatedPaths = prevBaseClass.paths.map(path => ({
+            ...path,
+            lessons: path.lessons?.map(lesson => 
+              lesson.id === entityId ? { ...lesson, ...updatedData } : lesson
+            ) || []
+          }));
+          
+          // Update selected item if it's this lesson
+          if (selectedItem.type === 'lesson' && selectedItem.id === entityId) {
+            const updatedLesson = updatedPaths
+              .flatMap(p => p.lessons || [])
+              .find(l => l.id === entityId);
+            if (updatedLesson) {
+              setSelectedItem(prev => ({
+                ...prev,
+                title: updatedLesson.title || prev.title,
+                data: updatedLesson
+              }));
+            }
+          }
+          
+          return { ...prevBaseClass, paths: updatedPaths };
+        });
+      }
+    } else if (entity === 'section') {
+      if (eventType === 'create') {
+        // Add new section to the appropriate lesson
+        setStudioBaseClass(prevBaseClass => {
+          if (!prevBaseClass || !prevBaseClass.paths) return prevBaseClass;
+          
+          const updatedPaths = prevBaseClass.paths.map(path => ({
+            ...path,
+            lessons: path.lessons?.map(lesson => {
+              // Find the lesson this section belongs to
+              if (updatedData.lesson_id === lesson.id) {
+                return {
+                  ...lesson,
+                  sections: [...(lesson.sections || []), updatedData]
+                };
+              }
+              return lesson;
+            }) || []
+          }));
+          
+          return { ...prevBaseClass, paths: updatedPaths };
+        });
+      } else {
+        // Update existing section data
+        setStudioBaseClass(prevBaseClass => {
+          if (!prevBaseClass || !prevBaseClass.paths) return prevBaseClass;
+          
+          const updatedPaths = prevBaseClass.paths.map(path => ({
+            ...path,
+            lessons: path.lessons?.map(lesson => ({
+              ...lesson,
+              sections: lesson.sections?.map(section => 
+                section.id === entityId ? { ...section, ...updatedData } : section
+              ) || []
+            })) || []
+          }));
+          
+          // Update selected item if it's this section
+          if (selectedItem.type === 'section' && selectedItem.id === entityId) {
+            const updatedSection = updatedPaths
+              .flatMap(p => p.lessons || [])
+              .flatMap(l => l.sections || [])
+              .find(s => s.id === entityId);
+            if (updatedSection) {
+              setSelectedItem(prev => ({
+                ...prev,
+                title: updatedSection.title || prev.title,
+                data: updatedSection
+              }));
+            }
+          }
+          
+          return { ...prevBaseClass, paths: updatedPaths };
+        });
+      }
     }
   });
 
@@ -819,6 +989,7 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
                 onReorderPaths={handleReorderPaths}
                 onReorderLessons={handleReorderLessons}
                 onReorderSections={handleReorderSections}
+                recentlyUpdatedItems={recentlyUpdatedItems}
               />
             )}
           </div>

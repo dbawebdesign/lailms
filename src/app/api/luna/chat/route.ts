@@ -913,7 +913,7 @@ interface CourseModule {
 }
 
 // --- Refined System Prompt Construction ---
-function constructSystemPrompt(context: SerializedUIContext, persona: string, message: string): string {
+function constructSystemPrompt(context: SerializedUIContext, persona: string, message: string, buttonData?: any): string {
   // Generate UI pattern analysis
   const patternInsights = analyzeUIPatterns(context);
 
@@ -1143,6 +1143,78 @@ Analyze the current UI context to determine the appropriate level of educational
 
 **IMPORTANT**: Do NOT use the generateCourseOutline tool for improving existing content. Only use it when the user explicitly wants to create something new.
 
+### 5. Multi-Step Content Creation Workflow Rules
+**CRITICAL WORKFLOW PRINCIPLE**: When creating hierarchical content (paths with lessons, lessons with sections, etc.), always follow a step-by-step approach to ensure proper ID availability and prevent content from being added to wrong parents.
+
+#### 5.1 Path Creation with Lessons Workflow
+**CRITICAL RULE**: When creating a new path that should include lessons, follow this two-step process:
+
+**Step 1 - Path Creation Only**:
+- Use ONLY the createPath tool to create the path
+- Do NOT attempt to create lessons in the same response
+- Inform the user that the path has been created and provide the path ID
+- Ask the user to confirm they want to add lessons to the newly created path
+
+**Step 2 - Lesson Creation (in follow-up response)**:
+- After path creation is confirmed, use createLesson tool with the path ID from the previous step
+- Create lessons one by one as requested
+- If lessons should have sections, follow the Lesson Creation with Sections workflow below
+
+**Example Response for Path Creation**:
+"I have successfully created the path '[Path Title]' with ID [pathId]. The path is now available in your course structure. Would you like me to add the lessons we discussed to this path? Please confirm and I will create these lessons within the newly created path."
+
+#### 5.2 Lesson Creation with Sections Workflow
+**CRITICAL RULE**: When creating a new lesson that should include sections, follow this two-step process:
+
+**Step 1 - Lesson Creation Only**:
+- Use ONLY the createLesson tool to create the lesson
+- Do NOT attempt to add sections in the same response
+- Inform the user that the lesson has been created and provide the lesson ID
+- Ask the user to confirm they want to add sections to the newly created lesson
+
+**Step 2 - Section Addition (in follow-up response)**:
+- After lesson creation is confirmed, use addLessonSection tool with the lesson ID from the previous step
+- Add sections one by one as requested
+
+**Example Response for Lesson Creation**:
+"I have successfully created the lesson '[Lesson Title]' with ID [lessonId]. The lesson is now available in your course structure. Would you like me to add the sections we discussed to this lesson? Please confirm and I will add these sections to the newly created lesson."
+
+#### 5.3 Complete Path with Lessons and Sections Workflow
+**CRITICAL RULE**: When creating a complete learning path with lessons and sections, follow this three-step process:
+
+**Step 1 - Path Creation Only**:
+- Create the path first using createPath tool
+- Provide path ID and ask for confirmation to proceed with lessons
+
+**Step 2 - Lesson Creation (in follow-up response)**:
+- Create lessons within the path using the path ID from Step 1
+- Provide lesson IDs and ask for confirmation to proceed with sections
+
+**Step 3 - Section Addition (in follow-up response)**:
+- Add sections to lessons using the lesson IDs from Step 2
+- Complete the content creation process
+
+**Example Multi-Step Response Flow**:
+1. "I've created the path '[Path Title]'. Would you like me to create the lessons within this path?"
+2. "I've created [X] lessons in the path. Would you like me to add sections to these lessons?"
+3. "I've added sections to all lessons. Your complete learning path is now ready!"
+
+#### 5.4 Why This Step-by-Step Approach is Critical:
+- **ID Availability**: Ensures parent IDs (path, lesson) are available before creating children
+- **Error Prevention**: Prevents content from being added to wrong parents due to ID confusion
+- **User Feedback**: Provides clear confirmation at each step of the creation process
+- **Rollback Capability**: Allows users to stop the process at any step if needed
+- **Real-time Updates**: Ensures the UI updates properly after each creation step
+
+#### 5.5 Exception Handling:
+- If any creation step fails, stop the workflow and report the error
+- Do not proceed to subsequent steps if a parent creation fails
+- Provide clear error messages and suggest next steps for recovery
+
+#### 5.6 Single-Item Creation (No Multi-Step Required):
+- When creating only one item without children (single path, single lesson, single section), proceed normally with single tool call
+- Multi-step workflow only applies when creating hierarchical content structures
+
 ## Response Guidelines
 
 ### Always Include:
@@ -1157,8 +1229,8 @@ Analyze the current UI context to determine the appropriate level of educational
 **Path IDs:**
 **NEVER create or assume path IDs by appending suffixes to base class IDs.** Path IDs are unique UUIDs that must be extracted from the current UI context. 
 
-- ❌ WRONG: Using IDs like "baseClassId_module_1" or "baseClassId_module_2"
-- ✅ CORRECT: Using actual path IDs from the navigation tree context (e.g., "a9f0dd67-d510-4fcd-8809-2989fe96aaa4")
+- WRONG: Using IDs like "baseClassId_module_1" or "baseClassId_module_2"
+- CORRECT: Using actual path IDs from the navigation tree context
 
 **When updating paths:**
 1. Only use path IDs that are explicitly provided in the "Available Context IDs for Tools" section
@@ -1168,8 +1240,8 @@ Analyze the current UI context to determine the appropriate level of educational
 **Lesson IDs:**
 **ONLY use lesson IDs that are explicitly visible in the current UI context.** Do not assume lesson IDs exist based on course structure or module names.
 
-- ❌ WRONG: Assuming lesson IDs exist for all modules in a course outline
-- ✅ CORRECT: Only updating lessons whose IDs are explicitly shown in the navigation tree or current context
+- WRONG: Assuming lesson IDs exist for all modules in a course outline
+- CORRECT: Only updating lessons whose IDs are explicitly shown in the navigation tree or current context
 
 **When updating multiple lessons:**
 1. First check if lesson IDs are available in the "Available Context IDs for Tools" section
@@ -1217,8 +1289,82 @@ Analyze the current UI context to determine the appropriate level of educational
 - Provide actionable advice when possible
 - Keep responses concise but comprehensive
 
+## Dynamic Action Buttons
+**CRITICAL**: When asking for confirmations, choices, or structured responses that don't require open-ended creative input, provide dynamic action buttons to make the interaction friction-free.
+
+### When to Provide Action Buttons:
+1. **Multi-Step Workflow Confirmations**: After creating paths, lessons, or sections
+2. **Yes/No Questions**: Any binary choice scenario
+3. **Multiple Choice Options**: When presenting 2-5 specific options
+4. **Common Actions**: Save, continue, cancel, edit, delete confirmations
+5. **Workflow Navigation**: Next step, previous step, skip, finish
+
+### Action Button Format:
+Include an actionButtons array in your response context. Each button should have:
+- id: Unique identifier for the action
+- label: User-friendly button text (keep concise, 1-3 words)
+- action: The action type (confirm, deny, select, navigate, etc.)
+- data: Any data needed to execute the action
+- style: Button style (primary, secondary, success, warning, danger)
+
+### Example Action Button Scenarios:
+
+**Path Creation Confirmation**:
+actionButtons: [
+  { id: "confirm-add-lessons", label: "Add Lessons", action: "confirm", data: { pathId: "uuid-here", nextStep: "createLessons" }, style: "primary" },
+  { id: "skip-lessons", label: "Skip for Now", action: "skip", data: { pathId: "uuid-here" }, style: "secondary" }
+]
+
+**Lesson Creation Confirmation**:
+actionButtons: [
+  { id: "add-sections", label: "Add Sections", action: "confirm", data: { lessonId: "uuid-here", nextStep: "addSections" }, style: "primary" },
+  { id: "finish-lesson", label: "Finish", action: "complete", data: { lessonId: "uuid-here" }, style: "success" }
+]
+
+**Multiple Choice Example**:
+actionButtons: [
+  { id: "option-beginner", label: "Beginner", action: "select", data: { level: "beginner" }, style: "secondary" },
+  { id: "option-intermediate", label: "Intermediate", action: "select", data: { level: "intermediate" }, style: "secondary" },
+  { id: "option-advanced", label: "Advanced", action: "select", data: { level: "advanced" }, style: "secondary" }
+]
+
+**Deletion Confirmation**:
+actionButtons: [
+  { id: "confirm-delete", label: "Delete", action: "confirm", data: { itemId: "uuid-here", itemType: "lesson" }, style: "danger" },
+  { id: "cancel-delete", label: "Cancel", action: "cancel", data: {}, style: "secondary" }
+]
+
+### Action Button Guidelines:
+- **Maximum 5 buttons** per response to avoid overwhelming the user
+- **Primary action** should be the most likely/recommended choice
+- **Destructive actions** (delete, remove) should use "danger" style
+- **Button labels** should be clear and action-oriented
+- **Include relevant data** needed to execute the action in the next request
+
+### Button Action Types:
+- confirm: User confirms to proceed with the suggested action
+- deny: User declines the suggested action
+- select: User selects from multiple options
+- navigate: User wants to navigate to a different step/section
+- complete: User indicates the current workflow is finished
+- cancel: User wants to cancel the current operation
+- skip: User wants to skip the current step
+- edit: User wants to modify something before proceeding
+
+When the user clicks a button, the frontend will send the button's data object as part of the next message, allowing you to continue the workflow seamlessly.
+
 # User Message
 "${message}"
+
+${buttonData ? `
+# Button Response Context
+The user clicked a button with the following data:
+- Button Action: ${buttonData.buttonAction || 'unknown'}
+- Button ID: ${buttonData.buttonId || 'unknown'}
+- Button Data: ${JSON.stringify(buttonData, null, 2)}
+
+This is a continuation of a multi-step workflow. Use this button data to proceed with the next step in the process.
+` : ''}
 
 # Response
 Provide a helpful, context-aware response that acknowledges what the user is currently viewing and offers relevant assistance based on their specific situation and the persona they've selected.`;
@@ -1420,6 +1566,152 @@ function extractCitationsFromToolResults(toolResults: any[]): { id: string; titl
   return citations;
 }
 
+// Extract action buttons from Luna's response text
+function extractActionButtons(responseText: string): any[] {
+  const actionButtons: any[] = [];
+  let hasSpecificButtons = false; // Flag to track if we've added specific buttons
+  
+  try {
+    console.log('[Luna] Extracting action buttons from response:', responseText.substring(0, 300) + '...');
+    
+    // Look for action button patterns in the response
+    // This is a simple implementation - Luna should ideally provide structured data
+    
+    // Pattern 1: Look for explicit actionButtons mentions
+    const actionButtonPattern = /actionButtons:\s*\[(.*?)\]/g;
+    const matches = responseText.match(actionButtonPattern);
+    
+    if (matches) {
+      console.log('[Luna] Found explicit actionButtons pattern:', matches);
+      for (const match of matches) {
+        try {
+          // Extract the array content
+          const arrayContent = match.replace(/actionButtons:\s*/, '');
+          // This is a simplified parser - in production, you might want a more robust solution
+          const buttons = eval(arrayContent); // Note: eval is used here for simplicity, consider a safer parser
+          if (Array.isArray(buttons)) {
+            actionButtons.push(...buttons);
+            hasSpecificButtons = true;
+          }
+        } catch (error) {
+          console.warn('Failed to parse action buttons from response:', error);
+        }
+      }
+    }
+    
+    // Pattern 2: Detect common confirmation scenarios and auto-generate buttons
+    if (actionButtons.length === 0) {
+      console.log('[Luna] No explicit buttons found, checking for auto-detection patterns...');
+      
+      // Auto-detect path creation confirmations
+      if (responseText.includes('path') && responseText.includes('created') && responseText.includes('lessons')) {
+        console.log('[Luna] Detected path creation confirmation pattern');
+        const pathIdMatch = responseText.match(/path.*?ID[:\s]+([a-f0-9-]{36})/i);
+        const pathId = pathIdMatch ? pathIdMatch[1] : null;
+        
+        if (pathId) {
+          actionButtons.push(
+            {
+              id: 'confirm-add-lessons',
+              label: 'Add Lessons',
+              action: 'confirm',
+              data: { pathId, nextStep: 'createLessons' },
+              style: 'primary'
+            },
+            {
+              id: 'skip-lessons',
+              label: 'Skip for Now',
+              action: 'skip',
+              data: { pathId },
+              style: 'secondary'
+            }
+          );
+          hasSpecificButtons = true;
+        }
+      }
+      
+      // Auto-detect lesson creation confirmations - improved patterns
+      if (!hasSpecificButtons && 
+          ((responseText.includes('lesson') && responseText.includes('create') && responseText.includes('sections')) ||
+           (responseText.includes('lesson') && responseText.includes('suggest') && responseText.includes('sections')) ||
+           (responseText.includes('create this lesson') && responseText.includes('suggest sections')))) {
+        console.log('[Luna] Detected lesson creation confirmation pattern');
+        const lessonIdMatch = responseText.match(/lesson.*?ID[:\s]+([a-f0-9-]{36})/i);
+        const lessonId = lessonIdMatch ? lessonIdMatch[1] : null;
+        
+        actionButtons.push(
+          {
+            id: 'create-lesson-with-sections',
+            label: 'Yes, Create Lesson',
+            action: 'confirm',
+            data: { lessonId, nextStep: 'createLessonWithSections', createLesson: true },
+            style: 'primary'
+          },
+          {
+            id: 'decline-lesson-creation',
+            label: 'No, Thanks',
+            action: 'deny',
+            data: { lessonId },
+            style: 'secondary'
+          }
+        );
+        hasSpecificButtons = true;
+      }
+      
+      // Auto-detect general yes/no questions - only if no specific buttons were added
+      if (!hasSpecificButtons && 
+          (responseText.includes('Would you like') || 
+           responseText.includes('Do you want') || 
+           responseText.includes('Should I') ||
+           responseText.includes('Would you prefer') ||
+           responseText.includes('Shall I'))) {
+        console.log('[Luna] Detected yes/no question pattern (no specific buttons found)');
+        actionButtons.push(
+          {
+            id: 'confirm-yes',
+            label: 'Yes',
+            action: 'confirm',
+            data: {},
+            style: 'primary'
+          },
+          {
+            id: 'decline-no',
+            label: 'No',
+            action: 'deny',
+            data: {},
+            style: 'secondary'
+          }
+        );
+      }
+      
+      // Auto-detect choice scenarios - only if no specific buttons were added
+      if (!hasSpecificButtons && 
+          (responseText.includes('choose') || responseText.includes('select') || responseText.includes('option'))) {
+        console.log('[Luna] Detected choice scenario pattern (no specific buttons found)');
+        // This could be expanded to extract specific options from the text
+      }
+      
+      // Debug: Log what patterns we're checking against
+      console.log('[Luna] Pattern checks:');
+      console.log('- Has specific buttons already:', hasSpecificButtons);
+      console.log('- Contains "Would you like":', responseText.includes('Would you like'));
+      console.log('- Contains "lesson":', responseText.includes('lesson'));
+      console.log('- Contains "create":', responseText.includes('create'));
+      console.log('- Contains "sections":', responseText.includes('sections'));
+      console.log('- Contains "suggest":', responseText.includes('suggest'));
+      console.log('- Contains "create this lesson":', responseText.includes('create this lesson'));
+      console.log('- Contains "suggest sections":', responseText.includes('suggest sections'));
+    }
+    
+    console.log('[Luna] Final action buttons extracted:', actionButtons);
+    
+  } catch (error) {
+    console.error('Error extracting action buttons:', error);
+  }
+  
+  return actionButtons;
+}
+
 export async function POST(request: Request) {
   if (!openaiClient) {
     console.error("[Luna Chat API] OpenAI client is not initialized. Check API key.");
@@ -1439,7 +1731,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid JSON in request' }, { status: 400 });
     }
     
-    const { message, context, messages: history = [], persona = 'lunaChat' } = requestBody;
+    const { message, context, messages: history = [], persona = 'lunaChat', buttonData } = requestBody;
 
     // Validate input
     if (!message || typeof message !== 'string') {
@@ -1458,7 +1750,7 @@ export async function POST(request: Request) {
     const forwardedCookies = request.headers.get('cookie');
 
     // Prepare messages for the FIRST API call
-    const systemMessage = constructSystemPrompt(context as SerializedUIContext, persona, message);
+    const systemMessage = constructSystemPrompt(context as SerializedUIContext, persona, message, buttonData);
     const userMessagesForFirstCall: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: "system", content: systemMessage },
       ...history.map((msg: { role: string, content: string }) => ({ 
@@ -1837,6 +2129,9 @@ export async function POST(request: Request) {
         // Citations are extracted from the results gathered *before* the second call
         const citations = extractCitationsFromToolResults(toolExecutionResults);
         
+        // Extract action buttons from the response text
+        const actionButtons = extractActionButtons(responseMessage.content || "");
+        
         // Check if any tool result contains course outline data
         let outlineData = null;
         let isOutline = false;
@@ -1852,6 +2147,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
           response: responseMessage.content || "", // Final text response
           citations,
+          actionButtons,
           hasToolResults: toolExecutionResults.length > 0,
           isOutline,
           outlineData
@@ -1860,9 +2156,14 @@ export async function POST(request: Request) {
       } else {
          // No tool calls, use the first response directly
          console.log("[Luna Chat API] First response did not include tool calls. Using direct response.");
+         
+         // Extract action buttons from the response text
+         const actionButtons = extractActionButtons(responseMessage.content || "");
+         
          return NextResponse.json({
            response: responseMessage.content || "",
            citations: [], // No tools called, so no citations from tools
+           actionButtons,
            hasToolResults: false,
          });
       }

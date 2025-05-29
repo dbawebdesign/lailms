@@ -10,9 +10,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { baseClassId: string } }
+  { params }: { params: Promise<{ baseClassId: string }> }
 ) {
-  const { baseClassId } = params;
+  const { baseClassId } = await params;
   console.log(`[STREAMING:generate-all-lessons-content] Received request for baseClassId: ${baseClassId}`);
 
   if (!baseClassId) {
@@ -209,9 +209,9 @@ export async function POST(
 // GET method to check if content already exists
 export async function GET(
   request: NextRequest,
-  { params }: { params: { baseClassId: string } }
+  { params }: { params: Promise<{ baseClassId: string }> }
 ) {
-  const { baseClassId } = params;
+  const { baseClassId } = await params;
   const url = new URL(request.url);
   const isCheck = url.searchParams.get('check') === 'true';
 
