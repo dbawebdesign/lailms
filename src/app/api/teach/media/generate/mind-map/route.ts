@@ -6,1162 +6,1640 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-interface MindMapRequest {
-  lessonId: string;
-  content?: string; // Optional fallback content
-  gradeLevel: string;
-}
-
-interface MindMapNode {
-  id: string;
-  label: string;
-  type: 'root' | 'main' | 'sub' | 'detail' | 'micro';
-  children?: MindMapNode[];
-  position?: { x: number; y: number };
-  color?: string;
-}
-
-// Helper function to extract text from JSONB content (same as podcast API)
-function extractTextFromContent(content: any): string {
+// Extract rich text content from JSONB
+function extractTextContent(content: any): string {
   if (!content) return '';
+  if (typeof content === 'string') return content;
   
-  if (typeof content === 'string') {
-    return content;
-  }
-  
-  if (typeof content === 'object') {
-    // Handle Tiptap/ProseMirror JSON structure
     if (content.type === 'doc' && content.content) {
-      return extractTextFromNodes(content.content);
-    }
-    
-    // Handle other JSON structures
-    if (Array.isArray(content)) {
-      return content.map(item => extractTextFromContent(item)).join(' ');
-    }
-    
-    // Extract text from object properties
-    const textValues = Object.values(content)
-      .filter(value => typeof value === 'string')
-      .join(' ');
-    
-    if (textValues) return textValues;
-    
-    // Recursively search nested objects
-    return Object.values(content)
-      .map(value => extractTextFromContent(value))
-      .filter(text => text)
-      .join(' ');
+    return extractFromNodes(content.content);
   }
   
-  return String(content);
+  return '';
 }
 
-function extractTextFromNodes(nodes: any[]): string {
+function extractFromNodes(nodes: any[]): string {
   if (!Array.isArray(nodes)) return '';
   
   return nodes.map(node => {
-    if (node.type === 'text') {
-      return node.text || '';
-    }
-    
+    if (node.type === 'text') return node.text || '';
     if (node.type === 'paragraph' && node.content) {
-      return extractTextFromNodes(node.content) + '\n\n';
+      return extractFromNodes(node.content) + '\n';
     }
-    
     if (node.type === 'heading' && node.content) {
-      return extractTextFromNodes(node.content) + '\n\n';
+      return extractFromNodes(node.content) + '\n';
     }
-    
-    if (node.type === 'bulletList' && node.content) {
-      return node.content.map((item: any) => 
-        '• ' + extractTextFromNodes(item.content || [])
-      ).join('\n') + '\n\n';
-    }
-    
-    if (node.type === 'orderedList' && node.content) {
-      return node.content.map((item: any, index: number) => 
-        `${index + 1}. ` + extractTextFromNodes(item.content || [])
-      ).join('\n') + '\n\n';
-    }
-    
-    if (node.content) {
-      return extractTextFromNodes(node.content);
-    }
-    
+    if (node.content) return extractFromNodes(node.content);
     return '';
   }).join('');
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { lessonId, content: fallbackContent, gradeLevel }: MindMapRequest = await request.json();
-
-    if (!lessonId) {
-      return NextResponse.json(
-        { error: 'Lesson ID is required' },
-        { status: 400 }
-      );
-    }
-
-    // Initialize Supabase client
+    const { lessonId } = await request.json();
     const supabase = createSupabaseServerClient();
 
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if regeneration is requested
-    const regenerate = request.nextUrl.searchParams.get('regenerate') === 'true';
-
-    // Check if a mind map already exists for this lesson
-    const { data: existingAssets } = await supabase
-      .from('lesson_media_assets')
-      .select('*')
-      .eq('lesson_id', lessonId)
-      .eq('asset_type', 'mind_map')
-      .eq('status', 'completed');
-
-    if (existingAssets && existingAssets.length > 0 && !regenerate) {
-      return NextResponse.json(
-        { error: 'A mind map already exists for this lesson' },
-        { status: 409 }
-      );
+    if (!lessonId) {
+      return NextResponse.json({ error: 'Lesson ID is required' }, { status: 400 });
     }
 
-    // If regenerating, delete existing mind maps first
-    if (regenerate && existingAssets && existingAssets.length > 0) {
-      const { error: deleteError } = await supabase
-        .from('lesson_media_assets')
-        .delete()
-        .eq('lesson_id', lessonId)
-        .eq('asset_type', 'mind_map');
-
-      if (deleteError) {
-        console.error('Failed to delete existing mind map:', deleteError);
-        return NextResponse.json(
-          { error: 'Failed to delete existing mind map' },
-          { status: 500 }
-        );
-      }
-    }
-
-    // Fetch lesson details and all its sections
-    const { data: lesson, error: lessonError } = await supabase
+    // Fetch comprehensive lesson content
+    const { data: lesson } = await supabase
       .from('lessons')
-      .select('title, description')
+      .select(`
+        title,
+        description,
+        lesson_sections (
+          title,
+          content,
+          section_type,
+          order_index
+        )
+      `)
       .eq('id', lessonId)
       .single();
 
-    if (lessonError) {
-      console.error('Failed to fetch lesson:', lessonError);
-      return NextResponse.json(
-        { error: 'Failed to fetch lesson details' },
-        { status: 500 }
-      );
+    if (!lesson) {
+      return NextResponse.json({ error: 'Lesson not found' }, { status: 404 });
     }
 
-    // Fetch all lesson sections for this lesson
-    const { data: sections, error: sectionsError } = await supabase
-      .from('lesson_sections')
-      .select('title, content, section_type, order_index')
-      .eq('lesson_id', lessonId)
-      .order('order_index', { ascending: true });
-
-    if (sectionsError) {
-      console.error('Failed to fetch lesson sections:', sectionsError);
-      return NextResponse.json(
-        { error: 'Failed to fetch lesson sections' },
-        { status: 500 }
-      );
-    }
-
-    // Build comprehensive content from lesson and all sections
-    let comprehensiveContent = '';
-
-    // Add lesson title and description
-    if (lesson.title) {
-      comprehensiveContent += `Lesson Title: ${lesson.title}\n\n`;
-    }
-    if (lesson.description) {
-      comprehensiveContent += `Lesson Description: ${lesson.description}\n\n`;
-    }
-
-    // Add all section content
-    if (sections && sections.length > 0) {
-      comprehensiveContent += 'Lesson Content:\n\n';
-      
-      sections.forEach((section, index) => {
-        comprehensiveContent += `Section ${index + 1}: ${section.title}\n`;
+    // Enhanced content extraction with deeper analysis
+    const lessonContent = {
+      title: lesson.title,
+      description: lesson.description || '',
+      sections: lesson.lesson_sections?.sort((a: any, b: any) => a.order_index - b.order_index).map((section: any) => {
+        const content = extractTextContent(section.content);
+        const keyPoints = extractKeyPoints(content);
+        const detailedConcepts = extractDetailedConcepts(content);
         
-        // Extract text content from JSONB
-        const sectionText = extractTextFromContent(section.content);
-        if (sectionText.trim()) {
-          comprehensiveContent += `${sectionText}\n\n`;
-        }
-      });
-    } else if (fallbackContent) {
-      // Use fallback content if no sections are available
-      comprehensiveContent += `Content: ${fallbackContent}\n\n`;
-    }
+        return {
+          title: section.title,
+          content: content,
+          type: section.section_type,
+          keyPoints: keyPoints,
+          concepts: detailedConcepts.slice(0, 4), // Limit to 4 main concepts per section
+          summary: content.substring(0, 300) // Section summary
+        };
+      }) || []
+    };
 
-    if (!comprehensiveContent.trim()) {
-      return NextResponse.json(
-        { error: 'No content available to generate mind map' },
-        { status: 400 }
-      );
-    }
+    // Generate mind map with AI - enhanced prompt for deeper hierarchy
+    const prompt = `Create a comprehensive, multi-level mind map from this lesson content. Extract ACTUAL content and create a deep hierarchy.
 
-    // Generate mind map structure using OpenAI
-    const prompt = `Create a detailed mind map for this lesson. Return ONLY valid JSON.
-
-CONTENT:
-${comprehensiveContent}
+LESSON STRUCTURE:
+${JSON.stringify(lessonContent, null, 2)}
 
 REQUIREMENTS:
-- Grade level: ${gradeLevel}
-- 4-level hierarchy: Root → Main concepts → Sub-concepts → Details
-- Educational focus with clear learning progression
-- Balanced content distribution
+1. Center: Lesson title "${lessonContent.title}"
+2. Level 1: Main sections (up to 6 branches)
+3. Level 2: Key concepts from each section (3-5 per branch)
+4. Level 3: Detailed points and examples (2-4 per concept)
+5. Level 4: Specific details and applications (1-3 per point)
+6. Use ACTUAL content from lesson sections
+7. Rich descriptions for each node
+8. Logical hierarchy progression
 
-STRUCTURE:
-Root: Lesson topic (2-4 words)
-Main branches: Key concepts (3-5 major themes)
-Sub-branches: Supporting details (2-4 per main branch)
-Details: Specific concepts (1-3 per sub-branch)
-
-COLORS (use exactly):
-Root: "#2563EB"
-Main: ["#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#06B6D4"]
-Sub: ["#34D399", "#A78BFA", "#FBBF24", "#F87171", "#22D3EE"]
-Detail: ["#6EE7B7", "#C4B5FD", "#FCD34D", "#FCA5A5", "#67E8F9"]
-
-JSON FORMAT:
+OUTPUT FORMAT (valid JSON only):
 {
-  "root": {
-    "id": "root",
-    "label": "Lesson Topic",
-    "type": "root",
-    "color": "#2563EB",
-    "children": [
-      {
-        "id": "main1",
-        "label": "Key Concept",
-        "type": "main",
-        "color": "#10B981",
-        "children": [
-          {
-            "id": "sub1_1",
-            "label": "Supporting Detail",
-            "type": "sub",
-            "color": "#34D399",
-            "children": [
-              {
-                "id": "detail1_1_1",
-                "label": "Specific Point",
-                "type": "detail",
-                "color": "#6EE7B7"
-              }
-            ]
-          }
-        ]
-      }
-    ]
+  "center": {
+    "label": "${lessonContent.title}",
+    "description": "${lessonContent.description || 'Comprehensive lesson overview'}"
   },
-  "title": "Lesson Mind Map"
+  "branches": [
+    {
+      "id": "section1",
+      "label": "Section Name",
+      "description": "Section overview and learning objectives",
+      "color": "#DC2626",
+      "concepts": [
+        {
+          "id": "concept1",
+          "label": "Key Concept",
+          "description": "Detailed concept explanation",
+          "points": [
+            {
+              "id": "point1",
+              "label": "Important Point",
+              "description": "Point explanation with context",
+              "details": [
+                {
+                  "id": "detail1",
+                  "label": "Specific Detail",
+                  "description": "Detailed explanation or example"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }
 
-CONSTRAINTS:
-- Maximum 4 levels deep
-- Labels: 2-6 words each
-- Cover all major lesson content
-- Use exact color codes provided
-- Return only JSON, no explanations`;
+Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
 
-    const completion = await openai.chat.completions.create({
+    const aiResponse = await openai.chat.completions.create({
       model: 'gpt-4.1-mini',
       messages: [
-        {
-          role: 'system',
-          content: `You are an educational mind map designer. Create clear, hierarchical visualizations that help students understand complex topics.
-
-CORE PRINCIPLES:
-- Educational focus supporting learning comprehension
-- Clear hierarchy from general to specific concepts
-- Visual balance across content areas
-- Grade-appropriate language and terminology
-
-CRITICAL REQUIREMENTS:
-- Return ONLY valid JSON, no explanations
-- Use EXACT color codes from prompt
-- Ensure proper JSON structure with all brackets closed
-- Maximum 4 levels deep to avoid complexity
-- Cover all major aspects of the topic
-- Keep labels concise (2-6 words)`
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
+        { role: 'system', content: 'You create educational mind maps with deep hierarchical structure. Return only valid JSON.' },
+        { role: 'user', content: prompt }
       ],
-      max_tokens: 12000, // Increased significantly to prevent truncation
-      temperature: 0.3, // Reduced for more consistent output
+      temperature: 0.1,
+      max_tokens: 8000
     });
 
-    const mindMapData = completion.choices[0]?.message?.content;
-    if (!mindMapData) {
-      throw new Error('Failed to generate mind map structure');
-    }
-
-    let parsedMindMap;
+    let mindMapData;
     try {
-      // Clean the response and extract JSON
-      let cleanedData = mindMapData.trim();
-      
-      // Remove any markdown code blocks if present
-      cleanedData = cleanedData.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
-      
-      // Try to find JSON object in the response
-      const jsonMatch = cleanedData.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        cleanedData = jsonMatch[0];
-      }
-      
-      // Advanced JSON repair for truncated responses
-      if (!cleanedData.endsWith('}')) {
-        console.log('JSON appears truncated, attempting advanced repair...');
-        
-        // Find the last complete object or array
-        let lastValidPosition = cleanedData.length;
-        let braceCount = 0;
-        let bracketCount = 0;
-        let inString = false;
-        let escapeNext = false;
-        
-        for (let i = cleanedData.length - 1; i >= 0; i--) {
-          const char = cleanedData[i];
-          
-          if (escapeNext) {
-            escapeNext = false;
-            continue;
-          }
-          
-          if (char === '\\') {
-            escapeNext = true;
-            continue;
-          }
-          
-          if (char === '"' && !escapeNext) {
-            inString = !inString;
-            continue;
-          }
-          
-          if (!inString) {
-            if (char === '}') braceCount++;
-            else if (char === '{') braceCount--;
-            else if (char === ']') bracketCount++;
-            else if (char === '[') bracketCount--;
-            
-            // If we have balanced braces and brackets, this might be a good cut point
-            if (braceCount === 0 && bracketCount === 0) {
-              lastValidPosition = i;
-              break;
-            }
-          }
-        }
-        
-        // Try to repair by cutting at the last valid position
-        if (lastValidPosition < cleanedData.length) {
-          cleanedData = cleanedData.substring(0, lastValidPosition);
-          
-          // Add missing closing braces/brackets
-          const openBraces = (cleanedData.match(/\{/g) || []).length;
-          const closeBraces = (cleanedData.match(/\}/g) || []).length;
-          const openBrackets = (cleanedData.match(/\[/g) || []).length;
-          const closeBrackets = (cleanedData.match(/\]/g) || []).length;
-          
-          const missingBraces = openBraces - closeBraces;
-          const missingBrackets = openBrackets - closeBrackets;
-          
-          if (missingBrackets > 0) {
-            cleanedData += ']'.repeat(missingBrackets);
-          }
-          if (missingBraces > 0) {
-            cleanedData += '}'.repeat(missingBraces);
-          }
-          
-          console.log(`Repaired JSON: cut at position ${lastValidPosition}, added ${missingBrackets} brackets and ${missingBraces} braces`);
-        }
-        
-        // Remove any trailing commas that might cause issues
-        cleanedData = cleanedData.replace(/,(\s*[}\]])/g, '$1');
-        
-        // Remove incomplete property names or values at the end
-        cleanedData = cleanedData.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*"?\s*$/, '');
-        cleanedData = cleanedData.replace(/,\s*"[^"]*"?\s*$/, '');
-      }
-      
-      console.log('Attempting to parse mind map JSON:', cleanedData.substring(0, 500));
-      console.log('JSON ends with:', cleanedData.slice(-100));
-      
-      parsedMindMap = JSON.parse(cleanedData);
-      
-      // Validate the structure
-      if (!parsedMindMap.root || !parsedMindMap.title) {
-        throw new Error('Mind map missing required root or title');
-      }
-      
-    } catch (e: unknown) {
-      console.error('Failed to parse mind map JSON:', e);
-      console.error('Raw response length:', mindMapData.length);
-      console.error('Raw response (first 1000 chars):', mindMapData.substring(0, 1000));
-      console.error('Raw response (last 500 chars):', mindMapData.slice(-500));
-      
-      // If parsing still failed, create a simplified fallback structure
-      const errorMessage = e instanceof Error ? e.message : 'Unknown parsing error';
-      
-      // Try to create a minimal valid structure as fallback
-      console.log('Creating fallback mind map structure...');
-      parsedMindMap = {
-        root: {
-          id: "root",
-          label: lesson.title || "Lesson",
-          type: "root",
-          color: "#2563EB",
-          children: sections?.slice(0, 5).map((section: any, index: number) => ({
-            id: `main${index + 1}`,
-            label: section.title.substring(0, 20),
-            type: "main",
-            color: ["#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#06B6D4"][index % 5],
-            children: []
-          })) || []
+      const responseText = aiResponse.choices[0]?.message?.content || '{}';
+      const cleanedJson = responseText.replace(/```json\s*|\s*```/g, '').trim();
+      mindMapData = JSON.parse(cleanedJson);
+    } catch (error) {
+      // Enhanced fallback structure with deeper hierarchy
+      const colors = ['#DC2626', '#059669', '#7C3AED', '#EA580C', '#0891B2', '#BE185D'];
+      mindMapData = {
+        center: {
+          label: lessonContent.title,
+          description: lessonContent.description || 'Comprehensive lesson'
         },
-        title: `${lesson.title} Mind Map`
+        branches: lessonContent.sections.slice(0, 6).map((section: any, index: number) => ({
+          id: `section${index + 1}`,
+          label: section.title,
+          description: section.summary,
+          color: colors[index],
+          concepts: section.concepts.slice(0, 4).map((concept: any, conceptIndex: number) => ({
+            id: `concept${index + 1}_${conceptIndex + 1}`,
+            label: concept.title,
+            description: concept.description,
+            points: concept.points?.slice(0, 3).map((point: any, pointIndex: number) => ({
+              id: `point${index + 1}_${conceptIndex + 1}_${pointIndex + 1}`,
+              label: point.title || point,
+              description: point.description || point,
+              details: point.details?.slice(0, 2).map((detail: any, detailIndex: number) => ({
+                id: `detail${index + 1}_${conceptIndex + 1}_${pointIndex + 1}_${detailIndex + 1}`,
+                label: detail.title || detail,
+                description: detail.description || detail
+              })) || []
+            })) || []
+          }))
+        }))
       };
-      
-      console.log('Using fallback structure with', parsedMindMap.root.children.length, 'sections');
     }
 
-    // Generate interactive HTML mind map
-    const htmlContent = generateInteractiveMindMap(parsedMindMap.root, parsedMindMap.title);
+    // Generate premium SVG mind map with enhanced positioning
+    const svgHtml = generateInteractiveSVGMindMap(mindMapData, lessonContent.title);
 
-    // Save the mind map asset to the database
-    const { data: assetData, error: assetError } = await supabase
+    // Save to database
+    const { data: asset } = await supabase
       .from('lesson_media_assets')
       .insert({
         lesson_id: lessonId,
         asset_type: 'mind_map',
-        title: parsedMindMap.title || 'Lesson Mind Map',
-        content: {
-          ...parsedMindMap,
-          sections_count: sections?.length || 0,
-          comprehensive_content_length: comprehensiveContent.length
-        },
-        svg_content: htmlContent,
+        title: `${lessonContent.title} Mind Map`,
+        content: mindMapData,
+        svg_content: svgHtml,
         status: 'completed',
         created_by: user.id
       })
       .select()
       .single();
 
-    if (assetError) {
-      console.error('Database error:', assetError);
-      throw new Error('Failed to save mind map');
-    }
-
-    // Generate a public URL for the mind map
-    const mindMapUrl = `/api/teach/media/mind-map/${assetData.id}`;
-
     return NextResponse.json({
       success: true,
       asset: {
-        id: assetData.id,
-        type: 'mind_map',
-        title: assetData.title,
-        url: mindMapUrl,
-        status: 'completed',
-        createdAt: assetData.created_at
+        id: asset.id,
+        url: `/api/teach/media/mind-map/${asset.id}`,
+        title: asset.title
       }
     });
 
   } catch (error) {
     console.error('Mind map generation error:', error);
-    return NextResponse.json(
-      { error: 'Failed to generate mind map. Please try again.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to generate mind map' }, { status: 500 });
   }
 }
 
-function generateInteractiveMindMap(rootNode: MindMapNode, title: string): string {
+function extractDetailedConcepts(content: string): any[] {
+  if (!content) return [];
+  
+  // Split content into paragraphs and extract concepts
+  const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 50);
+  
+  return paragraphs.slice(0, 6).map((paragraph, index) => {
+    const sentences = paragraph.split(/[.!?]+/).filter(s => s.trim().length > 20);
+    const title = sentences[0]?.trim().substring(0, 80) || `Concept ${index + 1}`;
+    
+    return {
+      title: title,
+      description: paragraph.substring(0, 200),
+      points: sentences.slice(1, 4).map(sentence => ({
+        title: sentence.trim().substring(0, 60),
+        description: sentence.trim(),
+        details: extractDetailsFromSentence(sentence)
+      }))
+    };
+  });
+}
+
+function extractDetailsFromSentence(sentence: string): any[] {
+  // Extract key phrases and terms from a sentence
+  const words = sentence.split(' ').filter(word => word.length > 4);
+  const keyPhrases = [];
+  
+  // Simple heuristic to find important phrases
+  for (let i = 0; i < words.length - 1; i++) {
+    if (words[i].length > 6 && words[i + 1].length > 4) {
+      keyPhrases.push(`${words[i]} ${words[i + 1]}`);
+    }
+  }
+  
+  return keyPhrases.slice(0, 3).map(phrase => ({
+    title: phrase,
+    description: `Important aspect: ${phrase}`
+  }));
+}
+
+function extractKeyPoints(content: string): string[] {
+  if (!content) return [];
+  
+  const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 20);
+  return sentences.slice(0, 6).map(s => s.trim());
+}
+
+function generateInteractiveSVGMindMap(data: any, title: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title}</title>
+    <title>${title} - Mind Map</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
-            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'SF Pro Display', sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
             overflow: hidden;
             height: 100vh;
-            margin: 0;
-            padding: 0;
-            font-feature-settings: 'kern' 1, 'liga' 1;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-        
-        .mind-map-container {
-            position: relative;
-            width: 100%;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
+            user-select: none;
             cursor: grab;
         }
         
-        .mind-map-container:active {
-            cursor: grabbing;
+        body:active { cursor: grabbing; }
+        
+        .mind-map-container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
         }
         
-        #mindMap {
-            position: relative;
+        #mindMapSvg {
             width: 100%;
             height: 100%;
-            transform-origin: center center;
-            transition: transform 0.3s ease;
+            background: transparent;
         }
         
-        .mind-map-title {
-            position: absolute;
-            top: 32px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 28px;
-            font-weight: 700;
-            color: #ffffff;
-            z-index: 10;
-            text-align: center;
-            letter-spacing: -0.025em;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-            max-width: 80%;
-            line-height: 1.2;
+        /* Premium node styles */
+        .center-node {
+            filter: drop-shadow(0 12px 40px rgba(0, 0, 0, 0.4));
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
         
-        .mind-map-node {
-            position: absolute;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .center-node:hover {
+            filter: drop-shadow(0 16px 48px rgba(255, 255, 255, 0.1)) drop-shadow(0 12px 40px rgba(0, 0, 0, 0.5));
+        }
+        
+        .main-branch {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            font-weight: 600;
-            text-align: center;
-            border: 2px solid rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(20px);
-            user-select: none;
-            padding: 12px 16px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
-            letter-spacing: -0.01em;
-            line-height: 1.3;
-            word-wrap: break-word;
-            white-space: normal;
-            overflow: visible;
+            filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.3));
         }
         
-        .mind-map-node:hover {
-            transform: scale(1.05) translateY(-2px);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0, 0, 0, 0.15);
-            border-color: rgba(255, 255, 255, 0.3);
-            z-index: 100;
+        .main-branch:hover {
+            filter: drop-shadow(0 8px 28px rgba(255, 255, 255, 0.08)) drop-shadow(0 6px 20px rgba(0, 0, 0, 0.4));
         }
         
-        .root-node {
-            background: linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%);
-            font-size: 18px;
-            font-weight: 700;
-            z-index: 5;
-            border-radius: 50%;
-            border: 3px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 32px rgba(37, 99, 235, 0.3), 0 4px 16px rgba(0, 0, 0, 0.2);
-            padding: 20px;
+        .concept-node {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            cursor: pointer;
+            filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.25));
         }
         
-        .main-node {
-            font-size: 14px;
-            border-radius: 20px;
-            z-index: 4;
-            position: relative;
-            padding: 12px 16px;
+        .concept-node:hover {
+            filter: drop-shadow(0 6px 20px rgba(255, 255, 255, 0.06)) drop-shadow(0 4px 16px rgba(0, 0, 0, 0.35));
         }
         
-        .sub-node {
-            font-size: 12px;
-            border-radius: 16px;
-            z-index: 3;
-            opacity: 0;
-            transform: scale(0);
-            padding: 10px 14px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        .point-node {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            cursor: pointer;
+            filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.2));
         }
         
-        .sub-node.visible {
-            opacity: 1;
-            transform: scale(1);
+        .point-node:hover {
+            filter: drop-shadow(0 4px 16px rgba(255, 255, 255, 0.05)) drop-shadow(0 2px 12px rgba(0, 0, 0, 0.3));
         }
         
         .detail-node {
-            font-size: 11px;
-            border-radius: 14px;
-            z-index: 2;
-            opacity: 0;
-            transform: scale(0);
-            padding: 8px 12px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            cursor: pointer;
+            filter: drop-shadow(0 1px 8px rgba(0, 0, 0, 0.15));
         }
         
-        .detail-node.visible {
+        .detail-node:hover {
+            filter: drop-shadow(0 2px 12px rgba(255, 255, 255, 0.04)) drop-shadow(0 1px 8px rgba(0, 0, 0, 0.25));
+        }
+        
+        /* Connection lines */
+        .connection-line {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            stroke-linecap: round;
+        }
+        
+        .connection-line:hover {
+            stroke-width: 1.5;
+            opacity: 1;
+        }
+        
+        /* Cross-connections for concept linking */
+        .cross-connection {
+            stroke: #fbbf24;
+            stroke-width: 2;
+            stroke-dasharray: 8,4;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            stroke-linecap: round;
+        }
+        
+        .cross-connection.visible {
+            opacity: 0.6;
+        }
+        
+        .expandable {
+            opacity: 0;
+            transform: scale(0.8);
+            transform-origin: center;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        
+        .expandable.visible {
             opacity: 1;
             transform: scale(1);
         }
         
-        .connection-line {
-            position: absolute;
-            transform-origin: left center;
-            z-index: 1;
-            height: 3px;
-            border-radius: 1.5px;
-            background: linear-gradient(90deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.1) 100%);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
+        /* Connection mode toggle */
+        .mode-toggle {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            border-radius: 16px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            z-index: 1000;
         }
         
-        .sub-connection {
-            height: 2px;
-            background: linear-gradient(90deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.08) 100%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .sub-connection.visible {
-            opacity: 1;
-        }
-        
-        .detail-connection {
-            height: 1px;
-            background: linear-gradient(90deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 100%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .detail-connection.visible {
-            opacity: 1;
-        }
-        
-        .expand-indicator {
-            position: absolute;
-            right: 8px;
-            top: 50%;
-            transform: translateY(-50%);
+        .mode-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            padding: 10px 16px;
+            border-radius: 12px;
+            cursor: pointer;
             font-size: 12px;
-            transition: transform 0.3s ease;
-            opacity: 0.7;
+            font-weight: 500;
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            backdrop-filter: blur(10px);
         }
         
-        .expand-indicator.expanded {
-            transform: translateY(-50%) rotate(90deg);
+        .mode-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
         }
         
+        .mode-btn.active {
+            background: rgba(251, 191, 36, 0.2);
+            border-color: rgba(251, 191, 36, 0.4);
+            color: #fbbf24;
+        }
+        
+        /* Premium controls */
         .controls {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            z-index: 40;
+            gap: 12px;
+            z-index: 1000;
         }
         
         .control-group {
             display: flex;
-            gap: 4px;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 4px;
-            border-radius: 8px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            border-radius: 16px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
         
         .control-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
-            padding: 8px;
-            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            padding: 10px 14px;
+            border-radius: 12px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            min-width: 44px;
+            text-align: center;
             backdrop-filter: blur(10px);
-            font-size: 12px;
-            min-width: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
         
         .control-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
             transform: translateY(-1px);
         }
         
-        .help-text {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            max-width: 280px;
+        .control-btn:active {
+            transform: translateY(0);
         }
         
-        @media (max-width: 768px) {
-            .mind-map-title {
-                font-size: 20px;
-                top: 16px;
-            }
-            
-            .controls {
-                bottom: 10px;
-                right: 10px;
-                scale: 0.9;
-            }
-            
-            .help-text {
-                bottom: 10px;
-                left: 10px;
-                font-size: 11px;
-                padding: 8px 12px;
-                max-width: 220px;
-            }
+        /* Premium info panel */
+        .info-panel {
+            position: fixed;
+            top: 24px;
+            left: 24px;
+            max-width: 380px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 16px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transform: translateX(-100%);
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            z-index: 1000;
+        }
+        
+        .info-panel.visible { 
+            transform: translateX(0);
+        }
+        
+        .info-panel h3 {
+            margin-bottom: 12px;
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+        
+        .info-panel p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        /* Node text styling */
+        .node-text {
+            pointer-events: none;
+            font-weight: 500;
+        }
+        
+        .center-text {
+            font-weight: 700;
+            font-size: 16px;
+        }
+        
+        .branch-text {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .concept-text {
+            font-weight: 500;
+            font-size: 12px;
+        }
+        
+        .point-text {
+            font-weight: 400;
+            font-size: 10px;
+        }
+        
+        .detail-text {
+            font-weight: 300;
+            font-size: 9px;
         }
     </style>
 </head>
 <body>
     <div class="mind-map-container">
-        <h1 class="mind-map-title">${title}</h1>
-        
-        <!-- Simplified Controls -->
+        <svg id="mindMapSvg" viewBox="0 0 1600 1200">
+            <defs>
+                <filter id="glow">
+                    <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                    <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+                
+                <filter id="shadow">
+                    <feDropShadow dx="0" dy="4" stdDeviation="12" flood-color="rgba(0,0,0,0.3)"/>
+                </filter>
+                
+                <linearGradient id="centerGradient" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#2d3748"/>
+                    <stop offset="100%" stop-color="#1a202c"/>
+                </linearGradient>
+            </defs>
+            
+            <g id="connectionsGroup"></g>
+            <g id="crossConnectionsGroup"></g>
+            <g id="nodesGroup"></g>
+        </svg>
+    </div>
+    
+    <div class="mode-toggle">
+        <button class="mode-btn" id="connectionModeBtn" onclick="toggleConnectionMode()">
+            🔗 Concept Links
+        </button>
+    </div>
+    
+    <div class="info-panel" id="infoPanel">
+        <h3 id="infoTitle">Select a node</h3>
+        <p id="infoDescription">Click on any node to explore detailed information and expand the hierarchy</p>
+    </div>
+    
         <div class="controls">
             <div class="control-group">
-                <button id="zoomIn" class="control-btn" title="Zoom In">+</button>
-                <button id="zoomOut" class="control-btn" title="Zoom Out">−</button>
-                <button id="resetView" class="control-btn" title="Reset View">⌂</button>
+            <button class="control-btn" onclick="zoomIn()" title="Zoom In">+</button>
+            <button class="control-btn" onclick="zoomOut()" title="Zoom Out">−</button>
+            <button class="control-btn" onclick="resetView()" title="Reset View">⌂</button>
             </div>
             <div class="control-group">
-                <button id="expandAll" class="control-btn" title="Expand All">⊞</button>
-                <button id="collapseAll" class="control-btn" title="Collapse All">⊟</button>
+            <button class="control-btn" onclick="expandAll()" title="Expand All">⊞</button>
+            <button class="control-btn" onclick="collapseAll()" title="Collapse All">⊟</button>
             </div>
-        </div>
-        
-        <!-- Clean Help Text -->
-        <div class="help-text">
-            <div style="font-weight: 600; margin-bottom: 8px;">Lesson Overview</div>
-            <div style="font-size: 11px; opacity: 0.8;">
-                <strong>Navigate:</strong> Click to expand • Drag to pan • Scroll to zoom<br>
-                <strong>Structure:</strong> Topic → Concepts → Details
-            </div>
-        </div>
-        
-        <div id="mindMap"></div>
     </div>
     
     <script>
-        const mindMapData = ${JSON.stringify(rootNode)};
-        let currentZoom = 1;
-        let expandedNodes = new Set();
-        let nodePositions = new Map();
+        const mindMapData = ${JSON.stringify(data)};
         
-        // Drag and pan variables
+        let currentScale = 1;
+        let currentTranslateX = 0;
+        let currentTranslateY = 0;
         let isDragging = false;
-        let dragStart = { x: 0, y: 0 };
-        let currentTransform = { x: 0, y: 0 };
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let expandedNodes = new Set();
+        let connectionMode = false;
+        let nodePositions = new Map();
+        let selectedNode = null; // Track currently selected node for visual feedback
         
-        // Clean layout configuration
-        const LAYOUT_CONFIG = {
-            MAIN_RADIUS: 300,
-            SUB_RADIUS: 200,
-            DETAIL_RADIUS: 140,
-            ANGLE_SPREAD: Math.PI * 1.4, // 252 degrees
+        const svg = document.getElementById('mindMapSvg');
+        const nodesGroup = document.getElementById('nodesGroup');
+        const connectionsGroup = document.getElementById('connectionsGroup');
+        const crossConnectionsGroup = document.getElementById('crossConnectionsGroup');
+        const infoPanel = document.getElementById('infoPanel');
+        
+        // Enhanced positioning constants with better spacing for outer levels
+        const LAYOUT = {
+            centerX: 800,
+            centerY: 600,
+            centerRadius: 80,
+            branchRadius: 380,  
+            conceptRadius: 240, // Increased from 220 for more room
+            pointRadius: 160,   // Increased from 140 for more room  
+            detailRadius: 110,  // Increased from 90 for more room
+            minAngleSpacing: 0.5, // Increased from 0.4 for better spacing
+            overlapBuffer: 30,    // Increased from 25 for more buffer
+            minNodeDistance: 25   // Increased from 20 for minimum distance between nodes
         };
         
-        function measureText(text, fontSize = 14, maxWidth = 200) {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            context.font = \`\${fontSize}px Inter, sans-serif\`;
+        function initializeMindMap() {
+            drawMindMap();
+            setupEventListeners();
+        }
+        
+        function drawMindMap() {
+            nodesGroup.innerHTML = '';
+            connectionsGroup.innerHTML = '';
+            crossConnectionsGroup.innerHTML = '';
+            nodePositions.clear();
+            selectedNode = null; // Reset selection
             
-            const words = text.split(' ');
-            const lines = [];
-            let currentLine = words[0];
+            drawCenterNode();
             
-            for (let i = 1; i < words.length; i++) {
-                const word = words[i];
-                const width = context.measureText(currentLine + ' ' + word).width;
-                if (width < maxWidth) {
-                    currentLine += ' ' + word;
-                } else {
-                    lines.push(currentLine);
-                    currentLine = word;
-                }
+            const branches = mindMapData.branches || [];
+            branches.forEach((branch, index) => {
+                drawBranch(branch, index, branches.length);
+            });
+            
+            // Generate cross-connections in connection mode
+            if (connectionMode) {
+                generateCrossConnections();
             }
-            lines.push(currentLine);
+        }
+        
+        function drawCenterNode() {
+            const centerData = mindMapData.center;
+            const { centerX, centerY } = LAYOUT;
             
-            const maxLineWidth = Math.max(...lines.map(line => context.measureText(line).width));
+            // Dynamic sizing based on text
+            const textMetrics = measureText(centerData.label, 16, 'bold');
+            const radius = Math.max(60, Math.min(100, textMetrics.width / 2 + 20));
+            
+            nodePositions.set('center', { 
+                x: centerX, 
+                y: centerY, 
+                radius: radius,
+                data: centerData 
+            });
+            
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', centerX);
+            circle.setAttribute('cy', centerY);
+            circle.setAttribute('r', radius);
+            circle.setAttribute('fill', 'url(#centerGradient)');
+            circle.setAttribute('stroke', '#4a5568');
+            circle.setAttribute('stroke-width', '3');
+            circle.setAttribute('class', 'center-node');
+            circle.setAttribute('filter', 'url(#shadow)');
+            
+            const text = createWrappedText(centerX, centerY, centerData.label, {
+                maxWidth: radius * 1.6,
+                fontSize: 16,
+                fontWeight: 'bold',
+                fill: '#ffffff',
+                className: 'center-text'
+            });
+            
+            nodesGroup.appendChild(circle);
+            nodesGroup.appendChild(text);
+            
+            circle.addEventListener('click', () => {
+                highlightSelectedNode(circle);
+                showNodeInfo(centerData.label, centerData.description);
+            });
+        }
+        
+        function drawBranch(branchData, branchIndex, totalBranches) {
+            const { centerX, centerY, branchRadius } = LAYOUT;
+            const angle = -Math.PI / 2 + (branchIndex * 2 * Math.PI / totalBranches);
+            const x = centerX + Math.cos(angle) * branchRadius;
+            const y = centerY + Math.sin(angle) * branchRadius;
+            
+            // Dynamic sizing based on text
+            const textMetrics = measureText(branchData.label, 14, 'bold');
+            const width = Math.max(textMetrics.width + 40, 150);
+            const height = Math.max(textMetrics.height + 20, 50);
+            const nodeRadius = Math.max(width, height) / 2;
+            
+            nodePositions.set(\`branch-\${branchIndex}\`, { 
+                x, 
+                y, 
+                radius: nodeRadius,
+                data: branchData 
+            });
+            
+            // Draw straight connection to center
+            const line = createStraightPath(centerX, centerY, x, y, branchData.color, 4);
+            connectionsGroup.appendChild(line);
+            
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', x - width/2);
+            rect.setAttribute('y', y - height/2);
+            rect.setAttribute('width', width);
+            rect.setAttribute('height', height);
+            rect.setAttribute('rx', height/2);
+            rect.setAttribute('fill', branchData.color);
+            rect.setAttribute('class', 'main-branch');
+            rect.setAttribute('filter', 'url(#shadow)');
+            rect.setAttribute('data-branch', branchIndex);
+            
+            const text = createWrappedText(x, y, branchData.label, {
+                maxWidth: width - 20,
+                fontSize: 14,
+                fontWeight: 'bold',
+                fill: '#ffffff',
+                className: 'branch-text'
+            });
+            
+            nodesGroup.appendChild(rect);
+            nodesGroup.appendChild(text);
+            
+            rect.addEventListener('click', (e) => {
+                e.stopPropagation();
+                highlightSelectedNode(rect);
+                toggleBranch(branchIndex, x, y, branchData, angle);
+                showNodeInfo(branchData.label, branchData.description);
+            });
+            
+            if (expandedNodes.has(\`branch-\${branchIndex}\`)) {
+                drawConcepts(x, y, branchData, angle, branchIndex);
+            }
+        }
+        
+        function measureText(text, fontSize = 14, fontWeight = 'normal') {
+            // Create a temporary SVG text element to measure dimensions
+            const tempText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            tempText.textContent = text;
+            tempText.setAttribute('font-size', fontSize);
+            tempText.setAttribute('font-weight', fontWeight);
+            tempText.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "SF Pro Display", sans-serif');
+            tempText.style.visibility = 'hidden';
+            
+            // Add to SVG to measure
+            document.getElementById('mindMapSvg').appendChild(tempText);
+            const bbox = tempText.getBBox();
+            document.getElementById('mindMapSvg').removeChild(tempText);
+            
             return {
-                width: Math.min(maxLineWidth + 32, maxWidth + 32),
-                height: lines.length * (fontSize * 1.4) + 24,
-                lines: lines.length
+                width: bbox.width,
+                height: bbox.height
             };
         }
         
-        function createNode(nodeData, className, x, y, width, height) {
-            const node = document.createElement('div');
-            node.className = \`mind-map-node \${className}\`;
-            node.style.left = x + 'px';
-            node.style.top = y + 'px';
-            node.style.width = width + 'px';
-            node.style.height = height + 'px';
-            node.textContent = nodeData.label;
-            node.setAttribute('data-id', nodeData.id);
-            node.setAttribute('data-type', nodeData.type || 'main');
+        function drawConcepts(branchX, branchY, branchData, branchAngle, branchIndex) {
+            const concepts = branchData.concepts || [];
+            if (concepts.length === 0) return;
             
-            // Apply colors if available
-            if (nodeData.color) {
-                if (className === 'root-node') {
-                    node.style.background = \`linear-gradient(135deg, \${nodeData.color} 0%, \${adjustBrightness(nodeData.color, -20)} 100%)\`;
+            // Create systematic positioning for concepts - cluster them in the branch's sector
+            const branchSectorAngle = (2 * Math.PI) / (mindMapData.branches?.length || 6); // Each branch gets an equal sector
+            const conceptStartAngle = branchAngle - (branchSectorAngle * 0.3); // Start angle for this branch's concepts
+            const conceptEndAngle = branchAngle + (branchSectorAngle * 0.3); // End angle for this branch's concepts
+            
+            // Calculate positions systematically within the branch sector
+            const conceptPositions = concepts.map((concept, conceptIndex) => {
+                const textMetrics = measureText(concept.label, 12, 'normal');
+                const width = Math.max(textMetrics.width + 30, 100);
+                const height = Math.max(textMetrics.height + 16, 35);
+                const nodeRadius = Math.max(width, height) / 2;
+                
+                // Distribute concepts evenly within the branch's sector
+                let angle;
+                if (concepts.length === 1) {
+                    angle = branchAngle; // Single concept stays on branch line
                 } else {
-                    node.style.background = \`linear-gradient(135deg, \${nodeData.color} 0%, \${adjustBrightness(nodeData.color, -15)} 100%)\`;
+                    // Distribute evenly within the sector
+                    angle = conceptStartAngle + (conceptIndex / (concepts.length - 1)) * (conceptEndAngle - conceptStartAngle);
                 }
-            }
-            
-            // Add expand indicator for nodes with children
-            if (nodeData.children && nodeData.children.length > 0) {
-                const indicator = document.createElement('span');
-                indicator.className = 'expand-indicator';
-                indicator.textContent = '▶';
-                node.appendChild(indicator);
-            }
-            
-            // Add click handler
-            node.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (nodeData.children && nodeData.children.length > 0) {
-                    toggleSubNodes(nodeData.id);
-                }
+                
+                return {
+                    angle: angle,
+                    radius: LAYOUT.conceptRadius,
+                    nodeRadius: nodeRadius,
+                    width: width,
+                    height: height,
+                    data: concept,
+                    conceptIndex: conceptIndex
+                };
             });
             
-            return node;
+            // Use the systematic positions (no need for collision avoidance if we're systematic)
+            conceptPositions.forEach((pos, index) => {
+                const concept = pos.data;
+                const conceptIndex = pos.conceptIndex;
+                const conceptKey = \`concept-\${branchIndex}-\${conceptIndex}\`;
+                
+                const finalX = branchX + Math.cos(pos.angle) * pos.radius;
+                const finalY = branchY + Math.sin(pos.angle) * pos.radius;
+                
+                // Store position with radius for collision detection
+                nodePositions.set(conceptKey, { 
+                    x: finalX, 
+                    y: finalY, 
+                    radius: pos.nodeRadius,
+                    data: concept 
+                });
+                
+                // Straight connection to branch
+                const line = createStraightPath(branchX, branchY, finalX, finalY, branchData.color, 3);
+                line.setAttribute('class', 'connection-line expandable visible');
+                connectionsGroup.appendChild(line);
+                
+                const ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+                ellipse.setAttribute('cx', finalX);
+                ellipse.setAttribute('cy', finalY);
+                ellipse.setAttribute('rx', pos.width/2);
+                ellipse.setAttribute('ry', pos.height/2);
+                ellipse.setAttribute('fill', branchData.color + '60');
+                ellipse.setAttribute('stroke', branchData.color);
+                ellipse.setAttribute('stroke-width', '2');
+                ellipse.setAttribute('class', 'concept-node expandable visible');
+                ellipse.setAttribute('data-concept', conceptKey);
+                
+                const text = createWrappedText(finalX, finalY, concept.label, {
+                    maxWidth: pos.width - 10,
+                    fontSize: 12,
+                    fill: '#ffffff',
+                    className: 'concept-text'
+                });
+                text.setAttribute('class', 'expandable visible concept-text');
+                
+                nodesGroup.appendChild(ellipse);
+                nodesGroup.appendChild(text);
+                
+                ellipse.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    highlightSelectedNode(ellipse);
+                    toggleConcept(branchIndex, conceptIndex, finalX, finalY, concept, pos.angle, branchData.color);
+                    showNodeInfo(concept.label, concept.description);
+                });
+                
+                if (expandedNodes.has(conceptKey)) {
+                    drawPoints(finalX, finalY, concept, pos.angle, branchIndex, conceptIndex, branchData.color);
+                }
+            });
         }
         
-        function adjustBrightness(color, percent) {
-            const num = parseInt(color.replace('#', ''), 16);
-            const amt = Math.round(2.55 * percent);
-            const R = (num >> 16) + amt;
-            const G = (num >> 8 & 0x00FF) + amt;
-            const B = (num & 0x0000FF) + amt;
-            return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
-                (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
-                (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+        function drawPoints(conceptX, conceptY, conceptData, conceptAngle, branchIndex, conceptIndex, color) {
+            const points = conceptData.points || [];
+            if (points.length === 0) return;
+            
+            // Create systematic clustering for points around their parent concept
+            const pointClusterRadius = LAYOUT.pointRadius;
+            const maxPointsPerRow = 4; // Limit points per "ring" for better organization
+            
+            const pointPositions = points.map((point, pointIndex) => {
+                const textMetrics = measureText(point.label.substring(0, 25), 10, 'normal');
+                const radius = Math.max(textMetrics.width / 2 + 8, 18);
+                
+                // Organize points in concentric rings if many points
+                const ringIndex = Math.floor(pointIndex / maxPointsPerRow);
+                const positionInRing = pointIndex % maxPointsPerRow;
+                const pointsInThisRing = Math.min(maxPointsPerRow, points.length - (ringIndex * maxPointsPerRow));
+                
+                // Calculate radius for this ring
+                const ringRadius = pointClusterRadius + (ringIndex * 80);
+                
+                // Calculate angle within the ring, keeping points clustered near parent concept direction
+                const ringSpread = Math.min(Math.PI * 0.8, pointsInThisRing * 0.4); // Limit spread to keep clustered
+                const startAngle = conceptAngle - ringSpread / 2;
+                let angle;
+                
+                if (pointsInThisRing === 1) {
+                    angle = conceptAngle; // Single point stays on concept line
+                } else {
+                    angle = startAngle + (positionInRing / (pointsInThisRing - 1)) * ringSpread;
+                }
+                
+                return {
+                    angle: angle,
+                    radius: ringRadius,
+                    nodeRadius: radius,
+                    data: point,
+                    pointIndex: pointIndex
+                };
+            });
+            
+            // Draw points with systematic positions
+            pointPositions.forEach((pos) => {
+                const point = pos.data;
+                const pointIndex = pos.pointIndex;
+                const pointKey = \`point-\${branchIndex}-\${conceptIndex}-\${pointIndex}\`;
+                
+                const finalX = conceptX + Math.cos(pos.angle) * pos.radius;
+                const finalY = conceptY + Math.sin(pos.angle) * pos.radius;
+                
+                // Store position with radius for collision detection
+                nodePositions.set(pointKey, { 
+                    x: finalX, 
+                    y: finalY, 
+                    radius: pos.nodeRadius,
+                    data: point 
+                });
+                
+                // Straight connection to concept
+                const line = createStraightPath(conceptX, conceptY, finalX, finalY, color, 2);
+                line.setAttribute('class', 'connection-line expandable visible');
+                connectionsGroup.appendChild(line);
+                
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', finalX);
+                circle.setAttribute('cy', finalY);
+                circle.setAttribute('r', pos.nodeRadius);
+                circle.setAttribute('fill', color + '40');
+                circle.setAttribute('stroke', color);
+                circle.setAttribute('stroke-width', '1.5');
+                circle.setAttribute('class', 'point-node expandable visible');
+                
+                const text = createWrappedText(finalX, finalY, point.label.substring(0, 25), {
+                    maxWidth: pos.nodeRadius * 1.8,
+                    fontSize: 10,
+                    fill: '#ffffff',
+                    className: 'point-text'
+                });
+                text.setAttribute('class', 'expandable visible point-text');
+                
+                nodesGroup.appendChild(circle);
+                nodesGroup.appendChild(text);
+                
+                circle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    highlightSelectedNode(circle);
+                    togglePoint(branchIndex, conceptIndex, pointIndex, finalX, finalY, point, pos.angle, color);
+                    showNodeInfo(point.label, point.description);
+                });
+                
+                if (expandedNodes.has(pointKey)) {
+                    drawDetails(finalX, finalY, point, pos.angle, branchIndex, conceptIndex, pointIndex, color);
+                }
+            });
         }
         
-        function createConnection(x1, y1, x2, y2, className = 'connection-line') {
-            const line = document.createElement('div');
-            line.className = className;
+        function drawDetails(pointX, pointY, pointData, pointAngle, branchIndex, conceptIndex, pointIndex, color) {
+            const details = pointData.details || [];
+            if (details.length === 0) return;
             
-            const deltaX = x2 - x1;
-            const deltaY = y2 - y1;
-            const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            const angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
+            // Filter out malformed detail objects
+            const validDetails = details.filter(detail => 
+                detail && 
+                typeof detail === 'object' && 
+                detail.label && 
+                detail.description
+            );
             
-            line.style.left = x1 + 'px';
-            line.style.top = y1 + 'px';
-            line.style.width = length + 'px';
-            line.style.transform = \`rotate(\${angle}deg)\`;
+            if (validDetails.length === 0) return;
+            
+            // Create tight clustering for details around their parent point
+            const detailClusterRadius = LAYOUT.detailRadius;
+            const maxDetailsPerRing = 3; // Smaller rings for details
+            
+            const detailPositions = validDetails.map((detail, detailIndex) => {
+                const textMetrics = measureText(detail.label.substring(0, 15), 9, 'normal');
+                const radius = Math.max(textMetrics.width / 2 + 5, 12);
+                
+                // Organize details in tight concentric rings
+                const ringIndex = Math.floor(detailIndex / maxDetailsPerRing);
+                const positionInRing = detailIndex % maxDetailsPerRing;
+                const detailsInThisRing = Math.min(maxDetailsPerRing, validDetails.length - (ringIndex * maxDetailsPerRing));
+                
+                // Calculate radius for this ring
+                const ringRadius = detailClusterRadius + (ringIndex * 60); // Increased from 40 for better spacing
+                
+                // Calculate angle within the ring, keeping details tightly clustered
+                const ringSpread = Math.min(Math.PI * 0.6, detailsInThisRing * 0.5); // Very tight clustering
+                const startAngle = pointAngle - ringSpread / 2;
+                let angle;
+                
+                if (detailsInThisRing === 1) {
+                    angle = pointAngle; // Single detail stays on point line
+                } else {
+                    angle = startAngle + (positionInRing / (detailsInThisRing - 1)) * ringSpread;
+                }
+                
+                return {
+                    angle: angle,
+                    radius: ringRadius,
+                    nodeRadius: radius,
+                    data: detail,
+                    detailIndex: detailIndex
+                };
+            });
+            
+            // Draw details with systematic positions
+            detailPositions.forEach((pos) => {
+                const detail = pos.data;
+                const detailIndex = pos.detailIndex;
+                const detailKey = \`detail-\${branchIndex}-\${conceptIndex}-\${pointIndex}-\${detailIndex}\`;
+                
+                const finalX = pointX + Math.cos(pos.angle) * pos.radius;
+                const finalY = pointY + Math.sin(pos.angle) * pos.radius;
+                
+                // Store position with radius for collision detection
+                nodePositions.set(detailKey, { 
+                    x: finalX, 
+                    y: finalY, 
+                    radius: pos.nodeRadius,
+                    data: detail 
+                });
+                
+                // Straight connection to point
+                const line = createStraightPath(pointX, pointY, finalX, finalY, color, 1);
+                line.setAttribute('class', 'connection-line expandable visible');
+                line.setAttribute('opacity', '0.6');
+                connectionsGroup.appendChild(line);
+                
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', finalX);
+                circle.setAttribute('cy', finalY);
+                circle.setAttribute('r', pos.nodeRadius);
+                circle.setAttribute('fill', color + '20');
+                circle.setAttribute('stroke', color);
+                circle.setAttribute('stroke-width', '1');
+                circle.setAttribute('class', 'detail-node expandable visible');
+                
+                const text = createWrappedText(finalX, finalY, detail.label.substring(0, 15), {
+                    maxWidth: pos.nodeRadius * 1.8,
+                    fontSize: 9,
+                    fill: '#ffffff',
+                    className: 'detail-text'
+                });
+                text.setAttribute('class', 'expandable visible detail-text');
+                
+                nodesGroup.appendChild(circle);
+                nodesGroup.appendChild(text);
+                
+                circle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    highlightSelectedNode(circle);
+                    showNodeInfo(detail.label, detail.description);
+                });
+            });
+        }
+        
+        function createCurvedPath(x1, y1, x2, y2, color, strokeWidth) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const dr = Math.sqrt(dx * dx + dy * dy);
+            const sweep = dx > 0 ? 1 : 0;
+            
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', \`M\${x1},\${y1} A\${dr * 0.5},\${dr * 0.5} 0 0,\${sweep} \${x2},\${y2}\`);
+            path.setAttribute('stroke', color);
+            path.setAttribute('stroke-width', strokeWidth);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('opacity', '0.8');
+            path.setAttribute('class', 'connection-line');
+            
+            return path;
+        }
+        
+        function createStraightPath(x1, y1, x2, y2, color, strokeWidth) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('stroke', color);
+            line.setAttribute('stroke-width', strokeWidth);
+            line.setAttribute('opacity', '0.6');
+            line.setAttribute('class', 'connection-line');
             
             return line;
         }
         
-        function layoutNodes() {
-            const container = document.getElementById('mindMap');
-            const centerX = container.offsetWidth / 2;
-            const centerY = container.offsetHeight / 2;
+        function createWrappedText(x, y, text, options = {}) {
+            const { maxWidth = 100, fontSize = 12, fontWeight = 'normal', fill = '#ffffff', className = '' } = options;
             
-            // Clear existing content
-            container.innerHTML = '';
-            nodePositions.clear();
+            const textElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            textElement.setAttribute('x', x);
+            textElement.setAttribute('y', y);
+            textElement.setAttribute('text-anchor', 'middle');
+            textElement.setAttribute('dominant-baseline', 'middle');
+            textElement.setAttribute('font-size', fontSize);
+            textElement.setAttribute('font-weight', fontWeight);
+            textElement.setAttribute('fill', fill);
+            textElement.setAttribute('class', \`node-text \${className}\`);
             
-            // Create root node
-            const rootMeasure = measureText(mindMapData.label, 18, 240);
-            const rootNode = createNode(mindMapData, 'root-node', 
-                centerX - rootMeasure.width / 2, 
-                centerY - rootMeasure.height / 2, 
-                rootMeasure.width, 
-                rootMeasure.height
-            );
-            container.appendChild(rootNode);
+            const words = text.split(' ');
+            const lines = [];
+            let currentLine = '';
             
-            nodePositions.set(mindMapData.id, {
-                x: centerX,
-                y: centerY,
-                width: rootMeasure.width,
-                height: rootMeasure.height,
-                node: rootNode,
-                data: mindMapData
-            });
-            
-            // Layout main branches
-            if (mindMapData.children) {
-                layoutMainBranches(mindMapData.children, centerX, centerY, container);
-            }
-        }
-        
-        function layoutMainBranches(children, centerX, centerY, container) {
-            const angleStep = LAYOUT_CONFIG.ANGLE_SPREAD / Math.max(1, children.length - 1);
-            const startAngle = -LAYOUT_CONFIG.ANGLE_SPREAD / 2;
-            
-            children.forEach((child, index) => {
-                const angle = startAngle + (index * angleStep);
-                const x = centerX + Math.cos(angle) * LAYOUT_CONFIG.MAIN_RADIUS;
-                const y = centerY + Math.sin(angle) * LAYOUT_CONFIG.MAIN_RADIUS;
-                
-                const measure = measureText(child.label, 14, 220);
-                const node = createNode(child, 'main-node', 
-                    x - measure.width / 2, 
-                    y - measure.height / 2, 
-                    measure.width, 
-                    measure.height
-                );
-                container.appendChild(node);
-                
-                nodePositions.set(child.id, {
-                    x: x,
-                    y: y,
-                    width: measure.width,
-                    height: measure.height,
-                    node: node,
-                    data: child,
-                    parentId: mindMapData.id
-                });
-                
-                // Create connection to root
-                const connection = createConnection(centerX, centerY, x, y);
-                container.appendChild(connection);
-            });
-        }
-        
-        function toggleSubNodes(nodeId) {
-            const nodePos = nodePositions.get(nodeId);
-            if (!nodePos || !nodePos.data.children) return;
-            
-            const isExpanded = expandedNodes.has(nodeId);
-            const container = document.getElementById('mindMap');
-            
-            if (isExpanded) {
-                // Collapse: remove sub-nodes and connections
-                expandedNodes.delete(nodeId);
-                
-                // Remove sub-nodes and their connections
-                nodePos.data.children.forEach(child => {
-                    const childPos = nodePositions.get(child.id);
-                    if (childPos) {
-                        childPos.node.remove();
-                        nodePositions.delete(child.id);
-                        
-                        // Remove connections
-                        container.querySelectorAll(\`[data-parent="\${child.id}"]\`).forEach(conn => conn.remove());
-                        
-                        // Recursively collapse children
-                        if (expandedNodes.has(child.id)) {
-                            toggleSubNodes(child.id);
-                        }
-                    }
-                });
-                
-                // Remove connections from parent to children
-                container.querySelectorAll(\`[data-parent="\${nodeId}"]\`).forEach(conn => conn.remove());
-                
-                // Update expand indicator
-                const indicator = nodePos.node.querySelector('.expand-indicator');
-                if (indicator) {
-                    indicator.textContent = '▶';
-                    indicator.classList.remove('expanded');
-                }
+            words.forEach(word => {
+                const testLine = currentLine ? \`\${currentLine} \${word}\` : word;
+                if (testLine.length * fontSize * 0.6 > maxWidth && currentLine) {
+                    lines.push(currentLine);
+                    currentLine = word;
             } else {
-                // Expand: add sub-nodes
-                expandedNodes.add(nodeId);
-                layoutSubNodes(nodePos, container);
-                
-                // Update expand indicator
-                const indicator = nodePos.node.querySelector('.expand-indicator');
-                if (indicator) {
-                    indicator.textContent = '▼';
-                    indicator.classList.add('expanded');
+                    currentLine = testLine;
                 }
-            }
-        }
-        
-        function layoutSubNodes(parentPos, container) {
-            const children = parentPos.data.children;
-            if (!children || children.length === 0) return;
+            });
+            if (currentLine) lines.push(currentLine);
             
-            const angleStep = Math.PI * 1.2 / Math.max(1, children.length - 1);
-            const startAngle = -Math.PI * 0.6;
+            const lineHeight = fontSize + 2;
+            const startY = y - ((lines.length - 1) * lineHeight) / 2;
             
-            children.forEach((child, index) => {
-                const angle = startAngle + (index * angleStep);
-                const distance = parentPos.data.type === 'main' ? LAYOUT_CONFIG.SUB_RADIUS : LAYOUT_CONFIG.DETAIL_RADIUS;
-                const x = parentPos.x + Math.cos(angle) * distance;
-                const y = parentPos.y + Math.sin(angle) * distance;
-                
-                const className = parentPos.data.type === 'main' ? 'sub-node' : 'detail-node';
-                const fontSize = parentPos.data.type === 'main' ? 12 : 11;
-                const maxWidth = parentPos.data.type === 'main' ? 180 : 140;
-                
-                const measure = measureText(child.label, fontSize, maxWidth);
-                const node = createNode(child, className, 
-                    x - measure.width / 2, 
-                    y - measure.height / 2, 
-                    measure.width, 
-                    measure.height
-                );
-                
-                container.appendChild(node);
-                
-                nodePositions.set(child.id, {
-                    x: x,
-                    y: y,
-                    width: measure.width,
-                    height: measure.height,
-                    node: node,
-                    data: child,
-                    parentId: parentPos.data.id
-                });
-                
-                // Create connection to parent
-                const connectionClass = parentPos.data.type === 'main' ? 'sub-connection' : 'detail-connection';
-                const connection = createConnection(parentPos.x, parentPos.y, x, y, connectionClass);
-                connection.setAttribute('data-parent', parentPos.data.id);
-                container.appendChild(connection);
-                
-                // Animate in
-                setTimeout(() => {
-                    node.classList.add('visible');
-                    connection.classList.add('visible');
-                }, 50 + index * 100);
+            lines.forEach((line, index) => {
+                const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                tspan.textContent = line;
+                tspan.setAttribute('x', x);
+                tspan.setAttribute('y', startY + index * lineHeight);
+                textElement.appendChild(tspan);
             });
+            
+            return textElement;
         }
         
-        function expandAllNodes() {
-            nodePositions.forEach((pos, nodeId) => {
-                if (pos.data.children && pos.data.children.length > 0 && !expandedNodes.has(nodeId)) {
-                    toggleSubNodes(nodeId);
+        function toggleBranch(branchIndex, x, y, branchData, angle) {
+            const key = \`branch-\${branchIndex}\`;
+            if (expandedNodes.has(key)) {
+                expandedNodes.delete(key);
+                removeExpandedElements(\`concept-\${branchIndex}-\`);
+            } else {
+                expandedNodes.add(key);
+                drawConcepts(x, y, branchData, angle, branchIndex);
+            }
+            
+            if (connectionMode) {
+                generateCrossConnections();
+            }
+        }
+        
+        function toggleConcept(branchIndex, conceptIndex, x, y, conceptData, angle, color) {
+            const key = \`concept-\${branchIndex}-\${conceptIndex}\`;
+            if (expandedNodes.has(key)) {
+                expandedNodes.delete(key);
+                removeExpandedElements(\`point-\${branchIndex}-\${conceptIndex}-\`);
+            } else {
+                expandedNodes.add(key);
+                drawPoints(x, y, conceptData, angle, branchIndex, conceptIndex, color);
+            }
+            
+            if (connectionMode) {
+                generateCrossConnections();
+            }
+        }
+        
+        function togglePoint(branchIndex, conceptIndex, pointIndex, x, y, pointData, angle, color) {
+            const key = \`point-\${branchIndex}-\${conceptIndex}-\${pointIndex}\`;
+            if (expandedNodes.has(key)) {
+                expandedNodes.delete(key);
+                removeExpandedElements(\`detail-\${branchIndex}-\${conceptIndex}-\${pointIndex}-\`);
+            } else {
+                expandedNodes.add(key);
+                drawDetails(x, y, pointData, angle, branchIndex, conceptIndex, pointIndex, color);
+            }
+        }
+        
+        function removeExpandedElements(prefix) {
+            const elementsToRemove = [];
+            document.querySelectorAll('.expandable').forEach(el => {
+                const dataAttrs = Object.keys(el.dataset);
+                if (dataAttrs.some(attr => el.dataset[attr]?.startsWith(prefix))) {
+                    elementsToRemove.push(el);
+                }
+            });
+            
+            // Also check by nodePositions keys
+            for (const [key] of nodePositions) {
+                if (key.startsWith(prefix)) {
+                    nodePositions.delete(key);
+                }
+            }
+            
+            elementsToRemove.forEach(el => {
+                el.classList.remove('visible');
+                setTimeout(() => el.remove(), 400);
+            });
+            
+            // Regenerate cross-connections if in connection mode
+            if (connectionMode) {
+                setTimeout(() => generateCrossConnections(), 500);
+            }
+        }
+        
+        function showNodeInfo(title, description) {
+            document.getElementById('infoTitle').textContent = title;
+            document.getElementById('infoDescription').textContent = description || 'Click to explore this concept further';
+            infoPanel.classList.add('visible');
+        }
+        
+        function setupEventListeners() {
+            svg.addEventListener('mousedown', startDrag);
+            svg.addEventListener('mousemove', drag);
+            svg.addEventListener('mouseup', endDrag);
+            svg.addEventListener('wheel', zoom);
+            
+            document.addEventListener('click', (e) => {
+                // Clear selection if clicking on canvas background or info panel close
+                if (e.target === svg || (!infoPanel.contains(e.target) && !e.target.closest('.main-branch, .concept-node, .point-node, .detail-node, .center-node'))) {
+                    clearNodeSelection();
+                    infoPanel.classList.remove('visible');
                 }
             });
         }
         
-        function collapseAllNodes() {
-            // Collapse in reverse order (children first)
-            const nodesToCollapse = Array.from(expandedNodes);
-            nodesToCollapse.reverse().forEach(nodeId => {
-                if (expandedNodes.has(nodeId)) {
-                    toggleSubNodes(nodeId);
-                }
-            });
-        }
-        
-        function applyTransform() {
-            const mindMap = document.getElementById('mindMap');
-            mindMap.style.transform = \`scale(\${currentZoom}) translate(\${currentTransform.x}px, \${currentTransform.y}px)\`;
-        }
-        
-        // Event listeners
-        document.getElementById('zoomIn').addEventListener('click', () => {
-            currentZoom = Math.min(currentZoom * 1.2, 3);
-            applyTransform();
-        });
-        
-        document.getElementById('zoomOut').addEventListener('click', () => {
-            currentZoom = Math.max(currentZoom / 1.2, 0.3);
-            applyTransform();
-        });
-        
-        document.getElementById('resetView').addEventListener('click', () => {
-            currentZoom = 1;
-            currentTransform = { x: 0, y: 0 };
-            applyTransform();
-        });
-        
-        document.getElementById('expandAll').addEventListener('click', expandAllNodes);
-        document.getElementById('collapseAll').addEventListener('click', collapseAllNodes);
-        
-        // Drag and pan functionality
-        const container = document.querySelector('.mind-map-container');
-        
-        container.addEventListener('mousedown', (e) => {
-            if (e.target === container || e.target.id === 'mindMap') {
-                isDragging = true;
-                dragStart = { x: e.clientX - currentTransform.x, y: e.clientY - currentTransform.y };
-                container.style.cursor = 'grabbing';
-            }
-        });
-        
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                currentTransform.x = e.clientX - dragStart.x;
-                currentTransform.y = e.clientY - dragStart.y;
-                applyTransform();
-            }
-        });
-        
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-            container.style.cursor = 'grab';
-        });
-        
-        // Zoom with mouse wheel
-        container.addEventListener('wheel', (e) => {
+        function startDrag(e) {
+            isDragging = true;
+            dragStartX = e.clientX - currentTranslateX;
+            dragStartY = e.clientY - currentTranslateY;
             e.preventDefault();
-            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-            currentZoom = Math.max(0.3, Math.min(3, currentZoom * zoomFactor));
-            applyTransform();
-        });
+        }
         
-        // Initialize
-        window.addEventListener('load', () => {
-            layoutNodes();
-        });
+        function drag(e) {
+            if (!isDragging) return;
+            currentTranslateX = e.clientX - dragStartX;
+            currentTranslateY = e.clientY - dragStartY;
+            updateTransform();
+            e.preventDefault();
+        }
         
-        window.addEventListener('resize', () => {
-            layoutNodes();
-        });
+        function endDrag() {
+            isDragging = false;
+        }
+        
+        function zoom(e) {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            currentScale = Math.max(0.3, Math.min(2.5, currentScale * delta));
+            updateTransform();
+        }
+        
+        function updateTransform() {
+            const transform = \`translate(\${currentTranslateX}, \${currentTranslateY}) scale(\${currentScale})\`;
+            nodesGroup.setAttribute('transform', transform);
+            connectionsGroup.setAttribute('transform', transform);
+            crossConnectionsGroup.setAttribute('transform', transform);
+        }
+        
+        function zoomIn() {
+            currentScale = Math.min(2.5, currentScale * 1.15);
+            updateTransform();
+        }
+        
+        function zoomOut() {
+            currentScale = Math.max(0.3, currentScale * 0.85);
+            updateTransform();
+        }
+        
+        function resetView() {
+            currentScale = 1;
+            currentTranslateX = 0;
+            currentTranslateY = 0;
+            updateTransform();
+        }
+        
+        function expandAll() {
+            mindMapData.branches.forEach((branch, branchIndex) => {
+                expandedNodes.add(\`branch-\${branchIndex}\`);
+                
+                // Safely handle concepts array
+                if (branch.concepts && Array.isArray(branch.concepts)) {
+                    branch.concepts.forEach((concept, conceptIndex) => {
+                        expandedNodes.add(\`concept-\${branchIndex}-\${conceptIndex}\`);
+                        
+                        // Safely handle points array
+                        if (concept.points && Array.isArray(concept.points)) {
+                            concept.points.forEach((point, pointIndex) => {
+                                expandedNodes.add(\`point-\${branchIndex}-\${conceptIndex}-\${pointIndex}\`);
+                                
+                                // Safely handle details array
+                                if (point.details && Array.isArray(point.details)) {
+                                    point.details.forEach((detail, detailIndex) => {
+                                        // Only add if detail has proper structure
+                                        if (detail && typeof detail === 'object' && detail.id) {
+                                            expandedNodes.add(\`detail-\${branchIndex}-\${conceptIndex}-\${pointIndex}-\${detailIndex}\`);
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            drawMindMap();
+        }
+        
+        function collapseAll() {
+            expandedNodes.clear();
+            drawMindMap();
+        }
+        
+        function toggleConnectionMode() {
+            connectionMode = !connectionMode;
+            const btn = document.getElementById('connectionModeBtn');
+            btn.classList.toggle('active');
+            
+            if (connectionMode) {
+                generateCrossConnections();
+            } else {
+                crossConnectionsGroup.innerHTML = '';
+            }
+        }
+        
+        function generateCrossConnections() {
+            const connections = [];
+            const allNodes = Array.from(nodePositions.entries())
+                .filter(([key]) => key !== 'center' && !key.startsWith('branch-'));
+            
+            // Track connections per node to limit overcrowding
+            const nodeConnectionCount = new Map();
+            const maxConnectionsPerNode = 3; // Limit each node to max 3 connections
+            
+            // More aggressive connection finding with multiple strategies
+            for (let i = 0; i < allNodes.length; i++) {
+                for (let j = i + 1; j < allNodes.length; j++) {
+                    const [key1, node1] = allNodes[i];
+                    const [key2, node2] = allNodes[j];
+                    
+                    // Skip if same branch (we want cross-branch connections)
+                    const branch1 = key1.split('-')[1];
+                    const branch2 = key2.split('-')[1];
+                    if (branch1 === branch2) continue;
+                    
+                    // Skip if either node already has too many connections
+                    const count1 = nodeConnectionCount.get(key1) || 0;
+                    const count2 = nodeConnectionCount.get(key2) || 0;
+                    if (count1 >= maxConnectionsPerNode || count2 >= maxConnectionsPerNode) continue;
+                    
+                    const similarity = calculateSimilarity(node1.data.label, node2.data.label);
+                    const conceptualSimilarity = calculateConceptualSimilarity(node1.data, node2.data);
+                    const keywordMatch = calculateKeywordSimilarity(node1.data.label, node2.data.label);
+                    
+                    // Multiple connection criteria (much more selective)
+                    let shouldConnect = false;
+                    let connectionType = '';
+                    let connectionStrength = 0;
+                    
+                    // Direct similarity (very strict threshold)
+                    if (similarity > 0.5) {  // Increased from 0.25 - now very strict
+                        shouldConnect = true;
+                        connectionType = 'similar';
+                        connectionStrength = similarity;
+                    }
+                    
+                    // Conceptual similarity (very strict threshold)
+                    if (conceptualSimilarity > 0.6) {  // Increased from 0.3 - now very strict
+                        shouldConnect = true;
+                        connectionType = 'conceptual';
+                        connectionStrength = Math.max(connectionStrength, conceptualSimilarity);
+                    }
+                    
+                    // Keyword matching (very strict threshold)
+                    if (keywordMatch > 0.6) {  // Increased from 0.35 - now very strict
+                        shouldConnect = true;
+                        connectionType = 'keyword';
+                        connectionStrength = Math.max(connectionStrength, keywordMatch);
+                    }
+                    
+                    // Theme-based connections (very strict threshold)
+                    const themeConnection = calculateThemeConnection(node1.data, node2.data);
+                    if (themeConnection > 0.5) {  // Increased from 0.3 - now very strict
+                        shouldConnect = true;
+                        connectionType = 'thematic';
+                        connectionStrength = Math.max(connectionStrength, themeConnection);
+                    }
+                    
+                    // Action/process connections (very strict threshold)
+                    const processConnection = calculateProcessConnection(node1.data.label, node2.data.label);
+                    if (processConnection > 0.5) {  // Increased from 0.3 - now very strict
+                        shouldConnect = true;
+                        connectionType = 'process';
+                        connectionStrength = Math.max(connectionStrength, processConnection);
+                    }
+                    
+                    // Semantic relationships (very strict threshold)
+                    const semanticConnection = calculateSemanticConnection(node1.data.label, node2.data.label);
+                    if (semanticConnection > 0.4) {  // Increased from 0.25 - now very strict
+                        shouldConnect = true;
+                        connectionType = 'semantic';
+                        connectionStrength = Math.max(connectionStrength, semanticConnection);
+                    }
+                    
+                    // Opposition/contrast connections (kept very strict)
+                    const contrastConnection = calculateContrastConnection(node1.data.label, node2.data.label);
+                    if (contrastConnection > 0.5) {  // Increased from 0.3 - now very strict
+                        shouldConnect = true;
+                        connectionType = 'contrast';
+                        connectionStrength = Math.max(connectionStrength, contrastConnection);
+                    }
+                    
+                    if (shouldConnect) {
+                        connections.push({
+                            from: { x: node1.x, y: node1.y },
+                            to: { x: node2.x, y: node2.y },
+                            type: connectionType,
+                            strength: connectionStrength,
+                            label1: node1.data.label,
+                            label2: node2.data.label,
+                            key1: key1,
+                            key2: key2
+                        });
+                    }
+                }
+            }
+            
+            // Sort connections by strength and limit total connections
+            connections.sort((a, b) => b.strength - a.strength);
+            const maxTotalConnections = Math.min(connections.length, 15); // Limit total connections
+            const finalConnections = connections.slice(0, maxTotalConnections);
+            
+            // Update connection counts for final connections
+            finalConnections.forEach(conn => {
+                nodeConnectionCount.set(conn.key1, (nodeConnectionCount.get(conn.key1) || 0) + 1);
+                nodeConnectionCount.set(conn.key2, (nodeConnectionCount.get(conn.key2) || 0) + 1);
+            });
+            
+            // Draw enhanced connections
+            finalConnections.forEach(conn => {
+                const path = createCurvedPath(conn.from.x, conn.from.y, conn.to.x, conn.to.y);
+                path.setAttribute('stroke', getConnectionColor(conn.type));
+                path.setAttribute('stroke-width', Math.max(1, conn.strength * 3));
+                path.setAttribute('stroke-dasharray', getConnectionPattern(conn.type));
+                path.setAttribute('opacity', Math.max(0.3, conn.strength * 0.8));
+                path.setAttribute('class', 'cross-connection visible'); // Added 'visible' class
+                path.setAttribute('fill', 'none');
+                
+                // Add connection title for debugging/info
+                const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                title.textContent = \`\${conn.type}: \${conn.label1} ↔ \${conn.label2} (\${(conn.strength * 100).toFixed(0)}%)\`;
+                path.appendChild(title);
+                
+                crossConnectionsGroup.appendChild(path);
+            });
+        }
+        
+        // Enhanced similarity calculation functions
+        function calculateSimilarity(text1, text2) {
+            if (!text1 || !text2) return 0;
+            
+            const words1 = text1.toLowerCase().split(/\\s+/).filter(w => w.length > 2);
+            const words2 = text2.toLowerCase().split(/\\s+/).filter(w => w.length > 2);
+            
+            if (words1.length === 0 || words2.length === 0) return 0;
+            
+            const shared = words1.filter(word => words2.includes(word));
+            return shared.length / Math.max(words1.length, words2.length);
+        }
+        
+        function calculateConceptualSimilarity(data1, data2) {
+            const text1 = (data1.description || data1.label || '').toLowerCase();
+            const text2 = (data2.description || data2.label || '').toLowerCase();
+            
+            const conceptWords = ['principle', 'theory', 'concept', 'idea', 'approach', 'method', 'technique', 'strategy', 'process', 'system'];
+            const matches = conceptWords.filter(word => text1.includes(word) && text2.includes(word));
+            
+            return matches.length / conceptWords.length;
+        }
+        
+        function calculateKeywordSimilarity(label1, label2) {
+            const words1 = label1.toLowerCase().split(/\\s+/).filter(w => w.length > 3);
+            const words2 = label2.toLowerCase().split(/\\s+/).filter(w => w.length > 3);
+            
+            const commonWords = words1.filter(word => words2.includes(word));
+            return commonWords.length / Math.max(words1.length, words2.length, 1);
+        }
+        
+        function calculateThemeConnection(data1, data2) {
+            const themes = [
+                ['leadership', 'management', 'authority', 'control'],
+                ['social', 'community', 'relationship', 'interaction'],
+                ['learning', 'education', 'knowledge', 'understanding'],
+                ['emotion', 'feeling', 'psychology', 'mental'],
+                ['action', 'behavior', 'conduct', 'practice'],
+                ['influence', 'persuasion', 'impact', 'effect'],
+                ['communication', 'language', 'expression', 'message']
+            ];
+            
+            const text1 = (data1.description || data1.label || '').toLowerCase();
+            const text2 = (data2.description || data2.label || '').toLowerCase();
+            
+            let maxThemeScore = 0;
+            themes.forEach(theme => {
+                const score1 = theme.filter(word => text1.includes(word)).length / theme.length;
+                const score2 = theme.filter(word => text2.includes(word)).length / theme.length;
+                const themeScore = Math.min(score1, score2) * 2; // Both must have theme words
+                maxThemeScore = Math.max(maxThemeScore, themeScore);
+            });
+            
+            return maxThemeScore;
+        }
+        
+        function calculateProcessConnection(label1, label2) {
+            const processWords = ['process', 'step', 'method', 'approach', 'technique', 'way', 'how to', 'strategy', 'practice', 'action'];
+            const text1 = label1.toLowerCase();
+            const text2 = label2.toLowerCase();
+            
+            const hasProcess1 = processWords.some(word => text1.includes(word));
+            const hasProcess2 = processWords.some(word => text2.includes(word));
+            
+            if (hasProcess1 && hasProcess2) {
+                return calculateSimilarity(label1, label2) * 1.5; // Boost process connections
+            }
+            
+            return 0;
+        }
+        
+        function calculateSemanticConnection(label1, label2) {
+            // Semantic relationship words that often connect concepts
+            const semanticRelations = [
+                // Causality
+                ['cause', 'effect', 'result', 'consequence', 'outcome', 'impact'],
+                // Hierarchy
+                ['parent', 'child', 'sub', 'main', 'primary', 'secondary'],
+                // Time/sequence
+                ['before', 'after', 'during', 'while', 'when', 'then', 'next'],
+                // Comparison
+                ['better', 'worse', 'more', 'less', 'same', 'different', 'similar'],
+                // Dependency
+                ['requires', 'needs', 'depends', 'relies', 'based', 'foundation'],
+                // Function/purpose
+                ['use', 'purpose', 'function', 'role', 'goal', 'aim', 'objective']
+            ];
+            
+            const text1 = label1.toLowerCase();
+            const text2 = label2.toLowerCase();
+            
+            let maxScore = 0;
+            semanticRelations.forEach(relations => {
+                const score1 = relations.filter(word => text1.includes(word)).length;
+                const score2 = relations.filter(word => text2.includes(word)).length;
+                if (score1 > 0 && score2 > 0) {
+                    maxScore = Math.max(maxScore, (score1 + score2) / relations.length);
+                }
+            });
+            
+            return maxScore;
+        }
+        
+        function calculateContrastConnection(label1, label2) {
+            // Opposition/contrast pairs that create meaningful connections
+            const oppositions = [
+                ['positive', 'negative'], ['good', 'bad'], ['right', 'wrong'],
+                ['active', 'passive'], ['strong', 'weak'], ['high', 'low'],
+                ['increase', 'decrease'], ['growth', 'decline'], ['success', 'failure'],
+                ['internal', 'external'], ['individual', 'group'], ['private', 'public'],
+                ['theory', 'practice'], ['abstract', 'concrete'], ['general', 'specific'],
+                ['formal', 'informal'], ['planned', 'spontaneous'], ['structured', 'flexible']
+            ];
+            
+            const text1 = label1.toLowerCase();
+            const text2 = label2.toLowerCase();
+            
+            for (const [word1, word2] of oppositions) {
+                if ((text1.includes(word1) && text2.includes(word2)) || 
+                    (text1.includes(word2) && text2.includes(word1))) {
+                    return 0.8; // High score for clear oppositions
+                }
+            }
+            
+            return 0;
+        }
+        
+        function getConnectionColor(type) {
+            const colors = {
+                'similar': '#60A5FA',     // Blue
+                'conceptual': '#34D399',  // Green  
+                'keyword': '#F59E0B',     // Amber
+                'thematic': '#EC4899',    // Pink
+                'process': '#8B5CF6',     // Purple
+                'semantic': '#06B6D4',    // Cyan
+                'contrast': '#EF4444'     // Red
+            };
+            return colors[type] || '#6B7280';
+        }
+        
+        function getConnectionPattern(type) {
+            const patterns = {
+                'similar': '0',           // Solid
+                'conceptual': '5,5',      // Dashed
+                'keyword': '3,3',         // Short dashed
+                'thematic': '8,3,3,3',    // Dash-dot
+                'process': '2,2',         // Dotted
+                'semantic': '6,2,2,2',    // Long dash-dot
+                'contrast': '4,4,2,4'     // Complex dash for contrast
+            };
+            return patterns[type] || '0';
+        }
+        
+        // Visual feedback functions
+        function highlightSelectedNode(nodeElement) {
+            // Remove previous selection
+            clearNodeSelection();
+            
+            // Add subtle selection styling - no movement, just gentle glow
+            nodeElement.style.filter = 'drop-shadow(0 0 8px #FFD700) drop-shadow(0 0 16px rgba(255, 215, 0, 0.5))';
+            nodeElement.style.strokeWidth = (parseInt(nodeElement.style.strokeWidth || nodeElement.getAttribute('stroke-width') || '2') + 1).toString();
+            nodeElement.style.stroke = '#FFD700';
+            nodeElement.style.transition = 'all 0.2s ease';
+            
+            selectedNode = nodeElement;
+        }
+        
+        function clearNodeSelection() {
+            if (selectedNode) {
+                selectedNode.style.filter = '';
+                selectedNode.style.transition = '';
+                selectedNode.style.stroke = ''; // Reset to original color
+                
+                // Reset to original stroke width based on node type
+                if (selectedNode.classList.contains('center-node')) {
+                    selectedNode.style.strokeWidth = '3';
+                } else if (selectedNode.classList.contains('concept-node')) {
+                    selectedNode.style.strokeWidth = '2';
+                } else if (selectedNode.classList.contains('point-node')) {
+                    selectedNode.style.strokeWidth = '1.5';
+                } else if (selectedNode.classList.contains('detail-node')) {
+                    selectedNode.style.strokeWidth = '1';
+                } else if (selectedNode.classList.contains('main-branch')) {
+                    selectedNode.style.strokeWidth = '2';
+                }
+            }
+            selectedNode = null;
+        }
+        
+        document.addEventListener('DOMContentLoaded', initializeMindMap);
     </script>
 </body>
 </html>`;
