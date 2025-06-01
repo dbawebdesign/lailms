@@ -429,39 +429,65 @@ async function generateBaseClassMindMap(supabase: any, baseClassId: string, user
   };
 
   // Generate mind map with AI
-  const prompt = `Create a comprehensive mind map from this course content. Extract and organize the ACTUAL content.
+  const prompt = `Create a comprehensive 5-level mind map from this course content. Extract and organize the ACTUAL content with maximum depth.
 
 COURSE STRUCTURE:
 ${JSON.stringify(courseContent, null, 2)}
 
-REQUIREMENTS:
-1. Center: Course title with brief description
-2. Main branches: Course modules/paths (up to 6, numbered)
-3. Sub-branches: Key lessons from each module
-4. Detail nodes: Important concepts from lesson sections
-5. Include rich descriptions for each node
-6. Use actual content from the provided structure
+REQUIREMENTS FOR 5-LEVEL STRUCTURE:
+1. CENTER: Course title with brief description
+2. BRANCHES: Course modules/paths (up to 6, numbered) 
+3. CONCEPTS: Key lessons and topics from each module (3-5 per branch)
+4. POINTS: Important concepts and learning objectives from each lesson (3-4 per concept)
+5. DETAILS: Specific facts, examples, or sub-points (2-3 per point)
+
+CONTENT EXTRACTION RULES:
+- Extract actual content from lesson sections, not just titles
+- Create meaningful hierarchical relationships
+- Use rich descriptions from the provided content
+- Include practical examples and key takeaways
+- Ensure each level adds meaningful detail
 
 OUTPUT FORMAT (valid JSON only):
 {
   "center": {
     "label": "${courseContent.title}",
-    "description": "Course overview"
+    "description": "Comprehensive course covering [key areas]"
   },
   "branches": [
     {
-      "id": "module1",
+      "id": "module1", 
       "label": "1. Module Name",
-      "description": "Module description",
+      "description": "Module overview and objectives",
       "color": "#DC2626",
       "concepts": [
         {
-          "label": "Concept Name",
-          "description": "Detailed explanation",
-          "details": [
+          "label": "Lesson/Topic Name",
+          "description": "What students will learn in this topic",
+          "points": [
             {
-              "label": "Key Point",
-              "description": "Specific detail"
+              "label": "Key Learning Point",
+              "description": "Detailed explanation of the concept",
+              "details": [
+                {
+                  "label": "Specific Detail",
+                  "description": "Example, fact, or sub-concept"
+                },
+                {
+                  "label": "Related Point", 
+                  "description": "Additional supporting information"
+                }
+              ]
+            },
+            {
+              "label": "Another Key Point",
+              "description": "Another important aspect to understand",
+              "details": [
+                {
+                  "label": "Supporting Example",
+                  "description": "Concrete example or application"
+                }
+              ]
             }
           ]
         }
@@ -470,16 +496,18 @@ OUTPUT FORMAT (valid JSON only):
   ]
 }
 
+IMPORTANT: Must include the "points" level between concepts and details. Extract real content, not just structural titles.
+
 Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
 
   const aiResponse = await openai.chat.completions.create({
-    model: 'gpt-4.1-mini',
+    model: 'gpt-4o-mini',
     messages: [
-      { role: 'system', content: 'You create educational mind maps. Return only valid JSON.' },
+      { role: 'system', content: 'You create comprehensive educational mind maps with deep content extraction. Always return valid JSON with the complete 5-level structure including center, branches, concepts, points, and details.' },
       { role: 'user', content: prompt }
     ],
-    temperature: 0.1,
-    max_tokens: 4000
+    temperature: 0.2,
+    max_tokens: 6000
   });
 
   let mindMapData;
@@ -487,26 +515,69 @@ Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
     const responseText = aiResponse.choices[0]?.message?.content || '{}';
     const cleanedJson = responseText.replace(/```json\s*|\s*```/g, '').trim();
     mindMapData = JSON.parse(cleanedJson);
+    
+    // Validate structure - ensure points level exists
+    if (mindMapData.branches) {
+      mindMapData.branches.forEach((branch: any) => {
+        if (branch.concepts) {
+          branch.concepts.forEach((concept: any) => {
+            if (!concept.points && concept.details) {
+              // Convert old structure to new structure
+              concept.points = concept.details.map((detail: any, index: number) => ({
+                label: detail.label || `Key Point ${index + 1}`,
+                description: detail.description || 'Important concept to understand',
+                details: [
+                  {
+                    label: `Detail of ${detail.label || 'concept'}`,
+                    description: detail.description?.substring(0, 100) || 'Supporting information'
+                  }
+                ]
+              }));
+              delete concept.details; // Remove old details
+            }
+          });
+        }
+      });
+    }
   } catch (error) {
-    // Fallback structure
+    console.error('AI response parsing failed, using enhanced fallback structure');
+    
+    // Enhanced fallback structure with deep content extraction
     const colors = ['#DC2626', '#059669', '#7C3AED', '#EA580C', '#0891B2', '#BE185D'];
     mindMapData = {
       center: {
         label: courseContent.title,
-        description: courseContent.description || 'Comprehensive course'
+        description: courseContent.description || `Comprehensive course covering ${courseContent.modules?.length || 0} modules`
       },
-      branches: courseContent.modules.slice(0, 6).map((module: any, index: number) => ({
-        id: `module${index + 1}`,
-        label: `${index + 1}. ${module.title}`,
-        description: module.description || `Learn ${module.title}`,
-        color: colors[index],
-        concepts: module.lessons.slice(0, 4).map((lesson: any) => ({
+      branches: courseContent.modules.slice(0, 6).map((module: any, moduleIndex: number) => ({
+        id: `module${moduleIndex + 1}`,
+        label: `${moduleIndex + 1}. ${module.title}`,
+        description: module.description || `Explore ${module.title} through structured lessons and practical applications`,
+        color: colors[moduleIndex % colors.length],
+        concepts: module.lessons.slice(0, 4).map((lesson: any, lessonIndex: number) => ({
           label: lesson.title,
-          description: lesson.description || `Key concepts in ${lesson.title}`,
-          details: lesson.concepts.slice(0, 3).map((concept: any) => ({
-            label: concept.title,
-            description: concept.content.substring(0, 150) || `Important aspects of ${concept.title}`
-          }))
+          description: lesson.description || `Master the fundamentals and applications of ${lesson.title}`,
+          points: lesson.concepts.slice(0, 4).map((concept: any, conceptIndex: number) => {
+            // Extract key points from the content
+            const contentParts = concept.content.split(/[.!?]+/).filter((part: string) => part.trim().length > 20);
+            const mainPoint = contentParts[0]?.trim() || concept.title;
+            const supportingPoint = contentParts[1]?.trim() || `Key aspects of ${concept.title}`;
+            
+            return {
+              label: concept.title.length > 40 ? concept.title.substring(0, 40) + '...' : concept.title,
+              description: mainPoint.length > 100 ? mainPoint.substring(0, 100) + '...' : mainPoint,
+              details: [
+                {
+                  label: supportingPoint.length > 30 ? supportingPoint.substring(0, 30) + '...' : supportingPoint || 'Key Detail',
+                  description: concept.content.substring(0, 120) || `Important information about ${concept.title}`
+                },
+                {
+                  label: concept.type === 'text' ? 'Learning Focus' : concept.type === 'video' ? 'Visual Learning' : 'Interactive Element',
+                  description: `This ${concept.type} section provides hands-on understanding of the topic`
+                }
+              ].filter(detail => detail.label && detail.description) // Remove empty details
+            };
+          }).filter((point: any) => point.details.length > 0) // Only include points with details
         }))
       }))
     };
@@ -934,13 +1005,13 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
             centerX: 800,
             centerY: 600,
             centerRadius: 80,
-            branchRadius: 380,  
-            conceptRadius: 240, // Increased from 220 for more room
-            pointRadius: 160,   // Increased from 140 for more room  
-            detailRadius: 110,  // Increased from 90 for more room
-            minAngleSpacing: 0.5, // Increased from 0.4 for better spacing
-            overlapBuffer: 30,    // Increased from 25 for more buffer
-            minNodeDistance: 25   // Increased from 20 for minimum distance between nodes
+            branchRadius: 420,  // Increased for more room
+            conceptRadius: 280, // Increased for more room
+            pointRadius: 180,   // Increased for more room  
+            detailRadius: 120,  // Increased for more room
+            minAngleSpacing: 0.6, // Increased for better spacing
+            overlapBuffer: 40,    // Increased buffer
+            minNodeDistance: 35   // Increased minimum distance between nodes
         };
         
         function initializeMindMap() {
@@ -1092,62 +1163,66 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
             if (concepts.length === 0) return;
             
             // Create systematic positioning for concepts - cluster them in the branch's sector
-            const branchSectorAngle = (2 * Math.PI) / (mindMapData.branches?.length || 6); // Each branch gets an equal sector
-            const conceptStartAngle = branchAngle - (branchSectorAngle * 0.3); // Start angle for this branch's concepts
-            const conceptEndAngle = branchAngle + (branchSectorAngle * 0.3); // End angle for this branch's concepts
+            const branchSectorAngle = (2 * Math.PI) / (mindMapData.branches?.length || 6);
+            const conceptStartAngle = branchAngle - (branchSectorAngle * 0.4);
+            const conceptEndAngle = branchAngle + (branchSectorAngle * 0.4);
             
-            // Calculate positions systematically within the branch sector
+            // Calculate initial positions systematically within the branch sector
             const conceptPositions = concepts.map((concept, conceptIndex) => {
                 const textMetrics = measureText(concept.label, 12, 'normal');
                 const width = Math.max(textMetrics.width + 30, 100);
                 const height = Math.max(textMetrics.height + 16, 35);
-                const nodeRadius = Math.max(width, height) / 2;
+                const nodeRadius = Math.max(width, height) / 2 + 10; // Add padding
                 
                 // Distribute concepts evenly within the branch's sector
                 let angle;
                 if (concepts.length === 1) {
-                    angle = branchAngle; // Single concept stays on branch line
+                    angle = branchAngle;
                 } else {
-                    // Distribute evenly within the sector
                     angle = conceptStartAngle + (conceptIndex / (concepts.length - 1)) * (conceptEndAngle - conceptStartAngle);
                 }
                 
+                const baseX = branchX + Math.cos(angle) * LAYOUT.conceptRadius;
+                const baseY = branchY + Math.sin(angle) * LAYOUT.conceptRadius;
+                
                 return {
+                    x: baseX,
+                    y: baseY,
                     angle: angle,
-                    radius: LAYOUT.conceptRadius,
                     nodeRadius: nodeRadius,
                     width: width,
                     height: height,
                     data: concept,
-                    conceptIndex: conceptIndex
+                    conceptIndex: conceptIndex,
+                    key: \`concept-\${branchIndex}-\${conceptIndex}\`
                 };
             });
             
-            // Use the systematic positions (no need for collision avoidance if we're systematic)
-            conceptPositions.forEach((pos, index) => {
+            // Adjust positions to avoid collisions
+            const adjustedPositions = adjustPositionsForCollisions(conceptPositions);
+            
+            // Draw concepts with collision-free positions
+            adjustedPositions.forEach((pos) => {
                 const concept = pos.data;
                 const conceptIndex = pos.conceptIndex;
-                const conceptKey = \`concept-\${branchIndex}-\${conceptIndex}\`;
+                const conceptKey = pos.key;
                 
-                const finalX = branchX + Math.cos(pos.angle) * pos.radius;
-                const finalY = branchY + Math.sin(pos.angle) * pos.radius;
-                
-                // Store position with radius for collision detection
+                // Update position in the map (it was temporarily added during adjustment)
                 nodePositions.set(conceptKey, { 
-                    x: finalX, 
-                    y: finalY, 
+                    x: pos.x, 
+                    y: pos.y, 
                     radius: pos.nodeRadius,
                     data: concept 
                 });
                 
                 // Straight connection to branch
-                const line = createStraightPath(branchX, branchY, finalX, finalY, branchData.color, 3);
+                const line = createStraightPath(branchX, branchY, pos.x, pos.y, branchData.color, 3);
                 line.setAttribute('class', 'connection-line expandable visible');
                 connectionsGroup.appendChild(line);
                 
                 const ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
-                ellipse.setAttribute('cx', finalX);
-                ellipse.setAttribute('cy', finalY);
+                ellipse.setAttribute('cx', pos.x);
+                ellipse.setAttribute('cy', pos.y);
                 ellipse.setAttribute('rx', pos.width/2);
                 ellipse.setAttribute('ry', pos.height/2);
                 ellipse.setAttribute('fill', branchData.color + '60');
@@ -1156,7 +1231,7 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
                 ellipse.setAttribute('class', 'concept-node expandable visible');
                 ellipse.setAttribute('data-concept', conceptKey);
                 
-                const text = createWrappedText(finalX, finalY, concept.label, {
+                const text = createWrappedText(pos.x, pos.y, concept.label, {
                     maxWidth: pos.width - 10,
                     fontSize: 12,
                     fill: '#ffffff',
@@ -1170,12 +1245,12 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
                 ellipse.addEventListener('click', (e) => {
                     e.stopPropagation();
                     highlightSelectedNode(ellipse, conceptKey);
-                    toggleConcept(branchIndex, conceptIndex, finalX, finalY, concept, pos.angle, branchData.color);
+                    toggleConcept(branchIndex, conceptIndex, pos.x, pos.y, concept, pos.angle, branchData.color);
                     showNodeInfo(concept.label, concept.description);
                 });
                 
                 if (expandedNodes.has(conceptKey)) {
-                    drawPoints(finalX, finalY, concept, pos.angle, branchIndex, conceptIndex, branchData.color);
+                    drawPoints(pos.x, pos.y, concept, pos.angle, branchIndex, conceptIndex, branchData.color);
                 }
             });
         }
@@ -1190,68 +1265,73 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
             
             const pointPositions = points.map((point, pointIndex) => {
                 const textMetrics = measureText(point.label.substring(0, 25), 10, 'normal');
-                const radius = Math.max(textMetrics.width / 2 + 8, 18);
+                const radius = Math.max(textMetrics.width / 2 + 12, 20); // Increased padding
                 
                 // Organize points in concentric rings if many points
                 const ringIndex = Math.floor(pointIndex / maxPointsPerRow);
                 const positionInRing = pointIndex % maxPointsPerRow;
                 const pointsInThisRing = Math.min(maxPointsPerRow, points.length - (ringIndex * maxPointsPerRow));
                 
-                // Calculate radius for this ring
-                const ringRadius = pointClusterRadius + (ringIndex * 80);
+                // Calculate radius for this ring with better spacing
+                const ringRadius = pointClusterRadius + (ringIndex * 100);
                 
                 // Calculate angle within the ring, keeping points clustered near parent concept direction
-                const ringSpread = Math.min(Math.PI * 0.8, pointsInThisRing * 0.4); // Limit spread to keep clustered
+                const ringSpread = Math.min(Math.PI * 0.9, pointsInThisRing * 0.5);
                 const startAngle = conceptAngle - ringSpread / 2;
                 let angle;
                 
                 if (pointsInThisRing === 1) {
-                    angle = conceptAngle; // Single point stays on concept line
+                    angle = conceptAngle;
                 } else {
                     angle = startAngle + (positionInRing / (pointsInThisRing - 1)) * ringSpread;
                 }
                 
+                const baseX = conceptX + Math.cos(angle) * ringRadius;
+                const baseY = conceptY + Math.sin(angle) * ringRadius;
+                
                 return {
+                    x: baseX,
+                    y: baseY,
                     angle: angle,
-                    radius: ringRadius,
                     nodeRadius: radius,
                     data: point,
-                    pointIndex: pointIndex
+                    pointIndex: pointIndex,
+                    key: \`point-\${branchIndex}-\${conceptIndex}-\${pointIndex}\`
                 };
             });
             
-            // Draw points with systematic positions
-            pointPositions.forEach((pos) => {
+            // Adjust positions to avoid collisions
+            const adjustedPositions = adjustPositionsForCollisions(pointPositions);
+            
+            // Draw points with collision-free positions
+            adjustedPositions.forEach((pos) => {
                 const point = pos.data;
                 const pointIndex = pos.pointIndex;
-                const pointKey = \`point-\${branchIndex}-\${conceptIndex}-\${pointIndex}\`;
+                const pointKey = pos.key;
                 
-                const finalX = conceptX + Math.cos(pos.angle) * pos.radius;
-                const finalY = conceptY + Math.sin(pos.angle) * pos.radius;
-                
-                // Store position with radius for collision detection
+                // Update position in the map
                 nodePositions.set(pointKey, { 
-                    x: finalX, 
-                    y: finalY, 
+                    x: pos.x, 
+                    y: pos.y, 
                     radius: pos.nodeRadius,
                     data: point 
                 });
                 
                 // Straight connection to concept
-                const line = createStraightPath(conceptX, conceptY, finalX, finalY, color, 2);
+                const line = createStraightPath(conceptX, conceptY, pos.x, pos.y, color, 2);
                 line.setAttribute('class', 'connection-line expandable visible');
                 connectionsGroup.appendChild(line);
                 
                 const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                circle.setAttribute('cx', finalX);
-                circle.setAttribute('cy', finalY);
+                circle.setAttribute('cx', pos.x);
+                circle.setAttribute('cy', pos.y);
                 circle.setAttribute('r', pos.nodeRadius);
                 circle.setAttribute('fill', color + '40');
                 circle.setAttribute('stroke', color);
                 circle.setAttribute('stroke-width', '1.5');
                 circle.setAttribute('class', 'point-node expandable visible');
                 
-                const text = createWrappedText(finalX, finalY, point.label.substring(0, 25), {
+                const text = createWrappedText(pos.x, pos.y, point.label.substring(0, 25), {
                     maxWidth: pos.nodeRadius * 1.8,
                     fontSize: 10,
                     fill: '#ffffff',
@@ -1265,12 +1345,12 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
                 circle.addEventListener('click', (e) => {
                     e.stopPropagation();
                     highlightSelectedNode(circle, pointKey);
-                    togglePoint(branchIndex, conceptIndex, pointIndex, finalX, finalY, point, pos.angle, color);
+                    togglePoint(branchIndex, conceptIndex, pointIndex, pos.x, pos.y, point, pos.angle, color);
                     showNodeInfo(point.label, point.description);
                 });
                 
                 if (expandedNodes.has(pointKey)) {
-                    drawDetails(finalX, finalY, point, pos.angle, branchIndex, conceptIndex, pointIndex, color);
+                    drawDetails(pos.x, pos.y, point, pos.angle, branchIndex, conceptIndex, pointIndex, color);
                 }
             });
         }
@@ -1295,69 +1375,74 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
             
             const detailPositions = validDetails.map((detail, detailIndex) => {
                 const textMetrics = measureText(detail.label.substring(0, 15), 9, 'normal');
-                const radius = Math.max(textMetrics.width / 2 + 5, 12);
+                const radius = Math.max(textMetrics.width / 2 + 8, 15); // Increased padding
                 
                 // Organize details in tight concentric rings
                 const ringIndex = Math.floor(detailIndex / maxDetailsPerRing);
                 const positionInRing = detailIndex % maxDetailsPerRing;
                 const detailsInThisRing = Math.min(maxDetailsPerRing, validDetails.length - (ringIndex * maxDetailsPerRing));
                 
-                // Calculate radius for this ring
-                const ringRadius = detailClusterRadius + (ringIndex * 60); // Increased from 40 for better spacing
+                // Calculate radius for this ring with better spacing
+                const ringRadius = detailClusterRadius + (ringIndex * 70);
                 
                 // Calculate angle within the ring, keeping details tightly clustered
-                const ringSpread = Math.min(Math.PI * 0.6, detailsInThisRing * 0.5); // Very tight clustering
+                const ringSpread = Math.min(Math.PI * 0.7, detailsInThisRing * 0.6);
                 const startAngle = pointAngle - ringSpread / 2;
                 let angle;
                 
                 if (detailsInThisRing === 1) {
-                    angle = pointAngle; // Single detail stays on point line
+                    angle = pointAngle;
                 } else {
                     angle = startAngle + (positionInRing / (detailsInThisRing - 1)) * ringSpread;
                 }
                 
+                const baseX = pointX + Math.cos(angle) * ringRadius;
+                const baseY = pointY + Math.sin(angle) * ringRadius;
+                
                 return {
+                    x: baseX,
+                    y: baseY,
                     angle: angle,
-                    radius: ringRadius,
                     nodeRadius: radius,
                     data: detail,
-                    detailIndex: detailIndex
+                    detailIndex: detailIndex,
+                    key: \`detail-\${branchIndex}-\${conceptIndex}-\${pointIndex}-\${detailIndex}\`
                 };
             });
             
-            // Draw details with systematic positions
-            detailPositions.forEach((pos) => {
+            // Adjust positions to avoid collisions
+            const adjustedPositions = adjustPositionsForCollisions(detailPositions);
+            
+            // Draw details with collision-free positions
+            adjustedPositions.forEach((pos) => {
                 const detail = pos.data;
                 const detailIndex = pos.detailIndex;
-                const detailKey = \`detail-\${branchIndex}-\${conceptIndex}-\${pointIndex}-\${detailIndex}\`;
+                const detailKey = pos.key;
                 
-                const finalX = pointX + Math.cos(pos.angle) * pos.radius;
-                const finalY = pointY + Math.sin(pos.angle) * pos.radius;
-                
-                // Store position with radius for collision detection
+                // Update position in the map
                 nodePositions.set(detailKey, { 
-                    x: finalX, 
-                    y: finalY, 
+                    x: pos.x, 
+                    y: pos.y, 
                     radius: pos.nodeRadius,
                     data: detail 
                 });
                 
                 // Straight connection to point
-                const line = createStraightPath(pointX, pointY, finalX, finalY, color, 1);
+                const line = createStraightPath(pointX, pointY, pos.x, pos.y, color, 1);
                 line.setAttribute('class', 'connection-line expandable visible');
                 line.setAttribute('opacity', '0.6');
                 connectionsGroup.appendChild(line);
                 
                 const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                circle.setAttribute('cx', finalX);
-                circle.setAttribute('cy', finalY);
+                circle.setAttribute('cx', pos.x);
+                circle.setAttribute('cy', pos.y);
                 circle.setAttribute('r', pos.nodeRadius);
                 circle.setAttribute('fill', color + '20');
                 circle.setAttribute('stroke', color);
                 circle.setAttribute('stroke-width', '1');
                 circle.setAttribute('class', 'detail-node expandable visible');
                 
-                const text = createWrappedText(finalX, finalY, detail.label.substring(0, 15), {
+                const text = createWrappedText(pos.x, pos.y, detail.label.substring(0, 15), {
                     maxWidth: pos.nodeRadius * 1.8,
                     fontSize: 9,
                     fill: '#ffffff',
@@ -2063,6 +2148,83 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
             // Also clear connected node highlights
             clearConnectedNodeHighlights();
             selectedNode = null;
+        }
+        
+        // Collision detection and avoidance functions
+        function checkCollision(x, y, radius, excludeKeys = []) {
+            for (const [key, pos] of nodePositions) {
+                if (excludeKeys.includes(key)) continue;
+                
+                const distance = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2);
+                const minDistance = radius + pos.radius + LAYOUT.overlapBuffer;
+                
+                if (distance < minDistance) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function findNonCollidingPosition(baseX, baseY, baseAngle, radius, maxAttempts = 20) {
+            // First try the base position
+            if (!checkCollision(baseX, baseY, radius)) {
+                return { x: baseX, y: baseY, angle: baseAngle };
+            }
+
+            // Try positions in a spiral pattern around the base position
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                const spiralRadius = attempt * 25; // Spiral outward
+                const angleVariations = 8 * attempt; // More positions per ring as we go out
+                
+                for (let angleIndex = 0; angleIndex < angleVariations; angleIndex++) {
+                    const angle = baseAngle + (angleIndex / angleVariations) * 2 * Math.PI;
+                    const x = baseX + Math.cos(angle) * spiralRadius;
+                    const y = baseY + Math.sin(angle) * spiralRadius;
+                    
+                    if (!checkCollision(x, y, radius)) {
+                        return { x, y, angle };
+                    }
+                }
+            }
+
+            // Fallback: return original position with a warning
+            console.warn('Could not find non-colliding position, using original');
+            return { x: baseX, y: baseY, angle: baseAngle };
+        }
+
+        function adjustPositionsForCollisions(positions) {
+            const adjustedPositions = [];
+            
+            for (let i = 0; i < positions.length; i++) {
+                const pos = positions[i];
+                const excludeKeys = adjustedPositions.map(p => p.key);
+                
+                // Check if this position collides with any already placed nodes
+                const baseX = pos.x;
+                const baseY = pos.y;
+                const baseAngle = pos.angle;
+                
+                const adjustedPos = findNonCollidingPosition(baseX, baseY, baseAngle, pos.nodeRadius, 15);
+                
+                adjustedPositions.push({
+                    ...pos,
+                    x: adjustedPos.x,
+                    y: adjustedPos.y,
+                    angle: adjustedPos.angle
+                });
+                
+                // Temporarily add to nodePositions for collision checking of subsequent nodes
+                if (pos.key) {
+                    nodePositions.set(pos.key, {
+                        x: adjustedPos.x,
+                        y: adjustedPos.y,
+                        radius: pos.nodeRadius,
+                        data: pos.data
+                    });
+                }
+            }
+            
+            return adjustedPositions;
         }
         
         document.addEventListener('DOMContentLoaded', initializeMindMap);
