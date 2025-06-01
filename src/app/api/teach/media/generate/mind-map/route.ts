@@ -1005,7 +1005,7 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
             nodesGroup.appendChild(text);
             
             circle.addEventListener('click', () => {
-                highlightSelectedNode(circle);
+                highlightSelectedNode(circle, 'center');
                 showNodeInfo(centerData.label, centerData.description);
             });
         }
@@ -1057,7 +1057,7 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
             
             rect.addEventListener('click', (e) => {
                 e.stopPropagation();
-                highlightSelectedNode(rect);
+                highlightSelectedNode(rect, \`branch-\${branchIndex}\`);
                 toggleBranch(branchIndex, x, y, branchData, angle);
                 showNodeInfo(branchData.label, branchData.description);
             });
@@ -1169,7 +1169,7 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
                 
                 ellipse.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    highlightSelectedNode(ellipse);
+                    highlightSelectedNode(ellipse, conceptKey);
                     toggleConcept(branchIndex, conceptIndex, finalX, finalY, concept, pos.angle, branchData.color);
                     showNodeInfo(concept.label, concept.description);
                 });
@@ -1264,7 +1264,7 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
                 
                 circle.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    highlightSelectedNode(circle);
+                    highlightSelectedNode(circle, pointKey);
                     togglePoint(branchIndex, conceptIndex, pointIndex, finalX, finalY, point, pos.angle, color);
                     showNodeInfo(point.label, point.description);
                 });
@@ -1370,7 +1370,7 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
                 
                 circle.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    highlightSelectedNode(circle);
+                    highlightSelectedNode(circle, detailKey);
                     showNodeInfo(detail.label, detail.description);
                 });
             });
@@ -1751,20 +1751,29 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
             
             // Draw enhanced connections
             finalConnections.forEach(conn => {
-                const path = createCurvedPath(conn.from.x, conn.from.y, conn.to.x, conn.to.y);
-                path.setAttribute('stroke', getConnectionColor(conn.type));
-                path.setAttribute('stroke-width', Math.max(1, conn.strength * 3));
-                path.setAttribute('stroke-dasharray', getConnectionPattern(conn.type));
-                path.setAttribute('opacity', Math.max(0.3, conn.strength * 0.8));
-                path.setAttribute('class', 'cross-connection visible'); // Added 'visible' class
-                path.setAttribute('fill', 'none');
+                // Use straight line instead of curved path for concept connections
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', conn.from.x);
+                line.setAttribute('y1', conn.from.y);
+                line.setAttribute('x2', conn.to.x);
+                line.setAttribute('y2', conn.to.y);
+                line.setAttribute('stroke', getConnectionColor(conn.type));
+                line.setAttribute('stroke-width', Math.max(1, conn.strength * 3));
+                line.setAttribute('stroke-dasharray', getConnectionPattern(conn.type));
+                line.setAttribute('opacity', Math.max(0.3, conn.strength * 0.8));
+                line.setAttribute('class', 'cross-connection visible');
+                line.setAttribute('fill', 'none');
+                
+                // Store connection data for smart highlighting
+                line.setAttribute('data-from-key', conn.key1);
+                line.setAttribute('data-to-key', conn.key2);
                 
                 // Add connection title for debugging/info
                 const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
                 title.textContent = \`\${conn.type}: \${conn.label1} ↔ \${conn.label2} (\${(conn.strength * 100).toFixed(0)}%)\`;
-                path.appendChild(title);
+                line.appendChild(title);
                 
-                crossConnectionsGroup.appendChild(path);
+                crossConnectionsGroup.appendChild(line);
             });
         }
         
@@ -1921,18 +1930,114 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
             return patterns[type] || '0';
         }
         
-        // Visual feedback functions
-        function highlightSelectedNode(nodeElement) {
-            // Remove previous selection
+        // Enhanced visual feedback functions with smart connection highlighting
+        function highlightSelectedNode(nodeElement, nodeKey) {
+            // Remove previous selection and reset connections
             clearNodeSelection();
+            clearConnectedNodeHighlights();
             
-            // Add subtle selection styling - no movement, just gentle glow
+            // Add primary selection styling
             nodeElement.style.filter = 'drop-shadow(0 0 8px #FFD700) drop-shadow(0 0 16px rgba(255, 215, 0, 0.5))';
             nodeElement.style.strokeWidth = (parseInt(nodeElement.style.strokeWidth || nodeElement.getAttribute('stroke-width') || '2') + 1).toString();
             nodeElement.style.stroke = '#FFD700';
             nodeElement.style.transition = 'all 0.2s ease';
             
             selectedNode = nodeElement;
+            
+            // Handle smart connection highlighting if in connection mode
+            if (connectionMode) {
+                highlightConnectedNodes(nodeKey);
+            }
+        }
+        
+        function highlightConnectedNodes(selectedNodeKey) {
+            if (!selectedNodeKey) return;
+            
+            const connections = document.querySelectorAll('.cross-connection');
+            const connectedNodes = new Set();
+            
+            // First pass: find all connected nodes and hide non-relevant connections
+            connections.forEach(connection => {
+                const fromKey = connection.getAttribute('data-from-key');
+                const toKey = connection.getAttribute('data-to-key');
+                
+                if (fromKey === selectedNodeKey || toKey === selectedNodeKey) {
+                    // This connection is relevant - keep it visible and track connected nodes
+                    connection.style.opacity = Math.max(0.6, parseFloat(connection.getAttribute('opacity') || '0.3'));
+                    connection.style.strokeWidth = (parseFloat(connection.getAttribute('stroke-width') || '2') * 1.2).toString();
+                    
+                    // Add the connected node to our set
+                    const connectedKey = fromKey === selectedNodeKey ? toKey : fromKey;
+                    connectedNodes.add(connectedKey);
+                } else {
+                    // This connection is not relevant - fade it out
+                    connection.style.opacity = '0.1';
+                    connection.style.strokeWidth = '1';
+                }
+            });
+            
+            // Second pass: highlight the connected nodes with subtle styling
+            connectedNodes.forEach(nodeKey => {
+                const nodeElement = findNodeByKey(nodeKey);
+                if (nodeElement) {
+                    // Subtle highlight for connected nodes
+                    nodeElement.style.filter = 'drop-shadow(0 0 4px #60A5FA) drop-shadow(0 0 8px rgba(96, 165, 250, 0.3))';
+                    nodeElement.style.stroke = '#60A5FA';
+                    nodeElement.style.strokeWidth = (parseInt(nodeElement.style.strokeWidth || nodeElement.getAttribute('stroke-width') || '2') + 0.5).toString();
+                    nodeElement.style.transition = 'all 0.2s ease';
+                    nodeElement.classList.add('connected-node-highlight');
+                }
+            });
+        }
+        
+        function findNodeByKey(nodeKey) {
+            // Look for nodes with matching data attributes
+            const possibleSelectors = [
+                \`[data-node-key="\${nodeKey}"]\`,
+                \`[data-branch="\${nodeKey}"]\`,
+                \`[data-concept="\${nodeKey}"]\`,
+                \`[data-point="\${nodeKey}"]\`,
+                \`[data-detail="\${nodeKey}"]\`
+            ];
+            
+            for (const selector of possibleSelectors) {
+                const element = document.querySelector(selector);
+                if (element) return element;
+            }
+            
+            return null;
+        }
+        
+        function clearConnectedNodeHighlights() {
+            // Reset all connection opacities and widths
+            const connections = document.querySelectorAll('.cross-connection');
+            connections.forEach(connection => {
+                connection.style.opacity = connection.getAttribute('opacity') || '0.3';
+                connection.style.strokeWidth = connection.getAttribute('stroke-width') || '2';
+            });
+            
+            // Reset all connected node highlights
+            const connectedNodes = document.querySelectorAll('.connected-node-highlight');
+            connectedNodes.forEach(node => {
+                node.style.filter = '';
+                node.style.stroke = '';
+                node.style.transition = '';
+                
+                // Reset to original stroke width based on node type
+                if (node.classList.contains('center-node')) {
+                    node.style.strokeWidth = '3';
+                } else if (node.classList.contains('concept-node')) {
+                    node.style.strokeWidth = '2';
+                } else if (node.classList.contains('point-node')) {
+                    node.style.strokeWidth = '1.5';
+                } else if (node.classList.contains('detail-node')) {
+                    node.style.strokeWidth = '1';
+                } else if (node.classList.contains('main-branch')) {
+                    node.style.strokeWidth = '2';
+                }
+                
+                node.classList.remove('connected-node-highlight');
+            });
         }
         
         function clearNodeSelection() {
@@ -1954,6 +2059,9 @@ function generateInteractiveSVGMindMap(data: any, title: string): string {
                     selectedNode.style.strokeWidth = '2';
                 }
             }
+            
+            // Also clear connected node highlights
+            clearConnectedNodeHighlights();
             selectedNode = null;
         }
         
