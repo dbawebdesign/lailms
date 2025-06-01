@@ -27,17 +27,43 @@ export async function GET(
       );
     }
 
-    // Fetch the mind map asset
-    const { data: asset, error: assetError } = await supabase
+    let asset = null;
+
+    // First try to fetch from lesson_media_assets
+    const { data: lessonAsset, error: lessonError } = await supabase
       .from('lesson_media_assets')
       .select('*')
       .eq('id', id)
       .eq('asset_type', 'mind_map')
       .single();
 
-    if (assetError || !asset) {
+    if (lessonAsset && !lessonError) {
+      asset = lessonAsset;
+    } else {
+      // If not found in lesson assets, try base_class_media_assets
+      const { data: baseClassAsset, error: baseClassError } = await supabase
+        .from('base_class_media_assets')
+        .select('*')
+        .eq('id', id)
+        .eq('asset_type', 'mind_map')
+        .eq('status', 'completed')
+        .single();
+
+      if (baseClassAsset && !baseClassError) {
+        asset = baseClassAsset;
+      }
+    }
+
+    if (!asset) {
       return NextResponse.json(
         { error: 'Mind map not found' },
+        { status: 404 }
+      );
+    }
+
+    if (!asset.svg_content) {
+      return NextResponse.json(
+        { error: 'Mind map content not available' },
         { status: 404 }
       );
     }

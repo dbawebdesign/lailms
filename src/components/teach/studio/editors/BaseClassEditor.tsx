@@ -68,7 +68,7 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
     try {
       setIsCheckingMindMap(true);
       
-      const response = await fetch(`/api/teach/base-classes/${baseClass.id}/mind-map`, {
+      const response = await fetch(`/api/teach/media/generate/mind-map?baseClassId=${baseClass.id}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -77,7 +77,7 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
       
       if (response.ok) {
         const result = await response.json();
-        if (result.asset) {
+        if (result.exists && result.asset) {
           setExistingMindMap({
             id: result.asset.id,
             url: result.asset.url
@@ -336,11 +336,15 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
     setFinalSummary(null);
 
     try {
-      const response = await fetch(`/api/teach/base-classes/${baseClass.id}/mind-map`, {
+      const regenerate = existingMindMap ? '?regenerate=true' : '';
+      const response = await fetch(`/api/teach/media/generate/mind-map${regenerate}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          baseClassId: baseClass.id
+        }),
       });
 
       if (!response.ok) {

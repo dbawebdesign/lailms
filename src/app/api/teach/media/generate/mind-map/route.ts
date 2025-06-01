@@ -11,7 +11,7 @@ function extractTextContent(content: any): string {
   if (!content) return '';
   if (typeof content === 'string') return content;
   
-    if (content.type === 'doc' && content.content) {
+  if (content.type === 'doc' && content.content) {
     return extractFromNodes(content.content);
   }
   
@@ -36,7 +36,8 @@ function extractFromNodes(nodes: any[]): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { lessonId } = await request.json();
+    const body = await request.json();
+    const { lessonId, baseClassId } = body;
     const supabase = createSupabaseServerClient();
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -44,52 +45,185 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!lessonId) {
-      return NextResponse.json({ error: 'Lesson ID is required' }, { status: 400 });
+    // Determine the type of mind map to generate
+    const isLessonMindMap = !!lessonId;
+    const isBaseClassMindMap = !!baseClassId;
+
+    if (!isLessonMindMap && !isBaseClassMindMap) {
+      return NextResponse.json({ error: 'Either lessonId or baseClassId is required' }, { status: 400 });
     }
 
-    // Fetch comprehensive lesson content
-    const { data: lesson } = await supabase
-      .from('lessons')
-      .select(`
+    if (isLessonMindMap && isBaseClassMindMap) {
+      return NextResponse.json({ error: 'Cannot specify both lessonId and baseClassId' }, { status: 400 });
+    }
+
+    const regenerate = request.nextUrl.searchParams.get('regenerate') === 'true';
+    let mindMapData, svgHtml, assetData;
+
+    if (isLessonMindMap) {
+      // Generate lesson mind map
+      const result = await generateLessonMindMap(supabase, lessonId, user, regenerate);
+      mindMapData = result.mindMapData;
+      svgHtml = result.svgHtml;
+      assetData = result.assetData;
+    } else {
+      // Generate base class mind map
+      const result = await generateBaseClassMindMap(supabase, baseClassId, user, regenerate);
+      mindMapData = result.mindMapData;
+      svgHtml = result.svgHtml;
+      assetData = result.assetData;
+    }
+
+    return NextResponse.json({
+      success: true,
+      asset: assetData
+    });
+
+  } catch (error) {
+    console.error('Mind map generation error:', error);
+    return NextResponse.json({ error: 'Failed to generate mind map' }, { status: 500 });
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = request.nextUrl;
+    const lessonId = searchParams.get('lessonId');
+    const baseClassId = searchParams.get('baseClassId');
+    const supabase = createSupabaseServerClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Determine the type of mind map to check
+    const isLessonMindMap = !!lessonId;
+    const isBaseClassMindMap = !!baseClassId;
+
+    if (!isLessonMindMap && !isBaseClassMindMap) {
+      return NextResponse.json({ error: 'Either lessonId or baseClassId is required' }, { status: 400 });
+    }
+
+    if (isLessonMindMap && isBaseClassMindMap) {
+      return NextResponse.json({ error: 'Cannot specify both lessonId and baseClassId' }, { status: 400 });
+    }
+
+    if (isLessonMindMap) {
+      // Check for lesson mind map
+      const { data: assets } = await supabase
+        .from('lesson_media_assets')
+        .select('id, title, created_at')
+        .eq('lesson_id', lessonId)
+        .eq('asset_type', 'mind_map')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (assets && assets.length > 0) {
+        return NextResponse.json({
+          exists: true,
+          asset: {
+            ...assets[0],
+            url: `/api/teach/media/mind-map/${assets[0].id}`
+          }
+        });
+      }
+    } else {
+      // Check for base class mind map
+      const { data: assets } = await supabase
+        .from('base_class_media_assets')
+        .select('id, title, created_at')
+        .eq('base_class_id', baseClassId)
+        .eq('asset_type', 'mind_map')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (assets && assets.length > 0) {
+        return NextResponse.json({
+          exists: true,
+          asset: {
+            ...assets[0],
+            url: `/api/teach/media/mind-map/${assets[0].id}`
+          }
+        });
+      }
+    }
+
+    return NextResponse.json({ exists: false, asset: null });
+
+  } catch (error) {
+    console.error('Error checking for mind map:', error);
+    return NextResponse.json({ error: 'Failed to check mind map' }, { status: 500 });
+  }
+}
+
+async function generateLessonMindMap(supabase: any, lessonId: string, user: any, regenerate: boolean) {
+  // Check for existing mind map
+  if (!regenerate) {
+    const { data: existingAssets } = await supabase
+      .from('lesson_media_assets')
+      .select('*')
+      .eq('lesson_id', lessonId)
+      .eq('asset_type', 'mind_map')
+      .eq('status', 'completed');
+
+    if (existingAssets && existingAssets.length > 0) {
+      throw new Error('A mind map already exists for this lesson');
+    }
+  }
+
+  if (regenerate) {
+    await supabase
+      .from('lesson_media_assets')
+      .delete()
+      .eq('lesson_id', lessonId)
+      .eq('asset_type', 'mind_map');
+  }
+
+  // Fetch comprehensive lesson content
+  const { data: lesson } = await supabase
+    .from('lessons')
+    .select(`
+      title,
+      description,
+      lesson_sections (
         title,
-        description,
-        lesson_sections (
-          title,
-          content,
-          section_type,
-          order_index
-        )
-      `)
-      .eq('id', lessonId)
-      .single();
+        content,
+        section_type,
+        order_index
+      )
+    `)
+    .eq('id', lessonId)
+    .single();
 
-    if (!lesson) {
-      return NextResponse.json({ error: 'Lesson not found' }, { status: 404 });
-    }
+  if (!lesson) {
+    throw new Error('Lesson not found');
+  }
 
-    // Enhanced content extraction with deeper analysis
-    const lessonContent = {
-      title: lesson.title,
-      description: lesson.description || '',
-      sections: lesson.lesson_sections?.sort((a: any, b: any) => a.order_index - b.order_index).map((section: any) => {
-        const content = extractTextContent(section.content);
-        const keyPoints = extractKeyPoints(content);
-        const detailedConcepts = extractDetailedConcepts(content);
-        
-        return {
-          title: section.title,
-          content: content,
-          type: section.section_type,
-          keyPoints: keyPoints,
-          concepts: detailedConcepts.slice(0, 4), // Limit to 4 main concepts per section
-          summary: content.substring(0, 300) // Section summary
-        };
-      }) || []
-    };
+  // Enhanced content extraction with deeper analysis
+  const lessonContent = {
+    title: lesson.title,
+    description: lesson.description || '',
+    sections: lesson.lesson_sections?.sort((a: any, b: any) => a.order_index - b.order_index).map((section: any) => {
+      const content = extractTextContent(section.content);
+      const keyPoints = extractKeyPoints(content);
+      const detailedConcepts = extractDetailedConcepts(content);
+      
+      return {
+        title: section.title,
+        content: content,
+        type: section.section_type,
+        keyPoints: keyPoints,
+        concepts: detailedConcepts.slice(0, 4), // Limit to 4 main concepts per section
+        summary: content.substring(0, 300) // Section summary
+      };
+    }) || []
+  };
 
-    // Generate mind map with AI - enhanced prompt for deeper hierarchy
-    const prompt = `Create a comprehensive, multi-level mind map from this lesson content. Extract ACTUAL content and create a deep hierarchy.
+  // Generate mind map with AI - enhanced prompt for deeper hierarchy
+  const prompt = `Create a comprehensive, multi-level mind map from this lesson content. Extract ACTUAL content and create a deep hierarchy.
 
 LESSON STRUCTURE:
 ${JSON.stringify(lessonContent, null, 2)}
@@ -143,84 +277,268 @@ OUTPUT FORMAT (valid JSON only):
 
 Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
 
-    const aiResponse = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
-      messages: [
-        { role: 'system', content: 'You create educational mind maps with deep hierarchical structure. Return only valid JSON.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.1,
-      max_tokens: 8000
-    });
+  const aiResponse = await openai.chat.completions.create({
+    model: 'gpt-4.1-mini',
+    messages: [
+      { role: 'system', content: 'You create educational mind maps with deep hierarchical structure. Return only valid JSON.' },
+      { role: 'user', content: prompt }
+    ],
+    temperature: 0.1,
+    max_tokens: 8000
+  });
 
-    let mindMapData;
-    try {
-      const responseText = aiResponse.choices[0]?.message?.content || '{}';
-      const cleanedJson = responseText.replace(/```json\s*|\s*```/g, '').trim();
-      mindMapData = JSON.parse(cleanedJson);
-    } catch (error) {
-      // Enhanced fallback structure with deeper hierarchy
-      const colors = ['#DC2626', '#059669', '#7C3AED', '#EA580C', '#0891B2', '#BE185D'];
-      mindMapData = {
-        center: {
-          label: lessonContent.title,
-          description: lessonContent.description || 'Comprehensive lesson'
-        },
-        branches: lessonContent.sections.slice(0, 6).map((section: any, index: number) => ({
-          id: `section${index + 1}`,
-          label: section.title,
-          description: section.summary,
-          color: colors[index],
-          concepts: section.concepts.slice(0, 4).map((concept: any, conceptIndex: number) => ({
-            id: `concept${index + 1}_${conceptIndex + 1}`,
-            label: concept.title,
-            description: concept.description,
-            points: concept.points?.slice(0, 3).map((point: any, pointIndex: number) => ({
-              id: `point${index + 1}_${conceptIndex + 1}_${pointIndex + 1}`,
-              label: point.title || point,
-              description: point.description || point,
-              details: point.details?.slice(0, 2).map((detail: any, detailIndex: number) => ({
-                id: `detail${index + 1}_${conceptIndex + 1}_${pointIndex + 1}_${detailIndex + 1}`,
-                label: detail.title || detail,
-                description: detail.description || detail
-              })) || []
+  let mindMapData;
+  try {
+    const responseText = aiResponse.choices[0]?.message?.content || '{}';
+    const cleanedJson = responseText.replace(/```json\s*|\s*```/g, '').trim();
+    mindMapData = JSON.parse(cleanedJson);
+  } catch (error) {
+    // Enhanced fallback structure with deeper hierarchy
+    const colors = ['#DC2626', '#059669', '#7C3AED', '#EA580C', '#0891B2', '#BE185D'];
+    mindMapData = {
+      center: {
+        label: lessonContent.title,
+        description: lessonContent.description || 'Comprehensive lesson'
+      },
+      branches: lessonContent.sections.slice(0, 6).map((section: any, index: number) => ({
+        id: `section${index + 1}`,
+        label: section.title,
+        description: section.summary,
+        color: colors[index],
+        concepts: section.concepts.slice(0, 4).map((concept: any, conceptIndex: number) => ({
+          id: `concept${index + 1}_${conceptIndex + 1}`,
+          label: concept.title,
+          description: concept.description,
+          points: concept.points?.slice(0, 3).map((point: any, pointIndex: number) => ({
+            id: `point${index + 1}_${conceptIndex + 1}_${pointIndex + 1}`,
+            label: point.title || point,
+            description: point.description || point,
+            details: point.details?.slice(0, 2).map((detail: any, detailIndex: number) => ({
+              id: `detail${index + 1}_${conceptIndex + 1}_${pointIndex + 1}_${detailIndex + 1}`,
+              label: detail.title || detail,
+              description: detail.description || detail
             })) || []
+          })) || []
+        }))
+      }))
+    };
+  }
+
+  // Generate premium SVG mind map with enhanced positioning
+  const svgHtml = generateInteractiveSVGMindMap(mindMapData, lessonContent.title);
+
+  // Save to database
+  const { data: asset } = await supabase
+    .from('lesson_media_assets')
+    .insert({
+      lesson_id: lessonId,
+      asset_type: 'mind_map',
+      title: `${lessonContent.title} Mind Map`,
+      content: mindMapData,
+      svg_content: svgHtml,
+      status: 'completed',
+      created_by: user.id
+    })
+    .select()
+    .single();
+
+  return {
+    mindMapData,
+    svgHtml,
+    assetData: {
+      id: asset.id,
+      url: `/api/teach/media/mind-map/${asset.id}`,
+      title: asset.title
+    }
+  };
+}
+
+async function generateBaseClassMindMap(supabase: any, baseClassId: string, user: any, regenerate: boolean) {
+  // Check for existing mind map
+  if (!regenerate) {
+    const { data: existingAssets } = await supabase
+      .from('base_class_media_assets')
+      .select('*')
+      .eq('base_class_id', baseClassId)
+      .eq('asset_type', 'mind_map')
+      .eq('status', 'completed');
+
+    if (existingAssets && existingAssets.length > 0) {
+      throw new Error('A mind map already exists for this base class');
+    }
+  }
+
+  if (regenerate) {
+    await supabase
+      .from('base_class_media_assets')
+      .delete()
+      .eq('base_class_id', baseClassId)
+      .eq('asset_type', 'mind_map');
+  }
+
+  // Fetch comprehensive content
+  const { data: baseClass } = await supabase
+    .from('base_classes')
+    .select(`
+      name,
+      description,
+      paths (
+        title,
+        description,
+        order_index,
+        lessons (
+          title,
+          description,
+          order_index,
+          lesson_sections (
+            title,
+            content,
+            section_type,
+            order_index
+          )
+        )
+      )
+    `)
+    .eq('id', baseClassId)
+    .single();
+
+  if (!baseClass) {
+    throw new Error('Base class not found');
+  }
+
+  // Structure content for mind map
+  const courseContent = {
+    title: baseClass.name,
+    description: baseClass.description || '',
+    modules: baseClass.paths?.sort((a: any, b: any) => a.order_index - b.order_index).map((path: any) => ({
+      title: path.title,
+      description: path.description || '',
+      lessons: path.lessons?.sort((a: any, b: any) => a.order_index - b.order_index).map((lesson: any) => ({
+        title: lesson.title,
+        description: lesson.description || '',
+        concepts: lesson.lesson_sections?.sort((a: any, b: any) => a.order_index - b.order_index).map((section: any) => {
+          const content = extractTextContent(section.content);
+          return {
+            title: section.title,
+            content: content.substring(0, 300),
+            type: section.section_type
+          };
+        }) || []
+      })) || []
+    })) || []
+  };
+
+  // Generate mind map with AI
+  const prompt = `Create a comprehensive mind map from this course content. Extract and organize the ACTUAL content.
+
+COURSE STRUCTURE:
+${JSON.stringify(courseContent, null, 2)}
+
+REQUIREMENTS:
+1. Center: Course title with brief description
+2. Main branches: Course modules/paths (up to 6, numbered)
+3. Sub-branches: Key lessons from each module
+4. Detail nodes: Important concepts from lesson sections
+5. Include rich descriptions for each node
+6. Use actual content from the provided structure
+
+OUTPUT FORMAT (valid JSON only):
+{
+  "center": {
+    "label": "${courseContent.title}",
+    "description": "Course overview"
+  },
+  "branches": [
+    {
+      "id": "module1",
+      "label": "1. Module Name",
+      "description": "Module description",
+      "color": "#DC2626",
+      "concepts": [
+        {
+          "label": "Concept Name",
+          "description": "Detailed explanation",
+          "details": [
+            {
+              "label": "Key Point",
+              "description": "Specific detail"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
+
+  const aiResponse = await openai.chat.completions.create({
+    model: 'gpt-4.1-mini',
+    messages: [
+      { role: 'system', content: 'You create educational mind maps. Return only valid JSON.' },
+      { role: 'user', content: prompt }
+    ],
+    temperature: 0.1,
+    max_tokens: 4000
+  });
+
+  let mindMapData;
+  try {
+    const responseText = aiResponse.choices[0]?.message?.content || '{}';
+    const cleanedJson = responseText.replace(/```json\s*|\s*```/g, '').trim();
+    mindMapData = JSON.parse(cleanedJson);
+  } catch (error) {
+    // Fallback structure
+    const colors = ['#DC2626', '#059669', '#7C3AED', '#EA580C', '#0891B2', '#BE185D'];
+    mindMapData = {
+      center: {
+        label: courseContent.title,
+        description: courseContent.description || 'Comprehensive course'
+      },
+      branches: courseContent.modules.slice(0, 6).map((module: any, index: number) => ({
+        id: `module${index + 1}`,
+        label: `${index + 1}. ${module.title}`,
+        description: module.description || `Learn ${module.title}`,
+        color: colors[index],
+        concepts: module.lessons.slice(0, 4).map((lesson: any) => ({
+          label: lesson.title,
+          description: lesson.description || `Key concepts in ${lesson.title}`,
+          details: lesson.concepts.slice(0, 3).map((concept: any) => ({
+            label: concept.title,
+            description: concept.content.substring(0, 150) || `Important aspects of ${concept.title}`
           }))
         }))
-      };
-    }
-
-    // Generate premium SVG mind map with enhanced positioning
-    const svgHtml = generateInteractiveSVGMindMap(mindMapData, lessonContent.title);
-
-    // Save to database
-    const { data: asset } = await supabase
-      .from('lesson_media_assets')
-      .insert({
-        lesson_id: lessonId,
-        asset_type: 'mind_map',
-        title: `${lessonContent.title} Mind Map`,
-        content: mindMapData,
-        svg_content: svgHtml,
-        status: 'completed',
-        created_by: user.id
-      })
-      .select()
-      .single();
-
-    return NextResponse.json({
-      success: true,
-      asset: {
-        id: asset.id,
-        url: `/api/teach/media/mind-map/${asset.id}`,
-        title: asset.title
-      }
-    });
-
-  } catch (error) {
-    console.error('Mind map generation error:', error);
-    return NextResponse.json({ error: 'Failed to generate mind map' }, { status: 500 });
+      }))
+    };
   }
+
+  // Generate premium SVG mind map
+  const svgHtml = generateInteractiveSVGMindMap(mindMapData, courseContent.title);
+
+  // Save to database
+  const { data: asset } = await supabase
+    .from('base_class_media_assets')
+    .insert({
+      base_class_id: baseClassId,
+      asset_type: 'mind_map',
+      title: `${baseClass.name} Mind Map`,
+      content: mindMapData,
+      svg_content: svgHtml,
+      status: 'completed',
+      created_by: user.id
+    })
+    .select()
+    .single();
+
+  return {
+    mindMapData,
+    svgHtml,
+    assetData: {
+      id: asset.id,
+      url: `/api/teach/media/mind-map/${asset.id}`,
+      title: asset.title
+    }
+  };
 }
 
 function extractDetailedConcepts(content: string): any[] {
