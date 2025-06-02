@@ -101,8 +101,8 @@ const createSupabaseRouteHandlerClient = async () => {
 };
 
 // GET a single base class by ID
-export async function GET(request: Request, context: { params: { baseClassId: string } }) {
-  const { baseClassId } = context.params;
+export async function GET(request: Request, { params }: { params: Promise<{ baseClassId: string }> }) {
+  const { baseClassId } = await params;
   const supabase = await createSupabaseRouteHandlerClient(); // Await the helper
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -141,7 +141,7 @@ export async function GET(request: Request, context: { params: { baseClassId: st
 }
 
 // UPDATE a base class by ID
-export async function PUT(request: Request, context: { params: { baseClassId: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ baseClassId: string }> }) {
   const cookieHeader = request.headers.get('cookie');
   console.log('Raw cookie header in PUT /base-classes/[baseClassId] (using @supabase/ssr):', cookieHeader);
 
@@ -154,7 +154,7 @@ export async function PUT(request: Request, context: { params: { baseClassId: st
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { baseClassId } = context.params;
+  const { baseClassId } = await params;
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
@@ -215,10 +215,22 @@ export async function PUT(request: Request, context: { params: { baseClassId: st
 }
 
 // PATCH a base class by ID (similar to PUT but more RESTful for partial updates)
-export async function PATCH(request: Request, context: { params: { baseClassId: string } }) {
-  const supabase = await createSupabaseRouteHandlerClient();
-  const { baseClassId } = context.params;
+export async function PATCH(request: Request, { params }: { params: Promise<{ baseClassId: string }> }) {
+  // Log any special cookie setup attempt from frontend
+  const cookieHeader = request.headers.get('cookie');
+  console.log('Raw cookie header PATCH /base-classes/[baseClassId]:', cookieHeader);
 
+  const supabase = await createSupabaseRouteHandlerClient(); // Await the helper
+
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    console.error("Error parsing request body in PATCH base-classes:", e);
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const { baseClassId } = await params;
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
@@ -226,7 +238,7 @@ export async function PATCH(request: Request, context: { params: { baseClassId: 
   }
 
   try {
-    const updates = await request.json();
+    const updates = body;
 
     // Get user's organisation
     const { data: profileData, error: profileError } = await supabase
@@ -288,9 +300,9 @@ export async function PATCH(request: Request, context: { params: { baseClassId: 
 }
 
 // DELETE a base class by ID
-export async function DELETE(request: Request, context: { params: { baseClassId: string } }) {
-  const { baseClassId } = context.params;
-  const supabase = await createSupabaseRouteHandlerClient(); // Await the helper
+export async function DELETE(request: Request, { params }: { params: Promise<{ baseClassId: string }> }) {
+  const supabase = await createSupabaseRouteHandlerClient();
+  const { baseClassId } = await params;
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {

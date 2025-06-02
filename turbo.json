@@ -12,5 +12,7 @@
       "cache": false,
       "persistent": true
     }
-  }
+  },
+  "globalDependencies": ["package.json"],
+  "globalEnv": ["NODE_ENV"]
 } 

@@ -5,7 +5,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "echo 'Skipping build for Supabase Edge Functions - these are deployed separately'",
+    "build:deno": "tsc",
     "lint": "eslint ."
   },
   "devDependencies": {

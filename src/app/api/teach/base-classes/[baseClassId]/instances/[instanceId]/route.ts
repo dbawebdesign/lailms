@@ -9,11 +9,13 @@ function mapDbInstanceToUi(dbInstance: any): ClassInstance {
     id: dbInstance.id,
     baseClassId: dbInstance.base_class_id,
     name: dbInstance.name,
+    enrollmentCode: dbInstance.enrollment_code,
     startDate: dbInstance.start_date,
     endDate: dbInstance.end_date,
     status: dbInstance.status, // Assuming status is directly mapped or calculated
     createdAt: dbInstance.created_at,
     updatedAt: dbInstance.updated_at,
+    creationDate: dbInstance.created_at, // Map to creationDate as well
     // Map settings from JSONB
     period: dbInstance.settings?.period,
     capacity: dbInstance.settings?.capacity,
@@ -55,10 +57,10 @@ function mapUiInstanceToDb(uiInstanceData: Partial<ClassInstanceCreationData | C
 
 export async function GET(
   request: Request,
-  { params }: { params: { baseClassId: string; instanceId: string } }
+  { params }: { params: Promise<{ baseClassId: string; instanceId: string }> }
 ) {
   const supabase = createSupabaseServerClient();
-  const { baseClassId, instanceId } = params;
+  const { baseClassId, instanceId } = await params;
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -125,10 +127,10 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { baseClassId: string; instanceId: string } }
+  { params }: { params: Promise<{ baseClassId: string; instanceId: string }> }
 ) {
   const supabase = createSupabaseServerClient();
-  const { baseClassId, instanceId } = params;
+  const { baseClassId, instanceId } = await params;
   let updatedInstanceData;
 
   try {
@@ -220,10 +222,10 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { baseClassId: string; instanceId: string } }
+  { params }: { params: Promise<{ baseClassId: string; instanceId: string }> }
 ) {
   const supabase = createSupabaseServerClient();
-  const { baseClassId, instanceId } = params;
+  const { baseClassId, instanceId } = await params;
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();

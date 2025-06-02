@@ -67,8 +67,9 @@ async function getClassInstanceData(instanceId: string, supabase: any): Promise<
 export default async function ClassInstanceSettingsPage({ 
   params 
 }: { 
-  params: { instanceId: string } 
+  params: Promise<{ instanceId: string }> 
 }) {
+  const { instanceId } = await params;
   const supabase = createSupabaseServerClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -86,7 +87,7 @@ export default async function ClassInstanceSettingsPage({
     redirect("/dashboard?error=unauthorized");
   }
 
-  const classInstance = await getClassInstanceData(params.instanceId, supabase);
+  const classInstance = await getClassInstanceData(instanceId, supabase);
   
   if (!classInstance) {
     notFound();

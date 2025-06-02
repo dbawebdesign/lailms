@@ -25,18 +25,13 @@ interface ResolvedPageParams {
 }
 
 interface BaseClassStudioPageProps {
-  // The props received by the component. As per Next.js warning, this `params` might be a Promise at runtime.
-  params: ResolvedPageParams | Promise<ResolvedPageParams>; 
+  // The props received by the component. As per Next.js 15, params is always a Promise
+  params: Promise<ResolvedPageParams>; 
 }
 
 const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
-  let resolvedParamsSignal: ResolvedPageParams;
-  // Check if props.params is a promise (duck typing for thenable)
-  if (props.params && typeof (props.params as Promise<ResolvedPageParams>)?.then === 'function') {
-    resolvedParamsSignal = use(props.params as Promise<ResolvedPageParams>);
-  } else {
-    resolvedParamsSignal = props.params as ResolvedPageParams;
-  }
+  // In Next.js 15, params is always a Promise
+  const resolvedParamsSignal = use(props.params);
   const { id: baseClassId } = resolvedParamsSignal;
 
   const [studioBaseClass, setStudioBaseClass] = useState<StudioBaseClass | null>(null);

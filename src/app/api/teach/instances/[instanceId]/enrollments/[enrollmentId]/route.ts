@@ -43,10 +43,10 @@ async function authorizeTeacherForEnrollmentAction(
 // DELETE Handler: Unenroll a student (deletes an enrollment record)
 export async function DELETE(
   request: Request,
-  { params }: { params: { instanceId: string; enrollmentId: string } }
+  { params }: { params: Promise<{ instanceId: string; enrollmentId: string }> }
 ) {
   const supabase = createSupabaseServerClient();
-  const { instanceId, enrollmentId } = params;
+  const { instanceId, enrollmentId } = await params;
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();

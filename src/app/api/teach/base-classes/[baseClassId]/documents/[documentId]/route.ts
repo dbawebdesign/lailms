@@ -3,15 +3,15 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     baseClassId: string;
     documentId: string;
-  };
+  }>;
 }
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const supabase = await createSupabaseServerClient();
-  const { baseClassId, documentId } = params;
+  const { baseClassId, documentId } = await params;
 
   const {
     data: { session },

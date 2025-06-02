@@ -213,8 +213,9 @@ async function getClassStats(instanceId: string, supabase: any): Promise<ClassSt
 export default async function ClassInstancePage({ 
   params 
 }: { 
-  params: { instanceId: string } 
+  params: Promise<{ instanceId: string }> 
 }) {
+  const { instanceId } = await params;
   const supabase = createSupabaseServerClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -232,16 +233,16 @@ export default async function ClassInstancePage({
     redirect("/dashboard?error=unauthorized");
   }
 
-  const classInstance = await getClassInstanceData(params.instanceId, supabase);
+  const classInstance = await getClassInstanceData(instanceId, supabase);
   
   if (!classInstance) {
     notFound();
   }
 
   const [studentPerformance, recentActivity, classStats] = await Promise.all([
-    getStudentPerformance(params.instanceId, supabase),
-    getRecentActivity(params.instanceId, supabase),
-    getClassStats(params.instanceId, supabase)
+    getStudentPerformance(instanceId, supabase),
+    getRecentActivity(instanceId, supabase),
+    getClassStats(instanceId, supabase)
   ]);
 
   const getStudentStatusColor = (status: string) => {

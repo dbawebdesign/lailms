@@ -49,9 +49,9 @@ function mapDbToUiInstance(dbInst: DbClassInstance): ClassInstance {
 }
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     baseClassId: string; // Renaming for clarity from Next.js route param name
-  }
+  }>;
 }
 
 export async function POST(request: Request, { params }: RouteParams) {

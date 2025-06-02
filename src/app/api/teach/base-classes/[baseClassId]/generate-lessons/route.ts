@@ -7,10 +7,10 @@ import { BaseClass } from '@/types/teach';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { baseClassId: string } }
+  { params }: { params: Promise<{ baseClassId: string }> }
 ) {
   // Destructure param from the helper argument first
-  const { baseClassId } = params;
+  const { baseClassId } = await params;
   console.log(`[generate-lessons] Received request for baseClassId: ${baseClassId}`);
 
   // Verify that baseClassId is provided immediately after destructuring

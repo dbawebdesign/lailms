@@ -1,19 +1,19 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, use } from 'react';
 import LessonEditor from '@/components/teach/designer/LessonEditor'; // We will create/update this component next
 import { getLessonSections } from '@/lib/services/teachService';
 import type { LessonSection } from '@/types/lesson';
 import { LoadingSpinner } from '@/components/ui/loading-spinner'; // Assuming a loading spinner component exists
 
 interface LessonPageProps {
-  params: {
+  params: Promise<{
     id: string; // This will be the lesson ID or 'new'
-  };
+  }>;
 }
 
 const LessonPage: React.FC<LessonPageProps> = ({ params }) => {
-  const { id: lessonIdParam } = params;
+  const { id: lessonIdParam } = use(params);
   const isNewLesson = lessonIdParam === 'new';
 
   const [initialSections, setInitialSections] = useState<LessonSection[] | undefined>(undefined);

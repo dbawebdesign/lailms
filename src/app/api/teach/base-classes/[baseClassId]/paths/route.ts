@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 interface BaseClassPathsParams {
-  params: {
+  params: Promise<{
     baseClassId: string;
-  };
+  }>;
 }
 
 // POST - Create a new path within a base class

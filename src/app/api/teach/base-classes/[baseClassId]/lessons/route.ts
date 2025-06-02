@@ -3,9 +3,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { baseClassId: string } }
+  { params }: { params: Promise<{ baseClassId: string }> }
 ) {
-  const { baseClassId } = params;
+  const { baseClassId } = await params;
   console.log(`[GET /lessons-for-baseclass] Received request for baseClassId: ${baseClassId}`);
 
   if (!baseClassId) {

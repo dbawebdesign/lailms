@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 
 interface RouteParams {
-  params: { baseClassId: string };
+  params: Promise<{ baseClassId: string }>;
 }
 
 // GET handler to list documents for a specific base class
