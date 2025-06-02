@@ -21,6 +21,16 @@ function getBaseURL(request?: Request): string {
       console.log('[getBaseURL] Resolved from request headers:', baseURL);
       return baseURL;
     }
+    
+    // Alternative: try to extract from request.url if headers fail
+    try {
+      const requestUrl = new URL(request.url);
+      const baseURL = `${requestUrl.protocol}//${requestUrl.host}`;
+      console.log('[getBaseURL] Resolved from request.url:', baseURL);
+      return baseURL;
+    } catch (error) {
+      console.log('[getBaseURL] Failed to parse request.url:', error);
+    }
   }
   
   // Fallback to environment variable
@@ -45,6 +55,10 @@ function getBaseURL(request?: Request): string {
   // In production without proper headers or env vars, this will cause an error
   // which is better than silently failing with localhost
   console.error('[getBaseURL] Unable to determine base URL - no request headers or env vars available');
+  console.error('[getBaseURL] Environment debug info:');
+  console.error('- NODE_ENV:', process.env.NODE_ENV);
+  console.error('- VERCEL_URL:', process.env.VERCEL_URL ? 'set' : 'not set');
+  console.error('- NEXT_PUBLIC_APP_URL:', process.env.NEXT_PUBLIC_APP_URL ? 'set' : 'not set');
   throw new Error('Unable to determine base URL. Please set NEXT_PUBLIC_APP_URL environment variable.');
 }
 
