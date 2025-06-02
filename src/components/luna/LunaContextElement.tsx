@@ -66,8 +66,7 @@ const LunaContextElement: React.FC<LunaContextElementProps> = ({
     state,
     metadata,
     parentId,
-    lunaContext.registerComponent, 
-    lunaContext.unregisterComponent
+    lunaContext
   ]);
 
   // Update component when content or state changes

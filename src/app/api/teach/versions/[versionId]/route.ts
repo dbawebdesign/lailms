@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: VersionParams) {
 
     const supabase = createSupabaseServerClient();
     const { data: version, error } = await supabase
-      .from('section_versions')
+      .from('lesson_section_versions')
       .select('*')
       .eq('id', versionId)
       .single();
@@ -55,8 +55,8 @@ export async function POST(request: Request, { params }: VersionParams) {
 
     // 1. Fetch the target version to revert to
     const { data: targetVersion, error: fetchTargetError } = await supabase
-      .from('section_versions')
-      .select('section_id, content')
+      .from('lesson_section_versions')
+      .select('lesson_section_id, content')
       .eq('id', versionId)
       .single();
 
@@ -65,11 +65,11 @@ export async function POST(request: Request, { params }: VersionParams) {
       return NextResponse.json({ error: 'Target version not found or permission issue.', details: fetchTargetError?.message }, { status: 404 });
     }
 
-    const { section_id: sectionId, content: targetContent } = targetVersion;
+    const { lesson_section_id: sectionId, content: targetContent } = targetVersion;
 
     // 2. Fetch the current content of the parent section to create a backup version
     const { data: currentSection, error: fetchCurrentError } = await supabase
-      .from('sections')
+      .from('lesson_sections')
       .select('content')
       .eq('id', sectionId)
       .single();
@@ -81,12 +81,24 @@ export async function POST(request: Request, { params }: VersionParams) {
 
     // 3. Create a new version entry for the *current* content (backup before overwriting)
     if (currentSection.content && JSON.stringify(currentSection.content) !== JSON.stringify(targetContent)) {
+        // Get the current max version number for this section
+        const { data: maxVersionData, error: maxVersionError } = await supabase
+          .from('lesson_section_versions')
+          .select('version_number')
+          .eq('lesson_section_id', sectionId)
+          .order('version_number', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const nextVersionNumber = maxVersionData ? maxVersionData.version_number + 1 : 1;
+
         const { error: backupVersionError } = await supabase
-        .from('section_versions')
+        .from('lesson_section_versions')
         .insert({
-            section_id: sectionId,
+            lesson_section_id: sectionId,
             content: currentSection.content, 
             creator_user_id: creatorUserId,
+            version_number: nextVersionNumber,
         });
 
         if (backupVersionError) {
@@ -94,9 +106,9 @@ export async function POST(request: Request, { params }: VersionParams) {
         }
     }
 
-    // 4. Update the parent sections.content with the content from the target version
+    // 4. Update the parent lesson_sections.content with the content from the target version
     const { data: updatedSection, error: updateError } = await supabase
-      .from('sections')
+      .from('lesson_sections')
       .update({
         content: targetContent,
         updated_at: new Date().toISOString(),

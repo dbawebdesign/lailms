@@ -80,6 +80,10 @@ export async function GET(
       return NextResponse.json({ error: 'User not associated with an organisation' }, { status: 403 });
     }
     const organisationId = profile.organisation_id;
+    
+    if (!organisationId) {
+      return NextResponse.json({ error: 'User not associated with an organisation' }, { status: 403 });
+    }
 
     // First, verify access to the base class
     const { data: baseClassOrg, error: baseClassOrgError } = await supabase
@@ -157,6 +161,10 @@ export async function PUT(
       return NextResponse.json({ error: 'User not associated with an organisation' }, { status: 403 });
     }
     const organisationId = profile.organisation_id;
+    
+    if (!organisationId) {
+      return NextResponse.json({ error: 'User not associated with an organisation' }, { status: 403 });
+    }
 
     // Verify access to the base class (and that it belongs to the org)
     const { data: baseClass, error: baseClassError } = await supabase
@@ -245,6 +253,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not associated with an organisation' }, { status: 403 });
     }
     const organisationId = profile.organisation_id;
+    
+    if (!organisationId) {
+      return NextResponse.json({ error: 'User not associated with an organisation' }, { status: 403 });
+    }
 
     // Verify access to the base class
     const { data: baseClass, error: baseClassError } = await supabase

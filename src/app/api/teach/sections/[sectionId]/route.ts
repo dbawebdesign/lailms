@@ -18,7 +18,7 @@ export async function GET(request: NextRequest, { params }: SectionParams) {
 
   try {
     const { data: section, error } = await supabase
-      .from('sections')
+      .from('lesson_sections')
       .select('*')
       .eq('id', sectionId)
       .single();
@@ -57,7 +57,7 @@ export async function PUT(request: NextRequest, { params }: SectionParams) {
 
   try {
     const { data, error } = await supabase
-      .from('sections')
+      .from('lesson_sections')
       .update(updatedData)
       .eq('id', sectionId)
       .select()
@@ -88,7 +88,7 @@ export async function DELETE(request: NextRequest, { params }: SectionParams) {
   }
 
   try {
-    const { error } = await supabase.from('sections').delete().eq('id', sectionId);
+    const { error } = await supabase.from('lesson_sections').delete().eq('id', sectionId);
 
     if (error) {
       console.error('Error deleting section:', error);

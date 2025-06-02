@@ -36,20 +36,10 @@ export async function GET(request: Request) {
       .eq('user_id', userId)
       .single();
     
-    // 3. Check all the relevant tables in case the profiles table doesn't exist
-    // Try members table as fallback
-    const { data: memberData, error: memberError } = await supabase
-      .from('members')
-      .select('id, user_id, organisation_id, created_at')
-      .eq('id', userId) // Note: 'members' might use 'id' rather than 'user_id'
-      .single();
-    
-    // 4. List organization and base classes if we can get an org ID
+    // 3. Check organisation from profiles
     let orgId = null;
     if (profileData?.organisation_id) {
       orgId = profileData.organisation_id;
-    } else if (memberData?.organisation_id) {
-      orgId = memberData.organisation_id;
     }
     
     let organization = null;
@@ -160,21 +150,6 @@ export async function GET(request: Request) {
       }
     }
     
-    // Get table schemas to confirm structure
-    let profilesSchema = null;
-    let profilesSchemaError = null;
-    
-    try {
-      const { data, error } = await supabase.rpc('get_table_columns', { table_name: 'profiles' });
-      profilesSchema = data;
-      profilesSchemaError = error;
-    } catch (e: any) {
-      profilesSchemaError = {
-        message: e.message,
-        name: e.name
-      };
-    }
-    
     return NextResponse.json({
       status: 'success',
       environment: environmentCheck,
@@ -188,14 +163,6 @@ export async function GET(request: Request) {
       profile: {
         data: profileData,
         error: profileError
-      },
-      profileSchema: {
-        data: profilesSchema,
-        error: profilesSchemaError
-      },
-      members: {
-        data: memberData,
-        error: memberError
       },
       organization: {
         id: orgId,

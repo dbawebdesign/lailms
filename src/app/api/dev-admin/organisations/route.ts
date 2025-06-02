@@ -1,7 +1,8 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { Database } from '@learnologyai/types/db' // Using package name
+import { Database } from '@/types/supabase'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 
 // Define the expected structure for the user role check
 interface MemberProfile {

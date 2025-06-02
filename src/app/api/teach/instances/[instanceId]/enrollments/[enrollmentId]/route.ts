@@ -9,27 +9,39 @@ async function authorizeTeacherForEnrollmentAction(
     enrollmentId: string, 
     currentUser: User
 ): Promise<{ enrollment?: any; errorResponse?: NextResponse }> {
-    const { data: member, error: memberError } = await supabase
-        .from('members')
+    const { data: profile, error: profileError } = await supabase
+        .from('profiles')
         .select('organisation_id, role')
         .eq('user_id', currentUser.id)
         .single();
 
-    if (memberError || !member) {
+    if (profileError || !profile) {
         return { errorResponse: NextResponse.json({ error: 'User not part of an organisation or not authorized.' }, { status: 403 }) };
     }
 
-    if (!['admin', 'teacher'].includes(member.role)) {
+    if (!profile.organisation_id) {
+        return { errorResponse: NextResponse.json({ error: 'User not associated with an organisation.' }, { status: 403 }) };
+    }
+
+    if (!['admin', 'teacher'].includes(profile.role)) {
         return { errorResponse: NextResponse.json({ error: 'User does not have sufficient privileges.' }, { status: 403 }) };
     }
 
     // Check if the enrollment exists, belongs to the instance, and the instance belongs to the teacher's org
+    // We need to join with class_instances to get the organisation_id
     const { data: enrollment, error: enrollmentError } = await supabase
-        .from('student_enrollments')
-        .select('id, class_instance_id, organisation_id')
+        .from('rosters')
+        .select(`
+            id, 
+            class_instance_id, 
+            class_instances!inner(
+                id,
+                organisation_id
+            )
+        `)
         .eq('id', enrollmentId)
         .eq('class_instance_id', instanceId) // Ensure it's for the correct instance
-        .eq('organisation_id', member.organisation_id) // Ensure it's within the teacher's org
+        .eq('class_instances.organisation_id', profile.organisation_id) // Ensure it's within the teacher's org
         .single();
 
     if (enrollmentError || !enrollment) {
@@ -61,7 +73,7 @@ export async function DELETE(
     // authCheck.enrollment contains the validated enrollment record
 
     const { error: deleteError, count } = await supabase
-      .from('student_enrollments')
+      .from('rosters')
       .delete()
       .eq('id', enrollmentId);
       // RLS also applies, but direct check via authorizeTeacherForEnrollmentAction is good practice

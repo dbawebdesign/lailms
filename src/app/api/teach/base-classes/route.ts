@@ -20,18 +20,24 @@ interface DbBaseClass {
   updated_at: string;
 }
 
-// Helper to map DB representation to frontend type
-function mapDbToUi(dbClass: DbBaseClass): BaseClass {
+// Helper function to map database row to UI model
+function mapDbToUi(dbClass: DbBaseClass | any): BaseClass {
   return {
     id: dbClass.id,
     organisation_id: dbClass.organisation_id,
     name: dbClass.name,
-    description: dbClass.description || undefined,
-    subject: dbClass.settings?.subject,
-    gradeLevel: dbClass.settings?.gradeLevel,
-    lengthInWeeks: dbClass.settings?.lengthInWeeks ?? 0, // Default to 0 if undefined
-    creationDate: dbClass.created_at, // Assuming creationDate in UI is created_at from DB
-    settings: dbClass.settings || {}, // Pass through settings
+    description: dbClass.description || '',
+    subject: dbClass.settings?.subject || '',
+    gradeLevel: dbClass.settings?.gradeLevel || '',
+    lengthInWeeks: dbClass.settings?.lengthInWeeks || 0,
+    creationDate: dbClass.created_at,
+    settings: {
+      generatedOutline: dbClass.settings?.generatedOutline || undefined,
+      subject: dbClass.settings?.subject,
+      gradeLevel: dbClass.settings?.gradeLevel,
+      lengthInWeeks: dbClass.settings?.lengthInWeeks,
+      ...dbClass.settings
+    },
   };
 }
 

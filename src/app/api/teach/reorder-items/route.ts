@@ -37,34 +37,64 @@ export async function POST(request: NextRequest) {
     // This might involve fetching the parent entity based on one of the orderedIds and verifying ownership.
     // For now, we assume the client-side logic only allows reordering of authorized items.
 
-    let rpcName = '';
-    let rpcParams: any = {}; // Use 'any' for flexibility, or define a more specific type
+    // Reorder items by updating their order_index based on their position in the orderedIds array
+    try {
+      switch (itemType) {
+        case 'path':
+          // Update paths order_index
+          for (let i = 0; i < orderedIds.length; i++) {
+            const { error: updateError } = await supabase
+              .from('paths')
+              .update({ order_index: i })
+              .eq('id', orderedIds[i])
+              .eq('base_class_id', parentId);
+            
+            if (updateError) {
+              throw new Error(`Failed to update path ${orderedIds[i]}: ${updateError.message}`);
+            }
+          }
+          break;
+          
+        case 'lesson':
+          // Update lessons order_index
+          for (let i = 0; i < orderedIds.length; i++) {
+            const { error: updateError } = await supabase
+              .from('lessons')
+              .update({ order_index: i })
+              .eq('id', orderedIds[i])
+              .eq('path_id', parentId);
+            
+            if (updateError) {
+              throw new Error(`Failed to update lesson ${orderedIds[i]}: ${updateError.message}`);
+            }
+          }
+          break;
+          
+        case 'section':
+          // Update lesson_sections order_index
+          for (let i = 0; i < orderedIds.length; i++) {
+            const { error: updateError } = await supabase
+              .from('lesson_sections')
+              .update({ order_index: i })
+              .eq('id', orderedIds[i])
+              .eq('lesson_id', parentId);
+            
+            if (updateError) {
+              throw new Error(`Failed to update section ${orderedIds[i]}: ${updateError.message}`);
+            }
+          }
+          break;
+          
+        default:
+          return NextResponse.json({ error: 'Invalid item type for reordering' }, { status: 400 });
+      }
 
-    switch (itemType) {
-      case 'path':
-        rpcName = 'reorder_paths';
-        rpcParams = { _base_class_id: parentId, _ordered_ids: orderedIds };
-        break;
-      case 'lesson':
-        rpcName = 'reorder_lessons';
-        rpcParams = { _path_id: parentId, _ordered_ids: orderedIds };
-        break;
-      case 'section':
-        rpcName = 'reorder_lesson_sections'; // Ensure this matches our DB function name
-        rpcParams = { _lesson_id: parentId, _ordered_ids: orderedIds };
-        break;
-      default:
-        return NextResponse.json({ error: 'Invalid item type for reordering' }, { status: 400 });
+      return NextResponse.json({ message: `${itemType} items reordered successfully.` });
+      
+    } catch (updateError: any) {
+      console.error(`Error updating ${itemType} order:`, updateError);
+      return NextResponse.json({ error: `Failed to update order for ${itemType}: ${updateError.message}` }, { status: 500 });
     }
-
-    const { data, error: rpcError } = await supabase.rpc(rpcName, rpcParams);
-
-    if (rpcError) {
-      console.error(`Error calling RPC ${rpcName} with params ${JSON.stringify(rpcParams)}:`, rpcError);
-      return NextResponse.json({ error: `Failed to update order for ${itemType}: ${rpcError.message}` }, { status: 500 });
-    }
-
-    return NextResponse.json({ message: `${itemType} items reordered successfully.` });
 
   } catch (e: any) {
     console.error('Error in reorder-items endpoint:', e);

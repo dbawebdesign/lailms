@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from '@learnologyai/types/db';
+import { Database } from '@/types/supabase';
 
 // Initialize OpenAI client
 const openai = new OpenAI({

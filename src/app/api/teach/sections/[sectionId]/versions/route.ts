@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: SectionVersionsParams) {
     
     // First, check if the section itself exists and is accessible
     const { data: sectionExists, error: sectionCheckError } = await supabase
-      .from('sections')
+      .from('lesson_sections')
       .select('id')
       .eq('id', sectionId)
       .maybeSingle();
@@ -35,9 +35,9 @@ export async function GET(request: Request, { params }: SectionVersionsParams) {
       
     // Now, fetch the versions for this section
     const { data: versions, error: versionsError } = await supabase
-      .from('section_versions')
+      .from('lesson_section_versions')
       .select('*')
-      .eq('section_id', sectionId)
+      .eq('lesson_section_id', sectionId)
       .order('created_at', { ascending: false });
 
     if (versionsError) {

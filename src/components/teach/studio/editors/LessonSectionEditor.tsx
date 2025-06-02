@@ -150,7 +150,7 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
       }
       editor.setEditable(section.section_type === 'text' && isEditing);
     }
-  }, [section, editor]);
+  }, [section, editor, isEditing]);
 
   // Update editor editability when editing mode changes
   useEffect(() => {

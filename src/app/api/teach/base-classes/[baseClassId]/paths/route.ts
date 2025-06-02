@@ -39,6 +39,10 @@ export async function POST(request: NextRequest, { params }: BaseClassPathsParam
       return NextResponse.json({ error: 'Could not verify user organisation' }, { status: 500 });
     }
 
+    if (!profile.organisation_id) {
+      return NextResponse.json({ error: 'User not associated with an organisation' }, { status: 403 });
+    }
+
     const pathData = {
       title,
       description,

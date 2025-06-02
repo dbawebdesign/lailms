@@ -131,6 +131,10 @@ export async function GET(request: NextRequest) {
       }
     } else {
       // Check for base class mind map
+      if (!baseClassId) {
+        return NextResponse.json({ error: 'baseClassId is required for base class mind map check' }, { status: 400 });
+      }
+      
       const { data: assets } = await supabase
         .from('base_class_media_assets')
         .select('id, title, created_at')

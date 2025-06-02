@@ -1,9 +1,11 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { Database } from '@learnologyai/types/db'
+import { Database } from '@/types/supabase'
 import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
+import { NextRequest } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 
 // Initialize OpenAI client for embeddings
 const openai = new OpenAI({

@@ -22,6 +22,106 @@ const LunaActionListener: React.FC = () => {
   const actionChannel = useRef<BroadcastChannel | null>(null);
   
   /**
+   * Handle click actions on UI components
+   */
+  const handleClickAction = async (component: any, params?: Record<string, any>) => {
+    // Find the DOM element by a data attribute we can add to our components
+    const element = document.querySelector(`[data-luna-id="${component.id}"]`) as HTMLElement;
+    
+    if (element) {
+      // Simulate a click on the element
+      element.click();
+    } else {
+      // If we can't find it by data attribute, try using the component's type and role
+      const fallbackSelector = `[data-luna-type="${component.type}"][data-luna-role="${component.role}"]`;
+      const fallbackElement = document.querySelector(fallbackSelector) as HTMLElement;
+      
+      if (fallbackElement) {
+        fallbackElement.click();
+      } else {
+        throw new Error('Could not find element to click');
+      }
+    }
+  };
+  
+  /**
+   * Handle navigation actions
+   */
+  const handleNavigationAction = useCallback(async (component: any, params?: Record<string, any>) => {
+    // Check if we have a specific path to navigate to
+    if (params?.path) {
+      router.push(params.path);
+      return;
+    }
+    
+    // Otherwise try to extract a path from the component data
+    if (component.props?.href) {
+      router.push(component.props.href);
+    } else if (component.metadata?.path) {
+      router.push(component.metadata.path);
+    } else {
+      throw new Error('No navigation path found in the component or parameters');
+    }
+  }, [router]);
+  
+  /**
+   * Handle form submission actions
+   */
+  const handleSubmitAction = async (component: any, params?: Record<string, any>) => {
+    // Find the form element
+    const formElement = document.querySelector(`[data-luna-id="${component.id}"]`) as HTMLFormElement;
+    
+    if (formElement) {
+      // Simulate a form submission
+      formElement.submit();
+    } else {
+      // Try to find a submit button inside the form component
+      const submitButton = document.querySelector(`[data-luna-id="${component.id}"] button[type="submit"]`) as HTMLButtonElement;
+      
+      if (submitButton) {
+        submitButton.click();
+      } else {
+        throw new Error('Could not find form or submit button to click');
+      }
+    }
+  };
+  
+  /**
+   * Handle select actions (for dropdowns, radio buttons, etc.)
+   */
+  const handleSelectAction = async (component: any, params?: Record<string, any>) => {
+    if (!params?.value) {
+      throw new Error('No value provided for select action');
+    }
+    
+    // Find the select element
+    const selectElement = document.querySelector(`[data-luna-id="${component.id}"]`) as HTMLSelectElement;
+    
+    if (selectElement) {
+      // Set the value and dispatch change event
+      selectElement.value = params.value;
+      selectElement.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      throw new Error('Could not find select element');
+    }
+  };
+  
+  /**
+   * Handle focus actions
+   */
+  const handleFocusAction = async (component: any, params?: Record<string, any>) => {
+    // Find the element
+    const element = document.querySelector(`[data-luna-id="${component.id}"]`) as HTMLElement;
+    
+    if (element) {
+      // Focus the element
+      element.focus();
+    } else {
+      throw new Error('Could not find element to focus');
+    }
+  };
+  
+  /**
    * Execute a UI action based on the action type
    */
   const executeAction = useCallback(async (action: UIAction) => {
@@ -87,7 +187,7 @@ const LunaActionListener: React.FC = () => {
         variant: 'destructive'
       });
     }
-  }, [router, debug]);
+  }, [debug, handleNavigationAction]);
   
   // Set up listener for UI actions
   useEffect(() => {
@@ -110,106 +210,6 @@ const LunaActionListener: React.FC = () => {
       actionChannel.current?.close();
     };
   }, [executeAction]);
-  
-  /**
-   * Handle click actions on UI components
-   */
-  const handleClickAction = async (component: any, params?: Record<string, any>) => {
-    // Find the DOM element by a data attribute we can add to our components
-    const element = document.querySelector(`[data-luna-id="${component.id}"]`) as HTMLElement;
-    
-    if (element) {
-      // Simulate a click on the element
-      element.click();
-    } else {
-      // If we can't find it by data attribute, try using the component's type and role
-      const fallbackSelector = `[data-luna-type="${component.type}"][data-luna-role="${component.role}"]`;
-      const fallbackElement = document.querySelector(fallbackSelector) as HTMLElement;
-      
-      if (fallbackElement) {
-        fallbackElement.click();
-      } else {
-        throw new Error('Could not find element to click');
-      }
-    }
-  };
-  
-  /**
-   * Handle navigation actions
-   */
-  const handleNavigationAction = async (component: any, params?: Record<string, any>) => {
-    // Check if we have a specific path to navigate to
-    if (params?.path) {
-      router.push(params.path);
-      return;
-    }
-    
-    // Otherwise try to extract a path from the component data
-    if (component.props?.href) {
-      router.push(component.props.href);
-    } else if (component.metadata?.path) {
-      router.push(component.metadata.path);
-    } else {
-      throw new Error('No navigation path found in the component or parameters');
-    }
-  };
-  
-  /**
-   * Handle form submission actions
-   */
-  const handleSubmitAction = async (component: any, params?: Record<string, any>) => {
-    // Find the form element
-    const formElement = document.querySelector(`[data-luna-id="${component.id}"]`) as HTMLFormElement;
-    
-    if (formElement) {
-      // Simulate a form submission
-      formElement.submit();
-    } else {
-      // Try to find a submit button inside the form component
-      const submitButton = document.querySelector(`[data-luna-id="${component.id}"] button[type="submit"]`) as HTMLButtonElement;
-      
-      if (submitButton) {
-        submitButton.click();
-      } else {
-        throw new Error('Could not find form or submit button to click');
-      }
-    }
-  };
-  
-  /**
-   * Handle select actions (for dropdowns, radio buttons, etc.)
-   */
-  const handleSelectAction = async (component: any, params?: Record<string, any>) => {
-    if (!params?.value) {
-      throw new Error('No value provided for select action');
-    }
-    
-    // Find the select element
-    const selectElement = document.querySelector(`[data-luna-id="${component.id}"]`) as HTMLSelectElement;
-    
-    if (selectElement) {
-      // Set the value and dispatch change event
-      selectElement.value = params.value;
-      selectElement.dispatchEvent(new Event('change', { bubbles: true }));
-    } else {
-      throw new Error('Could not find select element');
-    }
-  };
-  
-  /**
-   * Handle focus actions
-   */
-  const handleFocusAction = async (component: any, params?: Record<string, any>) => {
-    // Find the element
-    const element = document.querySelector(`[data-luna-id="${component.id}"]`) as HTMLElement;
-    
-    if (element) {
-      // Focus the element
-      element.focus();
-    } else {
-      throw new Error('Could not find element to focus');
-    }
-  };
   
   // This component doesn't render anything visible
   return null;

@@ -37,38 +37,78 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
     }
 
-    // Call the RPC function
-    // The type casting `as JoinByCodeResponse` assumes the RPC returns a single row matching this structure.
-    const { data: rpcResult, error: rpcError } = await supabase
-      .rpc('join_class_by_code', { p_enrollment_code: enrollment_code })
-      .single<JoinByCodeResponse>(); // .single() is appropriate as RPC returns one row
+    // Get user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .single();
 
-    if (rpcError) {
-      console.error('Error calling join_class_by_code RPC:', rpcError);
-      return NextResponse.json({ 
-        error: 'Failed to process enrollment code.', 
-        details: rpcError.message 
-      }, { status: 500 });
+    if (profileError || !profile) {
+      return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
     }
 
-    if (!rpcResult) {
-        // This case might occur if the RPC somehow doesn't return a row, though it should always return one.
-        return NextResponse.json({ error: 'No response from enrollment process.'}, { status: 500 });
+    // Find the class instance by enrollment code
+    const { data: classInstance, error: classError } = await supabase
+      .from('class_instances')
+      .select('id, name, base_class_id')
+      .eq('enrollment_code', enrollment_code)
+      .single();
+
+    if (classError) {
+      if (classError.code === 'PGRST116') { // Not found
+        return NextResponse.json({
+          success: false,
+          message: 'Invalid enrollment code'
+        }, { status: 404 });
+      }
+      throw classError;
     }
 
-    // The RPC result contains { success, message, class_instance_id, ... }
-    // We can return this directly, or tailor the response.
-    if (rpcResult.success) {
-      return NextResponse.json(rpcResult, { status: 200 }); // Or 201 if a new enrollment was created
-    } else {
-      // Determine appropriate status code based on the message if possible, else default to 400 or 404
-      let statusCode = 400;
-      if (rpcResult.message?.includes('Invalid enrollment code')) statusCode = 404;
-      if (rpcResult.message?.includes('maximum capacity')) statusCode = 409; // Conflict
-      if (rpcResult.message?.includes('already enrolled')) statusCode = 200; // Still a success in a way, or 409 if preferred
-      
-      return NextResponse.json(rpcResult, { status: statusCode });
+    // Check if user is already enrolled
+    const { data: existingEnrollment, error: enrollmentCheckError } = await supabase
+      .from('rosters')
+      .select('id')
+      .eq('class_instance_id', classInstance.id)
+      .eq('profile_id', user.id)
+      .single();
+
+    if (enrollmentCheckError && enrollmentCheckError.code !== 'PGRST116') {
+      throw enrollmentCheckError;
     }
+
+    if (existingEnrollment) {
+      return NextResponse.json({
+        success: true,
+        message: 'You are already enrolled in this class',
+        class_instance_id: classInstance.id,
+        class_instance_name: classInstance.name,
+        enrollment_id: existingEnrollment.id
+      }, { status: 200 });
+    }
+
+    // Create new enrollment
+    const { data: newEnrollment, error: enrollmentError } = await supabase
+      .from('rosters')
+      .insert({
+        class_instance_id: classInstance.id,
+        profile_id: user.id,
+        role: 'student' // Default role for joining by code
+      })
+      .select('id')
+      .single();
+
+    if (enrollmentError) {
+      throw enrollmentError;
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Successfully enrolled in class',
+      class_instance_id: classInstance.id,
+      class_instance_name: classInstance.name,
+      enrollment_id: newEnrollment.id
+    }, { status: 201 });
 
   } catch (error: any) {
     console.error('Unexpected error in POST /enrollments/join-by-code:', error);
