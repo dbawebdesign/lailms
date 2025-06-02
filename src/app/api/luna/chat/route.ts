@@ -5,36 +5,47 @@ import { z } from 'zod';
 
 // Add a helper function to get the base URL from request headers
 function getBaseURL(request?: Request): string {
+  console.log('[getBaseURL] Starting URL resolution...');
+  
   // First try to get from request headers (most reliable in server-side contexts)
   if (request) {
     const host = request.headers.get('host');
     const proto = request.headers.get('x-forwarded-proto');
     
+    console.log('[getBaseURL] Request headers - host:', host, 'proto:', proto);
+    
     if (host) {
       // In production deployments like Vercel, x-forwarded-proto should be 'https'
       const protocol = proto === 'https' ? 'https' : 'http';
-      return `${protocol}://${host}`;
+      const baseURL = `${protocol}://${host}`;
+      console.log('[getBaseURL] Resolved from request headers:', baseURL);
+      return baseURL;
     }
   }
   
   // Fallback to environment variable
   if (process.env.NEXT_PUBLIC_APP_URL) {
+    console.log('[getBaseURL] Using NEXT_PUBLIC_APP_URL:', process.env.NEXT_PUBLIC_APP_URL);
     return process.env.NEXT_PUBLIC_APP_URL;
   }
   
   // Additional fallback: try to construct from VERCEL_URL (Vercel-specific)
   if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
+    const baseURL = `https://${process.env.VERCEL_URL}`;
+    console.log('[getBaseURL] Using VERCEL_URL:', baseURL);
+    return baseURL;
   }
   
   // Only use localhost in development
   if (process.env.NODE_ENV === 'development') {
+    console.log('[getBaseURL] Development mode - using localhost');
     return 'http://localhost:3000';
   }
   
   // In production without proper headers or env vars, this will cause an error
   // which is better than silently failing with localhost
-  throw new Error('Unable to determine base URL. Please set NEXT_PUBLIC_APP_URL environment variable or ensure request headers are available.');
+  console.error('[getBaseURL] Unable to determine base URL - no request headers or env vars available');
+  throw new Error('Unable to determine base URL. Please set NEXT_PUBLIC_APP_URL environment variable.');
 }
 
 // Hard-code the API key directly for development
@@ -186,9 +197,12 @@ async function performLessonUpdate(sectionId: string, instruction: string): Prom
 // Generate course outline when explicitly requested
 async function performCourseOutlineGeneration(prompt: string, gradeLevel?: string, lengthInWeeks?: number, forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> EXECUTING COURSE OUTLINE GENERATION for prompt: ${prompt}`);
+  console.log(`[performCourseOutlineGeneration] Request object available:`, !!request);
   
   const baseURL = getBaseURL(request);
   const generateURL = `${baseURL}/api/teach/generate-course-outline`;
+  
+  console.log(`[performCourseOutlineGeneration] Making fetch request to:`, generateURL);
 
   // Prepare headers, including the forwarded cookie if available
   const headers: HeadersInit = {
