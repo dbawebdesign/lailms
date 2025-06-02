@@ -44,7 +44,7 @@ export interface ClassInstance {
   // studentCount?: number; // Could be added later
 }
 
-export interface ClassInstanceCreationData extends Omit<ClassInstance, "id" | "enrollmentCode" | "creationDate" | "status"> {
+export interface ClassInstanceCreationData extends Omit<ClassInstance, "id" | "enrollmentCode" | "creationDate" | "status" | "createdAt" | "updatedAt"> {
   // baseClassId is already part of Omit, but explicitly stating it is fine if needed for clarity
   // status will likely be set server-side or defaulted to 'upcoming'/'active'
 }

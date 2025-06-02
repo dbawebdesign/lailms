@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 interface LessonParams {
-  params: {
+  params: Promise<{
     lessonId: string;
-  };
+  }>;
 }
 
 // PATCH - Update a lesson

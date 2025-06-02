@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 interface PathLessonsParams {
-  params: {
+  params: Promise<{
     pathId: string;
-  };
+  }>;
 }
 
 // POST - Create a new lesson within a path

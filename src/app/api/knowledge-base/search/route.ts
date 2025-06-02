@@ -163,12 +163,11 @@ export async function POST(req: Request) {
       dimensions: 1536
     })
 
-    const queryEmbedding = embeddingResponse.data[0].embedding
+    const queryEmbeddingArray = embeddingResponse.data[0].embedding
+    const queryEmbedding = `[${queryEmbeddingArray.join(',')}]`; // Convert to pgvector string format
     
     // Execute the vector similarity search using the RPC function
-    // Reverting to named parameters as positional arguments caused type errors
     const { data, error: searchError } = await supabase.rpc(
-      // @ts-expect-error - We know this RPC function exists in our schema, but may have typing issues
       'vector_search',
       {
         query_embedding: queryEmbedding,

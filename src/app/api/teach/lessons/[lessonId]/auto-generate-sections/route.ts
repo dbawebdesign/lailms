@@ -377,17 +377,16 @@ Based on the lesson "${lesson_title}" with objective "${lesson_objective || 'N/A
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { lessonId: string } }
+  { params }: { params: Promise<{ lessonId: string }> }
 ) {
-  const { lessonId } = params;
+  const supabase = createSupabaseServerClient();
+  const { lessonId } = await params;
   console.log(`[auto-generate-sections] Received request for lessonId: ${lessonId}`);
 
   if (!lessonId) {
     console.error("[auto-generate-sections] Error: Lesson ID is required.");
     return NextResponse.json({ error: 'Lesson ID is required' }, { status: 400 });
   }
-
-  const supabase = createSupabaseServerClient();
 
   try {
     // 1. Authenticate user

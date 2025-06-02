@@ -3,9 +3,9 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'; // Updat
 import { cookies } from 'next/headers';
 
 interface SectionsParams {
-  params: {
+  params: Promise<{
     lessonId: string;
-  };
+  }>;
 }
 
 // Helper function to create Supabase client for Route Handlers

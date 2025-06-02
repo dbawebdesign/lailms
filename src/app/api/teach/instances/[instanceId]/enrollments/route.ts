@@ -54,10 +54,10 @@ async function authorizeTeacher(supabase: any, instanceId: string, currentUser: 
 // GET Handler: List enrolled students for a class instance
 export async function GET(
   request: Request,
-  { params }: { params: { instanceId: string } }
+  { params }: { params: Promise<{ instanceId: string }> }
 ) {
   const supabase = createSupabaseServerClient();
-  const { instanceId } = params;
+  const { instanceId } = await params;
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -113,10 +113,10 @@ export async function GET(
 // POST Handler: Enroll a student into a class instance
 export async function POST(
   request: Request,
-  { params }: { params: { instanceId: string } }
+  { params }: { params: Promise<{ instanceId: string }> }
 ) {
   const supabase = createSupabaseServerClient();
-  const { instanceId } = params;
+  const { instanceId } = await params;
   let requestBody: EnrollmentRequest;
 
   try {

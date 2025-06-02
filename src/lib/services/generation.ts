@@ -70,7 +70,13 @@ export async function generateWithCitations(request: GenerationRequest) {
     const response = completion.choices[0].message.content || "Sorry, I couldn't generate a response.";
     
     // Store generation and citations
-    const generationId = await storeGeneration(prompt, response, queryId, organisationId);
+    const generationId = await storeGeneration(
+      prompt, 
+      response, 
+      queryId, 
+      organisationId,
+      "cited_response"
+    );
     
     // Store citations
     if (generationId) {
@@ -104,7 +110,8 @@ async function storeGeneration(
   prompt: string, 
   response: string, 
   queryId: string, 
-  organisationId: string
+  organisationId: string,
+  asset_type: string
 ): Promise<string | null> {
   try {
     const supabase = createClientComponentClient<Database>();
@@ -118,23 +125,29 @@ async function storeGeneration(
     }
     
     // Create generation record
-    const generationId = uuidv4();
-    const { error } = await supabase
+    const { data: newGeneration, error } = await supabase
       .from('generations')
       .insert({
-        id: generationId,
         user_id: user.id,
         organisation_id: organisationId,
         query: prompt,
         response: response,
-      });
+        asset_type: asset_type,
+      })
+      .select('id')
+      .single();
     
     if (error) {
       console.error('Error storing generation:', error);
       return null;
     }
+
+    if (!newGeneration?.id) {
+      console.error('Failed to retrieve generated ID after storing generation.');
+      return null;
+    }
     
-    return generationId;
+    return newGeneration.id;
   } catch (error) {
     console.error('Error in storeGeneration:', error);
     return null;

@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 interface PathParams {
-  params: {
+  params: Promise<{
     pathId: string;
-  };
+  }>;
 }
 
 // PATCH - Update a path
