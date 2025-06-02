@@ -3,6 +3,40 @@ import { SerializedUIContext } from '@/context/LunaContextProvider';
 import OpenAI from 'openai';
 import { z } from 'zod';
 
+// Add a helper function to get the base URL from request headers
+function getBaseURL(request?: Request): string {
+  // First try to get from request headers (most reliable in server-side contexts)
+  if (request) {
+    const host = request.headers.get('host');
+    const proto = request.headers.get('x-forwarded-proto');
+    
+    if (host) {
+      // In production deployments like Vercel, x-forwarded-proto should be 'https'
+      const protocol = proto === 'https' ? 'https' : 'http';
+      return `${protocol}://${host}`;
+    }
+  }
+  
+  // Fallback to environment variable
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL;
+  }
+  
+  // Additional fallback: try to construct from VERCEL_URL (Vercel-specific)
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  
+  // Only use localhost in development
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:3000';
+  }
+  
+  // In production without proper headers or env vars, this will cause an error
+  // which is better than silently failing with localhost
+  throw new Error('Unable to determine base URL. Please set NEXT_PUBLIC_APP_URL environment variable or ensure request headers are available.');
+}
+
 // Hard-code the API key directly for development
 // In production, use environment variables properly
 // const OPENAI_API_KEY = "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";
@@ -56,11 +90,11 @@ const performUIActionSchema = z.object({
 
 // --- Backend Implementations (Placeholders/Delegation) ---
 
-// Updated function to accept cookies
-async function performKnowledgeBaseSearch(query: string, forwardedCookies: string | null): Promise<any> {
+// Updated function to accept cookies AND request
+async function performKnowledgeBaseSearch(query: string, forwardedCookies: string | null, request?: Request): Promise<any> {
   console.log(`---> EXECUTING KB SEARCH for query: ${query}`);
   
-  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseURL = getBaseURL(request);
   const searchURL = `${baseURL}/api/knowledge-base/search`;
 
   // Prepare headers, including the forwarded cookie if available
@@ -150,10 +184,10 @@ async function performLessonUpdate(sectionId: string, instruction: string): Prom
 }
 
 // Generate course outline when explicitly requested
-async function performCourseOutlineGeneration(prompt: string, gradeLevel?: string, lengthInWeeks?: number, forwardedCookies?: string | null): Promise<any> {
+async function performCourseOutlineGeneration(prompt: string, gradeLevel?: string, lengthInWeeks?: number, forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> EXECUTING COURSE OUTLINE GENERATION for prompt: ${prompt}`);
   
-  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseURL = getBaseURL(request);
   const generateURL = `${baseURL}/api/teach/generate-course-outline`;
 
   // Prepare headers, including the forwarded cookie if available
@@ -207,17 +241,21 @@ async function performCourseOutlineGeneration(prompt: string, gradeLevel?: strin
 }
 
 // Add a new lesson section with AI-generated content
-async function performAddLessonSection(lessonId: string, title: string, contentDescription: string, sectionType: string = 'text-editor', orderIndex?: number, forwardedCookies?: string | null): Promise<any> {
-  console.log(`---> EXECUTING ADD LESSON SECTION for lesson: ${lessonId}, title: ${title}`);
+async function performAddLessonSection(lessonId: string, title: string, contentDescription: string, sectionType: string = 'text-editor', orderIndex?: number, forwardedCookies?: string | null, request?: Request): Promise<any> {
+  console.log(`---> ADDING LESSON SECTION to lesson ${lessonId}: ${title}`);
   
-  if (!openaiClient) {
-    return {
-      success: false,
-      message: "AI content generation is not available. Please check the server configuration."
-    };
-  }
-
   try {
+    // First fetch the lesson to verify it exists and get current section count
+    const baseURL = getBaseURL(request);
+    const sectionsURL = `${baseURL}/api/teach/lessons/${lessonId}/sections`;
+
+    if (!openaiClient) {
+      return {
+        success: false,
+        message: "AI content generation is not available. Please check the server configuration."
+      };
+    }
+
     // First, generate the content using OpenAI
     console.log(`[Luna] Generating content for section: ${title}`);
     const contentGenerationResponse = await openaiClient.chat.completions.create({
@@ -289,9 +327,6 @@ Generate detailed educational content that fulfills these requirements. Structur
     };
 
     // Now create the lesson section via the API
-    const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const sectionsURL = `${baseURL}/api/teach/lessons/${lessonId}/sections`;
-
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
@@ -343,10 +378,10 @@ Generate detailed educational content that fulfills these requirements. Structur
 }
 
 // Fetch complete base class structure with all lesson IDs
-async function performFetchBaseClassStructure(baseClassId: string, forwardedCookies?: string | null): Promise<any> {
+async function performFetchBaseClassStructure(baseClassId: string, forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> FETCHING BASE CLASS STRUCTURE for ${baseClassId}`);
   
-  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseURL = getBaseURL(request);
   const fetchURL = `${baseURL}/api/teach/base-classes/${baseClassId}`;
 
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -398,10 +433,10 @@ async function performFetchBaseClassStructure(baseClassId: string, forwardedCook
 }
 
 // Update base class properties
-async function performUpdateBaseClass(baseClassId: string, updates: any, forwardedCookies?: string | null): Promise<any> {
+async function performUpdateBaseClass(baseClassId: string, updates: any, forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> UPDATING BASE CLASS ${baseClassId}:`, updates);
   
-  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseURL = getBaseURL(request);
   const updateURL = `${baseURL}/api/teach/base-classes/${baseClassId}`;
 
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -435,10 +470,10 @@ async function performUpdateBaseClass(baseClassId: string, updates: any, forward
 }
 
 // Create new path
-async function performCreatePath(baseClassId: string, title: string, description: string, orderIndex?: number, forwardedCookies?: string | null): Promise<any> {
+async function performCreatePath(baseClassId: string, title: string, description: string, orderIndex?: number, forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> CREATING PATH in base class ${baseClassId}:`, { title, description });
   
-  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseURL = getBaseURL(request);
   const createURL = `${baseURL}/api/teach/base-classes/${baseClassId}/paths`;
 
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -472,7 +507,7 @@ async function performCreatePath(baseClassId: string, title: string, description
 }
 
 // Update path properties
-async function performUpdatePath(pathId: string, updates: any, forwardedCookies?: string | null): Promise<any> {
+async function performUpdatePath(pathId: string, updates: any, forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> UPDATING PATH ${pathId}:`, updates);
   
   // Validate that pathId is a valid UUID format
@@ -485,7 +520,7 @@ async function performUpdatePath(pathId: string, updates: any, forwardedCookies?
     };
   }
   
-  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseURL = getBaseURL(request);
   const updateURL = `${baseURL}/api/teach/paths/${pathId}`;
 
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -519,10 +554,10 @@ async function performUpdatePath(pathId: string, updates: any, forwardedCookies?
 }
 
 // Delete path
-async function performDeletePath(pathId: string, forwardedCookies?: string | null): Promise<any> {
+async function performDeletePath(pathId: string, forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> DELETING PATH ${pathId}`);
   
-  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseURL = getBaseURL(request);
   const deleteURL = `${baseURL}/api/teach/paths/${pathId}`;
 
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -553,10 +588,10 @@ async function performDeletePath(pathId: string, forwardedCookies?: string | nul
 }
 
 // Create new lesson
-async function performCreateLesson(pathId: string, title: string, description: string, objectives?: string, orderIndex?: number, forwardedCookies?: string | null): Promise<any> {
+async function performCreateLesson(pathId: string, title: string, description: string, objectives?: string, orderIndex?: number, forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> CREATING LESSON in path ${pathId}:`, { title, description, objectives });
   
-  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseURL = getBaseURL(request);
   const createURL = `${baseURL}/api/teach/paths/${pathId}/lessons`;
 
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -594,10 +629,10 @@ async function performCreateLesson(pathId: string, title: string, description: s
 }
 
 // Update lesson properties
-async function performUpdateLesson(lessonId: string, updates: any, forwardedCookies?: string | null): Promise<any> {
+async function performUpdateLesson(lessonId: string, updates: any, forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> UPDATING LESSON ${lessonId}:`, updates);
   
-  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseURL = getBaseURL(request);
   const updateURL = `${baseURL}/api/teach/lessons/${lessonId}`;
 
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -641,10 +676,10 @@ async function performUpdateLesson(lessonId: string, updates: any, forwardedCook
 }
 
 // Delete lesson
-async function performDeleteLesson(lessonId: string, forwardedCookies?: string | null): Promise<any> {
+async function performDeleteLesson(lessonId: string, forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> DELETING LESSON ${lessonId}`);
   
-  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseURL = getBaseURL(request);
   const deleteURL = `${baseURL}/api/teach/lessons/${lessonId}`;
 
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -675,10 +710,10 @@ async function performDeleteLesson(lessonId: string, forwardedCookies?: string |
 }
 
 // Update lesson section properties
-async function performUpdateLessonSection(sectionId: string, updates: any, forwardedCookies?: string | null): Promise<any> {
+async function performUpdateLessonSection(sectionId: string, updates: any, forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> UPDATING LESSON SECTION ${sectionId}:`, updates);
   
-  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseURL = getBaseURL(request);
   const updateURL = `${baseURL}/api/teach/sections/${sectionId}`;
 
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -759,10 +794,10 @@ async function performUpdateLessonSection(sectionId: string, updates: any, forwa
 }
 
 // Delete lesson section
-async function performDeleteLessonSection(sectionId: string, forwardedCookies?: string | null): Promise<any> {
+async function performDeleteLessonSection(sectionId: string, forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> DELETING LESSON SECTION ${sectionId}`);
   
-  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseURL = getBaseURL(request);
   const deleteURL = `${baseURL}/api/teach/sections/${sectionId}`;
 
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -793,10 +828,10 @@ async function performDeleteLessonSection(sectionId: string, forwardedCookies?: 
 }
 
 // Reorder content (paths, lessons, sections)
-async function performReorderContent(itemType: string, parentId: string, orderedIds: string[], forwardedCookies?: string | null): Promise<any> {
+async function performReorderContent(itemType: string, parentId: string, orderedIds: string[], forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> REORDERING ${itemType.toUpperCase()}S in ${parentId}:`, orderedIds);
   
-  const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseURL = getBaseURL(request);
   const reorderURL = `${baseURL}/api/teach/reorder-items`;
 
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -2058,35 +2093,35 @@ export async function POST(request: Request) {
             try {
               // Execute the appropriate function based on the tool call
               if (functionName === 'search') {
-                result = await performKnowledgeBaseSearch(functionArgs.query, forwardedCookies);
+                result = await performKnowledgeBaseSearch(functionArgs.query, forwardedCookies, request);
               } else if (functionName === 'updateContent') {
                 result = await performLessonUpdate(functionArgs.sectionId, functionArgs.modificationInstruction);
               } else if (functionName === 'generateCourseOutline') {
-                result = await performCourseOutlineGeneration(functionArgs.prompt, functionArgs.gradeLevel, functionArgs.lengthInWeeks, forwardedCookies);
+                result = await performCourseOutlineGeneration(functionArgs.prompt, functionArgs.gradeLevel, functionArgs.lengthInWeeks, forwardedCookies, request);
               } else if (functionName === 'addLessonSection') {
-                result = await performAddLessonSection(functionArgs.lessonId, functionArgs.title, functionArgs.contentDescription, functionArgs.sectionType, functionArgs.orderIndex, forwardedCookies);
+                result = await performAddLessonSection(functionArgs.lessonId, functionArgs.title, functionArgs.contentDescription, functionArgs.sectionType, functionArgs.orderIndex, forwardedCookies, request);
               } else if (functionName === 'fetchBaseClassStructure') {
-                result = await performFetchBaseClassStructure(functionArgs.baseClassId, forwardedCookies);
+                result = await performFetchBaseClassStructure(functionArgs.baseClassId, forwardedCookies, request);
               } else if (functionName === 'updateBaseClass') {
-                result = await performUpdateBaseClass(functionArgs.baseClassId, functionArgs, forwardedCookies);
+                result = await performUpdateBaseClass(functionArgs.baseClassId, functionArgs, forwardedCookies, request);
               } else if (functionName === 'createPath') {
-                result = await performCreatePath(functionArgs.baseClassId, functionArgs.title, functionArgs.description, functionArgs.orderIndex, forwardedCookies);
+                result = await performCreatePath(functionArgs.baseClassId, functionArgs.title, functionArgs.description, functionArgs.orderIndex, forwardedCookies, request);
               } else if (functionName === 'updatePath') {
-                result = await performUpdatePath(functionArgs.pathId, functionArgs, forwardedCookies);
+                result = await performUpdatePath(functionArgs.pathId, functionArgs, forwardedCookies, request);
               } else if (functionName === 'deletePath') {
-                result = await performDeletePath(functionArgs.pathId, forwardedCookies);
+                result = await performDeletePath(functionArgs.pathId, forwardedCookies, request);
               } else if (functionName === 'createLesson') {
-                result = await performCreateLesson(functionArgs.pathId, functionArgs.title, functionArgs.description, functionArgs.objectives, functionArgs.orderIndex, forwardedCookies);
+                result = await performCreateLesson(functionArgs.pathId, functionArgs.title, functionArgs.description, functionArgs.objectives, functionArgs.orderIndex, forwardedCookies, request);
               } else if (functionName === 'updateLesson') {
-                result = await performUpdateLesson(functionArgs.lessonId, functionArgs, forwardedCookies);
+                result = await performUpdateLesson(functionArgs.lessonId, functionArgs, forwardedCookies, request);
               } else if (functionName === 'deleteLesson') {
-                result = await performDeleteLesson(functionArgs.lessonId, forwardedCookies);
+                result = await performDeleteLesson(functionArgs.lessonId, forwardedCookies, request);
               } else if (functionName === 'updateLessonSection') {
-                result = await performUpdateLessonSection(functionArgs.sectionId, functionArgs, forwardedCookies);
+                result = await performUpdateLessonSection(functionArgs.sectionId, functionArgs, forwardedCookies, request);
               } else if (functionName === 'deleteLessonSection') {
-                result = await performDeleteLessonSection(functionArgs.sectionId, forwardedCookies);
+                result = await performDeleteLessonSection(functionArgs.sectionId, forwardedCookies, request);
               } else if (functionName === 'reorderContent') {
-                result = await performReorderContent(functionArgs.itemType, functionArgs.parentId, functionArgs.orderedIds, forwardedCookies);
+                result = await performReorderContent(functionArgs.itemType, functionArgs.parentId, functionArgs.orderedIds, forwardedCookies, request);
               } else if (functionName === 'uiAction') {
                 result = await performUIAction(functionArgs.componentId, functionArgs.actionType, functionArgs.additionalParams);
               } else {
