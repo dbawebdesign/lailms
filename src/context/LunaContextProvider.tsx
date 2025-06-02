@@ -98,15 +98,12 @@ export const LunaContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
         sessionStorage.setItem(storageKey, storedSessionId);
       }
       sessionId.current = storedSessionId;
-      
-      // Removed initial broadcast from here
     }
     
     return () => {
       broadcastChannel.current?.close();
-      broadcastChannel.current = null; // Nullify on cleanup
+      broadcastChannel.current = null;
     };
-  // Dependency array is empty, runs once on mount
   }, []);
   
   // Function to serialize the current UI context
@@ -125,35 +122,28 @@ export const LunaContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
   }, [pathname, focusedComponentId]);
   
+  // Ref for the debounce timeout
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Debounced broadcast function
-  const debouncedBroadcast = useCallback(
-    (() => {
-      let timeout: NodeJS.Timeout | null = null;
-      
-      return () => {
-        if (timeout) clearTimeout(timeout);
-        
-        timeout = setTimeout(() => {
-          if (broadcastChannel.current) { // Check if channel still exists
-            const context = serializeContext();
-            broadcastChannel.current.postMessage(context); // No optional chaining needed due to check
-            
-            sessionStorage.setItem('luna-latest-ui-context', JSON.stringify(context));
-          }
-        }, 300); 
-      };
-    })(),
-    [serializeContext]
-  );
+  const debouncedBroadcast = useCallback(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    debounceTimeoutRef.current = setTimeout(() => {
+      if (broadcastChannel.current) {
+        const context = serializeContext();
+        broadcastChannel.current.postMessage(context);
+        sessionStorage.setItem('luna-latest-ui-context', JSON.stringify(context));
+      }
+    }, 300);
+  }, [serializeContext]);
   
   // Broadcast context on component registry changes or path changes
   useEffect(() => {
-    // Broadcast only if sessionId is initialized 
     if (sessionId.current) {
-        debouncedBroadcast();
+        debouncedBroadcast(); // Call normally
     }
-    // This hook triggers when the broadcast function itself changes (unlikely) 
-    // or when the route changes.
   }, [debouncedBroadcast, pathname]);
   
   // Register a component
@@ -175,7 +165,6 @@ export const LunaContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
       metadata: data.metadata || {},
     };
     
-    // Update parent's children array if parentId is provided
     if (data.parentId && registry.current[data.parentId]) {
       registry.current[data.parentId].children = [
         ...(registry.current[data.parentId].children || []),
@@ -183,7 +172,7 @@ export const LunaContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
       ];
     }
     
-    debouncedBroadcast();
+    debouncedBroadcast(); // Call normally
     return id;
   }, [pathname, debouncedBroadcast]);
   
@@ -197,14 +186,13 @@ export const LunaContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
       lastUpdated: Date.now(),
     };
     
-    debouncedBroadcast();
+    debouncedBroadcast(); // Call normally
   }, [debouncedBroadcast]);
   
   // Unregister a component
   const unregisterComponent = useCallback((id: string) => {
     if (!registry.current[id]) return;
     
-    // Remove this component from its parent's children array
     const parentId = registry.current[id].parentId;
     if (parentId && registry.current[parentId] && registry.current[parentId].children) {
       registry.current[parentId].children = registry.current[parentId].children?.filter(
@@ -212,10 +200,9 @@ export const LunaContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
       );
     }
     
-    // Delete the component from registry
     delete registry.current[id];
     
-    debouncedBroadcast();
+    debouncedBroadcast(); // Call normally
   }, [debouncedBroadcast]);
   
   // Record user action
@@ -226,13 +213,13 @@ export const LunaContextProvider: React.FC<{ children: React.ReactNode }> = ({ c
       timestamp: Date.now(),
     };
     
-    debouncedBroadcast();
+    debouncedBroadcast(); // Call normally
   }, [debouncedBroadcast]);
   
   // Set focused component
   const setFocusedComponent = useCallback((componentId: string | null) => {
     setFocusedComponentId(componentId);
-    debouncedBroadcast();
+    debouncedBroadcast(); // Call normally
   }, [debouncedBroadcast]);
   
   // Debug utilities

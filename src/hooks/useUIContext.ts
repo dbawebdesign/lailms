@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useLunaContextControl, UIComponentConfig, UIComponentData } from '@/context/LunaContextProvider';
 
 /**
@@ -34,39 +34,39 @@ export function useUIContext(config: UIComponentConfig) {
         isMounted.current = false;
       }
     };
-  }, []); // Empty dependency array to only run on mount/unmount
+  }, [config, registerComponent, unregisterComponent]);
   
   // Handlers for updating component state
-  const updateState = (newState: Record<string, any>) => {
+  const updateState = useCallback((newState: Record<string, any>) => {
     if (componentId) {
       updateComponent(componentId, { state: newState });
     }
-  };
+  }, [componentId, updateComponent]);
   
-  const updateContent = (newContent: Record<string, any>) => {
+  const updateContent = useCallback((newContent: Record<string, any>) => {
     if (componentId) {
       updateComponent(componentId, { content: newContent });
     }
-  };
+  }, [componentId, updateComponent]);
   
-  const updateVisibility = (isVisible: boolean) => {
+  const updateVisibility = useCallback((isVisible: boolean) => {
     if (componentId) {
       updateComponent(componentId, { isVisible });
     }
-  };
+  }, [componentId, updateComponent]);
   
-  const updateMetadata = (newMetadata: Record<string, any>) => {
+  const updateMetadata = useCallback((newMetadata: Record<string, any>) => {
     if (componentId) {
       updateComponent(componentId, { metadata: newMetadata });
     }
-  };
+  }, [componentId, updateComponent]);
   
   // Function to record user interactions with this component
-  const trackUserAction = (actionType: string) => {
+  const trackUserAction = useCallback((actionType: string) => {
     if (componentId) {
       recordUserAction(componentId, actionType);
     }
-  };
+  }, [componentId, recordUserAction]);
   
   return {
     componentId,

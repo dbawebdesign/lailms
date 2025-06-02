@@ -29,11 +29,9 @@ interface LessonSectionEditorProps {
 
 // Toolbar component
 const EditorToolbar = ({ editor }: { editor: any | null }) => {
-  if (!editor) {
-    return null;
-  }
-
+  // Moved useCallback hooks before the conditional return to ensure they are always called
   const addImage = useCallback(() => {
+    if (!editor) return; // Guard against editor being null here
     const url = window.prompt('Enter image URL');
     if (url) {
       editor.chain().focus().setImage({ src: url }).run();
@@ -41,6 +39,7 @@ const EditorToolbar = ({ editor }: { editor: any | null }) => {
   }, [editor]);
 
   const setLink = useCallback(() => {
+    if (!editor) return; // Guard against editor being null here
     const previousUrl = editor.getAttributes('link').href;
     const url = window.prompt('Enter URL', previousUrl);
     if (url === null) return;
@@ -50,6 +49,10 @@ const EditorToolbar = ({ editor }: { editor: any | null }) => {
     }
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   }, [editor]);
+
+  if (!editor) {
+    return null;
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-2 p-2 border border-input rounded-t-md bg-background">
@@ -154,7 +157,7 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
     if (editor) {
       editor.setEditable(sectionType === 'text' && isEditing);
     }
-  }, [editor, sectionType, isEditing]);
+  }, [editor, sectionType, isEditing]); // Ensured isEditing is in the dependency array
 
   // Define setLink for BubbleMenu
   const setLinkBubble = useCallback(() => {

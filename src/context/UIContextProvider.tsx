@@ -95,6 +95,7 @@ export const UIContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Track focused component and last user action
   const [focusedComponentId, setFocusedComponentId] = useState<string | null>(null);
   const lastUserAction = useRef<{ componentId: string; actionType: string; timestamp: number } | null>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Added for debouncing
   
   // Initialize broadcast channel
   useEffect(() => {
@@ -124,30 +125,22 @@ export const UIContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [pathname, focusedComponentId]);
   
   // Debounced broadcast function
-  const debouncedBroadcast = useCallback(
-    (() => {
-      let timeout: NodeJS.Timeout | null = null;
-      
-      return () => {
-        if (timeout) clearTimeout(timeout);
-        
-        timeout = setTimeout(() => {
-          const context = serializeContext();
-          broadcastChannel.current?.postMessage(context);
-          
-          // Also store in sessionStorage for persistence
-          sessionStorage.setItem('luna-latest-ui-context', JSON.stringify(context));
-        }, 300); // 300ms debounce
-      };
-    })(),
-    [serializeContext]
-  );
+  const debouncedBroadcast = useCallback(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    debounceTimeoutRef.current = setTimeout(() => {
+      const context = serializeContext();
+      broadcastChannel.current?.postMessage(context);
+      sessionStorage.setItem('luna-latest-ui-context', JSON.stringify(context));
+    }, 300); // 300ms debounce
+  }, [serializeContext]);
   
   // Broadcast context on component registry changes
   useEffect(() => {
     // Initial broadcast
     debouncedBroadcast();
-  }, [debouncedBroadcast, pathname]);
+  }, [debouncedBroadcast]);
   
   // Register a component
   const registerComponent = useCallback((data: UIComponentConfig): string => {

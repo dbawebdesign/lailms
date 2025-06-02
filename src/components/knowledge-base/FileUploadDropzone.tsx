@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import Image from 'next/image'
 
 // Define accepted file types
 const ACCEPTED_FILE_TYPES = {
@@ -455,9 +456,11 @@ export function FileUploadDropzone({
                     <div className="flex items-center space-x-3">
                       {file.previewUrl ? (
                         <div className="h-10 w-10 rounded overflow-hidden flex-shrink-0">
-                          <img
+                          <Image
                             src={file.previewUrl}
                             alt={file.file.name}
+                            width={40} 
+                            height={40}
                             className="h-full w-full object-cover"
                           />
                         </div>

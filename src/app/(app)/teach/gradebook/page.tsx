@@ -92,7 +92,7 @@ export default function GradebookPage() {
     if (!useMockData && userClasses.length === 0 && !error) {
       loadUserClasses();
     }
-  }, [useMockData]);
+  }, [useMockData, error, userClasses.length]);
 
   const loadMockData = async () => {
     return Promise.resolve();

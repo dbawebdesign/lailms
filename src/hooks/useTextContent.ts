@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useUIContext } from './useUIContext';
 import { createContentSummary, getVisibleTextFromElement } from '@/lib/contextUtils';
 
@@ -41,32 +41,29 @@ export function useTextContent(
   // Reference to mutation observer
   const observer = useRef<MutationObserver | null>(null);
   
+  // Memoized function to update text content
+  const updateTextContentInternal = useCallback(() => {
+    const element = elementRef.current;
+    // Ensure updateContent is available (it should be, but good practice for useCallback dependencies)
+    if (!element || !updateContent) return;
+    
+    const rawText = trackVisibleOnly
+      ? getVisibleTextFromElement(element)
+      : element.textContent || '';
+    
+    const contentData = createContentSummary(rawText, maxLength);
+    updateContent(contentData);
+  }, [elementRef, trackVisibleOnly, maxLength, updateContent]);
+  
   // Setup the content tracking
   useEffect(() => {
     if (!componentId || !elementRef.current) return;
     
     // Initial content capture
-    const updateTextContent = () => {
-      const element = elementRef.current;
-      if (!element) return;
-      
-      // Get text content (either all or just visible portion)
-      const rawText = trackVisibleOnly
-        ? getVisibleTextFromElement(element)
-        : element.textContent || '';
-      
-      // Create a content summary if needed
-      const contentData = createContentSummary(rawText, maxLength);
-      
-      // Update the component's content
-      updateContent(contentData);
-    };
-    
-    // Call immediately for initial state
-    updateTextContent();
+    updateTextContentInternal();
     
     // Setup mutation observer to track content changes
-    observer.current = new MutationObserver(updateTextContent);
+    observer.current = new MutationObserver(updateTextContentInternal);
     
     observer.current.observe(elementRef.current, {
       characterData: true,
@@ -74,20 +71,20 @@ export function useTextContent(
       subtree: true
     });
     
-    // If tracking visible content, also listen for scroll events
+    let scrollTargetElement: HTMLElement | null = null;
     if (trackVisibleOnly && elementRef.current) {
-      elementRef.current.addEventListener('scroll', updateTextContent);
+      scrollTargetElement = elementRef.current;
+      scrollTargetElement.addEventListener('scroll', updateTextContentInternal);
     }
     
     // Cleanup
     return () => {
       observer.current?.disconnect();
-      
-      if (trackVisibleOnly && elementRef.current) {
-        elementRef.current.removeEventListener('scroll', updateTextContent);
+      if (trackVisibleOnly && scrollTargetElement) {
+        scrollTargetElement.removeEventListener('scroll', updateTextContentInternal);
       }
     };
-  }, [componentId, elementRef, maxLength, trackVisibleOnly, updateContent]);
+  }, [componentId, elementRef, trackVisibleOnly, updateTextContentInternal]);
   
   return componentId;
 } 

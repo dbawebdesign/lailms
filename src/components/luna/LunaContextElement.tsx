@@ -62,6 +62,10 @@ const LunaContextElement: React.FC<LunaContextElementProps> = ({
   }, [
     type, 
     role, 
+    content,
+    state,
+    metadata,
+    parentId,
     lunaContext.registerComponent, 
     lunaContext.unregisterComponent
   ]);
@@ -75,7 +79,7 @@ const LunaContextElement: React.FC<LunaContextElementProps> = ({
         metadata
       });
     }
-  }, [componentId, content, state, metadata, lunaContext.updateComponent]);
+  }, [componentId, content, state, metadata, lunaContext]);
 
   // Register click event handler
   const handleInteraction = (e: React.MouseEvent) => {

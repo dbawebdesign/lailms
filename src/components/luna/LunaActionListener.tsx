@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLunaContextControl } from '@/context/LunaContextProvider';
 import { toast } from '@/components/ui/use-toast';
@@ -21,32 +21,10 @@ const LunaActionListener: React.FC = () => {
   const { debug } = useLunaContextControl();
   const actionChannel = useRef<BroadcastChannel | null>(null);
   
-  // Set up listener for UI actions
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    // Initialize broadcast channel
-    actionChannel.current = new BroadcastChannel('luna-ui-actions');
-    
-    // Listen for action messages
-    actionChannel.current.onmessage = (event: MessageEvent<UIAction>) => {
-      const action = event.data;
-      console.log('Luna Action received:', action);
-      
-      // Execute the action
-      executeAction(action);
-    };
-    
-    return () => {
-      // Clean up
-      actionChannel.current?.close();
-    };
-  }, [router]);
-  
   /**
    * Execute a UI action based on the action type
    */
-  const executeAction = async (action: UIAction) => {
+  const executeAction = useCallback(async (action: UIAction) => {
     const { componentId, actionType, additionalParams } = action;
     
     try {
@@ -109,7 +87,29 @@ const LunaActionListener: React.FC = () => {
         variant: 'destructive'
       });
     }
-  };
+  }, [router, debug]);
+  
+  // Set up listener for UI actions
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Initialize broadcast channel
+    actionChannel.current = new BroadcastChannel('luna-ui-actions');
+    
+    // Listen for action messages
+    actionChannel.current.onmessage = (event: MessageEvent<UIAction>) => {
+      const action = event.data;
+      console.log('Luna Action received:', action);
+      
+      // Execute the action
+      executeAction(action);
+    };
+    
+    return () => {
+      // Clean up
+      actionChannel.current?.close();
+    };
+  }, [executeAction]);
   
   /**
    * Handle click actions on UI components

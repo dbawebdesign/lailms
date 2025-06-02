@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -53,10 +53,22 @@ export default function MediaAssetsPanel({
   const [selectedMindMap, setSelectedMindMap] = useState<MediaAsset | null>(null);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
 
+  const loadExistingAssets = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/teach/lessons/${lessonId}/media-assets`);
+      if (response.ok) {
+        const data = await response.json();
+        setAssets(data.assets || []);
+      }
+    } catch (err) {
+      console.error('Failed to load existing assets:', err);
+    }
+  }, [lessonId]);
+
   // Load existing assets on mount
   useEffect(() => {
     loadExistingAssets();
-  }, [lessonId]);
+  }, [loadExistingAssets]);
 
   // Clean up audio when component unmounts
   useEffect(() => {
@@ -67,18 +79,6 @@ export default function MediaAssetsPanel({
       }
     };
   }, [currentAudio]);
-
-  const loadExistingAssets = async () => {
-    try {
-      const response = await fetch(`/api/teach/lessons/${lessonId}/media-assets`);
-      if (response.ok) {
-        const data = await response.json();
-        setAssets(data.assets || []);
-      }
-    } catch (err) {
-      console.error('Failed to load existing assets:', err);
-    }
-  };
 
   const generateMindMap = async (regenerate = false) => {
     if (!lessonContent.trim()) {
