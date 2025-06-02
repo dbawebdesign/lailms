@@ -500,9 +500,12 @@ async function performUpdateBaseClass(baseClassId: string, updates: any, forward
 // Create new path
 async function performCreatePath(baseClassId: string, title: string, description: string, orderIndex?: number, forwardedCookies?: string | null, request?: Request): Promise<any> {
   console.log(`---> CREATING PATH in base class ${baseClassId}:`, { title, description });
+  console.log(`[performCreatePath] Request object available:`, !!request);
   
   const baseURL = getBaseURL(request);
   const createURL = `${baseURL}/api/teach/base-classes/${baseClassId}/paths`;
+  
+  console.log(`[performCreatePath] Making fetch request to:`, createURL);
 
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
   if (forwardedCookies) headers['Cookie'] = forwardedCookies;
