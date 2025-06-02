@@ -55,7 +55,7 @@ interface RouteParams {
 }
 
 export async function POST(request: Request, { params }: RouteParams) {
-  const { baseClassId: base_class_id_from_param } = params; // Use the param name as per directory structure
+  const { baseClassId: base_class_id_from_param } = await params; // Await params as required by Next.js 15
   const supabase = createSupabaseServerClient();
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();

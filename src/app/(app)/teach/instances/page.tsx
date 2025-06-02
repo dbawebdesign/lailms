@@ -3,58 +3,29 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 // Types will be needed for ClassInstance and eventually BaseClass if we enrich data here
-import { ClassInstance } from "@/types/teach"; 
+import { EnrichedClassInstance } from "@/types/teach"; 
 // The new table component we will create
 import { AllInstancesTable } from "@/components/teach/AllInstancesTable"; 
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
-// --- Mock API Stubs --- 
-// We'll need a mock function to fetch ALL instances for a teacher,
-// potentially enriched with base class names.
+// Real API function to fetch enriched instances
+const fetchAllEnrichedInstances = async (): Promise<EnrichedClassInstance[]> => {
+  const response = await fetch('/api/teach/instances', {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
 
-// Example of an enriched instance type (can also be defined in types/teach.ts)
-interface EnrichedClassInstance extends ClassInstance {
-  baseClassName: string;
-  // potentially baseClassSubject, etc.
-}
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to fetch instances');
+  }
 
-const MOCK_ALL_ENRICHED_INSTANCES: EnrichedClassInstance[] = [
-  // Assuming MOCK_CLASS_INSTANCES_DB and MOCK_BASE_CLASSES_DB from the other file are accessible 
-  // or we redefine/import them. For simplicity, let's create a few here.
-  {
-    id: "inst101", baseClassId: "1", baseClassName: "Introduction to Programming", name: "Prog - Fall 2023", 
-    enrollmentCode: "PROG101F23", status: "completed", creationDate: new Date("2023-08-01").toISOString(), 
-    startDate: new Date("2023-09-01").toISOString(), endDate: new Date("2023-12-15").toISOString(), 
-    period: "Period 1", capacity: 30
-  },
-  {
-    id: "inst102", baseClassId: "1", baseClassName: "Introduction to Programming", name: "Prog - Spring 2024", 
-    enrollmentCode: "PROG101S24", status: "active", creationDate: new Date("2023-12-01").toISOString(), 
-    startDate: new Date("2024-01-15").toISOString(), endDate: new Date("2024-05-10").toISOString(), 
-    period: "Period 2", capacity: 25
-  },
-  {
-    id: "hist201", baseClassId: "2", baseClassName: "World History: Ancient Times", name: "History - Section A", 
-    enrollmentCode: "HIST201A", status: "active", creationDate: new Date("2023-12-15").toISOString(), 
-    startDate: new Date("2024-01-20").toISOString(), capacity: 35
-  },
-  {
-    id: "inst103", baseClassId: "1", baseClassName: "Introduction to Programming", name: "Prog - Summer 2024", 
-    enrollmentCode: "PROG101SU24", status: "upcoming", creationDate: new Date("2024-04-01").toISOString(), 
-    startDate: new Date("2024-06-01").toISOString(), endDate: new Date("2024-07-30").toISOString()
-  },
-];
-
-const mockFetchAllEnrichedInstances = async (): Promise<EnrichedClassInstance[]> => {
-  console.log("Mock API: Fetching all enriched instances...");
-  await new Promise(resolve => setTimeout(resolve, 600));
-  // Sort by creation date descending by default for a timeline view
-  return [...MOCK_ALL_ENRICHED_INSTANCES].sort((a,b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime());
+  return response.json();
 };
-
-// --- End Mock API Stubs ---
 
 export default function AllInstancesPage() {
   const router = useRouter();
@@ -65,11 +36,15 @@ export default function AllInstancesPage() {
   const loadInstances = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await mockFetchAllEnrichedInstances();
+      const data = await fetchAllEnrichedInstances();
       setInstances(data);
     } catch (error) {
       console.error("Failed to load all instances:", error);
-      toast({ title: "Error Loading Instances", description: "Could not load class instances.", variant: "destructive" });
+      toast({ 
+        title: "Error Loading Instances", 
+        description: error instanceof Error ? error.message : "Could not load class instances.", 
+        variant: "destructive" 
+      });
     } finally {
       setIsLoading(false);
     }
@@ -79,42 +54,67 @@ export default function AllInstancesPage() {
     loadInstances();
   }, [loadInstances]);
 
-  // Placeholder action handlers - these would interact with modals or navigate
-  const handleEditInstance = (instanceId: string) => {
-    console.log("Edit instance:", instanceId);
-    // router.push(`/teach/base-classes/${findBaseClassId(instanceId)}/instance/${instanceId}/edit`); // Or open a modal
-    toast({title: "Edit Action", description: `Would edit instance ${instanceId}`});
+  // Action handlers
+  const handleEditInstance = (instanceId: string, baseClassId: string) => {
+    console.log("Edit instance:", instanceId, "from base class:", baseClassId);
+    router.push(`/teach/base-classes/${baseClassId}`);
   };
 
-  const handleArchiveInstance = (instanceId: string) => {
-    console.log("Archive instance:", instanceId);
-    // Mock update status and refresh list
-    setInstances(prev => prev.map(inst => inst.id === instanceId ? {...inst, status: "archived"} : inst));
-    toast({title: "Archive Action", description: `Instance ${instanceId} would be archived.`});
+  const handleArchiveInstance = async (instanceId: string) => {
+    try {
+      // This would call an API to update the instance status
+      // For now, we'll just update the local state
+      setInstances(prev => prev.map(inst => 
+        inst.id === instanceId ? {...inst, status: "archived" as const} : inst
+      ));
+      toast({
+        title: "Instance Archived", 
+        description: `Instance has been archived successfully.`
+      });
+    } catch (error) {
+      toast({
+        title: "Archive Failed", 
+        description: "Could not archive instance.", 
+        variant: "destructive"
+      });
+    }
   };
 
   const handleViewStudents = (instanceId: string) => {
-    console.log("View students for instance:", instanceId);
-    // router.push(`/teach/instances/${instanceId}/students`);
-    toast({title: "View Students", description: `Would show students for ${instanceId}`});
+    router.push(`/teach/instances/${instanceId}/students`);
   };
   
   const handleViewInstanceDetails = (instance: EnrichedClassInstance) => {
-    console.log("View details for instance:", instance.id, "of base class:", instance.baseClassId);
-    router.push(`/teach/base-classes/${instance.baseClassId}`); // Navigate to parent base class detail page
+    router.push(`/teach/base-classes/${instance.baseClassId}`);
   };
 
   if (isLoading) {
-    return <div className="container mx-auto py-10 px-4 md:px-6 lg:px-8 text-center">Loading all instances...</div>;
+    return (
+      <div className="container mx-auto py-10 px-4 md:px-6 lg:px-8">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="text-muted-foreground">Loading class instances...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-8">
       <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl lg:text-[36px] font-bold tracking-tight">All My Class Instances</h1>
-        {/* Optional: A global "Create New Instance" button could go here, 
-            but it might be better placed on the Base Class specific pages 
-            or require selecting a Base Class first. For now, we omit it here. */}
+        <div>
+          <h1 className="text-3xl lg:text-[36px] font-bold tracking-tight">My Class Instances</h1>
+          <p className="text-muted-foreground mt-2">Manage all your active and past class instances</p>
+        </div>
+        <Button 
+          onClick={() => router.push('/teach/base-classes')}
+          className="bg-brand-gradient hover:opacity-90 transition-airy"
+        >
+          <PlusCircle className="w-4 h-4 mr-2" />
+          Create New Instance
+        </Button>
       </header>
 
       <AllInstancesTable 

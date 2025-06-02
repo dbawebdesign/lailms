@@ -110,10 +110,10 @@ export const BaseClassCard: React.FC<BaseClassCardProps> = ({
       <CardFooter className="p-6 pt-0">
         <Button
           variant="outline"
-          className="w-full py-3 px-6"
+          className="w-full py-3 px-6 border-gray-300 dark:border-gray-600 hover:bg-accent hover:text-accent-foreground"
           onClick={() => onViewDetails(baseClass.id)}
         >
-          View Details & Instances
+          View Class
         </Button>
       </CardFooter>
     </Card>

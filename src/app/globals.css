@@ -6,8 +6,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -44,89 +44,234 @@
 }
 
 :root {
-  /* Base radius */
-  --radius: 0.5rem; /* 8px - Matches button radius */
+  /* Base radius - Following style guide: 8px for buttons, 12px for cards */
+  --radius: 0.5rem; /* 8px */
+  --radius-card: 0.75rem; /* 12px */
+  --radius-input: 0.375rem; /* 6px */
 
-  /* Light Mode Colors - Based on style-guide.md Section 1.2 */
-  --background: #FFFFFF; /* Light Background */
-  --foreground: #1A1A1A; /* Light Text Primary */
-  --card: #F7F7F7;       /* Light Surface/Card */
+  /* Font Variables - Following style guide Section 3 */
+  --font-sans: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-mono: "SF Mono", "Monaco", "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+
+  /* Brand Gradient Colors - Following style guide Section 1.2 */
+  --gradient-start: #FF835D;
+  --gradient-mid: #E45DE5;
+  --gradient-end: #6B5DE5;
+
+  /* Light Mode Colors - Following style guide Section 1.2 */
+  --background: #FFFFFF;
+  --foreground: #1A1A1A;
+  --text-primary: #1A1A1A;
+  --text-secondary: #4A4A4A;
+  --surface: #F7F7F7;
+  --divider: #E0E0E0;
+
+  /* Component Colors */
+  --card: #F7F7F7;
   --card-foreground: #1A1A1A;
-  --popover: #F7F7F7;    /* Assuming popover uses Surface/Card color */
+  --popover: #F7F7F7;
   --popover-foreground: #1A1A1A;
-  --primary: #6B5DE5; /* Placeholder - End color of default gradient. Use gradient class/style where needed. */
-  --primary-foreground: #FFFFFF; /* Text on accent */
-  --secondary: #F7F7F7; /* Light Surface/Card - For secondary elements */
-  --secondary-foreground: #1A1A1A; /* Text on secondary */
-  --muted: #F7F7F7; /* Light Surface/Card */
-  --muted-foreground: #4A4A4A; /* Light Text Secondary */
-  --accent: #E45DE5; /* Placeholder - Mid color of default gradient. Use gradient class/style where needed. */
-  --accent-foreground: #FFFFFF; /* Text on accent */
-  --destructive: oklch(0.577 0.245 27.325); /* Keeping original OKLCH for destructive */
-  --border: #E0E0E0;   /* Light Divider */
-  --input: #E0E0E0;    /* Assuming input border uses Divider */
-  --ring: #6B5DE5;     /* Placeholder - Using primary color for ring */
+  --primary: #6B5DE5; /* End color of gradient - can be overridden by institution */
+  --primary-foreground: #FFFFFF;
+  --secondary: #F7F7F7;
+  --secondary-foreground: #1A1A1A;
+  --muted: #F7F7F7;
+  --muted-foreground: #4A4A4A;
+  --accent: #E45DE5; /* Mid color of gradient */
+  --accent-foreground: #FFFFFF;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #E0E0E0;
+  --input: #F7F7F7;
+  --input-border: #E0E0E0;
+  --ring: #6B5DE5;
 
-  /* Chart colors (keep original or define based on guide) */
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  /* Success/Warning/Info Colors */
+  --success: #10B981;
+  --success-foreground: #FFFFFF;
+  --warning: #F59E0B;
+  --warning-foreground: #FFFFFF;
+  --info: #3B82F6;
+  --info-foreground: #FFFFFF;
 
-  /* Font Variables */
-  --font-sans: "Inter", "SF Pro Display", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "Geist Mono", monospace; /* Keeping Geist Mono for now */
+  /* Spacing Scale - Following style guide generous spacing */
+  --spacing-xs: 0.5rem;    /* 8px */
+  --spacing-sm: 0.75rem;   /* 12px */
+  --spacing-md: 1rem;      /* 16px */
+  --spacing-lg: 1.5rem;    /* 24px */
+  --spacing-xl: 2rem;      /* 32px */
+  --spacing-2xl: 3rem;     /* 48px */
+  --spacing-3xl: 4rem;     /* 64px */
+
+  /* Chart colors */
+  --chart-1: #6B5DE5;
+  --chart-2: #E45DE5;
+  --chart-3: #FF835D;
+  --chart-4: #10B981;
+  --chart-5: #F59E0B;
+
+  /* Sidebar colors */
+  --sidebar: #F7F7F7;
+  --sidebar-primary: #6B5DE5;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #FFFFFF;
+  --sidebar-accent-foreground: #1A1A1A;
+  --sidebar-border: #E0E0E0;
+  --sidebar-ring: #6B5DE5;
+  --sidebar-foreground: #1A1A1A;
 }
 
 .dark {
-  /* Dark Mode Colors - Based on style-guide.md Section 1.2 */
-  --background: #121212; /* Dark Background */
-  --foreground: #EDEDED; /* Dark Text Primary */
-  --card: #1E1E1E;       /* Dark Surface/Card */
-  --card-foreground: #EDEDED;
-  --popover: #1E1E1E;    /* Assuming popover uses Surface/Card color */
-  --popover-foreground: #EDEDED;
-  --primary: #6B5DE5; /* Placeholder - End color of default gradient. Use gradient class/style where needed. */
-  --primary-foreground: #FFFFFF; /* Text on accent */
-  --secondary: #1E1E1E; /* Dark Surface/Card - For secondary elements */
-  --secondary-foreground: #EDEDED; /* Text on secondary */
-  --muted: #1E1E1E; /* Dark Surface/Card */
-  --muted-foreground: #A0A0A0; /* Dark Text Secondary */
-  --accent: #E45DE5; /* Placeholder - Mid color of default gradient. Use gradient class/style where needed. */
-  --accent-foreground: #FFFFFF; /* Text on accent */
-  --destructive: oklch(0.704 0.191 22.216); /* Keeping original OKLCH for destructive */
-  --border: #333333;   /* Dark Divider */
-  --input: #333333;    /* Assuming input border uses Divider */
-  --ring: #6B5DE5;     /* Placeholder - Using primary color for ring */
+  /* Dark Mode Colors - Following style guide Section 1.2 */
+  --background: #121212;
+  --foreground: #EDEDED;
+  --text-primary: #EDEDED;
+  --text-secondary: #A0A0A0;
+  --surface: #1E1E1E;
+  --divider: #333333;
 
-  /* Chart colors (keep original or define based on guide) */
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%); /* Keep original dark sidebar border */
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+  /* Component Colors */
+  --card: #1E1E1E;
+  --card-foreground: #EDEDED;
+  --popover: #1E1E1E;
+  --popover-foreground: #EDEDED;
+  --primary: #6B5DE5; /* Keep same brand colors in dark mode */
+  --primary-foreground: #FFFFFF;
+  --secondary: #1E1E1E;
+  --secondary-foreground: #EDEDED;
+  --muted: #1E1E1E;
+  --muted-foreground: #A0A0A0;
+  --accent: #E45DE5;
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #333333;
+  --input: #1E1E1E;
+  --input-border: #333333;
+  --ring: #6B5DE5;
+
+  /* Success/Warning/Info Colors - Slightly adjusted for dark mode */
+  --success: #10B981;
+  --success-foreground: #FFFFFF;
+  --warning: #F59E0B;
+  --warning-foreground: #000000;
+  --info: #3B82F6;
+  --info-foreground: #FFFFFF;
+
+  /* Chart colors - Keep same for consistency */
+  --chart-1: #6B5DE5;
+  --chart-2: #E45DE5;
+  --chart-3: #FF835D;
+  --chart-4: #10B981;
+  --chart-5: #F59E0B;
+
+  /* Sidebar colors */
+  --sidebar: #1E1E1E;
+  --sidebar-primary: #6B5DE5;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #333333;
+  --sidebar-accent-foreground: #EDEDED;
+  --sidebar-border: #333333;
+  --sidebar-ring: #6B5DE5;
+  --sidebar-foreground: #EDEDED;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    /* Smooth transitions for theme changes - Following style guide Section 9 */
+    transition: background-color 150ms ease-in-out, color 150ms ease-in-out;
+  }
+
+  /* Typography Scale - Following style guide Section 3 */
+  h1, .text-h1 {
+    @apply text-4xl font-bold leading-tight tracking-wide;
+    /* 36px, 700 weight, 44px line-height, +0.25px spacing */
+    font-size: 2.25rem;
+    line-height: 2.75rem;
+    letter-spacing: 0.025em;
+  }
+
+  h2, .text-h2 {
+    @apply text-2xl font-semibold leading-8 tracking-wide;
+    /* 24px, 600 weight, 32px line-height, +0.25px spacing */
+    font-size: 1.5rem;
+    line-height: 2rem;
+    letter-spacing: 0.025em;
+  }
+
+  h3, .text-h3 {
+    @apply text-lg font-medium leading-7;
+    /* 18px, 500 weight, 28px line-height, 0px spacing */
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+
+  .text-body {
+    @apply text-base font-normal leading-6;
+    /* 16px, 400 weight, 24px line-height, 0px spacing */
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+
+  .text-caption {
+    @apply text-sm font-normal leading-5;
+    /* 14px, 400 weight, 20px line-height, 0px spacing */
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+}
+
+/* Brand Gradient Utilities */
+@layer utilities {
+  .bg-brand-gradient {
+    background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-mid) 50%, var(--gradient-end) 100%);
+  }
+  
+  .text-brand-gradient {
+    background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-mid) 50%, var(--gradient-end) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .border-brand-gradient {
+    border-image: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-mid) 50%, var(--gradient-end) 100%) 1;
+  }
+
+  /* Spacing utilities following style guide */
+  .space-airy > * + * {
+    margin-top: var(--spacing-lg); /* 24px */
+  }
+
+  .space-flowing > * + * {
+    margin-top: var(--spacing-xl); /* 32px */
+  }
+
+  /* Card elevation following style guide Section 6.3 */
+  .shadow-card {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .dark .shadow-card {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Motion utilities following style guide Section 9 */
+  .transition-airy {
+    transition: all 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+
+  .transition-short {
+    transition: all 100ms cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+
+  .transition-long {
+    transition: all 300ms cubic-bezier(0.4, 0.0, 0.2, 1);
   }
 }

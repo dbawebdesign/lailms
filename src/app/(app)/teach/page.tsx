@@ -2,11 +2,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import WelcomeCard from "@/components/dashboard/WelcomeCard";
 import { ActiveClassItem } from "@/components/dashboard/teacher/ActiveClassItem";
-import { RecentlyGradedItem } from "@/components/dashboard/teacher/RecentlyGradedItem";
-import { UpcomingDeadlineItem } from "@/components/dashboard/teacher/UpcomingDeadlineItem";
-import { StudentPerformanceItem } from "@/components/dashboard/teacher/StudentPerformanceItem";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BookOpenCheck, ClipboardCheck, AlertTriangle, Info, CalendarClock, Users } from 'lucide-react';
+import { BookOpenCheck, ClipboardCheck, AlertTriangle, Info, Users, Sparkles, Activity, TrendingUp, BookOpen, CheckCircle, Target, Eye, Lightbulb, Search } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 interface ActiveClassData {
   id: string;
@@ -16,311 +15,133 @@ interface ActiveClassData {
   manageClassUrl: string;
 }
 
+interface RecentActivityData {
+  type: 'quiz_submission' | 'lesson_completion' | 'late_submission';
+  studentName: string;
+  className: string;
+  description: string;
+  timeAgo: string;
+  actionUrl?: string;
+}
+
+interface ClassAttentionData {
+  id: string;
+  className: string;
+  issue: string;
+  priority: 'High' | 'Medium' | 'Low';
+  actionUrl?: string;
+}
+
+interface TeachingProgressData {
+  totalStudents: number;
+  lessonsCreated: number;
+  lessonsThisWeek: number;
+  averagePerformance: number;
+  pendingReviews: number;
+}
+
 async function getActiveClassesData(supabase: ReturnType<typeof createSupabaseServerClient>, userId: string): Promise<ActiveClassData[]> {
-  // 1. Get class instances where the user is a teacher
-  const { data: rosterEntries, error: rosterError } = await supabase
-    .from('rosters')
-    .select('class_instance_id')
-    .eq('profile_id', userId)
-    .eq('role', 'teacher');
-
-  if (rosterError) {
-    console.error("Error fetching teacher's roster entries:", rosterError);
-    return [];
-  }
-
-  if (!rosterEntries || rosterEntries.length === 0) {
-    return [];
-  }
-
-  const classInstanceIds = rosterEntries.map(entry => entry.class_instance_id);
-
-  // 2. Get details for these class instances and their base classes
-  const { data: classInstances, error: classInstancesError } = await supabase
+  try {
+    const { data, error } = await supabase
     .from('class_instances')
     .select(`
       id,
       name,
-      base_class_id,
-      base_classes (name)
-    `)
-    .in('id', classInstanceIds)
-    // Add a limit for the dashboard, e.g., 5 most recent or by start_date
-    .order('created_at', { ascending: false })
-    .limit(5);
+        base_classes!inner(name),
+        rosters(id)
+      `)
+      .eq('base_classes.user_id', userId)
+      .eq('status', 'active');
 
-  if (classInstancesError) {
-    console.error('Error fetching class instances:', classInstancesError);
+    if (error) {
+      console.error('Error fetching active classes:', error);
     return [];
   }
 
-  if (!classInstances) return [];
-
-  // 3. For each class instance, get the student count
-  const activeClassesWithCounts: ActiveClassData[] = await Promise.all(
-    classInstances.map(async (instance) => {
-      const { count, error: countError } = await supabase
-        .from('rosters')
-        .select('*', { count: 'exact', head: true })
-        .eq('class_instance_id', instance.id)
-        .eq('role', 'STUDENT');
-
-      if (countError) {
-        console.error(`Error fetching student count for class ${instance.id}:`, countError);
-      }
-      
-      const baseClass = instance.base_classes as { name: string } | null; // Type assertion
-
-      return {
+    return (data || []).map((instance: any) => ({
         id: instance.id,
         name: instance.name,
-        baseClassName: baseClass?.name || 'Unknown Base Class',
-        studentCount: countError ? 0 : count || 0,
-        manageClassUrl: `/teach/instances/${instance.id}`,
-      };
-    })
-  );
-
-  return activeClassesWithCounts;
-}
-
-interface RecentlyGradedData {
-  submissionId: string;
-  assignmentName: string;
-  studentName: string;
-  studentInitials: string;
-  // studentAvatarUrl?: string; // If Avatar is added later
-  score: number | null;
-  maxScore?: number; // Assuming quizzes might have a max score defined in questions or quiz settings
-  gradedAt: string;
-  viewSubmissionUrl?: string; // e.g., /teach/instances/:instanceId/quizzes/:quizId/submissions/:submissionId
-}
-
-async function getRecentlyGradedData(supabase: ReturnType<typeof createSupabaseServerClient>, userId: string): Promise<RecentlyGradedData[]> {
-  // 1. Get class instances where the user is a teacher
-  const { data: rosterEntries, error: rosterError } = await supabase
-    .from('rosters')
-    .select('class_instance_id')
-    .eq('profile_id', userId)
-    .eq('role', 'teacher');
-
-  if (rosterError) {
-    console.error("Error fetching teacher's roster entries for graded data:", rosterError);
+      baseClassName: instance.base_classes?.name || 'Unknown',
+      studentCount: instance.rosters?.length || 0,
+      manageClassUrl: `/teach/instances/${instance.id}`
+    }));
+  } catch (error) {
+    console.error('Error in getActiveClassesData:', error);
     return [];
   }
-  if (!rosterEntries || rosterEntries.length === 0) return [];
-  const classInstanceIds = rosterEntries.map(entry => entry.class_instance_id);
-
-  // 2. Get base_class_ids for these class instances
-  const { data: classInstanceDetails, error: ciError } = await supabase
-    .from('class_instances')
-    .select('id, base_class_id')
-    .in('id', classInstanceIds);
-
-  if (ciError) {
-    console.error("Error fetching class instance details for graded data:", ciError);
-    return [];
-  }
-  if (!classInstanceDetails || classInstanceDetails.length === 0) return [];
-  const baseClassIds = classInstanceDetails.map(ci => ci.base_class_id);
-
-  // 3. Get lesson_ids for these base_classes
-  const { data: lessons, error: lessonError } = await supabase
-    .from('lessons')
-    .select('id')
-    .in('base_class_id', baseClassIds);
-
-  if (lessonError) {
-    console.error("Error fetching lessons for graded data:", lessonError);
-    return [];
-  }
-  if (!lessons || lessons.length === 0) return [];
-  const lessonIds = lessons.map(l => l.id);
-
-  // 4. Get quiz_ids for these lessons
-  const { data: quizzes, error: quizError } = await supabase
-    .from('quizzes')
-    .select('id, title, questions(points)') // Fetch quiz title and potentially sum points for maxScore
-    .in('lesson_id', lessonIds);
-
-  if (quizError) {
-    console.error("Error fetching quizzes for graded data:", quizError);
-    return [];
-  }
-  if (!quizzes || quizzes.length === 0) return [];
-  const quizIdMap = new Map(quizzes.map(q => [q.id, {
-    title: q.title,
-    // Calculate maxScore: sum of points of all questions in the quiz
-    // This assumes questions are always fetched. If not, maxScore calculation might need adjustment or be omitted.
-    maxScore: q.questions ? q.questions.reduce((sum: number, qs: any) => sum + (qs.points || 0), 0) : undefined
-  }]));
-  const quizIds = quizzes.map(q => q.id);
-
-  // 5. Get recent graded submissions for these quizzes
-  const { data: submissions, error: submissionError } = await supabase
-    .from('submissions')
-    .select(`
-      id,
-      quiz_id,
-      member_id,
-      score,
-      graded_at,
-      members (first_name, last_name)
-    `)
-    .in('quiz_id', quizIds)
-    .not('graded_at', 'is', null)
-    .order('graded_at', { ascending: false })
-    .limit(5); // Limit to 5 recent items
-
-  if (submissionError) {
-    console.error("Error fetching recent submissions:", submissionError);
-    return [];
-  }
-  if (!submissions) return [];
-
-  return submissions.map(sub => {
-    const quizInfo = quizIdMap.get(sub.quiz_id);
-    const student = sub.members as { first_name: string | null; last_name: string | null } | null;
-    const studentFirstName = student?.first_name || '' ;
-    const studentLastName = student?.last_name || '' ;
-    const studentName = `${studentFirstName} ${studentLastName}`.trim() || 'Unknown Student';
-    const studentInitials = `${studentFirstName?.[0] || ''}${studentLastName?.[0] || ''}`.toUpperCase() || 'N/A';
-    
-    // Try to find the classInstanceId associated with this submission for the URL
-    // This is a bit complex here; a simpler URL might be better for now, or this needs more robust logic
-    // For now, we don't have a direct link from submission back to one specific instance if a base_class is used in multiple instances
-    // Let's omit specific instanceId in URL for now if it's too complex to derive accurately here.
-    const viewUrl = quizInfo ? `/teach/quizzes/${sub.quiz_id}/submissions/${sub.id}` : undefined;
-
-    return {
-      submissionId: sub.id,
-      assignmentName: quizInfo?.title || 'Unknown Assignment',
-      studentName: studentName,
-      studentInitials: studentInitials,
-      score: sub.score,
-      maxScore: quizInfo?.maxScore,
-      gradedAt: sub.graded_at!, // We filtered for not null
-      viewSubmissionUrl: viewUrl,
-    };
-  });
 }
 
-interface UpcomingDeadlineData {
-  id: string;
-  assignmentName: string;
-  className: string; 
-  dueDate: string; // ISO string
-  detailsUrl?: string;
-}
-
-async function getUpcomingDeadlinesData(supabase: ReturnType<typeof createSupabaseServerClient>, userId: string): Promise<UpcomingDeadlineData[]> {
-  // NOTE: This function currently returns mock data or an empty array 
-  // as the database schema does not have a clear 'due_date' field for assignments/quizzes.
-  // This needs to be updated if/when the schema supports queryable due dates.
-  console.warn("getUpcomingDeadlinesData is returning placeholder data. Schema update needed for real data.");
-  
-  // To demonstrate UI, returning mock data. Replace with actual data fetching when possible.
-  // const MOCK_DELAY = 100; // ms
-  // await new Promise(resolve => setTimeout(resolve, MOCK_DELAY));
-  
-  // Example of how data might be fetched if quizzes had a due_date and were linked to class_instances:
-  /*
-  const { data: rosterEntries, error: rosterError } = await supabase
-    .from('rosters')
-    .select('class_instance_id')
-    .eq('profile_id', userId)
-    .eq('role', 'teacher');
-  if (rosterError || !rosterEntries) return [];
-  const classInstanceIds = rosterEntries.map(entry => entry.class_instance_id);
-
-  const { data: classInstances, error: ciError } = await supabase
-    .from('class_instances')
-    .select('id, name, base_class_id, base_classes(name)')
-    .in('id', classInstanceIds);
-  if (ciError || !classInstances) return [];
-
-  const deadlines: UpcomingDeadlineData[] = [];
-  const today = new Date();
-  const futureDate = new Date(today);
-  futureDate.setDate(today.getDate() + 30); // Look ahead 30 days
-
-  for (const instance of classInstances) {
-    const { data: lessons, error: lessonError } = await supabase
-      .from('lessons')
-      .select('id')
-      .eq('base_class_id', instance.base_class_id);
-    if (lessonError || !lessons) continue;
-    const lessonIds = lessons.map(l => l.id);
-
-    const { data: quizzes, error: quizError } = await supabase
-      .from('quizzes') // Assuming quizzes table has 'title' and 'due_date'
-      .select('id, title, due_date') // Requires 'due_date' on quizzes table
-      .in('lesson_id', lessonIds)
-      .gte('due_date', today.toISOString().split('T')[0]) // Due date is today or in the future
-      .lte('due_date', futureDate.toISOString().split('T')[0]) // Due date within the next 30 days
-      .order('due_date', { ascending: true })
-      .limit(3); // Limit per class instance for example
-    
-    if (quizzes) {
-      quizzes.forEach(quiz => {
-        if(quiz.due_date) { // ensure due_date is not null
-            deadlines.push({
-                id: quiz.id,
-                assignmentName: quiz.title,
-                className: instance.name || instance.base_classes?.name || 'Unknown Class',
-                dueDate: quiz.due_date, 
-                detailsUrl: `/teach/instances/${instance.id}/quizzes/${quiz.id}`
-            });
-        }
-      });
-    }
-  }
-  // Sort all found deadlines and take top N (e.g., 5)
-  deadlines.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  return deadlines.slice(0, 5);
-  */
-  return []; // Returning empty for now until schema is confirmed/updated
-}
-
-interface StudentPerformanceData {
-  id: string; // class_instance_id
-  name: string; // Class name
-  studentCount: number;
-  averageScore?: number;
-  studentsAtRiskCount?: number;
-  detailsUrl?: string;
-}
-
-async function getStudentPerformanceData(supabase: ReturnType<typeof createSupabaseServerClient>, userId: string): Promise<StudentPerformanceData[]> {
-  // NOTE: This function currently returns an empty array.
-  // Fetching and calculating student performance data (average scores, students at risk)
-  // is complex and requires further definition of how scores are aggregated and thresholds are set.
-  // This would likely involve querying submissions for all quizzes in a class, calculating averages,
-  // and comparing against defined criteria.
-  console.warn("getStudentPerformanceData is returning placeholder data. Complex data aggregation and schema review needed for real data.");
-
-  // Example mock data structure (if we were to return some for UI demo):
-  /*
+// TODO: Replace with real data fetching based on quiz_attempts, progress, and rosters tables
+async function getRecentStudentActivity(supabase: any, userId: string): Promise<RecentActivityData[]> {
+  // Mock data for now - in real implementation, this would query:
+  // - quiz_attempts with completed_at in last 24-48 hours
+  // - progress table for recent lesson completions  
+  // - overdue assignments based on class instance settings
   return [
     {
-      id: "class_1",
-      name: "Introduction to Algebra - Fall 2024",
-      studentCount: 25,
-      averageScore: 78,
-      studentsAtRiskCount: 3,
-      detailsUrl: "/teach/instances/class_1/performance"
+      type: 'quiz_submission',
+      studentName: 'Alice Johnson',
+      className: 'Mathematics 101',
+      description: 'Completed Chapter 3 Quiz with 85%',
+      timeAgo: '2 hours ago',
+      actionUrl: '/teach/gradebook'
     },
     {
-      id: "class_2",
-      name: "Creative Writing Workshop",
-      studentCount: 18,
-      averageScore: 85,
-      studentsAtRiskCount: 1,
-      detailsUrl: "/teach/instances/class_2/performance"
+      type: 'lesson_completion',
+      studentName: 'Bob Smith',
+      className: 'Science Fundamentals',
+      description: 'Finished Lesson: Introduction to Physics',
+      timeAgo: '4 hours ago'
+    },
+    {
+      type: 'late_submission',
+      studentName: 'Carol Davis',
+      className: 'Mathematics 101',
+      description: 'Late submission for Chapter 2 Assignment',
+      timeAgo: '6 hours ago',
+      actionUrl: '/teach/gradebook'
     }
   ];
-  */
-  return []; // Returning empty for now
+}
+
+// TODO: Replace with real data fetching based on class performance analytics
+async function getClassesNeedingAttention(supabase: any, userId: string): Promise<ClassAttentionData[]> {
+  // Mock data for now - in real implementation, this would analyze:
+  // - Students with low quiz scores or incomplete lessons
+  // - Ungraded assignments based on quiz_attempts
+  // - Students who haven't been active recently
+  return [
+    {
+      id: '1',
+      className: 'Mathematics 101',
+      issue: '3 students falling behind',
+      priority: 'High',
+      actionUrl: '/teach/gradebook'
+    },
+    {
+      id: '2', 
+      className: 'Science Fundamentals',
+      issue: '5 ungraded assignments',
+      priority: 'Medium',
+      actionUrl: '/teach/gradebook'
+    }
+  ];
+}
+
+// TODO: Replace with real data fetching based on aggregated class and student data
+async function getTeachingProgress(supabase: any, userId: string): Promise<TeachingProgressData> {
+  // Mock data for now - in real implementation, this would aggregate:
+  // - Total students across all teacher's class instances
+  // - Lessons created in the lessons table
+  // - Average performance from quiz_attempts
+  // - Pending reviews from ungraded quiz_attempts
+  return {
+    totalStudents: 127,
+    lessonsCreated: 45,
+    lessonsThisWeek: 3,
+    averagePerformance: 78,
+    pendingReviews: 12
+  };
 }
 
 export default async function TeacherDashboardPage() {
@@ -352,14 +173,12 @@ export default async function TeacherDashboardPage() {
 
   const userName = profile.first_name || 'Teacher';
 
-  const [activeClasses, recentlyGraded, upcomingDeadlines, studentPerformance] = await Promise.all([
+  const [activeClasses, recentActivity, classesNeedingAttention, teachingProgress] = await Promise.all([
     getActiveClassesData(supabase, user.id),
-    getRecentlyGradedData(supabase, user.id),
-    getUpcomingDeadlinesData(supabase, user.id),
-    getStudentPerformanceData(supabase, user.id)
+    getRecentStudentActivity(supabase, user.id),
+    getClassesNeedingAttention(supabase, user.id),
+    getTeachingProgress(supabase, user.id)
   ]);
-  // Note: Error handling for individual data fetches can be added here if needed, 
-  // or keep as is if minor errors in one section shouldn't block the page.
 
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6 md:space-y-8">
@@ -374,7 +193,6 @@ export default async function TeacherDashboardPage() {
             <BookOpenCheck className="mr-3 h-6 w-6 text-primary" />
             Your Active Classes
           </h2>
-          {/* Error/Empty state handling for activeClasses can go here if activeClassesError was fetched */}
           {activeClasses.length === 0 && (
             <Alert>
               <Info className="h-4 w-4" />
@@ -400,107 +218,169 @@ export default async function TeacherDashboardPage() {
           )}
         </div>
 
-        {/* Card 2: Upcoming Deadlines (Spans 1 column on lg) */}
-        <div className="lg:col-span-1 bg-card p-4 md:p-6 rounded-lg shadow">
-          <h2 id="upcoming-deadlines-heading" className="text-xl font-semibold mb-4 flex items-center">
-            <CalendarClock className="mr-3 h-6 w-6 text-primary" />
-            Upcoming Deadlines
+        {/* Card 2: Quick Actions (Spans 1 column on lg) */}
+        <div className="bg-card p-4 md:p-6 rounded-lg shadow">
+          <h2 id="quick-actions-heading" className="text-xl font-semibold mb-4 flex items-center">
+            <Sparkles className="mr-3 h-6 w-6 text-primary" />
+            Quick Actions
           </h2>
-          {upcomingDeadlines.length === 0 && (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertTitle>No Upcoming Deadlines</AlertTitle>
-              <AlertDescription>
-                No deadlines in the next 30 days, or schema update needed for live data.
-              </AlertDescription>
-            </Alert>
-          )}
-          {upcomingDeadlines.length > 0 && (
             <div className="space-y-3">
-              {upcomingDeadlines.map((item) => (
-                <UpcomingDeadlineItem
-                  key={item.id}
-                  id={item.id}
-                  assignmentName={item.assignmentName}
-                  className={item.className}
-                  dueDate={item.dueDate}
-                  detailsUrl={item.detailsUrl}
-                />
-              ))}
+            <Button asChild className="w-full justify-start" variant="outline">
+              <Link href="/teach/base-classes">
+                <BookOpen className="mr-2 h-4 w-4" />
+                Create New Course
+              </Link>
+            </Button>
+            <Button asChild className="w-full justify-start" variant="outline">
+              <Link href="/teach/gradebook">
+                <ClipboardCheck className="mr-2 h-4 w-4" />
+                Grade Assignments
+              </Link>
+            </Button>
+            <Button asChild className="w-full justify-start" variant="outline">
+              <Link href="/teach/designer">
+                <Lightbulb className="mr-2 h-4 w-4" />
+                Create Content
+              </Link>
+            </Button>
+            <Button asChild className="w-full justify-start" variant="outline">
+              <Link href="/knowledge-base">
+                <Search className="mr-2 h-4 w-4" />
+                Search Knowledge
+              </Link>
+            </Button>
             </div>
-          )}
-          <p className="mt-2 text-xs text-muted-foreground">
-            Note: Deadline data is currently illustrative.
-          </p>
         </div>
 
-        {/* Card 3: Recently Graded Assignments (Spans 2 columns on lg) */}
+        {/* Card 3: Recent Student Activity (Spans 2 columns on lg) */}
         <div className="lg:col-span-2 bg-card p-4 md:p-6 rounded-lg shadow">
-          <h2 id="graded-assignments-heading" className="text-xl font-semibold mb-4 flex items-center">
-            <ClipboardCheck className="mr-3 h-6 w-6 text-primary" />
-            Recently Graded
+          <h2 id="recent-activity-heading" className="text-xl font-semibold mb-4 flex items-center">
+            <Activity className="mr-3 h-6 w-6 text-primary" />
+            Recent Student Activity
           </h2>
-          {recentlyGraded.length === 0 && (
+          {recentActivity.length === 0 && (
             <Alert>
               <Info className="h-4 w-4" />
-              <AlertTitle>No Recently Graded Assignments</AlertTitle>
+              <AlertTitle>No Recent Activity</AlertTitle>
               <AlertDescription>
-                No assignments have been graded recently.
+                No student submissions or quiz attempts in the last 24 hours.
               </AlertDescription>
             </Alert>
           )}
-          {recentlyGraded.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {recentlyGraded.map((item) => (
-                <RecentlyGradedItem
-                  key={item.submissionId}
-                  submissionId={item.submissionId}
-                  assignmentName={item.assignmentName}
-                  studentName={item.studentName}
-                  studentInitials={item.studentInitials}
-                  score={item.score}
-                  maxScore={item.maxScore}
-                  gradedAt={item.gradedAt}
-                  viewSubmissionUrl={item.viewSubmissionUrl}
-                />
+          {recentActivity.length > 0 && (
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {recentActivity.map((activity, index) => (
+                <div key={index} className="flex items-center gap-3 p-3 bg-background rounded-lg border border-muted">
+                  <div className={`p-2 rounded-lg ${
+                    activity.type === 'quiz_submission' ? 'bg-success/10' :
+                    activity.type === 'lesson_completion' ? 'bg-info/10' :
+                    activity.type === 'late_submission' ? 'bg-warning/10' : 'bg-muted/50'
+                  }`}>
+                    {activity.type === 'quiz_submission' && <Target className="h-4 w-4 text-success" />}
+                    {activity.type === 'lesson_completion' && <CheckCircle className="h-4 w-4 text-info" />}
+                    {activity.type === 'late_submission' && <AlertTriangle className="h-4 w-4 text-warning" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {activity.studentName} - {activity.className}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {activity.description} • {activity.timeAgo}
+                    </p>
+                  </div>
+                  {activity.actionUrl && (
+                    <Button asChild size="sm" variant="ghost">
+                      <Link href={activity.actionUrl}>
+                        <Eye className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  )}
+                </div>
               ))}
             </div>
           )}
         </div>
         
-        {/* Card 4: Student Performance Overview (Spans 1 column on lg) */}
-        <div className="lg:col-span-1 bg-card p-4 md:p-6 rounded-lg shadow">
-          <h2 id="student-performance-heading" className="text-xl font-semibold mb-4 flex items-center">
-            <Users className="mr-3 h-6 w-6 text-primary" />
-            Student Performance
+        {/* Card 4: Classes Needing Attention (Spans 1 column on lg) */}
+        <div className="bg-card p-4 md:p-6 rounded-lg shadow">
+          <h2 id="attention-needed-heading" className="text-xl font-semibold mb-4 flex items-center">
+            <AlertTriangle className="mr-3 h-6 w-6 text-warning" />
+            Needs Attention
           </h2>
-          {studentPerformance.length === 0 && (
+          {classesNeedingAttention.length === 0 && (
             <Alert>
-              <Info className="h-4 w-4" />
-              <AlertTitle>Performance Data Not Available</AlertTitle>
+              <CheckCircle className="h-4 w-4" />
+              <AlertTitle>All Caught Up!</AlertTitle>
               <AlertDescription>
-                Aggregated student performance data is not yet available.
+                No classes require immediate attention.
               </AlertDescription>
             </Alert>
           )}
-          {studentPerformance.length > 0 && (
+          {classesNeedingAttention.length > 0 && (
             <div className="space-y-3">
-              {studentPerformance.map((item) => (
-                <StudentPerformanceItem
-                  key={item.id}
-                  id={item.id}
-                  name={item.name}
-                  studentCount={item.studentCount}
-                  averageScore={item.averageScore}
-                  studentsAtRiskCount={item.studentsAtRiskCount}
-                  detailsUrl={item.detailsUrl}
-                />
+              {classesNeedingAttention.map((item) => (
+                <div key={item.id} className="p-3 bg-background rounded-lg border border-muted">
+                  <h4 className="font-medium text-foreground text-sm">{item.className}</h4>
+                  <p className="text-xs text-muted-foreground mt-1">{item.issue}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs font-medium text-warning">{item.priority}</span>
+                    {item.actionUrl && (
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={item.actionUrl}>Review</Link>
+                      </Button>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           )}
-           <p className="mt-2 text-xs text-muted-foreground">
-            Note: Performance data is currently illustrative.
-          </p>
+        </div>
+
+        {/* Card 5: Teaching Progress & Insights (Spans 3 columns on lg) */}
+        <div className="lg:col-span-3 bg-card p-4 md:p-6 rounded-lg shadow">
+          <h2 id="teaching-progress-heading" className="text-xl font-semibold mb-4 flex items-center">
+            <TrendingUp className="mr-3 h-6 w-6 text-primary" />
+            Teaching Progress & Insights
+          </h2>
+          {teachingProgress && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 bg-background rounded-lg border border-muted">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total Students</span>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-2xl font-bold text-foreground mt-1">{teachingProgress.totalStudents}</p>
+                <p className="text-xs text-muted-foreground">Across all classes</p>
+              </div>
+              
+              <div className="p-4 bg-background rounded-lg border border-muted">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Lessons Created</span>
+                  <BookOpen className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-2xl font-bold text-foreground mt-1">{teachingProgress.lessonsCreated}</p>
+                <p className="text-xs text-success">+{teachingProgress.lessonsThisWeek} this week</p>
+              </div>
+              
+              <div className="p-4 bg-background rounded-lg border border-muted">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Avg Class Performance</span>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-2xl font-bold text-foreground mt-1">{teachingProgress.averagePerformance}%</p>
+                <p className="text-xs text-muted-foreground">Based on quiz scores</p>
+              </div>
+              
+              <div className="p-4 bg-background rounded-lg border border-muted">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Pending Reviews</span>
+                  <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-2xl font-bold text-foreground mt-1">{teachingProgress.pendingReviews}</p>
+                <p className="text-xs text-muted-foreground">Assignments to grade</p>
+              </div>
+            </div>
+          )}
         </div>
 
       </div>

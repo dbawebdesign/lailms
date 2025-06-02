@@ -4,13 +4,15 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Users } from 'lucide-react';
 import { Progress } from '@/components/ui/progress'; // Import Progress component
 
 // NEW: Import for the Knowledge Base Manager
 import BaseClassKnowledgeBaseManager from './BaseClassKnowledgeBaseManager';
 // NEW: Import for the Mind Map Modal
 import MindMapViewModal from './MindMapViewModal';
+// NEW: Import for the Create Instance Modal
+import CreateInstanceModal from './CreateInstanceModal';
 
 interface BaseClassEditorProps {
   baseClass: StudioBaseClass;
@@ -44,6 +46,9 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
   // NEW: State for mind map modal
   const [mindMapModalOpen, setMindMapModalOpen] = useState(false);
   const [selectedMindMap, setSelectedMindMap] = useState<{ id: string; title: string; url: string } | null>(null);
+  
+  // NEW: State for create instance modal
+  const [createInstanceModalOpen, setCreateInstanceModalOpen] = useState(false);
   
   // State for streaming progress
   const [generationProgress, setGenerationProgress] = useState(0); // Percentage 0-100
@@ -396,6 +401,23 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
     }
   };
 
+  const handleCreateInstance = () => {
+    setCreateInstanceModalOpen(true);
+  };
+
+  const handleInstanceCreated = (instanceId: string) => {
+    // Show success message
+    setFinalSummary({ 
+      message: `Class instance created successfully! Instance ID: ${instanceId}`, 
+      type: 'success' 
+    });
+    
+    // Clear the success message after 5 seconds
+    setTimeout(() => {
+      setFinalSummary(null);
+    }, 5000);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -444,6 +466,17 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
             */}
             <div className="flex space-x-2">
               <Button onClick={handleSave} disabled={isGeneratingContent || isGeneratingMindMap || isCheckingContent || isCheckingMindMap}>Save Changes</Button>
+              
+              {/* Create Instance Button - Always Available */}
+              <Button 
+                onClick={handleCreateInstance} 
+                disabled={isGeneratingContent || isGeneratingMindMap || isCheckingContent || isCheckingMindMap}
+                className="bg-brand-gradient hover:opacity-90 transition-airy"
+              >
+                <Users className="mr-2 h-4 w-4" />
+                Create Instance
+              </Button>
+              
               {isCheckingContent || isCheckingMindMap ? (
                 <Button disabled>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -508,6 +541,15 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
           urlPath={selectedMindMap.url}
         />
       )}
+
+      {/* Create Instance Modal */}
+      <CreateInstanceModal
+        isOpen={createInstanceModalOpen}
+        onClose={() => setCreateInstanceModalOpen(false)}
+        baseClassId={baseClass.id}
+        baseClassName={baseClass.name}
+        onInstanceCreated={handleInstanceCreated}
+      />
     </Card>
   );
 };
