@@ -123,25 +123,44 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
     if (!isMobile) return;
 
     const updateViewportHeight = () => {
-      // Use visual viewport if available, fallback to window.innerHeight
-      const height = window.visualViewport?.height || window.innerHeight;
-      setViewportHeight(`${height}px`);
+      // Use visual viewport if available for accurate keyboard detection
+      if (window.visualViewport) {
+        const height = window.visualViewport.height;
+        setViewportHeight(`${height}px`);
+        
+        // Update CSS custom property for other components
+        const vh = height * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+      } else {
+        // Fallback to window.innerHeight
+        const height = window.innerHeight;
+        setViewportHeight(`${height}px`);
+        
+        const vh = height * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+      }
     };
 
     // Initial setup
     updateViewportHeight();
 
-    // Listen for viewport changes
+    // Listen for viewport changes (keyboard open/close)
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', updateViewportHeight);
+      window.visualViewport.addEventListener('scroll', updateViewportHeight);
+      
       return () => {
         window.visualViewport?.removeEventListener('resize', updateViewportHeight);
+        window.visualViewport?.removeEventListener('scroll', updateViewportHeight);
       };
     } else {
       // Fallback for browsers without visual viewport API
       window.addEventListener('resize', updateViewportHeight);
+      window.addEventListener('orientationchange', updateViewportHeight);
+      
       return () => {
         window.removeEventListener('resize', updateViewportHeight);
+        window.removeEventListener('orientationchange', updateViewportHeight);
       };
     }
   }, [isMobile]);
@@ -189,8 +208,9 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
   }, [messages, currentPersona, saveChatHistory, isLoaded]);
 
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    // Auto-focus the input field when the component mounts, but prevent scroll
+    inputRef.current?.focus({ preventScroll: true });
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   // Listen for logout events to clear chat history
   useEffect(() => {
@@ -477,11 +497,11 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
     } finally {
       setIsLoading(false);
       
-      // Re-focus input on mobile after a short delay
+      // Re-focus input on mobile after a short delay to ensure smooth UX
       if (isMobile && inputRef.current) {
         setTimeout(() => {
           inputRef.current?.focus();
-        }, 100);
+        }, 150); // Slightly longer delay for better mobile UX
       }
     }
   };
@@ -640,8 +660,12 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
 
   // --- Render --- 
   return (
-    <div className={`flex flex-col h-full ${isMobile ? 'relative overflow-hidden' : ''}`} 
-         style={isMobile ? { height: viewportHeight } : {}}>
+    <div className={`flex flex-col ${isMobile ? 'h-full' : 'h-full'}`} 
+         style={isMobile ? { 
+           height: viewportHeight, 
+           position: 'relative',
+           overflow: 'hidden'
+         } : {}}>
       {/* Persona Selector */}
       <div className={`flex border-b bg-muted/10 items-center space-x-2 flex-shrink-0 ${isMobile ? 'p-3' : 'p-2'}`}>
         <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Mode:</span>
@@ -670,15 +694,16 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
         </Select>
       </div>
       
-      {/* Chat Messages - Adjust for mobile input positioning */}
+      {/* Chat Messages - Takes remaining space above input */}
       <div 
-        className={`overflow-hidden ${isMobile ? 'flex-1' : 'flex-grow'} min-h-0`}
+        className={`flex-1 min-h-0 ${isMobile ? '' : ''}`}
         style={isMobile ? { 
-          height: `calc(${viewportHeight} - 140px)`, // Account for header + input area
-          paddingBottom: '20px' 
+          height: `calc(${viewportHeight} - 120px)`, // Account for persona selector + input
+          overflow: 'hidden',
+          paddingBottom: '80px' // Space for fixed input
         } : {}}
       >
-        <ScrollArea className={`h-full ${isMobile ? 'overscroll-contain px-3 py-4' : 'px-2 py-3'}`}>
+        <ScrollArea className={`h-full ${isMobile ? 'overscroll-contain px-3 py-4 no-bounce-scroll' : 'px-2 py-3'}`}>
           <div className={`${isMobile ? 'space-y-3 pb-4' : 'space-y-4'}`}>
             {messages.map((message) => {
               const isAIGenerated = aiGeneratedContent.has(message.id);
@@ -851,18 +876,14 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
         onClose={() => setShowSuccessNotification(false)}
       />
 
-      {/* Input Area */}
+      {/* Input Area - Fixed at bottom like ChatGPT */}
       <div 
         className={`border-t bg-background flex-shrink-0 ${
           isMobile 
-            ? 'absolute left-0 right-0 p-4 z-10' 
+            ? 'mobile-chat-input p-4' 
             : 'p-2'
         }`}
-        style={isMobile ? { 
-          bottom: '0px',
-          backgroundColor: 'hsl(var(--background))',
-          borderTopColor: 'hsl(var(--border))'
-        } : {}}
+        style={isMobile ? {} : {}}
       >
         <div className={`flex w-full items-end ${isMobile ? 'gap-3' : 'space-x-2'}`}>
           <Button

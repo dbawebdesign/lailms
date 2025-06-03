@@ -175,10 +175,10 @@ export default function TeachBaseClassesPage() {
   );
 
   const renderPageSkeletonState = () => (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-8">
-        <SkeletonBar height="h-10" width="w-1/3" /> {/* Title: My Base Classes */}
-        <SkeletonBar height="h-10" width="w-36" /> {/* Create New Button */}
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <SkeletonBar height="h-8" width="w-64" /> {/* Title: My Base Classes */}
+        <SkeletonBar height="h-10" width="w-48" /> {/* Create New Button */}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} />)}
@@ -343,17 +343,17 @@ export default function TeachBaseClassesPage() {
   };
 
   // Main conditional rendering based on loading and error states
-  if (isLoadingOrg || (isLoadingPage && baseClasses.length === 0)) { // Show skeleton if org is loading OR page is loading AND no classes yet
+  if (isLoadingOrg || (isLoadingPage && baseClasses.length === 0)) {
     return renderPageSkeletonState();
   }
 
-  if (pageError && baseClasses.length === 0) { // Only show full page error if loading failed and no classes are available to show
-    return <div className="container mx-auto p-4 text-center text-red-600">Error: {pageError} <Button onClick={() => window.location.reload()} variant="outline" className="ml-2">Refresh</Button></div>;
+  if (pageError && baseClasses.length === 0) { 
+    return <div className="text-center text-red-600 container mx-auto p-6">Error: {pageError} <Button onClick={() => window.location.reload()} variant="outline" className="ml-2">Refresh</Button></div>;
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-8">
+    <div className="container mx-auto p-4 md:p-6 space-y-6 md:space-y-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">My Base Classes</h1>
         <Button 
           onClick={handleModalOpen} 
@@ -375,53 +375,55 @@ export default function TeachBaseClassesPage() {
       </div>
 
       {pageError && (baseClasses.length > 0 || userOrgId) && (
-         <div className="mb-4 p-3 bg-red-100 text-red-700 border border-red-400 rounded">
+         <div className="p-3 bg-red-100 text-red-700 border border-red-400 rounded">
            Error: {pageError}
          </div>
       )}
       {/* Show currentProcessStatus as a banner only if it's an error and modal is closed */}
       {currentProcessStatus && currentProcessStatus.toLowerCase().startsWith('error') && !isModalOpen && (
-         <div className={`mb-4 p-3 border rounded bg-red-100 text-red-700 border-red-400`}>
+         <div className="p-3 border rounded bg-red-100 text-red-700 border-red-400">
            Last Operation Status: {currentProcessStatus}
          </div>
       )}
 
-      {baseClasses.length > 0 ? (
-        <BaseClassCardGrid
-          baseClasses={baseClasses}
-          onViewDetails={handleViewDetails}
-          onEdit={handleEdit}
-          onClone={handleClone}
-          onArchive={handleArchive}
-          onDelete={handleDelete}
-        />
-      ) : (
-        !isLoadingPage && !isLoadingOrg && !pageError && baseClasses.length === 0 && userOrgId && (
-          <div className="text-center py-12">
-            <BookOpenText className="mx-auto h-16 w-16 text-slate-400 dark:text-slate-500" />
-            <h3 className="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">No Base Classes Yet</h3>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Get started by creating your first base class.
-            </p>
-            <Button 
-              onClick={handleModalOpen} 
-              variant="outline" 
-              className="mt-6" 
-              disabled={isProcessingRequest || isLoadingOrg || !userOrgId}
-            >
-              {isProcessingRequest && currentProcessStatus ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {currentProcessStatus.substring(0,18)}...</>
-              ) : isLoadingOrg ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Context...</>
-              ) : !userOrgId ? (
-                <><Plus className="mr-2 h-4 w-4" /> Org ID Missing</>
-              ) : (
-                <><Plus className="mr-2 h-4 w-4" /> Create Base Class</>
-              )}
-            </Button>
-          </div>
-        )
-      )}
+      <div>
+        {baseClasses.length > 0 ? (
+          <BaseClassCardGrid
+            baseClasses={baseClasses}
+            onViewDetails={handleViewDetails}
+            onEdit={handleEdit}
+            onClone={handleClone}
+            onArchive={handleArchive}
+            onDelete={handleDelete}
+          />
+        ) : (
+          !isLoadingPage && !isLoadingOrg && !pageError && baseClasses.length === 0 && userOrgId && (
+            <div className="text-center py-12">
+              <BookOpenText className="mx-auto h-16 w-16 text-slate-400 dark:text-slate-500" />
+              <h3 className="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">No Base Classes Yet</h3>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                Get started by creating your first base class.
+              </p>
+              <Button 
+                onClick={handleModalOpen} 
+                variant="outline" 
+                className="mt-6" 
+                disabled={isProcessingRequest || isLoadingOrg || !userOrgId}
+              >
+                {isProcessingRequest && currentProcessStatus ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {currentProcessStatus.substring(0,18)}...</>
+                ) : isLoadingOrg ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Context...</>
+                ) : !userOrgId ? (
+                  <><Plus className="mr-2 h-4 w-4" /> Org ID Missing</>
+                ) : (
+                  <><Plus className="mr-2 h-4 w-4" /> Create Base Class</>
+                )}
+              </Button>
+            </div>
+          )
+        )}
+      </div>
       
       {isModalOpen && userOrgId && (
         <CreateBaseClassModal

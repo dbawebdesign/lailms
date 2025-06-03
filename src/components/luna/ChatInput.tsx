@@ -120,41 +120,41 @@ const ChatInput: React.FC<ChatInputProps> = ({ persona }) => {
       
       {/* Text Input */}
       <div className="flex-1 relative">
-        <Input
-          ref={inputRef}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
+      <Input
+        ref={inputRef}
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder={`Ask ${persona === 'tutor' ? 'your tutor' : persona === 'peer' ? 'your peer buddy' : 'your exam coach'}...`}
+        placeholder={`Ask ${persona === 'tutor' ? 'your tutor' : persona === 'peer' ? 'your peer buddy' : 'your exam coach'}...`}
           className={`focus-visible:ring-primary pr-12 ${
             isMobile 
               ? 'h-12 text-base rounded-xl md:h-10 md:text-sm md:rounded-md' 
               : 'h-10'
           }`}
-          disabled={isLoading || isRecording}
+        disabled={isLoading || isRecording}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="sentences"
-        />
-        
+      />
+      
         {/* Send Button - Positioned inside input on mobile */}
-        <Button
-          type="submit"
-          variant="default"
-          size="icon"
+      <Button
+        type="submit"
+        variant="default"
+        size="icon"
           className={`absolute right-1 top-1/2 transform -translate-y-1/2 rounded-full flex-shrink-0 ${
             isMobile 
               ? 'h-10 w-10 md:h-8 md:w-8' 
               : 'h-8 w-8'
           } ${!message.trim() ? 'bg-muted-foreground/50' : ''}`}
-          disabled={!message.trim() || isLoading}
-        >
+        disabled={!message.trim() || isLoading}
+      >
           {isLoading ? (
             <Loader2 size={isMobile ? 18 : 16} className="animate-spin" />
           ) : (
             <Send size={isMobile ? 18 : 16} />
           )}
-        </Button>
+      </Button>
       </div>
     </form>
   );

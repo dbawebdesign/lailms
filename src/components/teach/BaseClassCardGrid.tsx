@@ -86,8 +86,8 @@ export const BaseClassCardGrid: React.FC<BaseClassCardGridProps> = ({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row gap-4 items-center">
+    <>
+      <div className="flex flex-col sm:flex-row gap-4 items-center mb-6">
         <Input
           placeholder="Search by name..."
           value={searchTerm}
@@ -135,6 +135,6 @@ export const BaseClassCardGrid: React.FC<BaseClassCardGridProps> = ({
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }; 

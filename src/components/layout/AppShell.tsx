@@ -41,7 +41,7 @@ const AppShell: React.FC<AppShellProps> = ({ children, userRole }) => {
 
   return (
     <> {/* Use Fragment to include non-visual CommandPalette */}
-      <div className="flex h-screen bg-background text-foreground">
+      <div className="flex h-screen bg-background text-foreground overflow-hidden">
         {/* Left Navigation - hide completely on mobile */}
         <div className="hidden md:block transition-all duration-300 ease-in-out z-20">
           <div className={cn(isNavCollapsed ? "w-16" : "w-60")}>
@@ -50,9 +50,11 @@ const AppShell: React.FC<AppShellProps> = ({ children, userRole }) => {
         </div>
 
         {/* Main Content Area */}
-        <div className={cn("flex-1 flex flex-col overflow-hidden", isMobile && "pb-16")}>
+        <div className={cn("flex-1 flex flex-col min-h-0", isMobile && "pb-16")}>
           <Header />
-          <MainContent>{children}</MainContent>
+          <div className="flex-1 overflow-y-auto">
+            <MainContent>{children}</MainContent>
+          </div>
         </div>
 
         {/* AI Panel for Desktop - Part of the flex layout to push content */}
