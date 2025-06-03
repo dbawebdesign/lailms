@@ -18,18 +18,16 @@ const ChatInput: React.FC<ChatInputProps> = ({ persona }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const { sendMessage, isLoading } = useLunaContext();
 
-  // Detect mobile
+  // Detect mobile on mount and window resize
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-
+    
     checkMobile();
     window.addEventListener('resize', checkMobile);
-
-    return () => {
-      window.removeEventListener('resize', checkMobile);
-    };
+    
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // Auto-focus the input field when component mounts (desktop only)
@@ -48,9 +46,13 @@ const ChatInput: React.FC<ChatInputProps> = ({ persona }) => {
       await sendMessage(message, persona);
       setMessage('');
       
-      // On mobile, blur input after sending to hide keyboard if desired
+      // Blur input on mobile to hide keyboard after sending
       if (isMobile && inputRef.current) {
         inputRef.current.blur();
+        // Re-focus after a short delay to maintain UX
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 100);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -58,12 +60,11 @@ const ChatInput: React.FC<ChatInputProps> = ({ persona }) => {
     }
   };
 
-  // Handle input focus on mobile - scroll into view
-  const handleInputFocus = () => {
-    if (isMobile) {
-      setTimeout(() => {
-        inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 300); // Delay to allow keyboard animation
+  // Handle Enter key press for mobile
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e as any);
     }
   };
 
@@ -93,12 +94,20 @@ const ChatInput: React.FC<ChatInputProps> = ({ persona }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className={`flex gap-2 items-center ${isMobile ? 'gap-3' : 'gap-2'}`}>
+    <form 
+      onSubmit={handleSubmit} 
+      className={`flex gap-2 items-end ${isMobile ? 'gap-3' : 'gap-2'}`}
+    >
+      {/* Voice Recording Button */}
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        className={`rounded-full flex-shrink-0 ${isMobile ? 'h-12 w-12' : 'h-10 w-10'}`}
+        className={`rounded-full flex-shrink-0 ${
+          isMobile 
+            ? 'h-12 w-12 md:h-10 md:w-10' 
+            : 'h-10 w-10'
+        }`}
         onClick={toggleRecording}
         disabled={isLoading}
       >
@@ -109,32 +118,44 @@ const ChatInput: React.FC<ChatInputProps> = ({ persona }) => {
         )}
       </Button>
       
-      <Input
-        ref={inputRef}
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onFocus={handleInputFocus}
-        placeholder={`Ask ${persona === 'tutor' ? 'your tutor' : persona === 'peer' ? 'your peer buddy' : 'your exam coach'}...`}
-        className={`flex-1 focus-visible:ring-primary ${isMobile ? 'h-12 text-base' : ''}`}
-        disabled={isLoading || isRecording}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="sentences"
-      />
-      
-      <Button
-        type="submit"
-        variant="default"
-        size="icon"
-        className={`rounded-full flex-shrink-0 ${isMobile ? 'h-12 w-12' : 'h-10 w-10'}`}
-        disabled={!message.trim() || isLoading}
-      >
-        {isLoading ? (
-          <Loader2 size={isMobile ? 20 : 18} className="animate-spin" />
-        ) : (
-          <Send size={isMobile ? 20 : 18} />
-        )}
-      </Button>
+      {/* Text Input */}
+      <div className="flex-1 relative">
+        <Input
+          ref={inputRef}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder={`Ask ${persona === 'tutor' ? 'your tutor' : persona === 'peer' ? 'your peer buddy' : 'your exam coach'}...`}
+          className={`focus-visible:ring-primary pr-12 ${
+            isMobile 
+              ? 'h-12 text-base rounded-xl md:h-10 md:text-sm md:rounded-md' 
+              : 'h-10'
+          }`}
+          disabled={isLoading || isRecording}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="sentences"
+        />
+        
+        {/* Send Button - Positioned inside input on mobile */}
+        <Button
+          type="submit"
+          variant="default"
+          size="icon"
+          className={`absolute right-1 top-1/2 transform -translate-y-1/2 rounded-full flex-shrink-0 ${
+            isMobile 
+              ? 'h-10 w-10 md:h-8 md:w-8' 
+              : 'h-8 w-8'
+          } ${!message.trim() ? 'bg-muted-foreground/50' : ''}`}
+          disabled={!message.trim() || isLoading}
+        >
+          {isLoading ? (
+            <Loader2 size={isMobile ? 18 : 16} className="animate-spin" />
+          ) : (
+            <Send size={isMobile ? 18 : 16} />
+          )}
+        </Button>
+      </div>
     </form>
   );
 };

@@ -66,14 +66,9 @@ const AppShell: React.FC<AppShellProps> = ({ children, userRole }) => {
         <MobileNav userRole={userRole} />
       </div>
 
-      {/* AI Panel for Mobile - Fixed positioning for overlay */}
+      {/* AI Panel for Mobile - Full screen experience */}
       {isMobile && isPanelVisible && (
-        <div 
-          className="fixed top-0 right-0 z-50 w-[90vw] max-w-[90vw] bg-background shadow-xl transition-all duration-300 ease-in-out"
-          style={{ height: '100dvh' }} // Use dvh for better mobile height handling
-        >
-          <AiPanel userRole={userRole} />
-        </div>
+        <AiPanel userRole={userRole} />
       )}
 
       <CommandPalette /> {/* Include CommandPalette here */}

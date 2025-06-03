@@ -18,22 +18,103 @@ interface AiPanelProps {
 const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
   const { togglePanelVisible } = useUIContext();
   const [isMobile, setIsMobile] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState('100vh');
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      
+      // Handle mobile viewport changes for keyboard
+      if (mobile) {
+        // Use dvh for better mobile support, fallback to innerHeight
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+        setViewportHeight(`${window.innerHeight}px`);
+      } else {
+        setViewportHeight('100vh');
+      }
     };
 
-    // Set initial state
+    // Initial check
     handleResize();
     
-    // Add event listener
+    // Add event listeners
     window.addEventListener('resize', handleResize);
-    
-    // Clean up
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+
+    // Handle visual viewport API for better keyboard detection
+    if (window.visualViewport) {
+      const handleViewportChange = () => {
+        if (window.innerWidth < 768) {
+          setViewportHeight(`${window.visualViewport?.height || window.innerHeight}px`);
+        }
+      };
+      
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+      
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('orientationchange', handleResize);
+        window.visualViewport?.removeEventListener('resize', handleViewportChange);
+      };
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
   }, []);
 
+  // Prevent background scrolling on mobile when panel is open
+  useEffect(() => {
+    if (isMobile) {
+      // Prevent scrolling on the body
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.height = '100%';
+      
+      return () => {
+        // Restore scrolling when component unmounts or mobile state changes
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
+      };
+    }
+  }, [isMobile]);
+
+  // Mobile full-screen layout
+  if (isMobile) {
+    return (
+      <div 
+        className="fixed inset-0 z-50 flex flex-col bg-background"
+        style={{ height: viewportHeight }}
+      >
+        {/* Mobile Header */}
+        <div className="bg-primary px-4 py-3 text-primary-foreground flex items-center justify-between border-b flex-shrink-0">
+          <h2 className="font-medium text-lg">Luna Assistant</h2>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-primary-foreground hover:bg-primary/80"
+            onClick={togglePanelVisible}
+            aria-label="Close AI Panel"
+          >
+            <X size={20} />
+          </Button>
+        </div>
+
+        {/* Mobile Luna AI Chat Component - Full screen */}
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          <LunaAIChat userRole={userRole} isMobile={true} />
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop layout (original)
   return (
     <aside
       className="h-full flex flex-col bg-background border-l border-[#E0E0E0] dark:border-[#333333]"

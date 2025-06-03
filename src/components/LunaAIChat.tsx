@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, ChangeEvent, KeyboardEvent } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useLunaContext } from '@/hooks/useLunaContext';
 import { useRealTimeUpdates } from '@/hooks/useRealTimeUpdates';
 import { useChatPersistence } from '@/hooks/useChatPersistence';
@@ -81,12 +81,13 @@ export interface ChatMessage {
 
 interface LunaAIChatProps {
   userRole: UserRole;
+  isMobile?: boolean; // Optional prop to control mobile behavior
 }
 
 /**
  * Luna AI Chat component - Updated for Teacher Personas
  */
-export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userRole from props
+export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { // Destructure both props
   const router = useRouter();
   const [userMessage, setUserMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -322,163 +323,141 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
   };
   
   const handleSendMessage = async (overrideMessage?: string, overrideButtonData?: any) => {
-    // Use override message if provided, otherwise use the input field
-    const currentInput = overrideMessage || userMessage.trim();
+    if (isLoading) return;
     
-    if (!currentInput || isLoading || (currentUserRole === 'student' && !isReady)) return; // Student needs context ready
-    
-    // Parse message if it's a button response
-    let actualMessage = currentInput;
-    let parsedButtonData = overrideButtonData;
-    
-    // Only try to parse JSON if no override button data was provided
-    if (!overrideButtonData) {
-      try {
-        const parsed = JSON.parse(currentInput);
-        if (parsed.text && parsed.buttonData) {
-          actualMessage = parsed.text;
-          parsedButtonData = parsed.buttonData;
-        }
-      } catch {
-        // Not a JSON message, use as-is
-      }
+    const messageToSend = overrideMessage || userMessage.trim();
+    if (!messageToSend) return;
+
+    // Check readiness for students
+    if (currentUserRole === 'student' && !isReady) {
+      setError('Luna is still initializing. Please wait a moment...');
+      return;
     }
-    
-    const userMsg: ChatMessage = { id: uuidv4(), role: 'user', content: actualMessage, timestamp: new Date() };
-    setMessages(prev => [...prev, userMsg]);
-    
-    // Only clear the input field if we're not using an override message (i.e., if this is from the input field)
-    if (!overrideMessage) {
-      setUserMessage('');
-    }
-    
-    setIsLoading(true);
+
     setError(null);
+    setUserMessage('');
+    setIsLoading(true);
     
-    const tempBotMessageId = uuidv4();
-    setMessages(prev => [...prev, { id: tempBotMessageId, role: 'assistant', content: '', timestamp: new Date(), isLoading: true, persona: currentPersona }]);
+    const userMsgId = uuidv4();
+    const assistantMsgId = uuidv4();
+    
+    // Create user message
+    const userMsg: ChatMessage = {
+      id: userMsgId,
+      role: 'user',
+      content: messageToSend,
+      timestamp: new Date(),
+      persona: currentPersona
+    };
+
+    // Create loading assistant message
+    const loadingMsg: ChatMessage = {
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isLoading: true,
+      persona: currentPersona
+    };
+
+    // Update UI immediately
+    setMessages(prev => [...prev, userMsg, loadingMsg]);
+    messageHistory.current.push({ role: 'user', content: messageToSend });
+    
+    // Blur input on mobile to hide keyboard after sending
+    if (isMobile && inputRef.current) {
+      inputRef.current.blur();
+    }
 
     try {
-      let assistantResponse: ChatMessage;
-
-      // --- All Personas Use Luna Chat API --- 
-      messageHistory.current.push({ role: 'user', content: actualMessage });
-      
-      // Prepare request body
-      const requestBody: any = {
-        message: actualMessage,
-        context,
-        messages: messageHistory.current,
-        persona: currentPersona
-      };
-      
-      // Include button data if available
-      if (parsedButtonData) {
-        requestBody.buttonData = parsedButtonData;
-      }
-      
       const response = await fetch('/api/luna/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          message: messageToSend,
+          persona: currentPersona,
+          userRole: currentUserRole,
+          history: messageHistory.current,
+          context,
+          buttonData: overrideButtonData,
+          timestamp: new Date().toISOString()
+        }),
       });
 
-      let data;
-      try {
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          data = await response.json();
-        } else {
-          const text = await response.text();
-          throw new Error(`Received non-JSON response: Status ${response.status}`);
-        }
-      } catch (parseError) {
-        throw new Error(`Failed to parse response: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to send message: ${response.status} ${errorText}`);
       }
 
-      if (!response.ok) {
-        throw new Error(data.error || `API error: ${response.status}`);
-      }
-      messageHistory.current.push({ role: 'assistant', content: data.response });
-      
-      assistantResponse = {
-        id: uuidv4(),
+      const result = await response.json();
+      console.log('[LunaAIChat] Response received:', result);
+
+      // Update message history
+      messageHistory.current.push({ role: 'assistant', content: result.response });
+
+      // Check if this is an outline
+      const isOutlineResponse = result.isOutline || (result.outlineData && Object.keys(result.outlineData).length > 0);
+
+      // Prepare the final assistant message
+      const finalAssistantMsg: ChatMessage = {
+        id: assistantMsgId,
         role: 'assistant',
-        content: data.response,
+        content: result.response,
         timestamp: new Date(),
+        citations: result.citations,
+        actionButtons: result.actionButtons,
         persona: currentPersona,
-        citations: data.citations || [],
-        actionButtons: data.actionButtons || [],
-        isOutline: data.isOutline || false,
-        outlineData: data.outlineData || undefined,
-        // Add action buttons for course outlines
-        actions: data.isOutline && data.outlineData ? [
-          { 
-            label: 'Save as Base Class', 
-            action: () => handleSaveOutline(data.outlineData) 
-          },
-          { 
-            label: 'Open in Designer', 
-            action: () => handleOpenInDesigner(data.outlineData) 
-          }
+        isLoading: false,
+        isOutline: isOutlineResponse,
+        outlineData: result.outlineData,
+        actions: isOutlineResponse ? [
+          { label: 'Save Outline', action: () => handleSaveOutline(result.outlineData) },
+          { label: 'Open in Designer', action: () => handleOpenInDesigner(result.outlineData) }
         ] : undefined
       };
 
-      // Check if Luna performed any actions that need real-time updates
-      if (data.hasToolResults && data.citations) {
-        // Mark this content as AI-generated for animations
-        setAiGeneratedContent(prev => new Set([...prev, assistantResponse.id]));
+      // Update messages to replace loading message
+      setMessages(prev => prev.map(msg => 
+        msg.id === assistantMsgId ? finalAssistantMsg : msg
+      ));
+
+      // Mark content as AI generated if flagged
+      if (result.isAIGenerated) {
+        setAiGeneratedContent(prev => new Set([...prev, assistantMsgId]));
         
-        // Trigger real-time updates based on citations
-        data.citations.forEach((citation: Citation) => {
-          if (citation.id && citation.title) {
-            // Determine entity type and trigger update
-            let entityType: 'baseClass' | 'path' | 'lesson' | 'section' = 'section';
-            let updateType: 'create' | 'update' | 'delete' = 'create';
-            
-            if (citation.title.includes('Base Class')) {
-              entityType = 'baseClass';
-            } else if (citation.title.includes('Path')) {
-              entityType = 'path';
-            } else if (citation.title.includes('Lesson')) {
-              entityType = 'lesson';
-            } else if (citation.title.includes('Section')) {
-              entityType = 'section';
-            }
-            
-            if (citation.title.includes('Updated')) {
-              updateType = 'update';
-            } else if (citation.title.includes('Deleted')) {
-              updateType = 'delete';
-            }
-            
-            triggerUpdate({
-              type: updateType,
-              entity: entityType,
-              entityId: citation.id,
-              data: citation,
-              isAIGenerated: true
-            });
-          }
-        });
+        // Trigger real-time update
+        if (result.entity && result.entityId) {
+          triggerUpdate({
+            type: result.action || 'update',
+            entity: result.entity,
+            entityId: result.entityId,
+            isAIGenerated: true
+          });
+        }
       }
 
-      // Update messages state with the final assistant response
-      setMessages(prev => prev.filter(msg => msg.id !== tempBotMessageId).concat(assistantResponse));
-
-    } catch (err) {
-      console.error("Chat Error:", err);
-      const message = err instanceof Error ? err.message : "An unknown error occurred";
-      setError(`Error: ${message}`);
-      setMessages(prev => prev.filter(msg => msg.id !== tempBotMessageId).concat({
-        id: uuidv4(), role: 'assistant', content: `Sorry, an error occurred: ${message}`, timestamp: new Date(), persona: currentPersona
-      }));
+    } catch (error: any) {
+      console.error('[LunaAIChat] Error:', error);
+      setError(error.message || 'An error occurred while sending your message.');
+      
+      // Remove the loading message on error
+      setMessages(prev => prev.filter(msg => msg.id !== assistantMsgId));
+      
+      // Remove the user message from history on error
+      messageHistory.current.pop();
     } finally {
       setIsLoading(false);
+      
+      // Re-focus input on mobile after a short delay
+      if (isMobile && inputRef.current) {
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 100);
+      }
     }
   };
   
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !isLoading) {
       handleSendMessage();
     }
@@ -632,15 +611,15 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
 
   // --- Render --- 
   return (
-    <div className="flex flex-col h-full">
+    <div className={`flex flex-col h-full ${isMobile ? 'relative' : ''}`}>
       {/* Persona Selector */}
-      <div className="flex border-b p-2 bg-muted/10 items-center space-x-2">
+      <div className={`flex border-b bg-muted/10 items-center space-x-2 ${isMobile ? 'p-3' : 'p-2'}`}>
         <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Mode:</span>
         <Select
           value={currentPersona}
           onValueChange={(value: string) => handlePersonaChange(value as PersonaType)}
         >
-          <SelectTrigger className="flex-grow h-9 focus:ring-primary">
+          <SelectTrigger className={`flex-grow focus:ring-primary ${isMobile ? 'h-10' : 'h-9'}`}>
             <SelectValue placeholder="Select a mode">
               <div className="flex items-center gap-2">
                 {availablePersonas.find(p => p.id === currentPersona)?.icon}
@@ -663,8 +642,8 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
       
       {/* Chat Messages */}
       <div className="flex-grow overflow-hidden">
-        <ScrollArea className="h-full px-2 py-3">
-          <div className="space-y-4">
+        <ScrollArea className={`h-full overscroll-contain ${isMobile ? 'px-3 py-4' : 'px-2 py-3'}`}>
+          <div className={`${isMobile ? 'space-y-3' : 'space-y-4'}`}>
             {messages.map((message) => {
               const isAIGenerated = aiGeneratedContent.has(message.id);
               
@@ -673,10 +652,10 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
                   key={message.id}
                   type={isAIGenerated ? 'glow' : 'slideUp'}
                   isAIGenerated={isAIGenerated}
-                  className={`flex gap-2 ${message.role === 'user' ? 'justify-end' : message.role === 'system' ? 'justify-center' : 'justify-start'}`}
+                  className={`flex ${isMobile ? 'gap-2' : 'gap-2'} ${message.role === 'user' ? 'justify-end' : message.role === 'system' ? 'justify-center' : 'justify-start'}`}
                 >
                   {message.role === 'assistant' && (
-                    <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground flex-shrink-0">
+                    <div className={`rounded-full bg-primary flex items-center justify-center text-primary-foreground flex-shrink-0 ${isMobile ? 'h-8 w-8' : 'h-8 w-8'}`}>
                       <Bot size={16} />
                     </div>
                   )}
@@ -687,9 +666,17 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
                     </div>
                   ) : (
                   <div 
-                      className={`max-w-[92%] min-w-0 rounded-lg p-3 overflow-hidden ${ message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground' } ${message.isLoading ? 'opacity-50 pointer-events-none' : ''}`}
+                      className={`min-w-0 rounded-lg overflow-hidden ${ 
+                        message.role === 'user' 
+                          ? 'bg-primary text-primary-foreground rounded-br-sm' 
+                          : 'bg-muted text-foreground rounded-bl-sm'
+                      } ${message.isLoading ? 'opacity-50 pointer-events-none' : ''} ${
+                        isMobile 
+                          ? 'max-w-[85%] p-3 text-sm' 
+                          : 'max-w-[92%] p-3 text-sm'
+                      }`}
                   >
-                  <div className="text-sm min-w-0 overflow-hidden">
+                  <div className="min-w-0 overflow-hidden">
                       {message.isLoading ? (
                         <div className="flex space-x-1.5">
                           <div className="h-2 w-2 rounded-full bg-current animate-bounce"></div>
@@ -732,10 +719,12 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
                             <Button
                               key={button.id}
                               variant={getButtonVariant(button.style)}
-                              size="sm"
+                              size={isMobile ? "default" : "sm"}
                               onClick={() => handleActionButtonClick(button)}
                               disabled={isLoading}
-                              className={`transition-all duration-200 hover:scale-105 ${getButtonClassName(button.style)}`}
+                              className={`transition-all duration-200 hover:scale-105 ${getButtonClassName(button.style)} ${
+                                isMobile ? 'text-sm px-4 py-2' : ''
+                              }`}
                             >
                               {button.label}
                             </Button>
@@ -748,7 +737,14 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
                     {message.actions && message.actions.length > 0 && (
                       <div className="mt-3 pt-2 border-t border-muted-foreground/20 flex flex-wrap gap-2 min-w-0 overflow-hidden">
                         {message.actions.map((action, index) => (
-                          <Button key={index} size="sm" variant="outline" onClick={action.action} disabled={isLoading} className="text-xs px-2 py-1 break-words">
+                          <Button 
+                            key={index} 
+                            size={isMobile ? "default" : "sm"}
+                            variant="outline" 
+                            onClick={action.action} 
+                            disabled={isLoading} 
+                            className={`break-words ${isMobile ? 'text-sm px-3 py-2' : 'text-xs px-2 py-1'}`}
+                          >
                             {action.label}
                           </Button>
                         ))}
@@ -764,7 +760,7 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
                           <Badge 
                             key={citation.id} 
                             variant="outline"
-                            className="flex items-center gap-1 text-xs break-words max-w-full"
+                            className={`flex items-center gap-1 break-words max-w-full ${isMobile ? 'text-xs' : 'text-xs'}`}
                           >
                             <span className="break-words text-wrap">{citation.title}</span>
                             {citation.url && (
@@ -786,7 +782,7 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
                 )}
                 
                 {message.role === 'user' && (
-                  <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground flex-shrink-0">
+                  <div className={`rounded-full bg-secondary flex items-center justify-center text-secondary-foreground flex-shrink-0 ${isMobile ? 'h-8 w-8' : 'h-8 w-8'}`}>
                     <User size={16} />
                   </div>
                 )}
@@ -795,19 +791,19 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
             })}
             {error && (
               <div className="flex justify-start">
-                <div className="p-3 rounded-lg bg-destructive text-destructive-foreground max-w-[92%]">
+                <div className={`p-3 rounded-lg bg-destructive text-destructive-foreground ${isMobile ? 'max-w-[85%]' : 'max-w-[92%]'}`}>
                   {error}
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} className={isMobile ? 'h-4' : 'h-2'} />
           </div>
         </ScrollArea>
       </div>
       
       {/* AI Loading Animation */}
       {isLoading && (
-        <div className="p-2">
+        <div className={isMobile ? 'p-3' : 'p-2'}>
           <AILoadingAnimation message="Luna is working on your request..." />
         </div>
       )}
@@ -820,42 +816,69 @@ export function LunaAIChat({ userRole }: LunaAIChatProps) { // Destructure userR
       />
 
       {/* Input Area */}
-      <div className="p-2 border-t">
-        <div className="flex w-full items-center space-x-2">
+      <div className={`border-t bg-background ${isMobile ? 'p-4 pb-safe' : 'p-2'}`}>
+        <div className={`flex w-full items-end ${isMobile ? 'gap-3' : 'space-x-2'}`}>
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-10 w-10 rounded-full flex-shrink-0"
+            className={`rounded-full flex-shrink-0 ${isMobile ? 'h-12 w-12' : 'h-10 w-10'}`}
             onClick={toggleRecording}
             disabled={isLoading || !isReady || isRecording}
           >
-            {isRecording ? <MicOff size={18} className="text-destructive" /> : <Mic size={18} />}
-          </Button>
-          
-          <Input
-            ref={inputRef}
-            type="text"
-            placeholder={`Ask ${availablePersonas.find(p => p.id === currentPersona)?.name ?? 'Luna'}...`}
-            value={userMessage}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setUserMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading || (currentUserRole === 'student' && !isReady) || isRecording}
-            className="flex-grow focus-visible:ring-primary"
-          />
-          
-          <Button 
-            onClick={() => handleSendMessage()} 
-            disabled={isLoading || !isReady || !userMessage.trim() || isRecording}
-            className="h-10 w-10 rounded-full flex-shrink-0 p-0"
-          >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"></line>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-              </svg>
+            {isRecording ? (
+              <MicOff size={isMobile ? 20 : 18} className="text-destructive" />
+            ) : (
+              <Mic size={isMobile ? 20 : 18} />
             )}
           </Button>
+          
+          <div className="flex-1 relative">
+            <Input
+              ref={inputRef}
+              type="text"
+              placeholder={`Ask ${availablePersonas.find(p => p.id === currentPersona)?.name ?? 'Luna'}...`}
+              value={userMessage}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={isLoading || (currentUserRole === 'student' && !isReady) || isRecording}
+              className={`focus-visible:ring-primary pr-12 ${
+                isMobile 
+                  ? 'h-12 text-base rounded-xl' 
+                  : 'h-10 flex-grow'
+              }`}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="sentences"
+            />
+            
+            <Button 
+              onClick={() => handleSendMessage()} 
+              disabled={isLoading || !isReady || !userMessage.trim() || isRecording}
+              className={`absolute right-1 top-1/2 transform -translate-y-1/2 rounded-full flex-shrink-0 p-0 ${
+                isMobile ? 'h-10 w-10' : 'h-8 w-8'
+              } ${!userMessage.trim() ? 'bg-muted-foreground/50' : ''}`}
+            >
+              {isLoading ? (
+                <Loader2 className={`animate-spin ${isMobile ? 'h-5 w-5' : 'h-4 w-4'}`} />
+              ) : (
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  viewBox="0 0 24 24" 
+                  width={isMobile ? "20" : "18"} 
+                  height={isMobile ? "20" : "18"} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

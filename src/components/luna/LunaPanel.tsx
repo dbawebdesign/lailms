@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,79 +19,77 @@ const LunaPanel: React.FC<LunaPanelProps> = ({ initialOpen = false }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [currentPersona, setCurrentPersona] = useState<PersonaType>('tutor');
   const [isMobile, setIsMobile] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState('100vh');
   const panelRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLDivElement>(null);
   const { registerComponent, unregisterComponent, updateComponent } = useLunaContext();
 
-  // Detect mobile and handle keyboard appearance
+  // Detect mobile and handle viewport changes
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      setIsMobile(window.innerWidth < 768); // md breakpoint
     };
 
     const handleResize = () => {
       checkMobile();
       
-      // Detect virtual keyboard on mobile
+      // Update viewport height to handle mobile keyboard
       if (window.innerWidth < 768) {
-        const viewportHeight = window.visualViewport?.height || window.innerHeight;
-        const windowHeight = window.innerHeight;
-        const keyboardHeightDetected = windowHeight - viewportHeight;
-        
-        setKeyboardHeight(Math.max(0, keyboardHeightDetected));
+        // Use dvh for better mobile support, fallback to innerHeight
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+        setViewportHeight(`${window.innerHeight}px`);
+      } else {
+        setViewportHeight('100vh');
       }
     };
 
-    const handleVisualViewportChange = () => {
-      if (window.visualViewport && window.innerWidth < 768) {
-        const keyboardHeightDetected = window.innerHeight - window.visualViewport.height;
-        setKeyboardHeight(Math.max(0, keyboardHeightDetected));
-        
-        // Scroll input into view when keyboard opens
-        if (keyboardHeightDetected > 0 && inputRef.current) {
-          setTimeout(() => {
-            inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          }, 100);
-        }
-      }
-    };
+    // Initial check
+    handleResize();
 
-    checkMobile();
+    // Add event listeners
     window.addEventListener('resize', handleResize);
-    
+    window.addEventListener('orientationchange', handleResize);
+
+    // Handle visual viewport API for better keyboard detection
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+      const handleViewportChange = () => {
+        if (window.innerWidth < 768) {
+          setViewportHeight(`${window.visualViewport?.height || window.innerHeight}px`);
+        }
+      };
+      
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+      
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('orientationchange', handleResize);
+        window.visualViewport?.removeEventListener('resize', handleViewportChange);
+      };
     }
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
-      }
+      window.removeEventListener('orientationchange', handleResize);
     };
   }, []);
 
-  // Prevent body scroll when panel is open on mobile
+  // Prevent background scrolling on mobile when chat is open
   useEffect(() => {
     if (isMobile && isOpen && !isMinimized) {
+      // Prevent scrolling on the body
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
-      document.body.style.top = '0';
-    } else {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.top = '';
+      document.body.style.height = '100%';
+      
+      return () => {
+        // Restore scrolling
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
+      };
     }
-
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.top = '';
-    };
   }, [isMobile, isOpen, isMinimized]);
 
   // Register with Luna Context
@@ -107,14 +105,15 @@ const LunaPanel: React.FC<LunaPanelProps> = ({ initialOpen = false }) => {
       state: {
         isOpen,
         isMinimized,
-        currentPersona
+        currentPersona,
+        isMobile
       }
     });
 
     return () => {
       unregisterComponent(componentId);
     };
-  }, [registerComponent, unregisterComponent, isOpen, isMinimized, currentPersona]);
+  }, [registerComponent, unregisterComponent, isOpen, isMinimized, currentPersona, isMobile]);
 
   // Update component state when it changes
   useEffect(() => {
@@ -122,59 +121,51 @@ const LunaPanel: React.FC<LunaPanelProps> = ({ initialOpen = false }) => {
       state: {
         isOpen,
         isMinimized,
-        currentPersona
+        currentPersona,
+        isMobile
       }
     });
-  }, [updateComponent, isOpen, isMinimized, currentPersona]);
+  }, [updateComponent, isOpen, isMinimized, currentPersona, isMobile]);
 
   // Toggle panel open/closed
-  const togglePanel = useCallback(() => {
+  const togglePanel = () => {
     setIsOpen(!isOpen);
     if (isMinimized && !isOpen) {
       setIsMinimized(false);
     }
-  }, [isOpen, isMinimized]);
-
-  // Toggle minimized state
-  const toggleMinimize = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsMinimized(!isMinimized);
-  }, [isMinimized]);
-
-  // Close panel
-  const closePanel = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsOpen(false);
-    setIsMinimized(false);
-  }, []);
-
-  // Handle persona change
-  const handlePersonaChange = useCallback((persona: PersonaType) => {
-    setCurrentPersona(persona);
-  }, []);
-
-  // Calculate dynamic height for mobile
-  const getMobileHeight = () => {
-    if (keyboardHeight > 0) {
-      // When keyboard is open, use available viewport height
-      return `${window.visualViewport?.height || window.innerHeight}px`;
-    }
-    return '100vh';
   };
 
-  // Floating button when closed
+  // Toggle minimized state (disabled on mobile)
+  const toggleMinimize = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isMobile) {
+      setIsMinimized(!isMinimized);
+    }
+  };
+
+  // Close panel
+  const closePanel = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsOpen(false);
+  };
+
+  // Handle persona change
+  const handlePersonaChange = (persona: PersonaType) => {
+    setCurrentPersona(persona);
+  };
+
   if (!isOpen) {
     return (
       <Button 
         onClick={togglePanel}
-        className={`fixed z-50 rounded-full shadow-lg bg-primary text-primary-foreground transition-all duration-300 hover:scale-110 active:scale-95
-          ${isMobile 
-            ? 'bottom-6 right-6 h-14 w-14 text-lg' 
-            : 'bottom-4 right-4 p-4'
-          }`}
+        className={`fixed z-50 rounded-full shadow-lg bg-primary text-primary-foreground transition-all duration-200 hover:scale-105 ${
+          isMobile 
+            ? 'bottom-6 right-6 h-14 w-14 p-0 text-lg' 
+            : 'bottom-4 right-4 h-12 w-12 p-0'
+        }`}
         aria-label="Open Luna Assistant"
       >
-        Luna
+        {isMobile ? '🌙' : 'Luna'}
       </Button>
     );
   }
@@ -185,26 +176,23 @@ const LunaPanel: React.FC<LunaPanelProps> = ({ initialOpen = false }) => {
       <>
         {/* Mobile backdrop */}
         <div 
-          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm transition-opacity duration-300"
+          className="fixed inset-0 bg-black/50 z-40"
           onClick={closePanel}
         />
         
-        {/* Mobile panel */}
+        {/* Mobile chat panel */}
         <div 
           ref={panelRef}
-          className="fixed inset-0 z-50 flex flex-col bg-background transition-transform duration-300 ease-out"
-          style={{ 
-            height: getMobileHeight(),
-            paddingBottom: keyboardHeight > 0 ? '0px' : 'env(safe-area-inset-bottom)'
-          }}
+          className="fixed inset-0 z-50 flex flex-col bg-background"
+          style={{ height: viewportHeight }}
         >
           {/* Mobile Header */}
-          <div className="bg-primary px-4 py-4 text-primary-foreground flex items-center justify-between shadow-sm">
-            <h2 className="font-semibold text-lg">Luna AI Assistant</h2>
+          <div className="bg-primary px-4 py-3 text-primary-foreground flex items-center justify-between border-b flex-shrink-0">
+            <h2 className="font-medium text-lg">Luna AI Assistant</h2>
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-10 w-10 text-primary-foreground hover:bg-primary/80 hover:text-primary-foreground rounded-full"
+              className="h-8 w-8 text-primary-foreground hover:bg-primary/80"
               onClick={closePanel}
             >
               <X size={20} />
@@ -212,7 +200,7 @@ const LunaPanel: React.FC<LunaPanelProps> = ({ initialOpen = false }) => {
           </div>
 
           {/* Mobile Persona Selector */}
-          <div className="px-4 py-2 border-b bg-background">
+          <div className="flex-shrink-0 border-b">
             <PersonaSelector 
               currentPersona={currentPersona} 
               onChange={handlePersonaChange} 
@@ -220,35 +208,33 @@ const LunaPanel: React.FC<LunaPanelProps> = ({ initialOpen = false }) => {
           </div>
 
           {/* Mobile Chat Thread */}
-          <div className="flex-1 overflow-hidden">
-            <ScrollArea className="h-full px-4 py-2">
-              <ChatThread persona={currentPersona} />
-            </ScrollArea>
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+              <div className="p-4">
+                <ChatThread persona={currentPersona} />
+              </div>
+            </div>
           </div>
 
-          {/* Mobile Input Area */}
-          <div 
-            ref={inputRef}
-            className="border-t bg-background p-4 pb-6"
-            style={{ 
-              paddingBottom: keyboardHeight > 0 ? '8px' : '24px'
-            }}
-          >
-            <ChatInput persona={currentPersona} />
+          {/* Mobile Input Area - Fixed at bottom */}
+          <div className="flex-shrink-0 border-t bg-background">
+            <div className="p-4 pb-safe">
+              <ChatInput persona={currentPersona} />
+            </div>
           </div>
         </div>
       </>
     );
   }
 
-  // Desktop layout (original)
+  // Desktop layout (existing design)
   return (
     <Card 
       ref={panelRef}
       className={`fixed bottom-4 right-4 z-50 flex flex-col shadow-xl transition-all duration-300 ease-in-out border-primary/20 overflow-hidden
         ${isMinimized ? 'h-16 w-72' : 'h-[70vh] w-96'}`}
     >
-      {/* Desktop Header */}
+      {/* Header */}
       <div className="bg-primary px-4 py-2 text-primary-foreground flex items-center justify-between cursor-pointer"
         onClick={isMinimized ? togglePanel : undefined}
       >
@@ -273,21 +259,21 @@ const LunaPanel: React.FC<LunaPanelProps> = ({ initialOpen = false }) => {
         </div>
       </div>
 
-      {/* Desktop Content - Only render if not minimized */}
+      {/* Main Content - Only render if not minimized */}
       {!isMinimized && (
         <>
-          {/* Desktop Persona Selector */}
+          {/* Persona Selector */}
           <PersonaSelector 
             currentPersona={currentPersona} 
             onChange={handlePersonaChange} 
           />
 
-          {/* Desktop Chat Thread */}
+          {/* Chat Thread */}
           <ScrollArea className="flex-1 p-4 pt-2">
             <ChatThread persona={currentPersona} />
           </ScrollArea>
 
-          {/* Desktop Input Area */}
+          {/* Input Area */}
           <div className="p-2 border-t">
             <ChatInput persona={currentPersona} />
           </div>
