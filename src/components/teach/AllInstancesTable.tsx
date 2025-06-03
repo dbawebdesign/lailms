@@ -36,7 +36,7 @@ import { format } from "date-fns";
 
 interface AllInstancesTableProps {
   instances: EnrichedClassInstance[];
-  onEditInstance: (instanceId: string, baseClassId: string) => void;
+  onEditInstance: (instanceId: string) => void;
   onArchiveInstance: (instanceId: string) => void;
   onViewStudents: (instanceId: string) => void;
   onViewInstanceDetails: (instance: EnrichedClassInstance) => void; // Navigates to base class detail page
@@ -253,8 +253,8 @@ export const AllInstancesTable: React.FC<AllInstancesTableProps> = ({
                       <DropdownMenuItem onClick={() => onViewInstanceDetails(instance)}>
                         <ExternalLink className="mr-2 h-4 w-4" /> View Base Class
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onEditInstance(instance.id, instance.baseClassId)}>
-                        <Edit2 className="mr-2 h-4 w-4" /> Edit Instance
+                      <DropdownMenuItem onClick={() => onEditInstance(instance.id)}>
+                        <Edit2 className="mr-2 h-4 w-4" /> Manage Instance
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onViewStudents(instance.id)}>
                         <Users className="mr-2 h-4 w-4" /> Manage Students

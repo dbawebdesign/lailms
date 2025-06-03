@@ -11,7 +11,7 @@ const MainContent: React.FC<MainContentProps> = ({ children }) => {
   const pathname = usePathname();
   
   // Pages that should have no top padding (flush with header)
-  const noTopPaddingPages = ['/teach/gradebook'];
+  const noTopPaddingPages = ['/teach/gradebook', '/teach/base-classes'];
   const shouldRemoveTopPadding = noTopPaddingPages.some(page => pathname?.startsWith(page));
   
   return (

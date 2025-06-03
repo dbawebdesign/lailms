@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useLunaContext } from '@/hooks/useLunaContext';
 import { UIComponentConfig } from '@/context/LunaContextProvider';
 
@@ -34,10 +34,19 @@ const LunaContextElement: React.FC<LunaContextElementProps> = ({
   const componentRef = useRef<HTMLDivElement>(null);
   const [componentId, setComponentId] = useState<string | null>(null);
   const lunaContext = useLunaContext();
+  
+  // Memoize the content, state, and metadata to prevent unnecessary re-renders
+  const memoizedContent = useMemo(() => content, [JSON.stringify(content)]);
+  const memoizedState = useMemo(() => state, [JSON.stringify(state)]);
+  const memoizedMetadata = useMemo(() => metadata, [JSON.stringify(metadata)]);
+
+  // Stabilize the lunaContext functions to prevent re-registration
+  const lunaContextRef = useRef(lunaContext);
+  lunaContextRef.current = lunaContext;
 
   // Register component with Luna Context
   useEffect(() => {
-    if (!lunaContext.registerComponent) {
+    if (!lunaContextRef.current.registerComponent) {
       console.warn('Luna Context not available for registration');
       return;
     }
@@ -45,59 +54,58 @@ const LunaContextElement: React.FC<LunaContextElementProps> = ({
     const componentConfig: UIComponentConfig = {
       type,
       role,
-      content,
-      state,
-      metadata,
+      content: memoizedContent,
+      state: memoizedState,
+      metadata: memoizedMetadata,
       parentId
     };
 
-    const id = lunaContext.registerComponent(componentConfig);
+    const id = lunaContextRef.current.registerComponent(componentConfig);
     setComponentId(id);
 
     return () => {
-      if (lunaContext.unregisterComponent && id) {
-        lunaContext.unregisterComponent(id);
+      if (lunaContextRef.current.unregisterComponent && id) {
+        lunaContextRef.current.unregisterComponent(id);
       }
     };
   }, [
     type, 
     role, 
-    content,
-    state,
-    metadata,
-    parentId,
-    lunaContext
+    memoizedContent,
+    memoizedState,
+    memoizedMetadata,
+    parentId
   ]);
 
   // Update component when content or state changes
   useEffect(() => {
-    if (componentId && lunaContext.updateComponent) {
-      lunaContext.updateComponent(componentId, {
-        content,
-        state,
-        metadata
+    if (componentId && lunaContextRef.current.updateComponent) {
+      lunaContextRef.current.updateComponent(componentId, {
+        content: memoizedContent,
+        state: memoizedState,
+        metadata: memoizedMetadata
       });
     }
-  }, [componentId, content, state, metadata, lunaContext]);
+  }, [componentId, memoizedContent, memoizedState, memoizedMetadata]);
 
   // Register click event handler
   const handleInteraction = (e: React.MouseEvent) => {
-    if (componentId && lunaContext.recordUserAction) {
-      lunaContext.recordUserAction(componentId, 'click');
+    if (componentId && lunaContextRef.current.recordUserAction) {
+      lunaContextRef.current.recordUserAction(componentId, 'click');
     }
   };
 
   // Register focus event handler
   const handleFocus = (e: React.FocusEvent) => {
-    if (componentId && lunaContext.setFocusedComponent) {
-      lunaContext.setFocusedComponent(componentId);
+    if (componentId && lunaContextRef.current.setFocusedComponent) {
+      lunaContextRef.current.setFocusedComponent(componentId);
     }
   };
 
   // Register blur event handler
   const handleBlur = (e: React.FocusEvent) => {
-    if (componentId && lunaContext.setFocusedComponent) {
-      lunaContext.setFocusedComponent(null);
+    if (componentId && lunaContextRef.current.setFocusedComponent) {
+      lunaContextRef.current.setFocusedComponent(null);
     }
   };
 

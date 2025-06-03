@@ -27,7 +27,7 @@ import { format } from "date-fns";
 interface InstanceTableProps {
   instances: ClassInstance[];
   baseClassId: string; // For context, might be used for some actions
-  onEditInstance: (instance: ClassInstance) => void;
+  onEditInstance: (instanceId: string) => void;
   onArchiveInstance: (instanceId: string) => void;
   onViewStudents: (instanceId: string) => void; // Placeholder for future student management
 }
@@ -130,8 +130,8 @@ export const InstanceTable: React.FC<InstanceTableProps> = ({
                   {/* <DropdownMenuItem onClick={() => console.log("View Instance Details:", instance.id)}>
                     <Eye className="mr-2 h-4 w-4" /> View Details
                   </DropdownMenuItem> */}
-                  <DropdownMenuItem onClick={() => onEditInstance(instance)}>
-                    <Edit2 className="mr-2 h-4 w-4" /> Edit Instance
+                  <DropdownMenuItem onClick={() => onEditInstance(instance.id)}>
+                    <Edit2 className="mr-2 h-4 w-4" /> Manage Instance
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onViewStudents(instance.id)}>
                     <Users className="mr-2 h-4 w-4" /> Manage Students

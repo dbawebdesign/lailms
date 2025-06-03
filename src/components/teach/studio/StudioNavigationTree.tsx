@@ -85,7 +85,13 @@ const SortablePathItem: React.FC<{
   };
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), // Require some movement before drag starts
+    useSensor(PointerSensor, { 
+      activationConstraint: { 
+        distance: 15, // Require more movement for path drag
+        delay: 200, // Add more delay to ensure it's intentional
+        tolerance: 5
+      }
+    }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -194,7 +200,13 @@ const SortableLessonItem: React.FC<{
 
   // Sensors for section DND context
   const sectionSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(PointerSensor, { 
+      activationConstraint: { 
+        distance: 8, // Require movement before drag starts
+        delay: 200, // Add more delay to ensure it's intentional
+        tolerance: 5
+      }
+    }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -326,7 +338,13 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
   const [expandedLessons, setExpandedLessons] = useState<Set<string>>(new Set());
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }), // Require more movement for path drag
+    useSensor(PointerSensor, { 
+      activationConstraint: { 
+        distance: 10, // Require movement before drag starts
+        delay: 200, // Add more delay to ensure it's intentional
+        tolerance: 5
+      }
+    }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -479,26 +497,23 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
       {/* Paths List - Sortable */}
       {baseClass.paths && baseClass.paths.length > 0 && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndPaths}>
-          <SortableContext 
-            items={baseClass.paths.map(p => p.id)} // Safe now due to the check above
-            strategy={verticalListSortingStrategy}
-          >
-            <ul className="pl-1 mt-1 space-y-0 list-none">
+          <SortableContext items={baseClass.paths.map(p => p.id)} strategy={verticalListSortingStrategy}>
+            <ul className="space-y-1">
               {baseClass.paths.map((path) => (
-                  <SortablePathItem 
-                    key={path.id} 
-                    path={path} 
-                    isExpanded={expandedPaths.has(path.id)}
-                    selectedItemId={selectedItemId} // Ensure this is passed
-                    onSelectItem={onSelectItem as (type: string, itemData: Path | Lesson | LessonSection) => void} // Ensure this is passed
-                    handlePathHeaderClick={handlePathToggleExpand} // Ensure this is passed
-                    lessons={path.lessons || []} // Ensure this is passed (already was)
-                    onToggleExpandLesson={handleLessonToggleExpandOverall} // Ensure this is passed
-                    onReorderLessons={onReorderLessons} // Ensure this is passed
-                    onReorderSections={onReorderSections} // Ensure this is passed
-                    expandedLessons={expandedLessons} // Ensure this is passed
-                    recentlyUpdatedItems={recentlyUpdatedItems}
-                  />
+                <SortablePathItem
+                  key={path.id}
+                  path={path}
+                  isExpanded={expandedPaths.has(path.id)}
+                  selectedItemId={selectedItemId}
+                  onSelectItem={onSelectItem}
+                  handlePathHeaderClick={handlePathToggleExpand}
+                  lessons={path.lessons || []} // Ensure lessons array is never undefined
+                  onToggleExpandLesson={handleLessonToggleExpandOverall} // Pass the overall lesson toggle handler
+                  onReorderLessons={onReorderLessons} // Ensure this is passed
+                  onReorderSections={onReorderSections} // Ensure this is passed
+                  expandedLessons={expandedLessons} // Ensure this is passed
+                  recentlyUpdatedItems={recentlyUpdatedItems}
+                />
               ))}
             </ul>
           </SortableContext>

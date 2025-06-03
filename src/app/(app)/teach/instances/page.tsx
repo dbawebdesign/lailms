@@ -55,9 +55,9 @@ export default function AllInstancesPage() {
   }, [loadInstances]);
 
   // Action handlers
-  const handleEditInstance = (instanceId: string, baseClassId: string) => {
-    console.log("Edit instance:", instanceId, "from base class:", baseClassId);
-    router.push(`/teach/base-classes/${baseClassId}`);
+  const handleEditInstance = (instanceId: string) => {
+    console.log("Manage instance:", instanceId);
+    router.push(`/teach/instances/${instanceId}`);
   };
 
   const handleArchiveInstance = async (instanceId: string) => {

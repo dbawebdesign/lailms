@@ -464,7 +464,7 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
               />
             </div>
             */}
-            <div className="flex space-x-2">
+            <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
               <Button onClick={handleSave} disabled={isGeneratingContent || isGeneratingMindMap || isCheckingContent || isCheckingMindMap}>Save Changes</Button>
               
               {/* Create Instance Button - Always Available */}

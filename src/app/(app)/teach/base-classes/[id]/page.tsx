@@ -241,37 +241,36 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
   // NEW: Function to render skeleton UI
   const renderSkeletonState = () => {
     return (
-      <div className="flex flex-col md:flex-row h-screen bg-background">
-        {/* Mobile Header Bar Skeleton (optional, can be simpler or match structure) */}
-        <div className="md:hidden p-4 border-b border-border flex items-center space-x-3">
-          <SkeletonBar width="w-6" height="h-6" />
-          <SkeletonBar width="w-32" height="h-6" />
-        </div>
-
+      <div className="flex flex-col lg:flex-row h-full min-h-0 bg-background">
         {/* Navigation Tree Panel Skeleton */}
-        <div className={`hidden md:block w-full md:w-[300px] lg:w-[350px] xl:w-[400px] border-b md:border-b-0 md:border-r border-border p-4 overflow-y-auto flex-shrink-0 h-auto md:h-screen`}>
-          <SkeletonBar height="h-8" width="w-3/4" className="mb-6" /> {/* Base Class Title Placeholder */}
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="p-2 space-y-2">
-                <SkeletonBar height="h-6" width="w-5/6" /> {/* Path Title Placeholder */}
-              </div>
-            ))}
+        <div className={`lg:block w-full lg:w-[350px] xl:w-[400px] border-b lg:border-b-0 lg:border-r border-border flex flex-col flex-shrink-0 h-full lg:h-auto lg:min-h-0`}>
+          <div className="flex-1 p-4 overflow-y-auto min-h-0">
+            <SkeletonBar height="h-8" width="w-3/4" className="mb-6" /> {/* Base Class Title Placeholder */}
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="p-2 space-y-2">
+                  <SkeletonBar height="h-6" width="w-5/6" /> {/* Path Title Placeholder */}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Main Content Editor Area Skeleton */}
-        <main className={`flex-1 p-6 overflow-auto ${(isNavOpen && typeof window !== 'undefined' && window.innerWidth < 768) ? 'hidden' : 'block'} md:block`}>
-          <div className="mb-6">
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="p-6 border-b border-border">
             <SkeletonBar height="h-10" width="w-1/2" className="mb-2" /> {/* "Base Class Studio" Title Placeholder */}
             <SkeletonBar height="h-6" width="w-1/3" /> {/* "Editing: ..." Subtitle Placeholder */}
           </div>
-          <div className="space-y-4">
-            <SkeletonBar height="h-10" /> {/* Placeholder for form field/area */}
-            <SkeletonBar height="h-24" /> {/* Placeholder for larger form field/area (e.g. description) */}
-            <SkeletonBar height="h-10" width="w-1/4" /> {/* Placeholder for a button */}
+          
+          <div className="flex-1 p-6 overflow-y-auto min-h-0">
+            <div className="space-y-4">
+              <SkeletonBar height="h-10" /> {/* Placeholder for form field/area */}
+              <SkeletonBar height="h-24" /> {/* Placeholder for larger form field/area (e.g. description) */}
+              <SkeletonBar height="h-10" width="w-1/4" /> {/* Placeholder for a button */}
+            </div>
           </div>
-        </main>
+        </div>
       </div>
     );
   };
@@ -331,7 +330,13 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
 
     // Check if lessons for this path are already fetched and present
     const pathExists = studioBaseClass.paths?.find(p => p.id === pathId);
-    if (pathExists && pathExists.lessons && pathExists.lessons.length > 0 && pathExists.lessons.every(l => l.sections !== undefined)) return;
+    if (pathExists && pathExists.lessons && pathExists.lessons.length > 0) {
+      // Only skip if lessons array exists AND has actual lessons
+      return;
+    }
+
+    // Prevent multiple simultaneous fetches for the same path
+    if (isLoadingLessons[pathId]) return;
 
     setIsLoadingLessons(prev => ({ ...prev, [pathId]: true }));
     try {
@@ -367,11 +372,21 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
 
     // Check if sections for this lesson are already fetched (deep check needed)
     let lessonExists = false;
+    let sectionsAlreadyLoaded = false;
     studioBaseClass.paths?.forEach(p => {
         const l = p.lessons?.find(les => les.id === lessonId);
-        if (l && l.sections && l.sections.length > 0) lessonExists = true;
+        if (l) {
+          lessonExists = true;
+          if (l.sections && l.sections.length > 0) {
+            sectionsAlreadyLoaded = true;
+          }
+        }
     });
-    if (lessonExists) { /* console.log(`Sections for lesson ${lessonId} already loaded.`); */ return; }
+    
+    if (sectionsAlreadyLoaded) return;
+
+    // Prevent multiple simultaneous fetches for the same lesson
+    if (isLoadingSections[lessonId]) return;
 
     setIsLoadingSections(prev => ({ ...prev, [lessonId]: true }));
     try {
@@ -445,14 +460,18 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
       case 'path':
         idToSet = (itemData as Path).id;
         titleToSet = (itemData as Path).title;
-        // Eagerly fetch lessons for the path when it's selected
-        if (idToSet) fetchLessonsForPath(idToSet);
+        // Only fetch lessons if this is a different path than currently selected
+        if (idToSet && (selectedItem.type !== 'path' || selectedItem.id !== idToSet)) {
+          fetchLessonsForPath(idToSet);
+        }
         break;
       case 'lesson':
         idToSet = (itemData as Lesson).id;
         titleToSet = (itemData as Lesson).title;
-        // Eagerly fetch sections for the lesson when it's selected
-        if (idToSet) fetchSectionsForLesson(idToSet);
+        // Only fetch sections if this is a different lesson than currently selected
+        if (idToSet && (selectedItem.type !== 'lesson' || selectedItem.id !== idToSet)) {
+          fetchSectionsForLesson(idToSet);
+        }
         break;
       case 'section':
         idToSet = (itemData as LessonSection).id;
@@ -919,19 +938,18 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
       }}
       actionable={true}
     >
-      <div className="flex flex-col md:flex-row h-screen bg-background">
-        {/* Mobile Header Bar: Nav Toggle Button & Title */}
-        <div className="md:hidden p-4 border-b border-border flex items-center space-x-3">
-          <button 
-            onClick={() => setIsNavOpen(!isNavOpen)} 
-            className="p-2 rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring flex-shrink-0"
-          >
-            <Menu className="h-6 w-6" />
-            <span className="sr-only">Toggle Navigation</span>
-          </button>
-          <h2 className="text-lg font-semibold text-foreground truncate">
-            Class Structure Nav
-          </h2>
+      <div className="flex flex-col lg:flex-row h-full min-h-0 bg-background">
+        {/* Mobile navigation toggle - Always visible on mobile */}
+        <div className="lg:hidden border-b border-border">
+          <div className="p-4">
+            <button 
+              onClick={() => setIsNavOpen(!isNavOpen)} 
+              className="flex items-center gap-2 p-2 rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring w-full"
+            >
+              <Menu className="h-5 w-5" />
+              <span className="text-sm font-medium">Class Structure Nav</span>
+            </button>
+          </div>
         </div>
 
         {/* Navigation Tree Panel */}
@@ -961,32 +979,37 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
         >
           <div 
             className={`
-              ${isNavOpen ? 'block' : 'hidden'} md:block 
-              w-full md:w-[300px] lg:w-[350px] xl:w-[400px] 
-              border-b md:border-b-0 md:border-r border-border 
-              p-4 overflow-y-auto 
+              ${isNavOpen ? 'block' : 'hidden'} lg:block 
+              w-full lg:w-[350px] xl:w-[400px] 
+              border-b lg:border-b-0 lg:border-r border-border 
+              flex flex-col
               flex-shrink-0 
-              h-auto md:h-screen
+              h-full lg:h-auto lg:min-h-0
             `}
           >
-            {studioBaseClass && (
-              <StudioNavigationTree 
-                baseClass={studioBaseClass} 
-                onSelectItem={(type, itemData) => {
-                  handleSelectItem(type, itemData);
-                  if (window.innerWidth < 768) { // md breakpoint in Tailwind is usually 768px
-                    setIsNavOpen(false); // Close nav on item selection on mobile
-                  }
-                }}
-                selectedItemId={selectedItem.id}
-                onToggleExpandPath={fetchLessonsForPath}
-                onToggleExpandLesson={fetchSectionsForLesson}
-                onReorderPaths={handleReorderPaths}
-                onReorderLessons={handleReorderLessons}
-                onReorderSections={handleReorderSections}
-                recentlyUpdatedItems={recentlyUpdatedItems}
-              />
-            )}
+            {/* Navigation content with proper scrolling */}
+            <div className="flex-1 p-4 overflow-y-auto min-h-0" style={{ isolation: 'isolate' }}>
+              {studioBaseClass && (
+                <div className="studio-navigation-tree" style={{ position: 'relative', zIndex: 1 }}>
+                  <StudioNavigationTree 
+                    baseClass={studioBaseClass} 
+                    onSelectItem={(type, itemData) => {
+                      handleSelectItem(type, itemData);
+                      if (window.innerWidth < 1024) { // lg breakpoint
+                        setIsNavOpen(false); // Close nav on item selection on mobile/tablet
+                      }
+                    }}
+                    selectedItemId={selectedItem.id}
+                    onToggleExpandPath={fetchLessonsForPath}
+                    onToggleExpandLesson={fetchSectionsForLesson}
+                    onReorderPaths={handleReorderPaths}
+                    onReorderLessons={handleReorderLessons}
+                    onReorderSections={handleReorderSections}
+                    recentlyUpdatedItems={recentlyUpdatedItems}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </LunaContextElement>
 
@@ -1030,21 +1053,18 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
           }}
           actionable={true}
         >
-          <main 
-            className={`
-              flex-1 p-6 overflow-auto 
-              ${(isNavOpen && window.innerWidth < 768) ? 'hidden' : 'block'} md:block
-            `}
-          >
-            <div className="mb-6">
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="p-6 border-b border-border">
               <h1 className="text-2xl md:text-3xl font-bold text-foreground">Base Class Studio</h1>
               {selectedItem && selectedItem.title && (
                 <p className="text-md md:text-lg text-muted-foreground mt-1">Editing: {selectedItem.title}</p>
               )}
             </div>
             
-            {renderEditor()}
-          </main>
+            <div className="flex-1 p-6 overflow-y-auto min-h-0">
+              {renderEditor()}
+            </div>
+          </div>
         </LunaContextElement>
       </div>
     </LunaContextElement>
