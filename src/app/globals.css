@@ -320,6 +320,8 @@
   /* Mobile keyboard optimization */
   .mobile-keyboard-aware {
     /* Ensure content stays visible when keyboard appears */
-    viewport-fit: cover;
+    /* Note: viewport-fit is handled in meta tag, not CSS */
+    will-change: transform;
+    backface-visibility: hidden;
   }
 }
