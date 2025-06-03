@@ -611,9 +611,9 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
 
   // --- Render --- 
   return (
-    <div className={`flex flex-col h-full ${isMobile ? 'relative' : ''}`}>
+    <div className={`flex flex-col h-full ${isMobile ? 'relative overflow-hidden' : ''}`}>
       {/* Persona Selector */}
-      <div className={`flex border-b bg-muted/10 items-center space-x-2 ${isMobile ? 'p-3' : 'p-2'}`}>
+      <div className={`flex border-b bg-muted/10 items-center space-x-2 flex-shrink-0 ${isMobile ? 'p-3' : 'p-2'}`}>
         <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Mode:</span>
         <Select
           value={currentPersona}
@@ -641,9 +641,9 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
       </div>
       
       {/* Chat Messages */}
-      <div className="flex-grow overflow-hidden">
-        <ScrollArea className={`h-full overscroll-contain ${isMobile ? 'px-3 py-4' : 'px-2 py-3'}`}>
-          <div className={`${isMobile ? 'space-y-3' : 'space-y-4'}`}>
+      <div className="flex-grow overflow-hidden min-h-0">
+        <ScrollArea className={`h-full ${isMobile ? 'overscroll-contain px-3 py-4' : 'px-2 py-3'}`}>
+          <div className={`${isMobile ? 'space-y-3 pb-4' : 'space-y-4'}`}>
             {messages.map((message) => {
               const isAIGenerated = aiGeneratedContent.has(message.id);
               
@@ -816,7 +816,7 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
       />
 
       {/* Input Area */}
-      <div className={`border-t bg-background ${isMobile ? 'p-4 pb-safe' : 'p-2'}`}>
+      <div className={`border-t bg-background flex-shrink-0 ${isMobile ? 'p-4 pb-safe sticky bottom-0 left-0 right-0' : 'p-2'}`}>
         <div className={`flex w-full items-end ${isMobile ? 'gap-3' : 'space-x-2'}`}>
           <Button
             type="button"
@@ -844,12 +844,13 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
               disabled={isLoading || (currentUserRole === 'student' && !isReady) || isRecording}
               className={`focus-visible:ring-primary pr-12 ${
                 isMobile 
-                  ? 'h-12 text-base rounded-xl' 
+                  ? 'h-12 text-base rounded-xl border-2' 
                   : 'h-10 flex-grow'
               }`}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="sentences"
+              style={isMobile ? { fontSize: '16px' } : {}} // Prevent zoom on iOS
             />
             
             <Button 

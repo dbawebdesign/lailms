@@ -19,20 +19,25 @@ const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
   const { togglePanelVisible } = useUIContext();
   const [isMobile, setIsMobile] = useState(false);
   const [viewportHeight, setViewportHeight] = useState('100vh');
+  const [actualViewportHeight, setActualViewportHeight] = useState('100vh');
 
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
       
-      // Handle mobile viewport changes for keyboard
       if (mobile) {
-        // Use dvh for better mobile support, fallback to innerHeight
+        // Set CSS custom property for viewport height
         const vh = window.innerHeight * 0.01;
         document.documentElement.style.setProperty('--vh', `${vh}px`);
-        setViewportHeight(`${window.innerHeight}px`);
+        
+        // Get the actual viewport height
+        const actualHeight = window.innerHeight;
+        setViewportHeight(`${actualHeight}px`);
+        setActualViewportHeight(`${actualHeight}px`);
       } else {
         setViewportHeight('100vh');
+        setActualViewportHeight('100vh');
       }
     };
 
@@ -44,10 +49,11 @@ const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
     window.addEventListener('orientationchange', handleResize);
 
     // Handle visual viewport API for better keyboard detection
-    if (window.visualViewport) {
+    if (window.visualViewport && typeof window !== 'undefined') {
       const handleViewportChange = () => {
         if (window.innerWidth < 768) {
-          setViewportHeight(`${window.visualViewport?.height || window.innerHeight}px`);
+          const visualHeight = window.visualViewport?.height || window.innerHeight;
+          setActualViewportHeight(`${visualHeight}px`);
         }
       };
       
@@ -66,21 +72,40 @@ const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
     };
   }, []);
 
-  // Prevent background scrolling on mobile when panel is open
+  // Prevent background scrolling and fix positioning when mobile panel is open
   useEffect(() => {
     if (isMobile) {
-      // Prevent scrolling on the body
+      // Store the current scroll position
+      const scrollY = window.scrollY;
+      
+      // Apply styles to prevent scrolling and fix positioning
+      const originalStyle = window.getComputedStyle(document.body);
+      const originalOverflow = originalStyle.overflow;
+      const originalPosition = originalStyle.position;
+      const originalTop = originalStyle.top;
+      const originalWidth = originalStyle.width;
+      
+      // Prevent all scrolling and fix the body position
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
       document.body.style.height = '100%';
       
+      // Also prevent scrolling on the html element
+      document.documentElement.style.overflow = 'hidden';
+      
       return () => {
-        // Restore scrolling when component unmounts or mobile state changes
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.width = '';
+        // Restore original styles
+        document.body.style.overflow = originalOverflow;
+        document.body.style.position = originalPosition;
+        document.body.style.top = originalTop;
+        document.body.style.width = originalWidth;
         document.body.style.height = '';
+        document.documentElement.style.overflow = '';
+        
+        // Restore scroll position
+        window.scrollTo(0, scrollY);
       };
     }
   }, [isMobile]);
@@ -89,11 +114,15 @@ const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
   if (isMobile) {
     return (
       <div 
-        className="fixed inset-0 z-50 flex flex-col bg-background"
-        style={{ height: viewportHeight }}
+        className="fixed inset-0 flex flex-col bg-background touch-none overscroll-none"
+        style={{ 
+          height: actualViewportHeight,
+          zIndex: 9999, // Ensure it's above everything including mobile nav
+          isolation: 'isolate' // Create new stacking context
+        }}
       >
         {/* Mobile Header */}
-        <div className="bg-primary px-4 py-3 text-primary-foreground flex items-center justify-between border-b flex-shrink-0">
+        <div className="bg-primary px-4 py-3 text-primary-foreground flex items-center justify-between border-b flex-shrink-0 relative z-10">
           <h2 className="font-medium text-lg">Luna Assistant</h2>
           <Button 
             variant="ghost" 
@@ -107,7 +136,7 @@ const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
         </div>
 
         {/* Mobile Luna AI Chat Component - Full screen */}
-        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0 relative">
           <LunaAIChat userRole={userRole} isMobile={true} />
         </div>
       </div>
