@@ -97,6 +97,7 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [aiGeneratedContent, setAiGeneratedContent] = useState<Set<string>>(new Set());
+  const [viewportHeight, setViewportHeight] = useState('100vh');
   
   // Use the passed userRole prop to set the initial currentUserRole state
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>(userRole);
@@ -116,6 +117,34 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { context, isReady } = useLunaContext();
+
+  // Track viewport height changes for mobile keyboard handling
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const updateViewportHeight = () => {
+      // Use visual viewport if available, fallback to window.innerHeight
+      const height = window.visualViewport?.height || window.innerHeight;
+      setViewportHeight(`${height}px`);
+    };
+
+    // Initial setup
+    updateViewportHeight();
+
+    // Listen for viewport changes
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewportHeight);
+      return () => {
+        window.visualViewport?.removeEventListener('resize', updateViewportHeight);
+      };
+    } else {
+      // Fallback for browsers without visual viewport API
+      window.addEventListener('resize', updateViewportHeight);
+      return () => {
+        window.removeEventListener('resize', updateViewportHeight);
+      };
+    }
+  }, [isMobile]);
 
   // Chat persistence hook
   const { loadChatHistory, saveChatHistory, clearChatHistory, isLoaded } = useChatPersistence();
@@ -640,8 +669,11 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
         </Select>
       </div>
       
-      {/* Chat Messages */}
-      <div className="flex-grow overflow-hidden min-h-0">
+      {/* Chat Messages - Adjust for mobile input positioning */}
+      <div 
+        className={`overflow-hidden ${isMobile ? 'flex-1' : 'flex-grow'} min-h-0`}
+        style={isMobile ? { paddingBottom: '100px' } : {}}
+      >
         <ScrollArea className={`h-full ${isMobile ? 'overscroll-contain px-3 py-4' : 'px-2 py-3'}`}>
           <div className={`${isMobile ? 'space-y-3 pb-4' : 'space-y-4'}`}>
             {messages.map((message) => {
@@ -816,7 +848,17 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
       />
 
       {/* Input Area */}
-      <div className={`border-t bg-background flex-shrink-0 ${isMobile ? 'p-4 pb-safe sticky bottom-0 left-0 right-0' : 'p-2'}`}>
+      <div 
+        className={`border-t bg-background flex-shrink-0 ${
+          isMobile 
+            ? 'fixed left-0 right-0 p-4 z-10' 
+            : 'p-2'
+        }`}
+        style={isMobile ? { 
+          bottom: 0,
+          maxHeight: viewportHeight
+        } : {}}
+      >
         <div className={`flex w-full items-end ${isMobile ? 'gap-3' : 'space-x-2'}`}>
           <Button
             type="button"
@@ -842,7 +884,7 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserMessage(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isLoading || (currentUserRole === 'student' && !isReady) || isRecording}
-              className={`focus-visible:ring-primary pr-12 ${
+              className={`focus-visible:ring-primary pr-12 no-zoom-input ${
                 isMobile 
                   ? 'h-12 text-base rounded-xl border-2' 
                   : 'h-10 flex-grow'
@@ -850,7 +892,6 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="sentences"
-              style={isMobile ? { fontSize: '16px' } : {}} // Prevent zoom on iOS
             />
             
             <Button 

@@ -292,8 +292,19 @@
     padding-right: env(safe-area-inset-right, 0);
   }
 
+  /* Keyboard-aware bottom positioning */
+  .bottom-keyboard-safe {
+    bottom: env(keyboard-inset-height, env(safe-area-inset-bottom, 0));
+  }
+
   /* Custom viewport height that accounts for mobile browser UI */
   .h-screen-mobile {
+    height: 100vh;
+    height: calc(var(--vh, 1vh) * 100);
+  }
+
+  /* Visual viewport height for keyboard awareness */
+  .h-viewport {
     height: 100vh;
     height: calc(var(--vh, 1vh) * 100);
   }

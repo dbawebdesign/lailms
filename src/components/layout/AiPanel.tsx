@@ -19,7 +19,7 @@ const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
   const { togglePanelVisible } = useUIContext();
   const [isMobile, setIsMobile] = useState(false);
   const [viewportHeight, setViewportHeight] = useState('100vh');
-  const [actualViewportHeight, setActualViewportHeight] = useState('100vh');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     const handleResize = () => {
@@ -27,17 +27,21 @@ const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
       setIsMobile(mobile);
       
       if (mobile) {
-        // Set CSS custom property for viewport height
-        const vh = window.innerHeight * 0.01;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
+        // Calculate the difference between window.innerHeight and visual viewport
+        // This gives us the keyboard height
+        const windowHeight = window.innerHeight;
+        const visualHeight = window.visualViewport?.height || windowHeight;
+        const keyboardHeight = windowHeight - visualHeight;
         
-        // Get the actual viewport height
-        const actualHeight = window.innerHeight;
-        setViewportHeight(`${actualHeight}px`);
-        setActualViewportHeight(`${actualHeight}px`);
+        setKeyboardHeight(keyboardHeight);
+        setViewportHeight(`${visualHeight}px`);
+        
+        // Set CSS custom property for viewport height
+        const vh = visualHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
       } else {
         setViewportHeight('100vh');
-        setActualViewportHeight('100vh');
+        setKeyboardHeight(0);
       }
     };
 
@@ -52,8 +56,16 @@ const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
     if (window.visualViewport && typeof window !== 'undefined') {
       const handleViewportChange = () => {
         if (window.innerWidth < 768) {
-          const visualHeight = window.visualViewport?.height || window.innerHeight;
-          setActualViewportHeight(`${visualHeight}px`);
+          const windowHeight = window.innerHeight;
+          const visualHeight = window.visualViewport?.height || windowHeight;
+          const keyboardHeight = Math.max(0, windowHeight - visualHeight);
+          
+          setKeyboardHeight(keyboardHeight);
+          setViewportHeight(`${visualHeight}px`);
+          
+          // Update CSS custom property
+          const vh = visualHeight * 0.01;
+          document.documentElement.style.setProperty('--vh', `${vh}px`);
         }
       };
       
@@ -116,7 +128,7 @@ const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
       <div 
         className="fixed inset-0 flex flex-col bg-background touch-none overscroll-none"
         style={{ 
-          height: actualViewportHeight,
+          height: viewportHeight,
           zIndex: 9999, // Ensure it's above everything including mobile nav
           isolation: 'isolate' // Create new stacking context
         }}
