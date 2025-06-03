@@ -344,6 +344,13 @@
     touch-action: pan-y;
   }
 
+  /* Mobile chat overlay - ensure solid background */
+  .mobile-chat-overlay {
+    background-color: hsl(var(--background)) !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
   /* Prevent zoom on input focus for iOS */
   .no-zoom-input {
     font-size: 16px !important;

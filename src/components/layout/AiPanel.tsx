@@ -126,9 +126,11 @@ const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
   if (isMobile) {
     return (
       <div 
-        className="fixed inset-0 flex flex-col bg-background touch-none overscroll-none"
+        className="fixed inset-0 flex flex-col bg-background touch-none overscroll-none mobile-chat-overlay"
         style={{ 
-          height: viewportHeight,
+          height: '100vh',
+          minHeight: '100vh',
+          maxHeight: '100vh',
           zIndex: 9999, // Ensure it's above everything including mobile nav
           isolation: 'isolate' // Create new stacking context
         }}
@@ -148,7 +150,10 @@ const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
         </div>
 
         {/* Mobile Luna AI Chat Component - Full screen */}
-        <div className="flex-1 overflow-hidden flex flex-col min-h-0 relative">
+        <div 
+          className="flex-1 overflow-hidden flex flex-col min-h-0 relative bg-background"
+          style={{ height: `calc(${viewportHeight} - 60px)` }} // Subtract header height
+        >
           <LunaAIChat userRole={userRole} isMobile={true} />
         </div>
       </div>

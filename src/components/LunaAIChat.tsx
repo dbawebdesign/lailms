@@ -640,7 +640,8 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
 
   // --- Render --- 
   return (
-    <div className={`flex flex-col h-full ${isMobile ? 'relative overflow-hidden' : ''}`}>
+    <div className={`flex flex-col h-full ${isMobile ? 'relative overflow-hidden' : ''}`} 
+         style={isMobile ? { height: viewportHeight } : {}}>
       {/* Persona Selector */}
       <div className={`flex border-b bg-muted/10 items-center space-x-2 flex-shrink-0 ${isMobile ? 'p-3' : 'p-2'}`}>
         <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Mode:</span>
@@ -672,7 +673,10 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
       {/* Chat Messages - Adjust for mobile input positioning */}
       <div 
         className={`overflow-hidden ${isMobile ? 'flex-1' : 'flex-grow'} min-h-0`}
-        style={isMobile ? { paddingBottom: '100px' } : {}}
+        style={isMobile ? { 
+          height: `calc(${viewportHeight} - 140px)`, // Account for header + input area
+          paddingBottom: '20px' 
+        } : {}}
       >
         <ScrollArea className={`h-full ${isMobile ? 'overscroll-contain px-3 py-4' : 'px-2 py-3'}`}>
           <div className={`${isMobile ? 'space-y-3 pb-4' : 'space-y-4'}`}>
@@ -851,12 +855,13 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
       <div 
         className={`border-t bg-background flex-shrink-0 ${
           isMobile 
-            ? 'fixed left-0 right-0 p-4 z-10' 
+            ? 'absolute left-0 right-0 p-4 z-10' 
             : 'p-2'
         }`}
         style={isMobile ? { 
-          bottom: 0,
-          maxHeight: viewportHeight
+          bottom: '0px',
+          backgroundColor: 'hsl(var(--background))',
+          borderTopColor: 'hsl(var(--border))'
         } : {}}
       >
         <div className={`flex w-full items-end ${isMobile ? 'gap-3' : 'space-x-2'}`}>
