@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PersonaType } from './PersonaSelector';
 import { useLunaContext } from '@/hooks/useLunaContext';
 import { Badge } from '@/components/ui/badge';
@@ -16,13 +16,14 @@ interface ActionButton {
   style: 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
 }
 
-// Message interfaces
+// Citation interface
 interface Citation {
   id: string;
   title: string;
   url?: string;
 }
 
+// Message interface
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -38,29 +39,23 @@ interface ChatThreadProps {
   persona: PersonaType;
 }
 
-// Action Buttons Component
-const ActionButtons: React.FC<{ buttons: ActionButton[]; onButtonClick: (button: ActionButton) => void; isLoading: boolean }> = ({ 
+const ActionButtons: React.FC<{ buttons: ActionButton[]; onButtonClick: (button: ActionButton) => void; isLoading: boolean; isMobile: boolean }> = ({ 
   buttons, 
   onButtonClick, 
-  isLoading 
+  isLoading,
+  isMobile
 }) => {
-  console.log('[ActionButtons] Rendering with buttons:', {
-    buttonsLength: buttons?.length || 0,
-    buttons: buttons,
-    isLoading
-  });
-
   if (!buttons || buttons.length === 0) {
-    console.log('[ActionButtons] No buttons to render');
     return null;
   }
 
+  // Map action button styles to Tailwind button variants
   const getButtonVariant = (style: ActionButton['style']) => {
     switch (style) {
       case 'primary': return 'default';
       case 'secondary': return 'secondary';
       case 'success': return 'default';
-      case 'warning': return 'secondary';
+      case 'warning': return 'destructive';
       case 'danger': return 'destructive';
       default: return 'secondary';
     }
@@ -75,24 +70,16 @@ const ActionButtons: React.FC<{ buttons: ActionButton[]; onButtonClick: (button:
   };
 
   return (
-    <div className="flex flex-wrap gap-2 mt-3">
-      {/* Temporary debug indicator */}
-      <div className="text-xs text-red-500 bg-red-100 px-2 py-1 rounded">
-        DEBUG: {buttons.length} buttons detected
-      </div>
-      
+    <div className={`mt-3 flex flex-wrap gap-2 ${isMobile ? 'gap-3' : 'gap-2'}`}>
       {buttons.map((button) => {
-        const variant = getButtonVariant(button.style);
-        console.log('[ActionButtons] Rendering button:', button);
-        
         return (
           <Button
             key={button.id}
-            variant={variant}
-            size="sm"
+            variant={getButtonVariant(button.style)}
+            size={isMobile ? "default" : "sm"}
+            className={`${getButtonClassName(button.style)} ${isMobile ? 'min-h-[44px] px-4' : ''}`}
             onClick={() => onButtonClick(button)}
             disabled={isLoading}
-            className="transition-all duration-200 hover:scale-105"
           >
             {button.label}
           </Button>
@@ -105,6 +92,21 @@ const ActionButtons: React.FC<{ buttons: ActionButton[]; onButtonClick: (button:
 export default function ChatThread({ persona }: ChatThreadProps) {
   const { messages, sendMessage, isLoading } = useLunaContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   // Debug: Log messages to see if action buttons are present
   console.log('[ChatThread] Current messages:', messages.map(msg => ({
@@ -179,41 +181,41 @@ export default function ChatThread({ persona }: ChatThreadProps) {
   };
 
   return (
-    <div className="flex flex-col space-y-4">
+    <div className={`flex flex-col ${isMobile ? 'space-y-6' : 'space-y-4'}`}>
       {displayMessages.map((message) => (
         <div 
           key={message.id}
-          className={`flex gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
         >
           {/* Avatar/Icon for the assistant */}
           {message.role === 'assistant' && (
-            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground flex-shrink-0">
-              <Bot size={16} />
+            <div className={`rounded-full bg-primary flex items-center justify-center text-primary-foreground flex-shrink-0 ${isMobile ? 'h-10 w-10' : 'h-8 w-8'}`}>
+              <Bot size={isMobile ? 18 : 16} />
             </div>
           )}
           
           {/* Message bubble */}
           <div 
-            className={`max-w-[80%] rounded-lg p-3 ${
+            className={`max-w-[85%] rounded-lg ${isMobile ? 'p-4' : 'p-3'} ${
               message.role === 'user' 
                 ? 'bg-primary text-primary-foreground' 
                 : 'bg-muted text-foreground'
             } ${message.isLoading ? 'animate-pulse' : ''}`}
           >
-            <div className="text-sm">
+            <div className={isMobile ? 'text-base leading-relaxed' : 'text-sm'}>
               {formatMessageContent(message.content)}
             </div>
             
             {/* Citations if any */}
             {message.citations && message.citations.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-muted-foreground/20 text-xs">
-                <p className="font-semibold mb-1">Sources:</p>
-                <div className="flex flex-wrap gap-1">
+              <div className={`mt-3 pt-3 border-t border-muted-foreground/20 ${isMobile ? 'text-sm' : 'text-xs'}`}>
+                <p className="font-semibold mb-2">Sources:</p>
+                <div className="flex flex-wrap gap-2">
                   {message.citations.map((citation) => (
                     <Badge 
                       key={citation.id} 
                       variant="outline"
-                      className="flex items-center gap-1 text-xs"
+                      className={`flex items-center gap-1 ${isMobile ? 'text-sm px-3 py-1' : 'text-xs'}`}
                     >
                       {citation.title}
                       {citation.url && (
@@ -223,7 +225,7 @@ export default function ChatThread({ persona }: ChatThreadProps) {
                           rel="noopener noreferrer"
                           className="inline-flex"
                         >
-                          <ExternalLink size={10} />
+                          <ExternalLink size={isMobile ? 12 : 10} />
                         </a>
                       )}
                     </Badge>
@@ -251,6 +253,7 @@ export default function ChatThread({ persona }: ChatThreadProps) {
                     buttons={message.actionButtons!}
                     onButtonClick={handleActionButtonClick}
                     isLoading={isLoading}
+                    isMobile={isMobile}
                   />
                 );
               } else {
@@ -265,8 +268,8 @@ export default function ChatThread({ persona }: ChatThreadProps) {
           
           {/* Avatar/Icon for the user */}
           {message.role === 'user' && (
-            <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground flex-shrink-0">
-              <User size={16} />
+            <div className={`rounded-full bg-secondary flex items-center justify-center text-secondary-foreground flex-shrink-0 ${isMobile ? 'h-10 w-10' : 'h-8 w-8'}`}>
+              <User size={isMobile ? 18 : 16} />
             </div>
           )}
         </div>
@@ -274,15 +277,15 @@ export default function ChatThread({ persona }: ChatThreadProps) {
       
       {/* Loading indicator */}
       {isLoading && (
-        <div className="flex gap-2 justify-start">
-          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground flex-shrink-0">
-            <Bot size={16} />
+        <div className="flex gap-3 justify-start">
+          <div className={`rounded-full bg-primary flex items-center justify-center text-primary-foreground flex-shrink-0 ${isMobile ? 'h-10 w-10' : 'h-8 w-8'}`}>
+            <Bot size={isMobile ? 18 : 16} />
           </div>
-          <div className="max-w-[80%] rounded-lg p-3 bg-muted text-foreground animate-pulse">
+          <div className={`max-w-[85%] rounded-lg bg-muted text-foreground animate-pulse ${isMobile ? 'p-4' : 'p-3'}`}>
             <div className="flex space-x-2">
-              <div className="h-2 w-2 rounded-full bg-current animate-bounce"></div>
-              <div className="h-2 w-2 rounded-full bg-current animate-bounce delay-150"></div>
-              <div className="h-2 w-2 rounded-full bg-current animate-bounce delay-300"></div>
+              <div className={`rounded-full bg-current animate-bounce ${isMobile ? 'h-3 w-3' : 'h-2 w-2'}`}></div>
+              <div className={`rounded-full bg-current animate-bounce delay-150 ${isMobile ? 'h-3 w-3' : 'h-2 w-2'}`}></div>
+              <div className={`rounded-full bg-current animate-bounce delay-300 ${isMobile ? 'h-3 w-3' : 'h-2 w-2'}`}></div>
             </div>
           </div>
         </div>
