@@ -112,22 +112,26 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
     // Handle quiz content
     if (typeof productionContent === 'object' && productionContent.questions) {
       return (
-        <div className="prose dark:prose-invert max-w-none">
+        <div className="prose dark:prose-invert max-w-none w-full">
           <h4 className="text-lg font-semibold mb-3">Quiz Questions</h4>
-          {productionContent.questions.map((question: any, index: number) => (
-            <div key={index} className="mb-4 p-4 bg-muted/30 rounded-lg">
-              <p className="font-medium mb-2">{index + 1}. {question.question}</p>
-              {question.options && (
-                <ul className="list-none space-y-1 ml-4">
-                  {question.options.map((option: string, optIndex: number) => (
-                    <li key={optIndex} className="text-sm">
-                      <span className="text-muted-foreground">{String.fromCharCode(65 + optIndex)}.</span> {option}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
+          <div className="w-full space-y-4">
+            {productionContent.questions.map((question: any, index: number) => (
+              <div key={index} className="w-full p-4 bg-muted/30 rounded-lg">
+                <p className="font-medium mb-2">{index + 1}. {question.question}</p>
+                {question.options && (
+                  <div className="w-full">
+                    <ul className="list-none space-y-1 ml-4">
+                      {question.options.map((option: string, optIndex: number) => (
+                        <li key={optIndex} className="text-sm">
+                          <span className="text-muted-foreground">{String.fromCharCode(65 + optIndex)}.</span> {option}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       );
     }

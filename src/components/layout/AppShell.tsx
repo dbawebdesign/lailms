@@ -41,25 +41,44 @@ const AppShell: React.FC<AppShellProps> = ({ children, userRole }) => {
 
   return (
     <> {/* Use Fragment to include non-visual CommandPalette */}
-      <div className="flex h-screen bg-background text-foreground overflow-hidden">
+      <div className="flex h-screen bg-background text-foreground overflow-hidden relative">
         {/* Left Navigation - hide completely on mobile */}
-        <div className="hidden md:block transition-all duration-300 ease-in-out z-20">
+        <div className="hidden md:block transition-all duration-300 ease-in-out z-20 flex-shrink-0">
           <div className={cn(isNavCollapsed ? "w-16" : "w-60")}>
             <LeftNav userRole={userRole} />
           </div>
         </div>
 
-        {/* Main Content Area */}
-        <div className={cn("flex-1 flex flex-col min-h-0", isMobile && "pb-16")}>
+        {/* Main Content Area - Take remaining space between nav and panel */}
+        <div className={cn(
+          "flex flex-col min-h-0 transition-all duration-300 ease-in-out",
+          isMobile && "pb-16",
+          // Calculate flex-basis based on available space
+          !isMobile && isPanelVisible 
+            ? "flex-1 min-w-0" // Allow shrinking but with minimum constraints
+            : "flex-1"
+        )}
+        style={{
+          // Ensure minimum width for content area when Luna panel is open
+          // This prevents the content from becoming too narrow when both nav and Luna panel are open
+          minWidth: !isMobile && isPanelVisible ? '320px' : undefined
+        }}>
           <Header />
           <div className="flex-1 overflow-y-auto">
             <MainContent>{children}</MainContent>
           </div>
         </div>
 
-        {/* AI Panel for Desktop - Part of the flex layout to push content */}
+        {/* AI Panel for Desktop - Fixed width, never pushed off screen */}
         {!isMobile && isPanelVisible && (
-          <div className="w-80 border-l border-[#E0E0E0] dark:border-[#333333] h-screen transition-all duration-300 ease-in-out">
+          <div 
+            className="w-80 min-w-80 max-w-80 border-l border-[#E0E0E0] dark:border-[#333333] h-screen transition-all duration-300 ease-in-out flex-shrink-0 bg-background"
+            style={{
+              // Ensure panel never goes off screen
+              position: 'relative',
+              zIndex: 30
+            }}
+          >
             <AiPanel userRole={userRole} />
           </div>
         )}

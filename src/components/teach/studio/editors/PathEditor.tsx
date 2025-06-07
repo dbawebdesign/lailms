@@ -38,11 +38,11 @@ const PathEditor: React.FC<PathEditorProps> = ({ path, onSave, baseClassId, less
   };
 
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>{path.title}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 w-full">
         <div>
           <label htmlFor="pathTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Title

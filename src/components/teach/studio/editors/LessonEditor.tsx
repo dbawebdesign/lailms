@@ -78,11 +78,11 @@ const LessonEditor: React.FC<LessonEditorProps> = ({
         </TabsList>
 
         <TabsContent value="details" className="flex-1 mt-4">
-          <Card>
+          <Card className="w-full">
             <CardHeader>
               <CardTitle>{lesson.title}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 w-full">
               <div>
                 <label htmlFor="lessonTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Title

@@ -289,11 +289,11 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
 
 
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>Editing: {section.title || "Untitled Section"}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 w-full">
         <div>
           <label htmlFor="sectionTitle" className="block text-sm font-medium text-foreground mb-1">
             Section Title
@@ -303,7 +303,6 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Enter section title"
-            className="max-w-lg"
           />
         </div>
         <div>
@@ -317,7 +316,7 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
                     setContentInput(typeof section.content === 'string' ? section.content : JSON.stringify(section.content || '', null, 2));
                 }
             }}>
-                <SelectTrigger id="sectionTypeSelect" className="w-[280px]">
+                <SelectTrigger id="sectionTypeSelect" className="w-full max-w-sm">
                     <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>

@@ -1053,16 +1053,24 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
           }}
           actionable={true}
         >
-          <div className="flex-1 flex flex-col min-h-0">
-            <div className="p-6 border-b border-border">
+          <div className="flex-1 flex flex-col h-full">
+            {/* Fixed Header */}
+            <div className="sticky top-0 z-10 p-6 border-b border-border bg-background">
               <h1 className="text-2xl md:text-3xl font-bold text-foreground">Base Class Studio</h1>
               {selectedItem && selectedItem.title && (
                 <p className="text-md md:text-lg text-muted-foreground mt-1">Editing: {selectedItem.title}</p>
               )}
             </div>
             
-            <div className="flex-1 p-6 overflow-y-auto min-h-0">
-              {renderEditor()}
+            {/* Sticky Editor Container - Below Header */}
+            <div className="flex-1 relative w-full">
+              <div className="sticky top-32 z-20 p-6 mt-6 w-full">
+                <div className="w-full min-w-full bg-background rounded-lg shadow-lg border border-border p-6">
+                  <div className="w-full">
+                    {renderEditor()}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </LunaContextElement>

@@ -419,15 +419,15 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
   };
 
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>{baseClass.name}</CardTitle>
         {/* REMOVED: Tab Navigation for Details/KnowledgeBase */}
       </CardHeader>
-      <CardContent className="space-y-4 mt-4">
+      <CardContent className="space-y-4 mt-4 w-full">
         {/* Content is now always details */}
           <>
-            <div>
+            <div className="w-full">
               <label htmlFor="baseClassName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Name
               </label>
@@ -436,9 +436,10 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Base Class Name"
+                className="w-full"
               />
             </div>
-            <div>
+            <div className="w-full">
               <label htmlFor="baseClassDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Description
               </label>
@@ -448,6 +449,7 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Base Class Description"
                 rows={4}
+                className="w-full"
               />
             </div>
             {/* Add more form fields for other properties of StudioBaseClass */}
@@ -464,31 +466,45 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
               />
             </div>
             */}
-            <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
-              <Button onClick={handleSave} disabled={isGeneratingContent || isGeneratingMindMap || isCheckingContent || isCheckingMindMap}>Save Changes</Button>
+            <div className="flex flex-col space-y-2 lg:flex-row lg:space-y-0 lg:space-x-2 lg:flex-wrap lg:gap-2">
+              <Button 
+                onClick={handleSave} 
+                disabled={isGeneratingContent || isGeneratingMindMap || isCheckingContent || isCheckingMindMap}
+                className="flex-shrink-0"
+              >
+                Save Changes
+              </Button>
               
               {/* Create Instance Button - Always Available */}
               <Button 
                 onClick={handleCreateInstance} 
                 disabled={isGeneratingContent || isGeneratingMindMap || isCheckingContent || isCheckingMindMap}
-                className="bg-brand-gradient hover:opacity-90 transition-airy"
+                className="bg-brand-gradient hover:opacity-90 transition-airy flex-shrink-0"
               >
                 <Users className="mr-2 h-4 w-4" />
                 Create Instance
               </Button>
               
               {isCheckingContent || isCheckingMindMap ? (
-                <Button disabled>
+                <Button disabled className="flex-shrink-0">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {isCheckingContent ? 'Checking content...' : 'Checking mind map...'}
                 </Button>
               ) : hasGeneratedContent ? (
                 existingMindMap ? (
-                  <Button onClick={handleViewBaseClassMindMap} disabled={isGeneratingContent || isGeneratingMindMap}>
+                  <Button 
+                    onClick={handleViewBaseClassMindMap} 
+                    disabled={isGeneratingContent || isGeneratingMindMap}
+                    className="flex-shrink-0"
+                  >
                     View Base Class Mind Map
                   </Button>
                 ) : (
-                  <Button onClick={handleGenerateBaseClassMindMap} disabled={isGeneratingContent || isGeneratingMindMap}>
+                  <Button 
+                    onClick={handleGenerateBaseClassMindMap} 
+                    disabled={isGeneratingContent || isGeneratingMindMap}
+                    className="flex-shrink-0"
+                  >
                     {isGeneratingMindMap ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -500,7 +516,11 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
                   </Button>
                 )
               ) : (
-                <Button onClick={handleCreateAllLessonContent} disabled={isGeneratingContent || isGeneratingMindMap}>
+                <Button 
+                  onClick={handleCreateAllLessonContent} 
+                  disabled={isGeneratingContent || isGeneratingMindMap}
+                  className="flex-shrink-0"
+                >
                   {isGeneratingContent && totalToProcessForStream > 0 && processedSoFarForStream < totalToProcessForStream ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -520,7 +540,7 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
 
           {/* Final summary message */}
                 {finalSummary && (
-            <div className={`p-3 rounded-md text-sm ${getSummaryMessageStyle(finalSummary.type)}`}>
+            <div className={`w-full p-3 rounded-md text-sm ${getSummaryMessageStyle(finalSummary.type)}`}>
                     {finalSummary.message}
               </div>
             )}
