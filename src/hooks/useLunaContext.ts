@@ -18,6 +18,7 @@ interface LunaChatContextValue {
   messages: ChatMessage[];
   isLoading: boolean;
   sendMessage: (message: string, persona: PersonaType, buttonData?: any) => Promise<void>;
+  clearChatHistory: () => void;
   context: SerializedUIContext | null;
   isReady: boolean;
   
@@ -44,6 +45,75 @@ export function useLunaContext(): LunaChatContextValue {
   
   // Message history for API calls
   const messageHistory = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  
+  // Storage keys for persistence
+  const CHAT_HISTORY_KEY = 'luna-chat-history';
+  const CHAT_TIMESTAMP_KEY = 'luna-chat-timestamp';
+  const CHAT_EXPIRY_HOURS = 2;
+  
+  // Helper function to check if chat history is still valid
+  const isChatHistoryValid = useCallback(() => {
+    if (typeof window === 'undefined') return false;
+    
+    const timestamp = sessionStorage.getItem(CHAT_TIMESTAMP_KEY);
+    if (!timestamp) return false;
+    
+    const savedTime = parseInt(timestamp, 10);
+    const currentTime = Date.now();
+    const expiryTime = CHAT_EXPIRY_HOURS * 60 * 60 * 1000; // 2 hours in milliseconds
+    
+    return (currentTime - savedTime) < expiryTime;
+  }, [CHAT_TIMESTAMP_KEY, CHAT_EXPIRY_HOURS]);
+  
+  // Helper function to save chat history
+  const saveChatHistory = useCallback((chatMessages: ChatMessage[], messageHistoryData: { role: 'user' | 'assistant'; content: string }[]) => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      sessionStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify({
+        messages: chatMessages,
+        messageHistory: messageHistoryData
+      }));
+      sessionStorage.setItem(CHAT_TIMESTAMP_KEY, Date.now().toString());
+    } catch (error) {
+      console.warn('[Luna] Failed to save chat history to sessionStorage:', error);
+    }
+  }, [CHAT_HISTORY_KEY, CHAT_TIMESTAMP_KEY]);
+  
+  // Helper function to load chat history
+  const loadChatHistory = useCallback(() => {
+    if (typeof window === 'undefined') return null;
+    
+    if (!isChatHistoryValid()) {
+      // Clear expired history
+      sessionStorage.removeItem(CHAT_HISTORY_KEY);
+      sessionStorage.removeItem(CHAT_TIMESTAMP_KEY);
+      return null;
+    }
+    
+    try {
+      const savedData = sessionStorage.getItem(CHAT_HISTORY_KEY);
+      if (savedData) {
+        return JSON.parse(savedData);
+      }
+    } catch (error) {
+      console.warn('[Luna] Failed to load chat history from sessionStorage:', error);
+      // Clear corrupted data
+      sessionStorage.removeItem(CHAT_HISTORY_KEY);
+      sessionStorage.removeItem(CHAT_TIMESTAMP_KEY);
+    }
+    
+    return null;
+  }, [CHAT_HISTORY_KEY, isChatHistoryValid]);
+  
+  // Load chat history on component mount
+  useEffect(() => {
+    const savedHistory = loadChatHistory();
+    if (savedHistory && savedHistory.messages && savedHistory.messageHistory) {
+      setMessages(savedHistory.messages);
+      messageHistory.current = savedHistory.messageHistory;
+    }
+  }, [loadChatHistory]);
   
   // Listen for context updates from broadcast channel
   useEffect(() => {
@@ -162,7 +232,9 @@ export function useLunaContext(): LunaChatContextValue {
         hasContext: !!currentContext,
         messageLength: actualMessage.length,
         hasButtonData: !!parsedButtonData,
-        buttonData: parsedButtonData
+        buttonData: parsedButtonData,
+        messagesLength: messageHistory.current.length,
+        lastTwoMessages: messageHistory.current.slice(-2)
       });
 
       const response = await fetch('/api/luna/chat', {
@@ -202,6 +274,40 @@ export function useLunaContext(): LunaChatContextValue {
       // Add assistant message to history
       messageHistory.current.push({ role: 'assistant', content: data.response });
       
+      // Trigger real-time updates if any were included in the response
+      if (data.realTimeUpdates && Array.isArray(data.realTimeUpdates)) {
+        data.realTimeUpdates.forEach((update: any) => {
+          try {
+                         // Use BroadcastChannel to notify other components of the update
+             const updateChannel = new BroadcastChannel('learnology-updates');
+             updateChannel.postMessage({
+               entity: update.entity,
+               entityId: update.entityId,
+               type: update.type,
+               isAIGenerated: update.isAIGenerated,
+               updatedData: update.updatedData,
+               timestamp: Date.now()
+             });
+             updateChannel.close();
+             
+             // Also dispatch a custom event as fallback
+             window.dispatchEvent(new CustomEvent('lunaContentUpdate', {
+               detail: {
+                 entity: update.entity,
+                 entityId: update.entityId,
+                 type: update.type,
+                 isAIGenerated: update.isAIGenerated,
+                 updatedData: update.updatedData
+               }
+             }));
+            
+            console.log('[Luna Frontend] Broadcasting real-time update:', update);
+          } catch (error) {
+            console.warn('Could not broadcast real-time update:', error, update);
+          }
+        });
+      }
+      
       // Remove temporary loading message and add the real response
       setMessages(prev => {
         // Filter out the loading message
@@ -225,10 +331,15 @@ export function useLunaContext(): LunaChatContextValue {
         });
         
         // Add the real response with action buttons if available
-        return [
+        const updatedMessages = [
           ...filteredMessages,
           newMessage
         ];
+        
+        // Save chat history to sessionStorage
+        saveChatHistory(updatedMessages, messageHistory.current);
+        
+        return updatedMessages;
       });
       
     } catch (error) {
@@ -240,16 +351,21 @@ export function useLunaContext(): LunaChatContextValue {
         const filteredMessages = prev.filter(msg => msg.id !== tempBotMessageId);
         
         // Add an error message
-        return [
+        const updatedMessages = [
           ...filteredMessages,
           {
             id: uuidv4(),
-            role: 'assistant',
+            role: 'assistant' as const,
             content: 'Sorry, I encountered an error processing your request. Please try again.',
             timestamp: new Date(),
             persona
           }
         ];
+        
+        // Save chat history to sessionStorage even in error case
+        saveChatHistory(updatedMessages, messageHistory.current);
+        
+        return updatedMessages;
       });
       
     } finally {
@@ -284,6 +400,16 @@ export function useLunaContext(): LunaChatContextValue {
     return context?.lastUserAction || null;
   }, [context]);
   
+  // Function to clear chat history (for logout)
+  const clearChatHistory = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    
+    setMessages([]);
+    messageHistory.current = [];
+    sessionStorage.removeItem(CHAT_HISTORY_KEY);
+    sessionStorage.removeItem(CHAT_TIMESTAMP_KEY);
+  }, [CHAT_HISTORY_KEY, CHAT_TIMESTAMP_KEY]);
+  
   return {
     // Pass through methods from LunaContextProvider
     registerComponent: lunaContext.registerComponent,
@@ -296,6 +422,7 @@ export function useLunaContext(): LunaChatContextValue {
     messages,
     isLoading,
     sendMessage,
+    clearChatHistory,
     context,
     isReady,
     

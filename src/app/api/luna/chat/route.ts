@@ -573,7 +573,8 @@ async function performUpdatePath(pathId: string, updates: any, forwardedCookies?
     return {
       success: true,
       message: `Path updated successfully`,
-      path: result
+      path: result,
+      pathId: pathId // Include the path ID for real-time updates
     };
   } catch (error) {
     console.error('Error updating path:', error);
@@ -979,7 +980,7 @@ interface CourseModule {
 }
 
 // --- Refined System Prompt Construction ---
-function constructSystemPrompt(context: SerializedUIContext, persona: string, message: string, buttonData?: any): string {
+function constructSystemPrompt(context: SerializedUIContext, persona: string, message: string, buttonData?: any, chatHistory?: { role: string, content: string }[]): string {
   // Generate UI pattern analysis
   const patternInsights = analyzeUIPatterns(context);
 
@@ -1021,6 +1022,19 @@ function constructSystemPrompt(context: SerializedUIContext, persona: string, me
 
   return `# Role & Objective
 You are Luna, an intelligent AI assistant integrated into the LearnologyAI platform. Your role is to provide contextual help, insights, and assistance based on what the user is currently viewing and working with on their screen.
+
+${chatHistory && chatHistory.length > 0 ? `
+# 🚨 CONVERSATION CONTINUITY ALERT
+⚠️ **CRITICAL**: This is NOT a new conversation. The user has been discussing specific topics with you. You MUST maintain context and reference the previous conversation. If they say "create it" or "do it" or refer to "this", they're referring to something discussed previously.
+
+**Immediate Previous Context (last 3 messages)**:
+${chatHistory.slice(-3).map((msg, index) => {
+  const role = msg.role === 'user' ? 'User' : 'Luna';
+  return `${role}: ${msg.content}`;
+}).join('\n')}
+
+⚠️ **REQUIRED**: Start your response by acknowledging what was previously discussed before proceeding. If the user's current message is a continuation (like "create it" or "do it"), immediately proceed with the previously discussed task without asking for more clarification.
+` : ''}
 
 # Current UI Context
 ${context ? `
@@ -1128,6 +1142,25 @@ ${(() => {
   return ids.length > 0 ? ids.join(', ') : 'No specific IDs detected in current context';
 })()}
 ` : 'No UI context available - user may be on a page without context registration'}
+
+# Recent Conversation Context
+${chatHistory && chatHistory.length > 0 ? `
+**CRITICAL: CONVERSATION CONTINUITY** - The user has been chatting with Luna about specific topics. You MUST maintain context from this conversation and reference it in your response:
+
+${chatHistory.slice(-6).map((msg, index) => {
+  const role = msg.role === 'user' ? 'User' : 'Luna';
+  const preview = msg.content.length > 200 ? msg.content.substring(0, 200) + '...' : msg.content;
+  return `**${role}**: ${preview}`;
+}).join('\n')}
+
+**MANDATORY CONTEXT RULES**:
+- You MUST acknowledge and reference the previous conversation when responding
+- If the user's current message is a follow-up or continuation, treat it as such
+- DON'T ask for clarification on topics that were already discussed in the conversation above
+- Build upon what was already established in the conversation
+- If the user says "create it" or "do it" or similar, refer to what they previously asked for
+- Maintain the same subject/context that was being discussed
+` : '**No Previous Conversation**: This appears to be the start of a new conversation or the user\'s first message.'}
 
 # Instructions
 
@@ -1816,7 +1849,11 @@ export async function POST(request: Request) {
     const forwardedCookies = request.headers.get('cookie');
 
     // Prepare messages for the FIRST API call
-    const systemMessage = constructSystemPrompt(context as SerializedUIContext, persona, message, buttonData);
+    console.log('[Luna Chat API] Chat history received:', history?.length || 0, 'messages');
+    if (history && history.length > 0) {
+      console.log('[Luna Chat API] Last 2 messages:', history.slice(-2));
+    }
+    const systemMessage = constructSystemPrompt(context as SerializedUIContext, persona, message, buttonData, history);
     const userMessagesForFirstCall: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: "system", content: systemMessage },
       ...history.map((msg: { role: string, content: string }) => ({ 
@@ -2209,6 +2246,102 @@ export async function POST(request: Request) {
           }
         }
         
+        // Extract real-time update information from tool results
+        const realTimeUpdates = [];
+        for (const toolResult of toolExecutionResults) {
+          if (toolResult.args?.success) {
+            switch (toolResult.name) {
+                             case 'updatePath':
+                 realTimeUpdates.push({
+                   entity: 'path',
+                   entityId: toolResult.args.pathId || toolResult.args.path?.id,
+                   type: 'update',
+                   isAIGenerated: true,
+                   updatedData: toolResult.args.path
+                 });
+                 break;
+                             case 'createPath':
+                 realTimeUpdates.push({
+                   entity: 'path',
+                   entityId: toolResult.args.path?.id,
+                   type: 'create',
+                   isAIGenerated: true,
+                   updatedData: toolResult.args.path
+                 });
+                 break;
+               case 'deletePath':
+                 realTimeUpdates.push({
+                   entity: 'path',
+                   entityId: toolResult.args.pathId,
+                   type: 'delete',
+                   isAIGenerated: true
+                 });
+                 break;
+               case 'updateLesson':
+                 realTimeUpdates.push({
+                   entity: 'lesson',
+                   entityId: toolResult.args.lesson?.id,
+                   type: 'update',
+                   isAIGenerated: true,
+                   updatedData: toolResult.args.lesson
+                 });
+                 break;
+               case 'createLesson':
+                 realTimeUpdates.push({
+                   entity: 'lesson',
+                   entityId: toolResult.args.lesson?.id,
+                   type: 'create',
+                   isAIGenerated: true,
+                   updatedData: toolResult.args.lesson
+                 });
+                 break;
+               case 'deleteLesson':
+                 realTimeUpdates.push({
+                   entity: 'lesson',
+                   entityId: toolResult.args.lessonId,
+                   type: 'delete',
+                   isAIGenerated: true
+                 });
+                 break;
+               case 'updateLessonSection':
+                 realTimeUpdates.push({
+                   entity: 'section',
+                   entityId: toolResult.args.section?.id,
+                   type: 'update',
+                   isAIGenerated: true,
+                   updatedData: toolResult.args.section
+                 });
+                 break;
+               case 'addLessonSection':
+                 realTimeUpdates.push({
+                   entity: 'section',
+                   entityId: toolResult.args.section?.id,
+                   type: 'create',
+                   isAIGenerated: true,
+                   updatedData: toolResult.args.section
+                 });
+                 break;
+               case 'deleteLessonSection':
+                 realTimeUpdates.push({
+                   entity: 'section',
+                   entityId: toolResult.args.sectionId,
+                   type: 'delete',
+                   isAIGenerated: true
+                 });
+                 break;
+               case 'updateBaseClass':
+                 realTimeUpdates.push({
+                   entity: 'baseClass',
+                   entityId: toolResult.args.baseClass?.id,
+                   type: 'update',
+                   isAIGenerated: true,
+                   updatedData: toolResult.args.baseClass
+                 });
+                 break;
+            }
+          }
+        }
+        
         console.log("[Luna Chat API] Second call complete. Final response generated.");
         return NextResponse.json({
           response: responseMessage.content || "", // Final text response
@@ -2216,7 +2349,8 @@ export async function POST(request: Request) {
           actionButtons,
           hasToolResults: toolExecutionResults.length > 0,
           isOutline,
-          outlineData
+          outlineData,
+          realTimeUpdates: realTimeUpdates.filter(update => update.entityId) // Only include updates with valid entity IDs
         });
         
       } else {
