@@ -131,23 +131,37 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
     setSectionType(section.section_type || 'text');
     if (editor) {
       // Ensure content is updated if section prop changes
-      // Tiptap's setContent expects JSON or HTML string. If section.content is already JSON, it's fine.
-      // If it's a string representation of JSON, it might need parsing if Tiptap doesn't handle it.
+      // For structured content with text field, extract the text for TipTap
       const currentContent = editor.getJSON();
-      if (JSON.stringify(currentContent) !== JSON.stringify(section.content)) {
-         // Only set content if it's different, to avoid cursor jumps and unnecessary re-renders
-         // Ensure section.content is valid for Tiptap (JSON object or HTML string)
-        try {
-            // If section.content is a string that needs parsing (e.g., from older data)
-            const newContent = typeof section.content === 'string' ? JSON.parse(section.content) : section.content;
-            editor.commands.setContent(newContent || '', false);
-        } catch (e) {
-            // If parsing fails or content is not structured, set as plain text or handle error
-            console.warn("Failed to parse section content for Tiptap, setting as plain text:", section.content, e);
-            // For safety, initialize with empty or basic paragraph if content is invalid for Tiptap
-            editor.commands.setContent(section.content || { type: 'doc', content: [{ type: 'paragraph' }] }, false);
+      let newContent;
+      
+      try {
+        // Handle structured lesson content
+        if (section.content && typeof section.content === 'object' && section.content.text) {
+          // For structured content, use the text field for TipTap editing
+          newContent = section.content.text;
+        } else if (section.content && typeof section.content === 'object' && section.content.type) {
+          // For TipTap JSON structure
+          newContent = section.content;
+        } else if (typeof section.content === 'string') {
+          // For plain text content
+          newContent = section.content;
+        } else {
+          // Fallback to empty content
+          newContent = '';
         }
+        
+        // Only set content if it's different, to avoid cursor jumps and unnecessary re-renders
+        if (JSON.stringify(currentContent) !== JSON.stringify(newContent)) {
+          editor.commands.setContent(newContent || '', false);
+        }
+      } catch (e) {
+        // If parsing fails or content is not structured, set as plain text or handle error
+        console.warn("Failed to parse section content for Tiptap:", section.content, e);
+        // For safety, initialize with empty content if content is invalid for Tiptap
+        editor.commands.setContent('', false);
       }
+      
       editor.setEditable(section.section_type === 'text' && isEditing);
     }
   }, [section, editor, isEditing]);
@@ -176,14 +190,37 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
   const debouncedSave = useCallback(
     async (currentTitle: string, currentContent: any, currentSectionType: string) => {
       setIsSaving(true);
-    const updatedData: Partial<LessonSection> = {
-      id: section.id,
+      
+      let contentToSave;
+      
+      if (currentSectionType === 'text') {
+        // For text content, preserve the structured format
+        if (section.content && typeof section.content === 'object' && section.content.knowledge_base_integration) {
+          // If we have existing structured content, preserve the metadata and update the text
+          contentToSave = {
+            ...section.content,
+            text: typeof currentContent === 'string' ? currentContent : (editor ? editor.getText() : JSON.stringify(currentContent))
+          };
+        } else {
+          // If we don't have structured content yet, create it
+          contentToSave = {
+            text: typeof currentContent === 'string' ? currentContent : (editor ? editor.getText() : JSON.stringify(currentContent))
+          };
+        }
+      } else {
+        // For non-text content types, save as-is
+        contentToSave = currentContent;
+      }
+      
+      const updatedData: Partial<LessonSection> = {
+        id: section.id,
         title: currentTitle,
-        content: currentSectionType === 'text' ? currentContent : section.content, // Only save Tiptap content if type is 'text'
+        content: contentToSave,
         section_type: currentSectionType,
-    };
+      };
+      
       try {
-    await onSave(updatedData);
+        await onSave(updatedData);
         setLastSaved(new Date());
       } catch (error) {
         console.error("Failed to save section:", error);
@@ -192,7 +229,7 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
         setIsSaving(false);
       }
     },
-    [onSave, section.id, section.content] // section.content in dependencies for non-'text' types
+    [onSave, section.id, section.content] // section.content in dependencies for preserving metadata
   );
 
   // Auto-save on content change (debounced)
@@ -222,14 +259,31 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
   };
   
   // State for non-Tiptap content input
-  const [contentInput, setContentInput] = useState(
-    typeof section.content === 'string' ? section.content : JSON.stringify(section.content || '', null, 2)
-  );
+  const [contentInput, setContentInput] = useState(() => {
+    if (sectionType === 'text') {
+      return '';
+    }
+    
+    // For non-text types, extract production content or show raw content
+    if (section.content && typeof section.content === 'object' && section.content.text) {
+      return section.content.text;
+    } else if (typeof section.content === 'string') {
+      return section.content;
+    } else {
+      return JSON.stringify(section.content || '', null, 2);
+    }
+  });
 
   useEffect(() => {
     // Update contentInput if section.content changes and it's not a text type editor
     if (sectionType !== 'text') {
-      setContentInput(typeof section.content === 'string' ? section.content : JSON.stringify(section.content || '', null, 2));
+      if (section.content && typeof section.content === 'object' && section.content.text) {
+        setContentInput(section.content.text);
+      } else if (typeof section.content === 'string') {
+        setContentInput(section.content);
+      } else {
+        setContentInput(JSON.stringify(section.content || '', null, 2));
+      }
     }
   }, [section.content, sectionType]);
 
@@ -291,12 +345,12 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
                 {isEditing ? (
                   <>
                     <Eye className="h-4 w-4" />
-                    Preview
+                    Student Preview
                   </>
                 ) : (
                   <>
                     <Edit className="h-4 w-4" />
-                    Edit
+                    Edit Content
                   </>
                 )}
               </Button>
@@ -340,12 +394,12 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
               {isEditing ? (
                 <>
                   <Eye className="h-4 w-4" />
-                  Preview
+                  Student Preview
                 </>
               ) : (
                 <>
                   <Edit className="h-4 w-4" />
-                  Edit
+                  Edit Content
                 </>
               )}
             </Button>

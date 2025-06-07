@@ -1,9 +1,22 @@
+export interface LessonSectionContent {
+  text?: string; // The main educational content for students
+  knowledge_base_integration?: {
+    references?: any[];
+    relevant_documents?: any[];
+    search_queries_used?: string[];
+    generation_timestamp?: string;
+  };
+  // Support for TipTap JSON structure
+  type?: string;
+  content?: any[];
+}
+
 export interface LessonSection {
   id: string;
   lesson_id: string;
   title: string;
   section_type: string; // e.g., 'text-editor', 'video', 'quiz', 'image'
-  content: any; // JSONB for Tiptap, 'any' for now or Tiptap's JSONContent
+  content: LessonSectionContent | any; // Structured content or TipTap JSON
   media_url: string | null;
   order_index: number;
   created_at: string;
