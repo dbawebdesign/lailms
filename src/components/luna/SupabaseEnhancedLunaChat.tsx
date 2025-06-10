@@ -15,10 +15,12 @@ import { createClient } from '@/lib/supabase/client';
 import { 
   Menu, Send, Search, Plus, Bot, User, Star, Trash2, Loader2, ArrowLeft,
   MessageSquare, ClipboardCheck, Wand2, Brain, Wrench, BarChart3, Users,
-  SlidersHorizontal, CreditCard, ShieldCheck
+  SlidersHorizontal, CreditCard, ShieldCheck, MoreHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
+import Image from 'next/image';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 interface LunaConversation {
   id: string;
@@ -362,6 +364,37 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     setCurrentPersona(conversation.persona);
     await loadMessages(conversation.id);
     setViewMode('chat');
+  };
+
+  const deleteConversation = async (conversationId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent switching to the conversation
+    
+    try {
+      // Delete messages first
+      await supabase
+        .from('luna_messages')
+        .delete()
+        .eq('conversation_id', conversationId);
+      
+      // Delete conversation
+      await supabase
+        .from('luna_conversations')
+        .delete()
+        .eq('id', conversationId);
+      
+      // If this was the current conversation, reset
+      if (currentConversation?.id === conversationId) {
+        setCurrentConversation(null);
+        setMessages([]);
+        setViewMode('sidebar');
+      }
+      
+      // Reload conversations
+      await loadConversations();
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+      setError('Failed to delete conversation');
+    }
   };
 
   const handleBackToSidebar = () => {
@@ -1245,7 +1278,13 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     <div className="flex flex-col h-full">
       <div className="p-4 border-b">
         <div className="flex items-center gap-2 mb-3">
-          <Bot size={20} className="text-primary" />
+          <Image 
+            src="/web-app-manifest-512x512.png" 
+            alt="Luna" 
+            width={20} 
+            height={20} 
+            className="rounded-full"
+          />
           <h2 className="font-semibold">Luna Conversations</h2>
         </div>
         
@@ -1283,9 +1322,28 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   {conversation.is_pinned && <Star size={12} className="text-yellow-500" />}
-                  <Badge variant="outline" className="text-xs py-0 px-1.5 h-4">
-                    {availablePersonas.find(p => p.id === conversation.persona)?.name || conversation.persona}
-                  </Badge>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-muted-foreground/20"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal size={12} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuLabel className="text-xs">Options</DropdownMenuLabel>
+                      <DropdownMenuItem 
+                        onClick={(e) => deleteConversation(conversation.id, e)}
+                        className="text-destructive focus:text-destructive text-xs"
+                      >
+                        <Trash2 size={12} className="mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </div>
@@ -1303,7 +1361,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
 
   // Chat View
   const renderChat = () => (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full w-full min-w-0">
       {/* Fixed Header Section */}
       <div className="flex-shrink-0 bg-background border-b">
         {/* Header */}
@@ -1319,7 +1377,13 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
             </Button>
             
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <Bot size={16} className="text-primary flex-shrink-0" />
+              <Image 
+                src="/web-app-manifest-512x512.png" 
+                alt="Luna" 
+                width={20} 
+                height={20} 
+                className="rounded-full"
+              />
               <div className="min-w-0 flex-1">
                 {editingTitle ? (
                   <Input
@@ -1404,12 +1468,18 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full px-3">
-          <div className="pt-3 space-y-3 w-full max-w-full min-w-0">
+      <div className="flex-1 min-h-0">
+        <ScrollArea className="h-full">
+          <div className="px-3 pt-3 pb-3 space-y-3">
           {messages.length === 0 && (
             <div className="text-center text-muted-foreground py-8">
-              <Bot size={48} className="mx-auto mb-4 opacity-50" />
+              <Image 
+                src="/web-app-manifest-512x512.png" 
+                alt="Luna" 
+                width={48} 
+                height={48} 
+                className="mx-auto mb-4 opacity-50"
+              />
               <p>Start a conversation with {availablePersonas.find(p => p.id === currentPersona)?.name}!</p>
             </div>
           )}
@@ -1418,13 +1488,19 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
             <div
               key={msg.id}
               className={cn(
-                "flex gap-3 animate-in slide-in-from-bottom-2",
+                "flex gap-3 animate-in slide-in-from-bottom-2 w-full",
                 msg.role === 'user' ? 'justify-end' : msg.role === 'system' ? 'justify-center' : 'justify-start'
               )}
             >
               {msg.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                  <Bot size={16} className="text-primary-foreground" />
+                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Image 
+                    src="/web-app-manifest-512x512.png" 
+                    alt="Luna" 
+                    width={20} 
+                    height={20} 
+                    className="rounded-full"
+                  />
                 </div>
               )}
               
@@ -1433,13 +1509,13 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
                   <span className="text-xs text-muted-foreground italic px-2 py-1 bg-muted rounded-full">{msg.content}</span>
                 </div>
               ) : (
-                              <div
-                className={cn(
-                  "max-w-[85%] rounded-lg px-3 py-2 min-w-0 overflow-hidden",
-                  msg.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted'
-                )}
+                <div
+                  className={cn(
+                    "max-w-[80%] rounded-lg px-3 py-2 min-w-0 break-words",
+                    msg.role === 'user'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted'
+                  )}
                 >
                   {msg.isLoading ? (
                     <div className="flex items-center gap-2">
@@ -1447,11 +1523,11 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
                       <span>Thinking...</span>
                     </div>
                   ) : (
-                    <div>
+                    <div className="break-words">
                       {msg.isOutline && msg.outlineData ? (
                         <CourseOutlineMessage outline={msg.outlineData} />
                       ) : (
-                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                        <div className="whitespace-pre-wrap break-words overflow-wrap-anywhere">{msg.content}</div>
                       )}
                     </div>
                   )}
@@ -1539,12 +1615,12 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
       {/* Input */}
       <div className="p-3 border-t flex-shrink-0">
         {error && (
-          <div className="mb-3 p-2 bg-destructive/10 text-destructive text-sm rounded">
+          <div className="mb-3 p-2 bg-destructive/10 text-destructive text-sm rounded break-words">
             {error}
           </div>
         )}
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full min-w-0">
           <Input
             value={message}
             onChange={(e) => setMessage(e.target.value)}
@@ -1556,12 +1632,13 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
             }}
             placeholder={`Ask ${availablePersonas.find(p => p.id === currentPersona)?.name}...`}
             disabled={isLoading}
-            className="flex-1"
+            className="flex-1 min-w-0"
           />
           <Button 
             onClick={handleSendMessage} 
             disabled={!message.trim() || isLoading}
             size="icon"
+            className="flex-shrink-0"
           >
             <Send size={16} />
           </Button>
@@ -1571,7 +1648,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
   );
 
   return (
-    <div className={cn("flex h-full", className)}>
+    <div className={cn("flex h-full w-full", className)}>
       {viewMode === 'sidebar' ? renderSidebar() : renderChat()}
     </div>
   );
