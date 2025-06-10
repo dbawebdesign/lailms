@@ -1757,37 +1757,119 @@ function extractActionButtons(responseText: string): any[] {
         hasSpecificButtons = true;
       }
       
-      // Auto-detect general yes/no questions - only if no specific buttons were added
-      if (!hasSpecificButtons && 
-          (responseText.includes('Would you like') || 
-           responseText.includes('Do you want') || 
-           responseText.includes('Should I') ||
-           responseText.includes('Would you prefer') ||
-           responseText.includes('Shall I'))) {
-        console.log('[Luna] Detected yes/no question pattern (no specific buttons found)');
-        actionButtons.push(
-          {
-            id: 'confirm-yes',
-            label: 'Yes',
-            action: 'confirm',
-            data: {},
-            style: 'primary'
-          },
-          {
-            id: 'decline-no',
-            label: 'No',
-            action: 'deny',
-            data: {},
-            style: 'secondary'
+      // Smart detection for different question types
+      if (!hasSpecificButtons) {
+        // First, check for explicit choice questions (higher priority)
+        const choicePatterns = [
+          /would you rather (.*?) or (.*?)\?/i,
+          /would you prefer (.*?) or (.*?)\?/i,
+          /choose between (.*?) and (.*?)/i,
+          /select either (.*?) or (.*?)/i,
+          /pick (.*?) or (.*?)\?/i
+        ];
+        
+        let foundChoice = false;
+        for (const pattern of choicePatterns) {
+          const match = responseText.match(pattern);
+          if (match) {
+            console.log('[Luna] Detected choice question pattern:', match[0]);
+            const option1 = match[1]?.trim() || 'Option 1';
+            const option2 = match[2]?.trim() || 'Option 2';
+            
+            actionButtons.push(
+              {
+                id: 'choice-option-1',
+                label: option1,
+                action: 'select',
+                data: { choice: option1, optionIndex: 1 },
+                style: 'primary'
+              },
+              {
+                id: 'choice-option-2',
+                label: option2,
+                action: 'select',
+                data: { choice: option2, optionIndex: 2 },
+                style: 'secondary'
+              }
+            );
+            foundChoice = true;
+            hasSpecificButtons = true;
+            break;
           }
-        );
-      }
-      
-      // Auto-detect choice scenarios - only if no specific buttons were added
-      if (!hasSpecificButtons && 
-          (responseText.includes('choose') || responseText.includes('select') || responseText.includes('option'))) {
-        console.log('[Luna] Detected choice scenario pattern (no specific buttons found)');
-        // This could be expanded to extract specific options from the text
+        }
+        
+        // If no choice pattern found, check for multiple choice scenarios
+        if (!foundChoice) {
+          const multipleChoicePatterns = [
+            /options?[:\s]+(.*?)(?:\n|$)/i,
+            /choose from[:\s]+(.*?)(?:\n|$)/i,
+            /select from[:\s]+(.*?)(?:\n|$)/i
+          ];
+          
+          for (const pattern of multipleChoicePatterns) {
+            const match = responseText.match(pattern);
+            if (match) {
+              console.log('[Luna] Detected multiple choice pattern:', match[0]);
+              const optionText = match[1];
+              
+              // Try to extract individual options (basic parsing)
+              const options = optionText.split(/,|\sor\s|\//).map(opt => opt.trim()).filter(opt => opt.length > 0);
+              
+              if (options.length >= 2 && options.length <= 4) {
+                options.forEach((option, index) => {
+                  actionButtons.push({
+                    id: `choice-option-${index + 1}`,
+                    label: option,
+                    action: 'select',
+                    data: { choice: option, optionIndex: index + 1 },
+                    style: index === 0 ? 'primary' : 'secondary'
+                  });
+                });
+                foundChoice = true;
+                hasSpecificButtons = true;
+                break;
+              }
+            }
+          }
+        }
+        
+        // Only fall back to Yes/No for confirmation questions if no choices were found
+        if (!foundChoice) {
+          const confirmationPatterns = [
+            /would you like me to/i,
+            /should I/i,
+            /shall I/i,
+            /do you want me to/i,
+            /can I/i,
+            /may I/i,
+            /update.*\?$/i,
+            /proceed.*\?$/i,
+            /continue.*\?$/i
+          ];
+          
+          const isConfirmationQuestion = confirmationPatterns.some(pattern => pattern.test(responseText));
+          
+          if (isConfirmationQuestion) {
+            console.log('[Luna] Detected confirmation question pattern');
+            actionButtons.push(
+              {
+                id: 'confirm-yes',
+                label: 'Yes',
+                action: 'confirm',
+                data: {},
+                style: 'primary'
+              },
+              {
+                id: 'decline-no',
+                label: 'No',
+                action: 'deny',
+                data: {},
+                style: 'secondary'
+              }
+            );
+            hasSpecificButtons = true;
+          }
+        }
       }
       
       // Debug: Log what patterns we're checking against
@@ -1830,7 +1912,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid JSON in request' }, { status: 400 });
     }
     
-    const { message, context, messages: history = [], persona = 'lunaChat', buttonData } = requestBody;
+    const { message, context, history = [], messages = [], persona = 'lunaChat', buttonData } = requestBody;
+    // Use history or messages (for backwards compatibility)
+    const chatHistory = history.length > 0 ? history : messages;
 
     // Validate input
     if (!message || typeof message !== 'string') {
@@ -1839,7 +1923,7 @@ export async function POST(request: Request) {
     if (!context || typeof context !== 'object') {
       return NextResponse.json({ error: 'Invalid context' }, { status: 400 });
     }
-    if (!Array.isArray(history)) {
+    if (!Array.isArray(chatHistory)) {
       return NextResponse.json({ error: 'Invalid history format' }, { status: 400 });
     }
 
@@ -1849,14 +1933,14 @@ export async function POST(request: Request) {
     const forwardedCookies = request.headers.get('cookie');
 
     // Prepare messages for the FIRST API call
-    console.log('[Luna Chat API] Chat history received:', history?.length || 0, 'messages');
-    if (history && history.length > 0) {
-      console.log('[Luna Chat API] Last 2 messages:', history.slice(-2));
+    console.log('[Luna Chat API] Chat history received:', chatHistory?.length || 0, 'messages');
+    if (chatHistory && chatHistory.length > 0) {
+      console.log('[Luna Chat API] Last 2 messages:', chatHistory.slice(-2));
     }
-    const systemMessage = constructSystemPrompt(context as SerializedUIContext, persona, message, buttonData, history);
+    const systemMessage = constructSystemPrompt(context as SerializedUIContext, persona, message, buttonData, chatHistory);
     const userMessagesForFirstCall: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: "system", content: systemMessage },
-      ...history.map((msg: { role: string, content: string }) => ({ 
+      ...chatHistory.map((msg: { role: string, content: string }) => ({ 
         role: msg.role as "user" | "assistant", // Assuming history roles are valid
         content: msg.content 
       })),
@@ -2348,6 +2432,7 @@ export async function POST(request: Request) {
           citations,
           actionButtons,
           hasToolResults: toolExecutionResults.length > 0,
+          toolsUsed: toolExecutionResults.map(result => result.name), // Add the tools that were used
           isOutline,
           outlineData,
           realTimeUpdates: realTimeUpdates.filter(update => update.entityId) // Only include updates with valid entity IDs

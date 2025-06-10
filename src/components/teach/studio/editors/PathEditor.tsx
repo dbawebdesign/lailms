@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useLunaUIUpdates } from '@/hooks/useLunaUIUpdates';
+import { cn } from '@/lib/utils';
 
 interface PathEditorProps {
   path: Path;
@@ -22,11 +24,31 @@ interface PathEditorProps {
 const PathEditor: React.FC<PathEditorProps> = ({ path, onSave, baseClassId, lessons, onReorderLessons, fetchLessonsForPath, isLoadingLessons }) => {
   const [title, setTitle] = useState(path.title);
   const [description, setDescription] = useState(path.description || '');
+  
+  // Enhanced hook for Luna UI updates with automatic data refresh
+  const { getGlowClasses, LUNA_UPDATE_TYPES } = useLunaUIUpdates({
+    onDataRefresh: async (elementType, elementId, data) => {
+      if (elementType === LUNA_UPDATE_TYPES.PATH_DESCRIPTION || 
+          elementType === LUNA_UPDATE_TYPES.PATH_TITLE) {
+        // Refetch the path data from the API
+        const response = await fetch(`/api/teach/paths/${path.id}`);
+        if (response.ok) {
+          const updatedPath = await response.json();
+          setTitle(updatedPath.title);
+          setDescription(updatedPath.description || '');
+        }
+      }
+    },
+    glowDuration: 3000,
+    refreshDelay: 3100
+  });
 
   useEffect(() => {
     setTitle(path.title);
     setDescription(path.description || '');
   }, [path]);
+
+
 
   const handleSave = async () => {
     const updatedData: Partial<Path> = {
@@ -52,6 +74,7 @@ const PathEditor: React.FC<PathEditorProps> = ({ path, onSave, baseClassId, less
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Path Title"
+            className={cn(getGlowClasses(LUNA_UPDATE_TYPES.PATH_TITLE))}
           />
         </div>
         <div>
@@ -64,6 +87,7 @@ const PathEditor: React.FC<PathEditorProps> = ({ path, onSave, baseClassId, less
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Path Description"
             rows={3}
+            className={cn(getGlowClasses(LUNA_UPDATE_TYPES.PATH_DESCRIPTION))}
           />
         </div>
         <Button onClick={handleSave}>Save Path Details</Button>

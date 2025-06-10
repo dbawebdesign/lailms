@@ -526,6 +526,311 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     console.log('🛠️ Debug functions available: debugLunaAuth() and debugLunaDatabase() in console');
   }
 
+  const handleActionButtonClick = async (button: any) => {
+    console.log('🔘 Action button clicked:', button);
+    
+    // Determine response text based on button
+    let responseText = '';
+    if (button.action === 'confirm' || button.label === 'Yes') {
+      responseText = 'Yes';
+    } else if (button.action === 'deny' || button.label === 'No') {
+      responseText = 'No';
+    } else if (button.data && button.data.responseText) {
+      responseText = button.data.responseText;
+    } else {
+      responseText = button.label;
+    }
+
+    // Send response directly to Luna without showing in input
+    await sendDirectResponseToLuna(responseText);
+  };
+
+  const sendDirectResponseToLuna = async (responseText: string) => {
+    if (!currentConversation?.id || !responseText.trim()) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Add user message to state immediately
+      const userMsg: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: responseText,
+        timestamp: new Date(),
+        persona: currentPersona,
+        isLoading: false
+      };
+
+      // Add loading assistant message
+      const assistantMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        persona: currentPersona,
+        isLoading: true
+      };
+
+      const tempMessages = [...messages, userMsg, assistantMsg];
+      setMessages(tempMessages);
+
+      // Save user message to database - using exact pattern from handleSendMessage
+      if (currentConversation) {
+        console.log('💾 Attempting to save action button response message:', {
+          conversationId: currentConversation.id,
+          messageId: userMsg.id,
+          role: 'user',
+          persona: currentPersona,
+          content: responseText
+        });
+        
+        const messageData = {
+          id: userMsg.id,
+          conversation_id: currentConversation.id,
+          role: 'user' as const,
+          content: responseText,
+          persona: currentPersona,
+          created_at: new Date().toISOString(),
+        };
+        
+        const { data: insertedMessage, error: messageError } = await supabase
+          .from('luna_messages')
+          .insert(messageData)
+          .select()
+          .single();
+          
+        if (messageError) {
+          console.error('❌ Message insert failed:', {
+            error: messageError,
+            code: messageError.code,
+            message: messageError.message,
+            details: messageError.details,
+            hint: messageError.hint
+          });
+          // Don't throw here, continue with the flow
+        } else {
+          console.log('✅ Action button response message saved successfully:', insertedMessage?.id);
+        }
+      }
+
+      // Prepare chat history for Luna API
+      const chatHistory = messageHistory.current.slice(-20);
+      chatHistory.push({ role: 'user', content: responseText });
+
+      // Call Luna API with correct parameters (matching handleSendMessage)
+      const response = await fetch('/api/luna/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: responseText,
+          persona: currentPersona,
+          userRole: userRole,
+          context: isReady ? context : undefined,
+          history: chatHistory,
+          timestamp: new Date().toISOString(),
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Luna API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Update assistant message with response
+      const finalAssistantMsg: ChatMessage = {
+        ...assistantMsg,
+        content: result.response || 'Sorry, I encountered an error.',
+        isLoading: false,
+        actionButtons: result.actionButtons || [],
+        citations: result.citations || [],
+        isOutline: result.isOutline || false,
+        outlineData: result.outlineData || null,
+        actions: result.isOutline ? [
+          {
+            label: 'Save Outline',
+            action: () => console.log('Save outline clicked')
+          },
+          {
+            label: 'Open in Designer',
+            action: () => handleOpenInDesigner(result.outlineData)
+          }
+        ] : []
+      };
+
+      const finalMessages = [...messages, userMsg, finalAssistantMsg];
+      setMessages(finalMessages);
+      messageHistory.current.push({ role: 'assistant', content: finalAssistantMsg.content });
+
+      // Check if Luna made any updates that should trigger UI refresh
+      console.log('🔍 Checking for UI updates in Luna response:', {
+        content: finalAssistantMsg.content.substring(0, 200) + '...',
+        toolsUsed: result.toolsUsed,
+        hasUpdated: finalAssistantMsg.content.toLowerCase().includes('updated'),
+        hasSuccessfullyUpdated: finalAssistantMsg.content.toLowerCase().includes('successfully updated'),
+        hasBeenUpdated: finalAssistantMsg.content.toLowerCase().includes('has been updated')
+      });
+
+      const content = finalAssistantMsg.content.toLowerCase();
+      const shouldTriggerUpdate = 
+        content.includes('updated') || 
+        content.includes('successfully updated') ||
+        content.includes('has been updated') ||
+        content.includes('saved') ||
+        content.includes('description has been') ||
+        content.includes('description is now') ||
+        content.includes('generated') ||
+        content.includes('created') ||
+        content.includes('modified') ||
+        content.includes('changed') ||
+        result.toolsUsed;
+
+      if (shouldTriggerUpdate) {
+        console.log('🔄 Luna made updates, triggering UI refresh...');
+        
+        // Intelligent update type detection based on content and tools used
+        let updateType = 'content-area'; // default
+        
+        // Check if specific tools were used first (most reliable)
+        if (result.toolsUsed) {
+          console.log('🔧 Tools used detected:', result.toolsUsed);
+          if (result.toolsUsed.includes('updatePath')) {
+            updateType = 'path-description';
+            console.log('🎯 Detected updatePath tool -> triggering path-description update');
+          } else if (result.toolsUsed.includes('updateBaseClass')) {
+            updateType = 'base-class-description';
+            console.log('🎯 Detected updateBaseClass tool -> triggering base-class-description update');
+          } else if (result.toolsUsed.includes('updateLesson')) {
+            updateType = 'lesson-content';
+            console.log('🎯 Detected updateLesson tool -> triggering lesson-content update');
+          }
+        }
+        
+        // Fallback to content-based detection
+        if (updateType === 'content-area') {
+          if (content.includes('path description') || content.includes('learning path description') || content.includes('module description')) {
+            updateType = 'path-description';
+          } else if (content.includes('path title') || content.includes('learning path title') || content.includes('module title')) {
+            updateType = 'path-title';
+          } else if (content.includes('base class name') || content.includes('class name')) {
+            updateType = 'base-class-name';
+          } else if (content.includes('base class description') || content.includes('class description')) {
+            updateType = 'base-class-description';
+          } else if (content.includes('lesson title')) {
+            updateType = 'lesson-title';
+          } else if (content.includes('lesson description')) {
+            updateType = 'lesson-description';
+          } else if (content.includes('lesson content') || content.includes('lesson material')) {
+            updateType = 'lesson-content';
+          } else if (content.includes('course outline') || content.includes('curriculum outline')) {
+            updateType = 'course-outline';
+          } else if (content.includes('mind map')) {
+            updateType = 'mind-map';
+          } else if (content.includes('section')) {
+            updateType = 'section-content';
+          } else if (content.includes('document') || content.includes('knowledge base')) {
+            updateType = 'knowledge-base';
+          }
+        }
+        
+        console.log('🔄 Triggering UI update with type:', updateType);
+        triggerUIUpdate(updateType);
+      } else {
+        console.log('🔍 No UI update triggers detected in response');
+      }
+
+      // Save assistant message to database - using pattern from handleSendMessage
+      if (currentConversation) {
+        console.log('💾 Saving assistant message to database');
+        
+        const assistantMessageData = {
+          id: finalAssistantMsg.id,
+          conversation_id: currentConversation.id,
+          role: 'assistant' as const,
+          content: finalAssistantMsg.content,
+          persona: currentPersona,
+          is_outline: finalAssistantMsg.isOutline || false,
+          outline_data: finalAssistantMsg.outlineData || null,
+          citations: finalAssistantMsg.citations || [],
+          action_buttons: finalAssistantMsg.actionButtons || [],
+          created_at: new Date().toISOString(),
+        };
+        
+        const { data: insertedAssistantMsg, error: assistantMsgError } = await supabase
+          .from('luna_messages')
+          .insert(assistantMessageData)
+          .select()
+          .single();
+          
+        if (assistantMsgError) {
+          console.error('❌ Failed to save assistant message:', {
+            error: assistantMsgError,
+            code: assistantMsgError.code,
+            message: assistantMsgError.message,
+            details: assistantMsgError.details,
+            hint: assistantMsgError.hint
+          });
+          // Don't throw here, continue with local state
+        } else {
+          console.log('✅ Assistant message saved successfully:', insertedAssistantMsg?.id);
+        }
+        
+        // Update conversation
+        const { error: updateError } = await supabase
+          .from('luna_conversations')
+          .update({ 
+            updated_at: new Date().toISOString(),
+            message_count: messages.length + 2,
+          })
+          .eq('id', currentConversation.id);
+          
+        if (updateError) {
+          console.error('❌ Failed to update conversation:', updateError);
+        }
+      }
+
+    } catch (error: any) {
+      console.error('❌ Error sending direct response to Luna:', error);
+      setError(error.message || 'Failed to send response');
+      
+      // Remove loading message on error
+      setMessages(prev => prev.filter(msg => !msg.isLoading));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const triggerUIUpdate = (elementType: string, elementId?: string) => {
+    console.log('🔄 Triggering UI update for:', elementType, elementId);
+    
+    // Send custom event to parent components to trigger glow effect and data refresh
+    const updateEvent = new CustomEvent('lunaUIUpdate', {
+      detail: { 
+        elementType, 
+        elementId,
+        action: 'glow-and-refresh',
+        timestamp: Date.now()
+      },
+      bubbles: true,
+      cancelable: true
+    });
+    
+    // Dispatch immediately and also with a small delay to ensure components are ready
+    window.dispatchEvent(updateEvent);
+    
+    setTimeout(() => {
+      console.log('🔄 Dispatching delayed UI update event for:', elementType);
+      window.dispatchEvent(updateEvent);
+    }, 100);
+    
+    // Also try dispatching to document for broader reach
+    setTimeout(() => {
+      document.dispatchEvent(updateEvent);
+      console.log('🔄 Sent UI update event to both window and document:', { elementType, elementId });
+    }, 200);
+  };
+
   const handleOpenInDesigner = async (outlineData: any) => {
     setIsCreatingCourse(true);
     setError(null);
@@ -704,6 +1009,13 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
       }
 
       // Call Luna API
+      console.log('🚀 Sending to Luna API:', {
+        message: messageToSend,
+        persona: currentPersona,
+        historyLength: messageHistory.current.length,
+        historyPreview: messageHistory.current.slice(-3),
+      });
+      
       const response = await fetch('/api/luna/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -802,6 +1114,86 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
       const finalMessages = [...messages, userMsg, assistantMsg];
       setMessages(finalMessages);
       messageHistory.current.push({ role: 'assistant', content: assistantMsg.content });
+
+      // Enhanced update detection with better logging
+      const content = assistantMsg.content.toLowerCase();
+      console.log('🔍 Checking for UI updates in response:', {
+        content: content.substring(0, 200) + '...',
+        hasUpdated: content.includes('updated'),
+        hasSaved: content.includes('saved'),
+        hasDescriptionBeen: content.includes('description has been'),
+        hasGenerated: content.includes('generated'),
+        hasToolsUsed: !!result.toolsUsed,
+        toolsUsed: result.toolsUsed
+      });
+
+      const updateTriggers = [
+        content.includes('updated'),
+        content.includes('saved'),
+        content.includes('description has been'),
+        content.includes('description is now'),
+        content.includes('generated'),
+        content.includes('created'),
+        content.includes('modified'),
+        content.includes('changed'),
+        !!result.toolsUsed
+      ];
+
+      if (updateTriggers.some(trigger => trigger)) {
+        console.log('🔄 Luna made updates, triggering UI refresh...');
+        
+        // Enhanced update type detection
+        let updateType = 'content-area'; // default
+        
+        // Check for module/path descriptions (common in base class studio)
+        if (content.includes('module description') || 
+            content.includes('path description') || 
+            content.includes('learning path description') ||
+            content.includes('description') && content.includes('module')) {
+          updateType = 'path-description';
+          console.log('🎯 Detected path/module description update');
+        } else if (content.includes('module title') ||
+                   content.includes('path title') || 
+                   content.includes('learning path title') ||
+                   content.includes('title') && content.includes('module')) {
+          updateType = 'path-title';
+          console.log('🎯 Detected path/module title update');
+        } else if (content.includes('base class name') || content.includes('class name')) {
+          updateType = 'base-class-name';
+          console.log('🎯 Detected base class name update');
+        } else if (content.includes('base class description') || content.includes('class description')) {
+          updateType = 'base-class-description';
+          console.log('🎯 Detected base class description update');
+        } else if (content.includes('lesson title')) {
+          updateType = 'lesson-title';
+          console.log('🎯 Detected lesson title update');
+        } else if (content.includes('lesson description')) {
+          updateType = 'lesson-description';
+          console.log('🎯 Detected lesson description update');
+        } else if (content.includes('lesson content') || content.includes('lesson material')) {
+          updateType = 'lesson-content';
+          console.log('🎯 Detected lesson content update');
+        } else if (content.includes('course outline') || content.includes('curriculum outline')) {
+          updateType = 'course-outline';
+          console.log('🎯 Detected course outline update');
+        } else if (content.includes('mind map')) {
+          updateType = 'mind-map';
+          console.log('🎯 Detected mind map update');
+        } else if (content.includes('section')) {
+          updateType = 'section-content';
+          console.log('🎯 Detected section content update');
+        } else if (content.includes('document') || content.includes('knowledge base')) {
+          updateType = 'knowledge-base';
+          console.log('🎯 Detected knowledge base update');
+        } else {
+          console.log('🎯 Using default content-area update type');
+        }
+        
+        console.log('🚀 Triggering UI update with type:', updateType);
+        triggerUIUpdate(updateType);
+      } else {
+        console.log('❌ No update triggers detected, skipping UI update');
+      }
 
       // Update conversation
       if (conversationToUse) {
@@ -912,105 +1304,109 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
   // Chat View
   const renderChat = () => (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b bg-muted/5">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBackToSidebar}
-            className="h-8 w-8 p-0 flex-shrink-0"
-          >
-            <ArrowLeft size={14} />
-          </Button>
-          
+      {/* Fixed Header Section */}
+      <div className="flex-shrink-0 bg-background border-b">
+        {/* Header */}
+        <div className="flex items-center justify-between p-3 border-b bg-muted/5">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Bot size={16} className="text-primary flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              {editingTitle ? (
-                <Input
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  onBlur={async () => {
-                    if (editTitle.trim() && editTitle !== currentConversation?.title) {
-                      // Update conversation title
-                      if (currentConversation) {
-                        try {
-                          await supabase
-                            .from('luna_conversations')
-                            .update({ title: editTitle.trim() })
-                            .eq('id', currentConversation.id);
-                          
-                          setCurrentConversation(prev => prev ? { ...prev, title: editTitle.trim() } : null);
-                          await loadConversations();
-                        } catch (error) {
-                          console.error('Failed to update title:', error);
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBackToSidebar}
+              className="h-8 w-8 p-0 flex-shrink-0"
+            >
+              <ArrowLeft size={14} />
+            </Button>
+            
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <Bot size={16} className="text-primary flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                {editingTitle ? (
+                  <Input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    onBlur={async () => {
+                      if (editTitle.trim() && editTitle !== currentConversation?.title) {
+                        // Update conversation title
+                        if (currentConversation) {
+                          try {
+                            await supabase
+                              .from('luna_conversations')
+                              .update({ title: editTitle.trim() })
+                              .eq('id', currentConversation.id);
+                            
+                            setCurrentConversation(prev => prev ? { ...prev, title: editTitle.trim() } : null);
+                            await loadConversations();
+                          } catch (error) {
+                            console.error('Failed to update title:', error);
+                          }
                         }
                       }
-                    }
-                    setEditingTitle(false);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.currentTarget.blur();
-                    } else if (e.key === 'Escape') {
                       setEditingTitle(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur();
+                      } else if (e.key === 'Escape') {
+                        setEditingTitle(false);
+                        setEditTitle(currentConversation?.title || '');
+                      }
+                    }}
+                    className="h-6 text-sm font-medium p-1"
+                    autoFocus
+                  />
+                ) : (
+                  <h1 
+                    className="text-sm font-medium truncate cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5"
+                    onClick={() => {
+                      setEditingTitle(true);
                       setEditTitle(currentConversation?.title || '');
-                    }
-                  }}
-                  className="h-6 text-sm font-medium p-1"
-                  autoFocus
-                />
-              ) : (
-                <h1 
-                  className="text-sm font-medium truncate cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5"
-                  onClick={() => {
-                    setEditingTitle(true);
-                    setEditTitle(currentConversation?.title || '');
-                  }}
-                >
-                  {currentConversation?.title || 'New Conversation'}
-                </h1>
-              )}
-              <p className="text-xs text-muted-foreground truncate">
-                {availablePersonas.find(p => p.id === currentPersona)?.name}
-              </p>
+                    }}
+                  >
+                    {currentConversation?.title || 'New Conversation'}
+                  </h1>
+                )}
+                <p className="text-xs text-muted-foreground truncate">
+                  {availablePersonas.find(p => p.id === currentPersona)?.name}
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Persona Selector */}
-      <div className="flex border-b bg-muted/10 items-center space-x-2 flex-shrink-0 px-3 py-2">
-        <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Mode:</span>
-        <Select
-          value={currentPersona}
-          onValueChange={(value: string) => handlePersonaChange(value as PersonaType)}
-        >
-          <SelectTrigger className="flex-grow focus:ring-primary h-8 text-sm">
-            <SelectValue placeholder="Select a mode">
-              <div className="flex items-center gap-1.5">
-                {availablePersonas.find(p => p.id === currentPersona)?.icon}
-                <span className="text-sm">{availablePersonas.find(p => p.id === currentPersona)?.name}</span>
-              </div>
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {availablePersonas.map((persona) => (
-              <SelectItem key={persona.id} value={persona.id}>
-                <div className="flex items-center gap-2">
-                  {persona.icon}
-                  <span>{persona.name}</span>
+        {/* Persona Selector */}
+        <div className="flex bg-muted/10 items-center space-x-2 flex-shrink-0 px-3 py-2">
+          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Mode:</span>
+          <Select
+            value={currentPersona}
+            onValueChange={(value: string) => handlePersonaChange(value as PersonaType)}
+          >
+            <SelectTrigger className="flex-grow focus:ring-primary h-8 text-sm">
+              <SelectValue placeholder="Select a mode">
+                <div className="flex items-center gap-1.5">
+                  {availablePersonas.find(p => p.id === currentPersona)?.icon}
+                  <span className="text-sm">{availablePersonas.find(p => p.id === currentPersona)?.name}</span>
                 </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {availablePersonas.map((persona) => (
+                <SelectItem key={persona.id} value={persona.id}>
+                  <div className="flex items-center gap-2">
+                    {persona.icon}
+                    <span>{persona.name}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-3 py-2">
-        <div className="space-y-3 w-full max-w-full min-w-0">
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full px-3">
+          <div className="pt-3 space-y-3 w-full max-w-full min-w-0">
           {messages.length === 0 && (
             <div className="text-center text-muted-foreground py-8">
               <Bot size={48} className="mx-auto mb-4 opacity-50" />
@@ -1100,7 +1496,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
                           variant={button.style === 'primary' ? 'default' : 'secondary'}
                           disabled={isLoading}
                           className="text-xs px-3 py-1"
-                          onClick={() => console.log('Action button clicked:', button)}
+                          onClick={() => handleActionButtonClick(button)}
                         >
                           {button.label}
                         </Button>
@@ -1136,8 +1532,9 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
             </div>
           ))}
           <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
+          </div>
+        </ScrollArea>
+      </div>
 
       {/* Input */}
       <div className="p-3 border-t flex-shrink-0">

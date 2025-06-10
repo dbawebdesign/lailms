@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Users } from 'lucide-react';
 import { Progress } from '@/components/ui/progress'; // Import Progress component
+import { useLunaUIUpdates } from '@/hooks/useLunaUIUpdates';
+import { cn } from '@/lib/utils';
 
 // NEW: Import for the Knowledge Base Manager
 import BaseClassKnowledgeBaseManager from './BaseClassKnowledgeBaseManager';
@@ -36,6 +38,21 @@ type SummaryMessageType = 'success' | 'warning' | 'error' | 'info';
 const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) => {
   const [name, setName] = useState(baseClass.name);
   const [description, setDescription] = useState(baseClass.description || '');
+  
+  // Enhanced Luna UI updates with automatic data refresh
+  const { getGlowClasses, LUNA_UPDATE_TYPES } = useLunaUIUpdates({
+    onDataRefresh: async (elementType, elementId, data) => {
+      if (elementType === LUNA_UPDATE_TYPES.BASE_CLASS_NAME || 
+          elementType === LUNA_UPDATE_TYPES.BASE_CLASS_DESCRIPTION) {
+        // Refetch the base class data - you might need to add this API endpoint
+        console.log('🔄 Refreshing base class data...');
+        // For now, this will depend on parent component refresh
+        // You could call onRefreshData() if it exists
+      }
+    },
+    glowDuration: 3000,
+    refreshDelay: 3100
+  });
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [isGeneratingMindMap, setIsGeneratingMindMap] = useState(false);
   const [hasGeneratedContent, setHasGeneratedContent] = useState(false);
@@ -436,7 +453,7 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Base Class Name"
-                className="w-full"
+                className={cn("w-full", getGlowClasses(LUNA_UPDATE_TYPES.BASE_CLASS_NAME))}
               />
             </div>
             <div className="w-full">
@@ -449,7 +466,7 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Base Class Description"
                 rows={4}
-                className="w-full"
+                className={cn("w-full", getGlowClasses(LUNA_UPDATE_TYPES.BASE_CLASS_DESCRIPTION))}
               />
             </div>
             {/* Add more form fields for other properties of StudioBaseClass */}

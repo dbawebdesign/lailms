@@ -8,6 +8,43 @@ interface PathParams {
   }>;
 }
 
+// GET - Fetch a single path
+export async function GET(request: NextRequest, { params }: PathParams) {
+  const supabase = await createSupabaseServerClient();
+  const { pathId } = await params;
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const { data: path, error: fetchError } = await supabase
+      .from('paths')
+      .select('*')
+      .eq('id', pathId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching path:', fetchError);
+      return NextResponse.json({ error: 'Failed to fetch path', details: fetchError.message }, { status: 500 });
+    }
+
+    if (!path) {
+      return NextResponse.json({ error: 'Path not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(path);
+
+  } catch (error: any) {
+    console.error('GET Path API Error:', error);
+    return NextResponse.json({ error: 'An unexpected error occurred', details: error.message }, { status: 500 });
+  }
+}
+
 // PATCH - Update a path
 export async function PATCH(request: NextRequest, { params }: PathParams) {
   const supabase = await createSupabaseServerClient();
