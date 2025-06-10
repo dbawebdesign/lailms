@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { useUIContext } from '@/context/UIContext';
-import { LunaAIChat } from '@/components/LunaAIChat';
+import { LunaIntegration } from '@/components/luna/LunaIntegration';
 import { cn } from '@/lib/utils';
 import type { UserRole } from "@/config/navConfig"; // Import UserRole
 
@@ -126,7 +126,7 @@ const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
 
         {/* Mobile Luna AI Chat Component - Full remaining space */}
         <div className="flex-1 overflow-hidden min-h-0 relative bg-background">
-          <LunaAIChat userRole={userRole} isMobile={true} />
+          <LunaIntegration userRole={userRole} isMobile={true} />
         </div>
       </div>
     );
@@ -165,7 +165,7 @@ const AiPanel: React.FC<AiPanelProps> = ({ userRole }) => {
 
         {/* Luna AI Chat Component */}
         <div className="flex-1 overflow-y-auto py-4 px-2">
-          <LunaAIChat userRole={userRole} />
+          <LunaIntegration userRole={userRole} />
         </div>
       </aside>
     );

@@ -34,20 +34,20 @@ export function CourseOutlineMessage({ outline }: CourseOutlineMessageProps) {
   if (!outline) return null;
 
   return (
-    <div className="space-y-3 text-sm w-full max-w-full overflow-hidden min-w-0">
+    <div className="space-y-2 text-sm w-full max-w-full overflow-hidden min-w-0">
       {/* Display basic course info if available */}
       {outline.baseClassName && (
         <div className="break-words text-wrap overflow-hidden">
-          <strong className="font-medium">Course Title:</strong> {outline.baseClassName}
+          <strong className="font-medium text-xs">Course Title:</strong> <span className="text-sm">{outline.baseClassName}</span>
         </div>
       )}
       {outline.description && (
         <div className="break-words text-wrap overflow-hidden">
-          <strong className="font-medium">Description:</strong> {outline.description}
+          <strong className="font-medium text-xs">Description:</strong> <span className="text-sm">{outline.description}</span>
         </div>
       )}
       {(outline.subject || outline.gradeLevel || outline.lengthInWeeks) && (
-        <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground overflow-hidden">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground overflow-hidden">
           {outline.subject && <span className="break-words text-wrap">Subject: {outline.subject}</span>}
           {outline.gradeLevel && <span className="break-words text-wrap">Grade: {outline.gradeLevel}</span>}
           {outline.lengthInWeeks && <span className="break-words text-wrap">Length: {outline.lengthInWeeks} weeks</span>}
@@ -56,15 +56,15 @@ export function CourseOutlineMessage({ outline }: CourseOutlineMessageProps) {
 
       {/* Display Modules using Accordion */}
       {outline.modules && outline.modules.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-muted-foreground/20 w-full min-w-0">
-          <h4 className="font-semibold mb-2 break-words text-wrap">Course Modules:</h4>
+        <div className="mt-2 pt-2 border-t border-muted-foreground/20 w-full min-w-0">
+          <h4 className="font-medium text-xs mb-2 break-words text-wrap">Course Modules:</h4>
           <Accordion type="single" collapsible className="w-full min-w-0">
             {outline.modules.map((module, index) => (
               <AccordionItem key={`module-${index}`} value={`item-${index}`} className="border-b border-muted-foreground/10 min-w-0">
-                <AccordionTrigger className="text-sm font-medium hover:no-underline py-2 text-left break-words text-wrap min-w-0">
+                <AccordionTrigger className="text-xs font-medium hover:no-underline py-1.5 text-left break-words text-wrap min-w-0">
                   <span className="break-words text-wrap pr-2 min-w-0 overflow-hidden">{module.title || `Module ${index + 1}`}</span>
                 </AccordionTrigger>
-                <AccordionContent className="pl-1 pt-2 pb-3 text-xs space-y-2 w-full max-w-full overflow-hidden min-w-0">
+                <AccordionContent className="pl-1 pt-1 pb-2 text-xs space-y-2 w-full max-w-full overflow-hidden min-w-0">
                   {/* Topics */}
                   {module.topics && module.topics.length > 0 && (
                     <div className="w-full min-w-0 overflow-hidden">
