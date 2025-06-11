@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import type { StudioBaseClass, Path, Lesson, LessonSection } from '@/types/lesson';
-import { ChevronRight, ChevronDown, FileText, GripVertical, Info as InfoIcon, FoldVertical, UnfoldVertical } from 'lucide-react';
+import { ChevronRight, ChevronDown, FileText, GripVertical, Info as InfoIcon, FoldVertical, UnfoldVertical, BookOpen } from 'lucide-react';
 import { UpdatedContentWrapper } from '@/components/ui/content-update-indicator';
 import { Button } from '@/components/ui/button';
 
@@ -29,6 +29,7 @@ interface StudioNavigationTreeProps {
   baseClass: StudioBaseClass | null;
   onSelectItem: (type: string, itemData: StudioBaseClass | Path | Lesson | LessonSection) => void;
   selectedItemId: string | null;
+  selectedItemType?: string; // NEW: Add selectedItemType for better selection highlighting
   onToggleExpandPath: (pathId: string) => Promise<void>;
   onToggleExpandLesson: (lessonId: string) => Promise<void>;
   // NEW: Prop for reordering paths
@@ -327,6 +328,7 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
   baseClass, 
   onSelectItem, 
   selectedItemId,
+  selectedItemType,
   onToggleExpandPath,
   onToggleExpandLesson, // This will be the main handler for lesson EXPANSION
   onReorderPaths,
@@ -359,6 +361,11 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
   // NEW: Handler for Knowledge Base item click
   const handleKnowledgeBaseClick = () => {
     onSelectItem('knowledgebase', baseClass);
+  };
+
+  // NEW: Handler for Assessments item click
+  const handleAssessmentsClick = () => {
+    onSelectItem('assessments', baseClass);
   };
 
   const handlePathToggleExpand = async (path: Path) => {
@@ -457,7 +464,7 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
       <div 
         onClick={handleBaseClassClick}
         className={`font-semibold text-lg p-3 cursor-pointer rounded-md transition-colors 
-          ${selectedItemId === baseClass.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+          ${selectedItemType === 'baseclass' && selectedItemId === baseClass.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
       >
         {baseClass.name} 
       </div>
@@ -466,12 +473,20 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
       <div 
         onClick={handleKnowledgeBaseClick} 
         className={`flex items-center space-x-2 p-3 cursor-pointer rounded-md transition-colors 
-          ${selectedItemId === baseClass.id && onSelectItem.toString().includes("'knowledgebase'") /* Crude check for KB selection, improve if selectedItem type is 'knowledgebase' */ 
-            ? 'bg-primary/20 text-primary font-medium' 
-            : 'hover:bg-muted'}`}
+          ${selectedItemType === 'knowledgebase' ? 'bg-primary/20 text-primary font-medium' : 'hover:bg-muted'}`}
       >
         <InfoIcon size={18} className="text-muted-foreground" />
         <span>Knowledge Base</span>
+      </div>
+
+      {/* NEW: Assessments & Questions Item - Not sortable */}
+      <div 
+        onClick={handleAssessmentsClick} 
+        className={`flex items-center space-x-2 p-3 cursor-pointer rounded-md transition-colors 
+          ${selectedItemType === 'assessments' ? 'bg-primary/20 text-primary font-medium' : 'hover:bg-muted'}`}
+      >
+        <BookOpen size={18} className="text-muted-foreground" />
+        <span>Assessments & Questions</span>
       </div>
 
       {/* Collapse/Expand All Controls */}

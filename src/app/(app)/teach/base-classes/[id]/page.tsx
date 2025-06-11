@@ -12,6 +12,7 @@ import LessonEditor from '@/components/teach/studio/editors/LessonEditor'; // Ad
 import LessonSectionEditor from '@/components/teach/studio/editors/LessonSectionEditor'; // Added import
 import ContentRenderer from '@/components/teach/studio/editors/ContentRenderer';
 import { KnowledgeBaseEditor } from '@/components/teach/studio/editors/KnowledgeBaseEditor'; // NEW: Import KnowledgeBaseEditor
+import { QuestionManager } from '@/components/teach/studio/assessment/QuestionManager'; // NEW: Import QuestionManager
 import LunaContextElement from '@/components/luna/LunaContextElement'; // NEW: Import Luna context
 import { RealTimeUpdater, useRealTimeContentUpdates } from '@/components/ui/real-time-updater';
 
@@ -904,6 +905,11 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
           return <KnowledgeBaseEditor baseClass={studioBaseClass} />;
         }
         return <p className="p-6 text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin inline-block"/>Loading Knowledge Base...</p>; // Fallback if studioBaseClass isn't ready
+      case 'assessments': // NEW: Render QuestionManager
+        if (studioBaseClass) { // Ensure studioBaseClass is loaded
+          return <QuestionManager baseClassId={studioBaseClass.id} mode="standalone" />;
+        }
+        return <p className="p-6 text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin inline-block"/>Loading Assessments...</p>; // Fallback if studioBaseClass isn't ready
       default:
         return <p className="p-6 text-muted-foreground">Editor for type "{selectedItem.type}" not implemented yet.</p>;
     }
@@ -1000,6 +1006,7 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
                       }
                     }}
                     selectedItemId={selectedItem.id}
+                    selectedItemType={selectedItem.type}
                     onToggleExpandPath={fetchLessonsForPath}
                     onToggleExpandLesson={fetchSectionsForLesson}
                     onReorderPaths={handleReorderPaths}

@@ -1,13 +1,103 @@
+'use client'
+
+import { useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, CheckCircle, Zap, Users, BookOpen, Brain, TrendingUp, Shield, Star, Play, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ShinyButton } from '@/components/ui/shiny-button'
 
 export default function LandingPage() {
+  useEffect(() => {
+    // Word by word animation
+    function animateWords() {
+      const words = document.querySelectorAll('.word')
+      const containers = document.querySelectorAll('h1, h2')
+      
+      // Show containers immediately
+      containers.forEach(container => {
+        ;(container as HTMLElement).style.animation = 'word-appear 0.3s ease-out forwards'
+      })
+      
+      words.forEach(word => {
+        const delay = parseInt(word.getAttribute('data-delay') || '0')
+        
+        setTimeout(() => {
+          ;(word as HTMLElement).style.animation = 'word-appear 0.8s ease-out forwards'
+        }, delay)
+      })
+    }
+
+    // Mouse interaction
+    let mouseX = 0, mouseY = 0
+    const gradient = document.getElementById('mouse-gradient')
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseX = e.clientX
+      mouseY = e.clientY
+      
+      if (gradient) {
+        gradient.style.left = (mouseX - 192) + 'px'
+        gradient.style.top = (mouseY - 192) + 'px'
+        gradient.style.opacity = '1'
+      }
+    }
+
+    const handleMouseLeave = () => {
+      if (gradient) {
+        gradient.style.opacity = '0'
+      }
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseleave', handleMouseLeave)
+
+    // Word hover effects
+    document.querySelectorAll('.word').forEach(word => {
+      word.addEventListener('mouseenter', () => {
+        ;(word as HTMLElement).style.textShadow = '0 0 20px rgba(107, 93, 229, 0.5)'
+      })
+      
+      word.addEventListener('mouseleave', () => {
+        ;(word as HTMLElement).style.textShadow = 'none'
+      })
+    })
+
+    // Click ripple effect
+    const handleClick = (e: MouseEvent) => {
+      const ripple = document.createElement('div')
+      ripple.style.position = 'fixed'
+      ripple.style.left = e.clientX + 'px'
+      ripple.style.top = e.clientY + 'px'
+      ripple.style.width = '4px'
+      ripple.style.height = '4px'
+      ripple.style.background = 'rgba(107, 93, 229, 0.6)'
+      ripple.style.borderRadius = '50%'
+      ripple.style.transform = 'translate(-50%, -50%)'
+      ripple.style.pointerEvents = 'none'
+      ripple.style.animation = 'pulse-glow 1s ease-out forwards'
+      document.body.appendChild(ripple)
+      
+      setTimeout(() => ripple.remove(), 1000)
+    }
+
+    document.addEventListener('click', handleClick)
+
+    // Initialize animations
+    setTimeout(animateWords, 500)
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseleave', handleMouseLeave)
+      document.removeEventListener('click', handleClick)
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Navigation */}
-      <nav className="px-6 py-4 flex items-center justify-between border-b border-gray-800">
+      <nav className="px-6 py-4 flex items-center justify-between border-b border-gray-800 relative z-50">
         <div className="flex items-center space-x-8">
           <Image
             src="/Horizontal white text.png"
@@ -32,61 +122,274 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="px-6 py-20 max-w-7xl mx-auto">
-        <div className="grid md:grid-cols-2 gap-12 items-center">
-          <div className="space-y-8">
-            <div className="space-y-6">
-              <h1 className="text-5xl md:text-6xl font-bold leading-tight">
-                The world's first
-                <span className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent">
-                  {" "}AI-first LMS
-                </span>
-              </h1>
-              <p className="text-xl text-gray-300 leading-relaxed">
-                Transform education with an AI-powered learning management system that creates, adapts, and personalizes content in real-time. Generate complete courses in minutes, not months.
-              </p>
+      <section className="relative min-h-screen flex flex-col justify-center items-center px-8 py-12 md:px-16 md:py-20 overflow-hidden">
+        {/* Grid Background */}
+        <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(107,93,229,0.25)" strokeWidth="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)" />
+          
+          {/* Main grid lines */}
+          <line x1="0" y1="20%" x2="100%" y2="20%" className="grid-line" style={{animationDelay: '0.5s'}} />
+          <line x1="0" y1="80%" x2="100%" y2="80%" className="grid-line" style={{animationDelay: '1s'}} />
+          <line x1="20%" y1="0" x2="20%" y2="100%" className="grid-line" style={{animationDelay: '1.5s'}} />
+          <line x1="80%" y1="0" x2="80%" y2="100%" className="grid-line" style={{animationDelay: '2s'}} />
+          
+          {/* Accent lines */}
+          <line x1="50%" y1="0" x2="50%" y2="100%" className="grid-line opacity-10" style={{animationDelay: '2.5s'}} />
+          <line x1="0" y1="50%" x2="100%" y2="50%" className="grid-line opacity-10" style={{animationDelay: '3s'}} />
+          
+          {/* Detail dots */}
+          <circle cx="20%" cy="20%" r="2" className="detail-dot" style={{animationDelay: '3s'}} />
+          <circle cx="80%" cy="20%" r="2" className="detail-dot" style={{animationDelay: '3.2s'}} />
+          <circle cx="20%" cy="80%" r="2" className="detail-dot" style={{animationDelay: '3.4s'}} />
+          <circle cx="80%" cy="80%" r="2" className="detail-dot" style={{animationDelay: '3.6s'}} />
+          <circle cx="50%" cy="50%" r="1.5" className="detail-dot" style={{animationDelay: '4s'}} />
+        </svg>
+
+        {/* Corner Elements */}
+        <div className="corner-element top-8 left-8" style={{animationDelay: '4s'}}>
+          <div className="absolute top-0 left-0 w-2 h-2 bg-[#6B5DE5] opacity-60"></div>
+        </div>
+        <div className="corner-element top-8 right-8" style={{animationDelay: '4.2s'}}>
+          <div className="absolute top-0 right-0 w-2 h-2 bg-[#E45DE5] opacity-60"></div>
+        </div>
+        <div className="corner-element bottom-8 left-8" style={{animationDelay: '4.4s'}}>
+          <div className="absolute bottom-0 left-0 w-2 h-2 bg-[#FF835D] opacity-60"></div>
+        </div>
+        <div className="corner-element bottom-8 right-8" style={{animationDelay: '4.6s'}}>
+          <div className="absolute bottom-0 right-0 w-2 h-2 bg-[#6B5DE5] opacity-60"></div>
+        </div>
+
+        {/* Floating Elements */}
+        <div className="floating-element" style={{top: '25%', left: '15%', animationDelay: '5s'}}></div>
+        <div className="floating-element" style={{top: '60%', left: '85%', animationDelay: '5.5s'}}></div>
+        <div className="floating-element" style={{top: '40%', left: '10%', animationDelay: '6s'}}></div>
+        <div className="floating-element" style={{top: '75%', left: '90%', animationDelay: '6.5s'}}></div>
+
+        {/* Top Text */}
+        <div className="text-center mb-16">
+          <h2 className="text-xs md:text-sm font-mono font-light text-gray-400 uppercase tracking-[0.2em] opacity-0">
+            <span className="word" data-delay="0">Transform</span>
+            <span className="word" data-delay="200">education</span>
+            <span className="word" data-delay="400">with</span>
+            <span className="word" data-delay="600">intelligence.</span>
+          </h2>
+          <div className="mt-4 w-16 h-px bg-gradient-to-r from-transparent via-[#6B5DE5] to-transparent opacity-30"></div>
+        </div>
+
+        {/* Center Text */}
+        <div className="text-center max-w-6xl mx-auto mb-16 relative">
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-extralight leading-tight tracking-tight text-white text-decoration opacity-0">
+            <div className="mb-4 md:mb-6">
+              <span className="word" data-delay="800">The</span>
+              <span className="word" data-delay="950">world's</span>
+              <span className="word" data-delay="1100">first</span>
+              <span className="word bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent" data-delay="1250"> AI-native </span>
+              <span className="word" data-delay="1400">LMS.</span>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center">
-                Start Building Today
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button variant="outline" className="border-gray-600 text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors flex items-center">
-                <Play className="mr-2 h-4 w-4" />
-                Watch Demo
-              </Button>
+            <div className="text-xl md:text-2xl lg:text-3xl font-thin text-gray-300 leading-relaxed">
+              <span className="word" data-delay="1700">Where</span>
+              <span className="word" data-delay="1850">artificial</span>
+              <span className="word" data-delay="2000">intelligence</span>
+              <span className="word" data-delay="2150">meets</span>
+              <span className="word" data-delay="2300">personalized</span>
+              <span className="word" data-delay="2450">learning,</span>
+              <span className="word" data-delay="2600">creating</span>
+              <span className="word" data-delay="2750">adaptive</span>
+              <span className="word" data-delay="2900">experiences</span>
+              <span className="word" data-delay="3050">that</span>
+              <span className="word" data-delay="3200">evolve</span>
+              <span className="word" data-delay="3350">with</span>
+              <span className="word" data-delay="3500">every</span>
+              <span className="word" data-delay="3650">student.</span>
             </div>
-          </div>
-          <div className="relative">
-            <div className="bg-gradient-to-br from-gray-900 to-black rounded-2xl border border-gray-800 p-8 shadow-2xl">
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                </div>
-                <div className="bg-gray-800 rounded-lg p-4 text-sm">
-                  <div className="text-blue-400">Luna AI:</div>
-                  <div className="text-gray-300 mt-1">I've generated a complete Biology course based on your uploaded textbook. Would you like me to create adaptive assessments for each chapter?</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="bg-gradient-to-r from-[#6B5DE5]/20 to-[#E45DE5]/20 rounded-lg p-3 text-sm">
-                    ✅ Generated 12 lessons with interactive content
-                  </div>
-                  <div className="bg-gradient-to-r from-[#E45DE5]/20 to-[#FF835D]/20 rounded-lg p-3 text-sm">
-                    🎯 Created personalized learning paths for 127 students
-                  </div>
-                  <div className="bg-gradient-to-r from-[#FF835D]/20 to-[#6B5DE5]/20 rounded-lg p-3 text-sm">
-                    📊 Automated grading with 98% accuracy
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="absolute -top-4 -right-4 w-24 h-24 bg-gradient-to-r from-[#6B5DE5] to-[#E45DE5] rounded-full opacity-20 blur-xl"></div>
-            <div className="absolute -bottom-8 -left-4 w-32 h-32 bg-gradient-to-r from-[#E45DE5] to-[#FF835D] rounded-full opacity-20 blur-xl"></div>
+          </h1>
+          
+          {/* Details around main text */}
+          <div className="absolute -left-8 top-1/2 w-4 h-px bg-[#6B5DE5] opacity-20 hidden md:block" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '3.8s'}}></div>
+          <div className="absolute -right-8 top-1/2 w-4 h-px bg-[#E45DE5] opacity-20 hidden md:block" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4s'}}></div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-16">
+          <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.2s'}}>
+            Book a Consultation
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+          <ShinyButton className="px-8 py-3 flex items-center opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.4s'}}>
+            <Play className="mr-2 h-4 w-4" />
+            Watch Demo
+          </ShinyButton>
+        </div>
+
+        {/* Bottom Text */}
+        <div className="text-center">
+          <div className="mb-4 w-16 h-px bg-gradient-to-r from-transparent via-[#FF835D] to-transparent opacity-30"></div>
+          <h2 className="text-xs md:text-sm font-mono font-light text-gray-400 uppercase tracking-[0.2em] opacity-0">
+            <span className="word" data-delay="4600">Generate</span>
+            <span className="word" data-delay="4750">complete</span>
+            <span className="word" data-delay="4900">courses</span>
+            <span className="word" data-delay="5050">in</span>
+            <span className="word" data-delay="5200">minutes.</span>
+          </h2>
+          
+          {/* Additional details */}
+          <div className="mt-6 flex justify-center space-x-4 opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '5.5s'}}>
+            <div className="w-1 h-1 bg-[#6B5DE5] rounded-full opacity-40"></div>
+            <div className="w-1 h-1 bg-[#E45DE5] rounded-full opacity-60"></div>
+            <div className="w-1 h-1 bg-[#FF835D] rounded-full opacity-40"></div>
           </div>
         </div>
+
+        {/* Interactive Gradient */}
+        <div id="mouse-gradient" className="fixed pointer-events-none w-96 h-96 bg-gradient-radial from-[#6B5DE5]/10 to-transparent rounded-full blur-3xl transition-all duration-500 ease-out opacity-0"></div>
       </section>
+
+      {/* Custom Styles */}
+      <style jsx>{`
+        @keyframes word-appear {
+          0% {
+            opacity: 0;
+            transform: translateY(30px) scale(0.8);
+            filter: blur(10px);
+          }
+          50% {
+            opacity: 0.8;
+            transform: translateY(10px) scale(0.95);
+            filter: blur(2px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0);
+          }
+        }
+        
+        @keyframes grid-draw {
+          0% {
+            stroke-dashoffset: 1000;
+            opacity: 0;
+          }
+          50% {
+            opacity: 0.4;
+          }
+          100% {
+            stroke-dashoffset: 0;
+            opacity: 0.25;
+          }
+        }
+        
+        @keyframes pulse-glow {
+          0%, 100% {
+            opacity: 0.1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.3;
+            transform: scale(1.1);
+          }
+        }
+        
+        .word {
+          display: inline-block;
+          opacity: 0;
+          margin: 0 0.1em;
+          transition: all 0.3s ease;
+        }
+        
+        .word:hover {
+          color: #E45DE5;
+          transform: translateY(-2px);
+        }
+        
+        .grid-line {
+          stroke: #6B5DE5;
+          stroke-width: 0.5;
+          opacity: 0;
+          stroke-dasharray: 5 5;
+          stroke-dashoffset: 1000;
+          animation: grid-draw 2s ease-out forwards;
+        }
+        
+        .detail-dot {
+          fill: #6B5DE5;
+          opacity: 0;
+          animation: pulse-glow 3s ease-in-out infinite;
+        }
+        
+        .corner-element {
+          position: absolute;
+          width: 40px;
+          height: 40px;
+          border: 1px solid rgba(107, 93, 229, 0.4);
+          opacity: 0;
+          animation: word-appear 1s ease-out forwards;
+        }
+        
+        .corner-element::before {
+          content: '';
+          position: absolute;
+          width: 8px;
+          height: 8px;
+          background: rgba(107, 93, 229, 0.5);
+          border-radius: 50%;
+        }
+        
+        .text-decoration {
+          position: relative;
+        }
+        
+        .text-decoration::after {
+          content: '';
+          position: absolute;
+          bottom: -4px;
+          left: 0;
+          width: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, #6B5DE5, transparent);
+          animation: underline-grow 2s ease-out forwards;
+          animation-delay: 4s;
+        }
+        
+        @keyframes underline-grow {
+          to {
+            width: 100%;
+          }
+        }
+        
+        .floating-element {
+          position: absolute;
+          width: 2px;
+          height: 2px;
+          background: #6B5DE5;
+          border-radius: 50%;
+          opacity: 0;
+          animation: float 4s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0) translateX(0);
+            opacity: 0.2;
+          }
+          25% {
+            transform: translateY(-10px) translateX(5px);
+            opacity: 0.6;
+          }
+          50% {
+            transform: translateY(-5px) translateX(-3px);
+            opacity: 0.4;
+          }
+          75% {
+            transform: translateY(-15px) translateX(7px);
+            opacity: 0.8;
+          }
+        }
+      `}</style>
 
       {/* Features Grid */}
       <section className="px-6 py-20 bg-gray-900/50">
