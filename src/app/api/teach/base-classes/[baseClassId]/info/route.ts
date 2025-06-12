@@ -4,10 +4,11 @@ import { cookies } from 'next/headers';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ baseClassId: string }> }
 ) {
   try {
     const cookieStore = await cookies();
+    const { baseClassId } = await params;
     
     // Create Supabase client
     const supabase = createServerClient(
@@ -42,8 +43,6 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const baseClassId = params.id;
-
     // Fetch base class information
     const { data: baseClass, error: baseClassError } = await supabase
       .from('base_classes')
@@ -55,47 +54,42 @@ export async function GET(
       return NextResponse.json({ error: 'Base class not found' }, { status: 404 });
     }
 
-    // Count total lessons
-    const { count: totalLessons, error: lessonsError } = await supabase
+    // Count total lessons - lessons are linked through paths to base classes
+    const { data: lessonsData, error: lessonsError } = await supabase
       .from('lessons')
-      .select('id', { count: 'exact' })
-      .eq('base_class_id', baseClassId);
+      .select('id, paths!inner(base_class_id)')
+      .eq('paths.base_class_id', baseClassId);
 
+    const totalLessons = lessonsData?.length || 0;
+    
     if (lessonsError) {
       console.error('Error counting lessons:', lessonsError);
     }
 
-    // Count total lesson sections
-    const { count: totalSections, error: sectionsError } = await supabase
-      .from('lesson_sections')
-      .select('lesson_id', { count: 'exact' })
-      .eq('lessons.base_class_id', baseClassId);
-
-    if (sectionsError) {
-      console.error('Error counting sections:', sectionsError);
-      // Try an alternative approach with join
-      const { data: sectionsData, error: sectionsError2 } = await supabase
+    // Count total lesson sections - get lesson IDs first, then count their sections
+    let totalSections = 0;
+    
+    if (lessonsData && lessonsData.length > 0) {
+      const lessonIds = lessonsData.map(lesson => lesson.id);
+      
+      const { data: sectionsData, error: sectionsError } = await supabase
         .from('lesson_sections')
-        .select('id, lessons!inner(base_class_id)')
-        .eq('lessons.base_class_id', baseClassId);
-      
-      const alternativeTotalSections = sectionsData?.length || 0;
-      
-      return NextResponse.json({
-        id: baseClass.id,
-        name: baseClass.name,
-        description: baseClass.description,
-        totalLessons: totalLessons || 0,
-        totalSections: alternativeTotalSections
-      });
+        .select('id')
+        .in('lesson_id', lessonIds);
+
+      if (sectionsError) {
+        console.error('Error counting sections:', sectionsError);
+      } else {
+        totalSections = sectionsData?.length || 0;
+      }
     }
 
     return NextResponse.json({
       id: baseClass.id,
       name: baseClass.name,
       description: baseClass.description,
-      totalLessons: totalLessons || 0,
-      totalSections: totalSections || 0
+      totalLessons: totalLessons,
+      totalSections: totalSections
     });
 
   } catch (error) {

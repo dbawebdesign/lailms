@@ -22,7 +22,7 @@ import type { Path as DndPath } from '@/types/lesson'; // Use a specific type fo
 
 // Define the shape of the params object if it were resolved
 interface ResolvedPageParams {
-  id: string;
+  baseClassId: string;
 }
 
 interface BaseClassStudioPageProps {
@@ -33,7 +33,7 @@ interface BaseClassStudioPageProps {
 const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
   // In Next.js 15, params is always a Promise
   const resolvedParamsSignal = use(props.params);
-  const { id: baseClassId } = resolvedParamsSignal;
+  const { baseClassId } = resolvedParamsSignal;
 
   const [studioBaseClass, setStudioBaseClass] = useState<StudioBaseClass | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -986,7 +986,7 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
           <div 
             className={`
               ${isNavOpen ? 'block' : 'hidden'} lg:block 
-              w-full lg:w-[350px] xl:w-[400px] 
+              w-full lg:w-[280px] xl:w-[320px] 2xl:w-[350px]
               border-b lg:border-b-0 lg:border-r border-border 
               flex flex-col
               flex-shrink-0 
@@ -994,7 +994,7 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
             `}
           >
             {/* Navigation content with proper scrolling */}
-            <div className="flex-1 p-4 overflow-y-auto min-h-0" style={{ isolation: 'isolate' }}>
+            <div className="flex-1 p-3 lg:p-4 overflow-y-auto min-h-0" style={{ isolation: 'isolate' }}>
               {studioBaseClass && (
                 <div className="studio-navigation-tree" style={{ position: 'relative', zIndex: 1 }}>
                   <StudioNavigationTree 
@@ -1060,20 +1060,20 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
           }}
           actionable={true}
         >
-          <div className="flex-1 flex flex-col h-full">
+          <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
             {/* Fixed Header */}
-            <div className="sticky top-0 z-10 p-6 border-b border-border bg-background">
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Base Class Studio</h1>
+            <div className="sticky top-0 z-10 p-4 lg:p-6 border-b border-border bg-background flex-shrink-0">
+              <h1 className="text-xl lg:text-2xl xl:text-3xl font-bold text-foreground truncate">Base Class Studio</h1>
               {selectedItem && selectedItem.title && (
-                <p className="text-md md:text-lg text-muted-foreground mt-1">Editing: {selectedItem.title}</p>
+                <p className="text-sm lg:text-md xl:text-lg text-muted-foreground mt-1 truncate">Editing: {selectedItem.title}</p>
               )}
             </div>
             
-            {/* Sticky Editor Container - Below Header */}
-            <div className="flex-1 relative w-full">
-              <div className="sticky top-32 z-20 p-6 mt-6 w-full">
-                <div className="w-full min-w-full bg-background rounded-lg shadow-lg border border-border p-6">
-                  <div className="w-full">
+            {/* Scrollable Editor Container */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <div className="p-4 lg:p-6">
+                <div className="w-full max-w-none bg-background rounded-lg shadow-lg border border-border">
+                  <div className="p-4 lg:p-6 w-full min-w-0">
                     {renderEditor()}
                   </div>
                 </div>

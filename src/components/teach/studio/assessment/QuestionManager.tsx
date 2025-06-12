@@ -148,15 +148,18 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
   const loadQuestions = async () => {
     setIsLoading(true);
     try {
-      // TODO: Implement API call to fetch questions
-      // const response = await fetch(`/api/teach/lessons/${lessonId}/questions`);
-      // const data = await response.json();
-      // setQuestions(data.questions || []);
-      
-      // Mock data for now
-      setQuestions([]);
+      // Fetch questions for this base class
+      const response = await fetch(`/api/teach/base-classes/${baseClassId}/questions`);
+      if (response.ok) {
+        const data = await response.json();
+        setQuestions(data.questions || []);
+      } else {
+        console.error('Failed to fetch questions:', response.statusText);
+        setQuestions([]);
+      }
     } catch (error) {
       console.error('Failed to load questions:', error);
+      setQuestions([]);
     } finally {
       setIsLoading(false);
     }
@@ -433,12 +436,12 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 lg:space-y-6 w-full min-w-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Question Management</h2>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl lg:text-2xl font-bold text-foreground truncate">Question Management</h2>
+          <p className="text-sm lg:text-base text-muted-foreground">
             Create and organize assessment questions {lessonId ? 'for this lesson' : 'for your course'}
           </p>
         </div>
@@ -447,10 +450,12 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
           <Button
             onClick={handleGenerateButtonClick}
             disabled={isGenerating}
-            className="bg-gradient-to-r from-purple-600 to-blue-600"
+            className="bg-gradient-to-r from-purple-600 to-blue-600 flex-shrink-0"
+            size="sm"
           >
             <Brain className="h-4 w-4 mr-2" />
-            Generate from Content
+            <span className="hidden sm:inline">Generate from Content</span>
+            <span className="sm:hidden">Generate</span>
           </Button>
         )}
       </div>
@@ -466,8 +471,8 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
         {/* Question Bank Tab */}
         <TabsContent value="bank" className="space-y-4">
           {/* Search and Filters */}
-          <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
-            <div className="flex-1">
+          <div className="flex flex-col lg:flex-row gap-4 p-4 bg-muted/30 rounded-lg">
+            <div className="flex-1 min-w-0">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -479,36 +484,39 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
               </div>
             </div>
             
-            <Select value={selectedQuestionType} onValueChange={setSelectedQuestionType}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Question Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                {questionTypes.map(type => (
-                  <SelectItem key={type.id} value={type.id}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Difficulty" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Levels</SelectItem>
-                <SelectItem value="easy">Easy</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="hard">Hard</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Button variant="outline" size="sm">
-              <Filter className="h-4 w-4 mr-2" />
-              More Filters
-            </Button>
+            <div className="flex flex-wrap gap-2 lg:gap-4">
+              <Select value={selectedQuestionType} onValueChange={setSelectedQuestionType}>
+                <SelectTrigger className="w-full sm:w-40">
+                  <SelectValue placeholder="Question Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {questionTypes.map(type => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
+                <SelectTrigger className="w-full sm:w-32">
+                  <SelectValue placeholder="Difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Levels</SelectItem>
+                  <SelectItem value="easy">Easy</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="hard">Hard</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Button variant="outline" size="sm" className="flex-shrink-0">
+                <Filter className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">More Filters</span>
+                <span className="sm:hidden">Filters</span>
+              </Button>
+            </div>
           </div>
 
           {/* Questions Grid */}
@@ -532,7 +540,7 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
 
         {/* Create Questions Tab */}
         <TabsContent value="create" className="space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {questionTypes.map(type => {
               const Icon = type.icon;
               return (
