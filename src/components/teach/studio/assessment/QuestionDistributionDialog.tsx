@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -182,13 +182,7 @@ export const QuestionDistributionDialog: React.FC<QuestionDistributionDialogProp
   }, [config, customTypeDistribution]);
 
   // Initialize with balanced preset
-  useEffect(() => {
-    if (selectedPreset === 'balanced' && Object.keys(customTypeDistribution).length === 0) {
-      handlePresetSelect('balanced');
-    }
-  }, []);
-
-  const handlePresetSelect = (presetKey: string) => {
+  const handlePresetSelect = useCallback((presetKey: string) => {
     const preset = presetConfigurations[presetKey as keyof typeof presetConfigurations];
     if (!preset) return;
 
@@ -219,7 +213,14 @@ export const QuestionDistributionDialog: React.FC<QuestionDistributionDialogProp
         bloomTaxonomyDistribution: {}
       }
     }));
-  };
+  }, [config.totalQuestions]);
+
+  // Initialize with balanced preset
+  useEffect(() => {
+    if (selectedPreset === 'balanced' && Object.keys(customTypeDistribution).length === 0) {
+      handlePresetSelect('balanced');
+    }
+  }, [selectedPreset, customTypeDistribution, handlePresetSelect]);
 
   const handleTypeDistributionChange = (type: string, count: number) => {
     const newDistribution = { ...customTypeDistribution, [type]: count };

@@ -36,9 +36,13 @@ const LunaContextElement: React.FC<LunaContextElementProps> = ({
   const lunaContext = useLunaContext();
   
   // Memoize the content, state, and metadata to prevent unnecessary re-renders
-  const memoizedContent = useMemo(() => content, [JSON.stringify(content)]);
-  const memoizedState = useMemo(() => state, [JSON.stringify(state)]);
-  const memoizedMetadata = useMemo(() => metadata, [JSON.stringify(metadata)]);
+  const contentString = JSON.stringify(content);
+  const stateString = JSON.stringify(state);
+  const metadataString = JSON.stringify(metadata);
+  
+  const memoizedContent = useMemo(() => content, [contentString]);
+  const memoizedState = useMemo(() => state, [stateString]);
+  const memoizedMetadata = useMemo(() => metadata, [metadataString]);
 
   // Stabilize the lunaContext functions to prevent re-registration
   const lunaContextRef = useRef(lunaContext);

@@ -28,15 +28,15 @@ export default function AnimatedHero() {
       mouseY = e.clientY
       
       if (gradient) {
-        gradient.style.left = (mouseX - 192) + 'px'
-        gradient.style.top = (mouseY - 192) + 'px'
-        gradient.style.opacity = '1'
+        (gradient as HTMLElement).style.left = (mouseX - 192) + 'px'
+        ;(gradient as HTMLElement).style.top = (mouseY - 192) + 'px'
+        ;(gradient as HTMLElement).style.opacity = '1'
       }
     }
 
     const handleMouseLeave = () => {
       if (gradient) {
-        gradient.style.opacity = '0'
+        (gradient as HTMLElement).style.opacity = '0'
       }
     }
 
@@ -210,151 +210,9 @@ export default function AnimatedHero() {
           </div>
         </div>
 
-        {/* Interactive Gradient */}
+                {/* Interactive Gradient */}
         <div id="mouse-gradient" className="fixed pointer-events-none w-96 h-96 bg-gradient-radial from-[#6B5DE5]/10 to-transparent rounded-full blur-3xl transition-all duration-500 ease-out opacity-0"></div>
       </section>
-
-      {/* Custom Styles */}
-      <style jsx>{`
-        @keyframes word-appear {
-          0% {
-            opacity: 0;
-            transform: translateY(30px) scale(0.8);
-            filter: blur(10px);
-          }
-          50% {
-            opacity: 0.8;
-            transform: translateY(10px) scale(0.95);
-            filter: blur(2px);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-            filter: blur(0);
-          }
-        }
-        
-        @keyframes grid-draw {
-          0% {
-            stroke-dashoffset: 1000;
-            opacity: 0;
-          }
-          50% {
-            opacity: 0.3;
-          }
-          100% {
-            stroke-dashoffset: 0;
-            opacity: 0.15;
-          }
-        }
-        
-        @keyframes pulse-glow {
-          0%, 100% {
-            opacity: 0.1;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.3;
-            transform: scale(1.1);
-          }
-        }
-        
-        .word {
-          display: inline-block;
-          opacity: 0;
-          margin: 0 0.1em;
-          transition: all 0.3s ease;
-        }
-        
-        .word:hover {
-          color: #E45DE5;
-          transform: translateY(-2px);
-        }
-        
-        .grid-line {
-          stroke: #6B5DE5;
-          stroke-width: 0.5;
-          opacity: 0;
-          stroke-dasharray: 5 5;
-          stroke-dashoffset: 1000;
-          animation: grid-draw 2s ease-out forwards;
-        }
-        
-        .detail-dot {
-          fill: #6B5DE5;
-          opacity: 0;
-          animation: pulse-glow 3s ease-in-out infinite;
-        }
-        
-        .corner-element {
-          position: absolute;
-          width: 40px;
-          height: 40px;
-          border: 1px solid rgba(107, 93, 229, 0.2);
-          opacity: 0;
-          animation: word-appear 1s ease-out forwards;
-        }
-        
-        .corner-element::before {
-          content: '';
-          position: absolute;
-          width: 8px;
-          height: 8px;
-          background: rgba(107, 93, 229, 0.3);
-          border-radius: 50%;
-        }
-        
-        .text-decoration {
-          position: relative;
-        }
-        
-        .text-decoration::after {
-          content: '';
-          position: absolute;
-          bottom: -4px;
-          left: 0;
-          width: 0;
-          height: 1px;
-          background: linear-gradient(90deg, transparent, #6B5DE5, transparent);
-          animation: underline-grow 2s ease-out forwards;
-          animation-delay: 4s;
-        }
-        
-        @keyframes underline-grow {
-          to {
-            width: 100%;
-          }
-        }
-        
-        .floating-element {
-          position: absolute;
-          width: 2px;
-          height: 2px;
-          background: #6B5DE5;
-          border-radius: 50%;
-          opacity: 0;
-          animation: float 4s ease-in-out infinite;
-        }
-        
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(0) translateX(0);
-            opacity: 0.2;
-          }
-          25% {
-            transform: translateY(-10px) translateX(5px);
-            opacity: 0.6;
-          }
-          50% {
-            transform: translateY(-5px) translateX(-3px);
-            opacity: 0.4;
-          }
-          75% {
-            transform: translateY(-15px) translateX(7px);
-            opacity: 0.8;
-          }
-        }
-      `}</style>
     </>
   )
 } 

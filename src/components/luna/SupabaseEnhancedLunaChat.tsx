@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -211,7 +211,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     checkDatabase();
   }, [userId, supabase]);
 
-  const loadConversations = async () => {
+  const loadConversations = useCallback(async () => {
     try {
       console.log('🔍 Loading conversations for user:', userId);
       
@@ -245,7 +245,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     } catch (error) {
       console.error('❌ Failed to load conversations:', error);
     }
-  };
+  }, [userId, supabase]);
 
   const loadMessages = async (conversationId: string) => {
     try {
