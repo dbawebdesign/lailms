@@ -6,11 +6,11 @@ import { QuestionValidationService } from '@/lib/services/question-validation-se
 // GET /api/teach/assessments/lesson/[lessonId] - Get lesson assessments
 export async function GET(
   request: NextRequest,
-  { params }: { params: { lessonId: string } }
+  { params }: { params: Promise<{ lessonId: string }> }
 ) {
   try {
     const supabase = createSupabaseServerClient();
-    const { lessonId } = params;
+    const { lessonId } = await params;
     const { searchParams } = new URL(request.url);
     
     // Get query parameters
@@ -181,11 +181,11 @@ export async function GET(
 // POST /api/teach/assessments/lesson/[lessonId] - Create new lesson assessment
 export async function POST(
   request: NextRequest,
-  { params }: { params: { lessonId: string } }
+  { params }: { params: Promise<{ lessonId: string }> }
 ) {
   try {
     const supabase = createSupabaseServerClient();
-    const { lessonId } = params;
+    const { lessonId } = await params;
     const body = await request.json();
 
     // Verify user authentication

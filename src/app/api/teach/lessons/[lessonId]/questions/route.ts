@@ -4,10 +4,11 @@ import { QuestionGenerationService } from '@/lib/services/question-generation-se
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { lessonId: string } }
+  { params }: { params: Promise<{ lessonId: string }> }
 ) {
   try {
     const supabase = createSupabaseServerClient();
+    const { lessonId } = await params;
 
     // Get user session
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -15,7 +16,6 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { lessonId } = params;
     const { searchParams } = new URL(request.url);
     const assessmentId = searchParams.get('assessment_id');
     const questionType = searchParams.get('type');
@@ -63,7 +63,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { lessonId: string } }
+  { params }: { params: Promise<{ lessonId: string }> }
 ) {
   try {
     const supabase = createSupabaseServerClient();
@@ -74,7 +74,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { lessonId } = params;
+    const { lessonId } = await params;
     const body = await request.json();
 
     const {

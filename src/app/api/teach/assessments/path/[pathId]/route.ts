@@ -5,11 +5,11 @@ import { QuestionGenerationService } from '@/lib/services/question-generation-se
 // GET /api/teach/assessments/path/[pathId] - Get path assessments
 export async function GET(
   request: NextRequest,
-  { params }: { params: { pathId: string } }
+  { params }: { params: Promise<{ pathId: string }> }
 ) {
   try {
     const supabase = createSupabaseServerClient();
-    const { pathId } = params;
+    const { pathId } = await params;
     const { searchParams } = new URL(request.url);
     
     // Get query parameters
@@ -108,11 +108,11 @@ export async function GET(
 // POST /api/teach/assessments/path/[pathId] - Create new path assessment
 export async function POST(
   request: NextRequest,
-  { params }: { params: { pathId: string } }
+  { params }: { params: Promise<{ pathId: string }> }
 ) {
   try {
     const supabase = createSupabaseServerClient();
-    const { pathId } = params;
+    const { pathId } = await params;
     const body = await request.json();
 
     // Verify user authentication
