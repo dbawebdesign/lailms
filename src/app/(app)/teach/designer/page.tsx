@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr';
 import { BookOpen, PenLine, Sparkles, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
@@ -33,7 +33,10 @@ export default function TeachDesignerPage() {
       // Load recent base classes
       const fetchRecentBaseClasses = async () => {
         try {
-          const supabase = createClientComponentClient();
+          const supabase = createBrowserClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+          );
           const { data, error } = await supabase
             .from('base_classes')
             .select('id, name, description, settings, created_at')

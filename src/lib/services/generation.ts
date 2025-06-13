@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
 
 // Initialize OpenAI client
@@ -114,7 +114,10 @@ async function storeGeneration(
   asset_type: string
 ): Promise<string | null> {
   try {
-    const supabase = createClientComponentClient<Database>();
+    const supabase = createBrowserClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
     
     // Get current user
     const { data: { user } } = await supabase.auth.getUser();
@@ -164,7 +167,10 @@ async function storeCitation(
   relevanceScore: number
 ): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient<Database>();
+    const supabase = createBrowserClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
     
     const { error } = await supabase
       .from('generation_citations')

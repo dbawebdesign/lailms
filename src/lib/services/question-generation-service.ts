@@ -3,9 +3,9 @@ import { SupabaseClient } from '@supabase/supabase-js';
 
 // Types for question generation
 interface QuestionGenerationOptions {
-  lessonId?: string;
+  lessonId: string;
   sectionIds?: string[];
-  baseClassId: string;
+  baseClassId?: string; // No longer the primary identifier, can be derived from lesson
   questionTypes: string[];
   difficulty: 'easy' | 'medium' | 'hard';
   numQuestions: number;
@@ -95,8 +95,8 @@ export class QuestionGenerationService {
   private openai: OpenAI;
   private supabase: SupabaseClient;
 
-  constructor(supabase: SupabaseClient) {
-    this.supabase = supabase;
+  constructor(supabase?: SupabaseClient) {
+    this.supabase = supabase!;
     
     if (!process.env.OPENAI_API_KEY) {
       throw new Error('OpenAI API key is not configured. Please set OPENAI_API_KEY environment variable.');
@@ -107,25 +107,97 @@ export class QuestionGenerationService {
     });
   }
 
+  // New method for lesson-level question generation
+  async generateLessonQuestions(options: {
+    lessonId: string;
+    lessonTitle: string;
+    lessonContent: string;
+    questionCount: number;
+    difficultyLevels: string[];
+    questionTypes: string[];
+    bloomTaxonomyLevels: string[];
+    learningObjectives: string[];
+    userId?: string;
+    saveToDatabase?: boolean;
+  }) {
+    try {
+      console.log('Generating questions for lesson:', options.lessonId);
+
+      // Create a focused prompt for lesson-specific content
+      const prompt = this.buildLessonQuestionPrompt(options);
+      
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert educational assessment designer. Generate high-quality questions based on specific lesson content that support mastery learning progression.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 3000
+      });
+
+      const aiResponse = response.choices[0]?.message?.content || '';
+      
+      // Parse the AI response into structured questions
+      const questions = this.parseLessonQuestions(aiResponse, options);
+      
+      // Save to database if requested and userId provided
+      if (options.saveToDatabase && options.userId) {
+        const savedQuestions = await this.saveLessonQuestionsToDatabase(questions, options);
+        return {
+          questions: savedQuestions,
+          metadata: {
+            lessonId: options.lessonId,
+            lessonTitle: options.lessonTitle,
+            questionCount: questions.length,
+            generationTimestamp: new Date().toISOString(),
+            difficultyLevels: options.difficultyLevels,
+            questionTypes: options.questionTypes,
+            bloomTaxonomyLevels: options.bloomTaxonomyLevels,
+            learningObjectives: options.learningObjectives
+          }
+        };
+      }
+      
+      return { questions, metadata: null };
+    } catch (error) {
+      console.error('Error generating lesson questions:', error);
+      throw error;
+    }
+  }
+
   async generateQuestionsFromContent(options: QuestionGenerationOptions) {
     try {
-      // 1. Fetch comprehensive content from the entire base class
+      // 1. Fetch comprehensive content from the lesson
       const comprehensiveContent = await this.fetchComprehensiveContent(options);
       
+      // Add baseClassId to options for any downstream methods that might still need it (like folder creation, etc.)
+      // Although ideal to remove, this provides a bridge during refactoring.
+      const optionsWithContext = {
+        ...options,
+        baseClassId: comprehensiveContent.baseClass.id,
+      };
+
       // 2. Analyze and extract key concepts from all content
       const analyzedContent = await this.analyzeComprehensiveContent(comprehensiveContent);
       
       // 3. Create question distribution plan
-      const distributionPlan = this.createDistributionPlan(options);
+      const distributionPlan = this.createDistributionPlan(optionsWithContext);
       
       // 4. Generate questions using AI with distribution plan
-      const questions = await this.generateQuestionsWithDistribution(analyzedContent, options, distributionPlan);
+      const questions = await this.generateQuestionsWithDistribution(analyzedContent, optionsWithContext, distributionPlan);
       
       // 5. Validate and enhance questions
-      const validatedQuestions = await this.validateQuestions(questions, options);
+      const validatedQuestions = await this.validateQuestions(questions, optionsWithContext);
       
       // 6. Save questions to database
-      const savedQuestions = await this.saveQuestionsToDatabase(validatedQuestions, options);
+      const savedQuestions = await this.saveQuestionsToDatabase(validatedQuestions, optionsWithContext);
 
       return {
         questions: savedQuestions,
@@ -158,137 +230,121 @@ export class QuestionGenerationService {
     }
   }
 
-  // Enhanced method to fetch comprehensive content from entire base class
+  // Rewritten to be lesson-centric instead of base-class-centric
   private async fetchComprehensiveContent(options: QuestionGenerationOptions): Promise<ComprehensiveContent> {
-    console.log('Fetching comprehensive content for base class:', options.baseClassId);
+    console.log(`Fetching comprehensive content for lesson: ${options.lessonId}`);
     
-    // 1. Fetch base class information
-    const { data: baseClass, error: baseClassError } = await this.supabase
-      .from('base_classes')
-      .select('id, name, description, settings')
-      .eq('id', options.baseClassId)
-      .single();
-
-    if (baseClassError || !baseClass) {
-      throw new Error(`Failed to fetch base class information: ${baseClassError?.message || 'Base class not found'}`);
-    }
-
-    // 2. Fetch all paths in the base class
-    const { data: paths, error: pathsError } = await this.supabase
-      .from('paths')
-      .select('id, title, description, level, order_index')
-      .eq('base_class_id', options.baseClassId)
-      .order('order_index', { ascending: true });
-
-    if (pathsError) {
-      throw new Error(`Failed to fetch paths: ${pathsError.message}`);
-    }
-
-    // 3. Fetch all lessons in the base class
-    const { data: lessons, error: lessonsError } = await this.supabase
+    // 1. Fetch the lesson and its parent info
+    const { data: lessonData, error: lessonError } = await this.supabase
       .from('lessons')
       .select(`
-        id, 
-        title, 
-        description, 
-        level, 
+        id,
+        title,
+        description,
+        level,
         order_index,
-        path_id,
-        paths!inner(
+        paths (
+          id,
           title,
-          base_class_id
+          description,
+          level,
+          order_index,
+          base_classes (
+            id,
+            name,
+            description,
+            settings
+          )
         )
       `)
-      .eq('paths.base_class_id', options.baseClassId)
-      .order('order_index', { ascending: true });
+      .eq('id', options.lessonId)
+      .single();
 
-    if (lessonsError) {
-      throw new Error(`Failed to fetch lessons: ${lessonsError.message}`);
+    if (lessonError || !lessonData) {
+      throw new Error(`Failed to fetch lesson information: ${lessonError?.message || 'Lesson not found'}`);
     }
 
-    // 4. Get lesson IDs from the lessons we just fetched
-    const lessonIds = lessons?.map(lesson => lesson.id) || [];
+    const pathData = lessonData.paths;
+    const baseClassData = pathData?.base_classes;
+
+    if (!pathData || !baseClassData) {
+      throw new Error('Lesson is not properly associated with a path and base class.');
+    }
     
-    if (lessonIds.length === 0) {
-      throw new Error('No lessons found in this base class. Please create lessons before generating questions.');
-    }
-
-    // 5. Fetch all lesson sections with comprehensive joins
-    let sectionsQuery = this.supabase
-      .from('lesson_sections')
+    // 2. Fetch sections for the lesson (or specific sections if ids provided)
+    let sectionQuery = this.supabase
+      .from('sections')
       .select(`
         id,
         title,
         content,
         section_type,
         order_index,
-        lesson_id,
-        lessons!inner(
+        lessons (
           id,
           title,
           description,
-          path_id,
-          paths!inner(title, description)
+          paths (
+            title,
+            description
+          )
         )
       `)
-      .in('lesson_id', lessonIds)
-      .order('order_index', { ascending: true });
+      .eq('lesson_id', options.lessonId);
 
-    // 6. Apply filters if specified
-    if (options.lessonId) {
-      sectionsQuery = sectionsQuery.eq('lesson_id', options.lessonId);
-    } else if (options.sectionIds?.length) {
-      sectionsQuery = sectionsQuery.in('id', options.sectionIds);
+    if (options.sectionIds && options.sectionIds.length > 0) {
+      sectionQuery = sectionQuery.in('id', options.sectionIds);
     }
 
-    const { data: sectionsData, error: sectionsError } = await sectionsQuery;
+    const { data: sections, error: sectionsError } = await sectionQuery.order('order_index', { ascending: true });
 
     if (sectionsError) {
-      throw new Error(`Failed to fetch lesson sections: ${sectionsError.message}`);
+      throw new Error(`Failed to fetch sections: ${sectionsError.message}`);
     }
 
-    if (!sectionsData || sectionsData.length === 0) {
-      const errorMessage = options.lessonId 
-        ? 'No content found for the specified lesson. Please ensure the lesson has content sections before generating questions.'
-        : 'No lesson content found in this base class. Please create lessons with content sections before generating questions.';
-      throw new Error(errorMessage);
-    }
-
-    // Transform the data into our expected format
-    const sections: ContentSection[] = sectionsData.map(section => ({
-      id: section.id,
-      title: section.title,
-      content: section.content,
-      section_type: section.section_type,
-      lesson_title: (section.lessons as any).title,
-      lesson_id: section.lesson_id,
-      lesson_description: (section.lessons as any).description,
-      path_title: (section.lessons as any).paths?.title,
-      path_description: (section.lessons as any).paths?.description,
-      order_index: section.order_index
-    }));
-
-    const formattedLessons = lessons?.map(lesson => ({
-      id: lesson.id,
-      title: lesson.title,
-      description: lesson.description,
-      level: lesson.level,
-      path_title: (lesson.paths as any)?.title,
-      order_index: lesson.order_index
-    })) || [];
-
-    return {
-      baseClass,
-      paths: paths || [],
-      lessons: formattedLessons,
-      sections,
+    // 3. Construct the ComprehensiveContent object
+    const comprehensiveContent: ComprehensiveContent = {
+      baseClass: {
+        id: baseClassData.id,
+        name: baseClassData.name,
+        description: baseClassData.description,
+        settings: baseClassData.settings,
+      },
+      paths: [{
+        id: pathData.id,
+        title: pathData.title,
+        description: pathData.description,
+        level: pathData.level,
+        order_index: pathData.order_index,
+      }],
+      lessons: [{
+        id: lessonData.id,
+        title: lessonData.title,
+        description: lessonData.description,
+        level: lessonData.level,
+        path_title: pathData.title,
+        order_index: lessonData.order_index,
+      }],
+      sections: sections.map(s => ({
+        id: s.id,
+        title: s.title,
+        content: s.content,
+        section_type: s.section_type,
+        lesson_title: s.lessons?.title || lessonData.title,
+        lesson_id: s.lessons?.id || lessonData.id,
+        lesson_description: s.lessons?.description || lessonData.description,
+        path_title: s.lessons?.paths?.title || pathData.title,
+        path_description: s.lessons?.paths?.description || pathData.description,
+        order_index: s.order_index,
+      })),
       totalSections: sections.length,
-      totalLessons: formattedLessons.length,
-      totalPaths: (paths || []).length
+      totalLessons: 1,
+      totalPaths: 1,
     };
+
+    return comprehensiveContent;
   }
 
-  // Enhanced content analysis with comprehensive context
   private async analyzeComprehensiveContent(comprehensiveContent: ComprehensiveContent) {
     console.log('Analyzing comprehensive content with', comprehensiveContent.totalSections, 'sections');
     
@@ -763,89 +819,287 @@ Generate exactly ${numQuestions} questions now:
     });
   }
 
-  private async getOrCreateAIQuestionFolder(baseClassId: string, userId: string): Promise<string> {
-    // First, try to find existing AI-generated questions folder for this base class
-    const { data: existingFolder } = await this.supabase
-      .from('question_folders')
-      .select('id')
-      .eq('base_class_id', baseClassId)
-      .eq('name', 'AI Generated Questions')
-      .single();
-
-    if (existingFolder) {
-      return existingFolder.id;
-    }
-
-    // Create new folder for AI-generated questions
-    const { data: newFolder, error } = await this.supabase
-      .from('question_folders')
-      .insert({
-        name: 'AI Generated Questions',
-        description: 'Questions automatically generated by AI from lesson content',
-        base_class_id: baseClassId,
-        created_by: userId,
-        color: '#10B981' // Green color for AI-generated content
-      })
-      .select('id')
-      .single();
-
-    if (error) {
-      throw new Error(`Failed to create AI questions folder: ${error.message}`);
-    }
-
-    return newFolder.id;
-  }
-
   private async saveQuestionsToDatabase(
     questions: GeneratedQuestion[], 
     options: QuestionGenerationOptions
   ) {
-    // Get or create the AI questions folder
-    const folderId = await this.getOrCreateAIQuestionFolder(options.baseClassId, options.userId);
-    
+    console.log(`Saving ${questions.length} questions for lesson ${options.lessonId}`);
+
+    const questionsToInsert = questions.map(q => ({
+      question_text: q.question_text,
+      question_type: q.question_type,
+      points: q.points,
+      difficulty_score: this.difficultyToScore(q.metadata.difficulty_level),
+      cognitive_level: q.metadata.bloom_taxonomy,
+      tags: q.metadata.tags,
+      learning_objectives: q.metadata.learning_objectives,
+      estimated_time: q.metadata.estimated_time,
+      metadata: q.metadata,
+      lesson_id: options.lessonId, // Associate with the lesson
+      created_by: options.userId,
+    }));
+
+    // Perform the insert operation
+    const { data: insertedQuestions, error } = await this.supabase
+      .from('questions')
+      .insert(questionsToInsert)
+      .select();
+
+    if (error) {
+      console.error('Error saving generated questions:', error);
+      throw new Error(`Failed to save questions to database: ${error.message}`);
+    }
+
+    // Since we are not using folders, we just return the inserted questions.
+    return insertedQuestions;
+  }
+
+  private difficultyToScore(difficulty: string): number {
+    const scores = { easy: 3, medium: 5, hard: 8 };
+    return scores[difficulty as keyof typeof scores] || 5;
+  }
+
+  // Helper methods for lesson-level question generation
+  private buildLessonQuestionPrompt(options: {
+    lessonId: string;
+    lessonTitle: string;
+    lessonContent: string;
+    questionCount: number;
+    difficultyLevels: string[];
+    questionTypes: string[];
+    bloomTaxonomyLevels: string[];
+    learningObjectives: string[];
+  }): string {
+    return `
+Generate ${options.questionCount} educational assessment questions based ONLY on the following lesson content.
+
+LESSON INFORMATION:
+Title: ${options.lessonTitle}
+Content: ${options.lessonContent}
+
+REQUIREMENTS:
+- Question Types: ${options.questionTypes.join(', ')}
+- Difficulty Levels: ${options.difficultyLevels.join(', ')}
+- Bloom's Taxonomy Levels: ${options.bloomTaxonomyLevels.join(', ')}
+- Learning Objectives: ${options.learningObjectives.join(', ')}
+
+CRITICAL FORMATTING REQUIREMENTS:
+1. Questions must be directly tied to the lesson content provided
+2. Support mastery learning progression - build from basic to advanced concepts
+3. Each question should assess specific learning objectives
+4. Provide clear, unambiguous correct answers with proper validation data
+5. Include explanations that reinforce learning
+6. Ensure answers are formatted for easy student interaction and automated grading
+
+QUESTION TYPE SPECIFICATIONS:
+
+MULTIPLE CHOICE:
+- Provide exactly 4 options (A, B, C, D)
+- Only ONE option should be correct
+- Options should be plausible but clearly distinguishable
+- Avoid "all of the above" or "none of the above"
+- correctAnswer should match exactly one of the options
+
+TRUE/FALSE:
+- Question should have a clear true or false answer
+- correctAnswer should be exactly "true" or "false" (lowercase)
+- Provide explanation for why the statement is true or false
+
+SHORT ANSWER:
+- Questions should have specific, measurable answers
+- correctAnswer should be the expected response (can include multiple acceptable variations)
+- Keep answers concise (1-3 sentences max)
+- Provide clear grading criteria in explanation
+
+ESSAY:
+- Questions should require thoughtful analysis or synthesis
+- correctAnswer should include key points that should be addressed
+- Provide rubric-style guidance in explanation
+- Include minimum word count expectations
+
+FORMAT YOUR RESPONSE AS JSON:
+[
+  {
+    "question": "Clear, specific question text here",
+    "type": "multiple_choice|true_false|short_answer|essay",
+    "difficulty": "easy|medium|hard",
+    "bloomLevel": "remember|understand|apply|analyze|evaluate|create",
+    "points": 1-5,
+    "options": ["Option A", "Option B", "Option C", "Option D"], // Only for multiple_choice
+    "correctAnswer": "Exact correct answer or key points for essay",
+    "explanation": "Detailed explanation including why this is correct and learning reinforcement",
+    "learningObjectives": ["specific objective from lesson"],
+    "tags": ["lesson_concept", "topic_area"],
+    "gradingCriteria": "Specific criteria for automated or manual grading", // For short_answer and essay
+    "acceptableVariations": ["alternative correct answers"], // For short_answer
+    "estimatedTime": 2-10 // minutes to complete
+  }
+]
+
+QUALITY STANDARDS:
+- Questions should be engaging and relevant to real-world applications
+- Use clear, student-friendly language appropriate for the grade level
+- Avoid trick questions or ambiguous wording
+- Ensure cultural sensitivity and inclusivity
+- Test understanding, not just memorization (except for remember-level questions)
+
+Generate questions that create an intuitive, clean, premium learning experience for students.
+`;
+  }
+
+  private parseLessonQuestions(aiResponse: string, options: {
+    lessonId: string;
+    lessonTitle: string;
+    lessonContent: string;
+    questionCount: number;
+    difficultyLevels: string[];
+    questionTypes: string[];
+    bloomTaxonomyLevels: string[];
+    learningObjectives: string[];
+  }) {
+    try {
+      // Try to extract JSON from the response
+      const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        throw new Error('No JSON array found in AI response');
+      }
+
+      const questionsData = JSON.parse(jsonMatch[0]);
+      
+      return questionsData.map((q: any, index: number) => {
+        // Validate and format the question based on type
+        const questionType = q.type || 'multiple_choice';
+        let formattedOptions = [];
+        let correctAnswer = q.correctAnswer || '';
+
+        // Format options for multiple choice questions
+        if (questionType === 'multiple_choice' && q.options) {
+          formattedOptions = q.options.map((opt: string, idx: number) => ({
+            id: `option_${idx}`,
+            text: opt,
+            value: opt,
+            isCorrect: opt === correctAnswer
+          }));
+        }
+
+        // Validate true/false answers
+        if (questionType === 'true_false') {
+          correctAnswer = correctAnswer.toLowerCase() === 'true' ? 'true' : 'false';
+        }
+
+        return {
+          question: q.question || '',
+          type: questionType,
+          difficulty: q.difficulty || 'medium',
+          bloomLevel: q.bloomLevel || 'understand',
+          points: q.points || 1,
+          options: formattedOptions,
+          correctAnswer,
+          explanation: q.explanation || '',
+          learningObjectives: q.learningObjectives || options.learningObjectives,
+          tags: q.tags || [options.lessonTitle.toLowerCase().replace(/\s+/g, '_')],
+          gradingCriteria: q.gradingCriteria || '',
+          acceptableVariations: q.acceptableVariations || [],
+          estimatedTime: q.estimatedTime || 3,
+          metadata: {
+            lessonId: options.lessonId,
+            lessonTitle: options.lessonTitle,
+            generatedAt: new Date().toISOString(),
+            validated: true
+          }
+        };
+      });
+    } catch (error) {
+      console.error('Error parsing lesson questions:', error);
+      // Fallback: return a basic question structure
+      return [{
+        question: `Based on the lesson "${options.lessonTitle}", what is the main concept covered?`,
+        type: 'short_answer',
+        difficulty: 'medium',
+        bloomLevel: 'understand',
+        points: 1,
+        options: [],
+        correctAnswer: 'Answer based on lesson content',
+        explanation: 'This question assesses understanding of the main lesson concepts',
+        learningObjectives: options.learningObjectives,
+        tags: [options.lessonTitle.toLowerCase().replace(/\s+/g, '_')],
+        gradingCriteria: 'Answer should demonstrate understanding of the main lesson concepts',
+        acceptableVariations: [],
+        estimatedTime: 3,
+        metadata: {
+          lessonId: options.lessonId,
+          lessonTitle: options.lessonTitle,
+          generatedAt: new Date().toISOString(),
+          validated: false,
+          fallback: true
+        }
+      }];
+    }
+  }
+
+  // Save lesson questions to the new lesson_questions table
+  private async saveLessonQuestionsToDatabase(
+    questions: any[], 
+    options: {
+      lessonId: string;
+      lessonTitle: string;
+      userId?: string;
+      difficultyLevels: string[];
+      questionTypes: string[];
+      bloomTaxonomyLevels: string[];
+      learningObjectives: string[];
+    }
+  ) {
     const savedQuestions = [];
 
     for (const question of questions) {
-      // Insert question
+      // Insert question into lesson_questions table with enhanced metadata
       const { data: questionData, error: questionError } = await this.supabase
-        .from('questions')
+        .from('lesson_questions')
         .insert({
-          question_text: question.question_text,
-          question_type: question.question_type,
+          lesson_id: options.lessonId,
+          question_text: question.question,
+          question_type: question.type,
+          difficulty_level: question.difficulty,
+          bloom_taxonomy_level: question.bloomLevel,
           points: question.points,
-          folder_id: folderId, // Use folder_id instead of quiz_id
-          created_by: options.userId,
-          difficulty_score: this.difficultyToScore(question.metadata.difficulty_level),
-          cognitive_level: question.metadata.bloom_taxonomy,
+          correct_answer: question.correctAnswer,
+          explanation: question.explanation,
+          learning_objectives: question.learningObjectives,
+          tags: question.tags,
           ai_generated: true,
-          metadata: question.metadata,
-          validation_status: 'draft',
-          tags: question.metadata.tags,
-          learning_objectives: question.metadata.learning_objectives,
-          estimated_time: question.metadata.estimated_time,
-          lesson_content_refs: question.metadata.lesson_content_refs,
-          source_content: question.metadata.source_content
+          created_by: options.userId,
+          estimated_time: question.estimatedTime,
+          metadata: {
+            generation_context: 'lesson_specific',
+            lesson_title: options.lessonTitle,
+            generation_timestamp: new Date().toISOString(),
+            grading_criteria: question.gradingCriteria,
+            acceptable_variations: question.acceptableVariations,
+            validated: question.metadata?.validated || false,
+            fallback: question.metadata?.fallback || false
+          }
         })
         .select()
         .single();
 
       if (questionError) {
-        console.error('Failed to save question:', questionError);
+        console.error('Failed to save lesson question:', questionError);
         continue;
       }
 
-      // Insert options for multiple choice/true false questions
-      if (question.options && questionData) {
-        const optionsToInsert = question.options.map((opt, index) => ({
+      // Insert options for multiple choice questions with enhanced format
+      if (question.type === 'multiple_choice' && question.options && questionData) {
+        const optionsToInsert = question.options.map((opt: any, index: number) => ({
           question_id: questionData.id,
-          option_text: opt.option_text,
-          is_correct: opt.is_correct,
+          option_text: opt.text || opt,
+          is_correct: opt.isCorrect || (opt.text === question.correctAnswer) || (opt === question.correctAnswer),
           order_index: index,
-          explanation: opt.explanation
+          option_id: opt.id || `option_${index}`
         }));
 
         const { error: optionsError } = await this.supabase
-          .from('question_options')
+          .from('lesson_question_options')
           .insert(optionsToInsert);
 
         if (optionsError) {
@@ -855,15 +1109,11 @@ Generate exactly ${numQuestions} questions now:
 
       savedQuestions.push({
         ...questionData,
-        options: question.options
+        options: question.options,
+        formattedForUI: true
       });
     }
 
     return savedQuestions;
-  }
-
-  private difficultyToScore(difficulty: string): number {
-    const scores = { easy: 3, medium: 5, hard: 8 };
-    return scores[difficulty as keyof typeof scores] || 5;
   }
 } 

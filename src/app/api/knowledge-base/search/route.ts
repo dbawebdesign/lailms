@@ -5,7 +5,6 @@ import { Database } from '@/types/supabase'
 import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 import { NextRequest } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 
 // Initialize OpenAI client for embeddings
 const openai = new OpenAI({
@@ -93,66 +92,64 @@ function extractReferenceContext(chunk: VectorSearchResult, query: string): stri
   return chunk.content.substring(start, end) + (end < chunk.content.length ? '...' : '');
 }
 
-export async function POST(req: Request) {
-  const cookieStore = await cookies()
-  
-  // Helper function to adapt Next.js cookies to Supabase methods
-  const supabaseCookieMethods = {
-    get(name: string) {
-      return cookieStore.get(name)?.value
-    },
-    set(name: string, value: string, options: CookieOptions) {
-      try {
-        cookieStore.set({ name, value, ...options })
-      } catch (error) {
-        // Ignore error on Server Components (middleware handles refresh)
-      }
-    },
-    remove(name: string, options: CookieOptions) {
-      try {
-        cookieStore.set({ name, value: '', ...options })
-      } catch (error) {
-         // Ignore error on Server Components (middleware handles refresh)
-      }
-    },
-  }
-
-  // Create client for user session
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: supabaseCookieMethods }
-  )
-
-  // Check user authentication
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-
-  if (sessionError) {
-    console.error('Error getting session:', sessionError)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-  }
-
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  // Get organization ID for the user
-  const { data: memberData, error: memberError } = await supabase
-    .from('profiles')
-    .select('organisation_id')
-    .eq('user_id', session.user.id)
-    .single()
-
-  if (memberError || !memberData?.organisation_id) {
-    console.error('Error fetching member organization:', memberError)
-    return NextResponse.json({ error: 'Could not determine user organization' }, { status: 403 })
-  }
-
-  const organisationId = memberData.organisation_id
-
-  // Parse the search query from the request
+export async function POST(request: NextRequest) {
   try {
-    const { query, limit = 10, filter } = await req.json()
+    const cookieStore = await cookies();
+    
+    const supabase = createServerClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value;
+          },
+          set(name: string, value: string, options: CookieOptions) {
+            try {
+              cookieStore.set({ name, value, ...options });
+            } catch (error) {
+              // Ignore error on Server Components (middleware handles refresh)
+            }
+          },
+          remove(name: string, options: CookieOptions) {
+            try {
+              cookieStore.set({ name, value: '', ...options });
+            } catch (error) {
+              // Ignore error on Server Components (middleware handles refresh)
+            }
+          },
+        },
+      }
+    );
+
+    // Check user authentication
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+
+    if (sessionError) {
+      console.error('Error getting session:', sessionError)
+      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    }
+
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get organization ID for the user
+    const { data: memberData, error: memberError } = await supabase
+      .from('profiles')
+      .select('organisation_id')
+      .eq('user_id', session.user.id)
+      .single()
+
+    if (memberError || !memberData?.organisation_id) {
+      console.error('Error fetching member organization:', memberError)
+      return NextResponse.json({ error: 'Could not determine user organization' }, { status: 403 })
+    }
+
+    const organisationId = memberData.organisation_id
+
+    // Parse the search query from the request
+    const { query, limit = 10, filter } = await request.json()
 
     if (!query || typeof query !== 'string') {
       return NextResponse.json({ error: 'Query parameter required' }, { status: 400 })

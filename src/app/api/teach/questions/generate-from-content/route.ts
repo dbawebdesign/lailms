@@ -47,7 +47,6 @@ export async function POST(request: NextRequest) {
     const { 
       lessonId, 
       sectionIds, 
-      baseClassId,
       questionTypes = ['multiple_choice'], 
       difficulty = 'medium',
       numQuestions = 5,
@@ -60,7 +59,6 @@ export async function POST(request: NextRequest) {
     console.log('Parsed request parameters:', {
       lessonId,
       sectionIds,
-      baseClassId,
       questionTypes,
       difficulty,
       numQuestions,
@@ -71,17 +69,13 @@ export async function POST(request: NextRequest) {
     });
 
     // Validate required fields
-    if (!baseClassId) {
-      console.error('Validation failed: baseClassId is required');
+    if (!lessonId) {
+      console.error('Validation failed: lessonId is required');
       return NextResponse.json(
-        { error: 'baseClassId is required' }, 
+        { error: 'lessonId is required' }, 
         { status: 400 }
       );
     }
-
-    // If no lessonId or sectionIds provided, we'll generate from all lessons in the base class
-    // This is handled by the service layer
-    console.log('Validation passed - proceeding with question generation');
 
     // Initialize the question generation service
     const questionService = new QuestionGenerationService(supabase);
@@ -90,7 +84,6 @@ export async function POST(request: NextRequest) {
     const result = await questionService.generateQuestionsFromContent({
       lessonId,
       sectionIds,
-      baseClassId,
       questionTypes,
       difficulty,
       numQuestions,
