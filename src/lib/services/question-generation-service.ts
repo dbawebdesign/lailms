@@ -183,7 +183,7 @@ export class QuestionGenerationService {
         ...options,
         baseClassId: comprehensiveContent.baseClass.id,
       };
-
+      
       // 2. Analyze and extract key concepts from all content
       const analyzedContent = await this.analyzeComprehensiveContent(comprehensiveContent);
       
@@ -238,10 +238,10 @@ export class QuestionGenerationService {
     const { data: lessonData, error: lessonError } = await this.supabase
       .from('lessons')
       .select(`
-        id,
-        title,
-        description,
-        level,
+        id, 
+        title, 
+        description, 
+        level, 
         order_index,
         paths (
           id,

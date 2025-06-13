@@ -15,7 +15,7 @@ import { createClient } from '@/lib/supabase/client';
 import { 
   Menu, Send, Search, Plus, Bot, User, Star, Trash2, Loader2, ArrowLeft,
   MessageSquare, ClipboardCheck, Wand2, Brain, Wrench, BarChart3, Users,
-  SlidersHorizontal, CreditCard, ShieldCheck, MoreHorizontal
+  SlidersHorizontal, CreditCard, ShieldCheck, MoreHorizontal, ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
@@ -1582,16 +1582,26 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
 
                   {/* Citations */}
                   {msg.citations && msg.citations.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-muted-foreground/20 text-xs">
-                      <p className="font-semibold mb-1">Sources:</p>
-                      <div className="flex flex-wrap gap-1">
+                    <div className="mt-2 pt-2 border-t border-muted-foreground/20 text-xs min-w-0 overflow-hidden">
+                      <p className="font-semibold mb-1 break-words text-wrap">Sources:</p>
+                      <div className="flex flex-wrap gap-1 max-w-full">
                         {msg.citations.map((citation: any) => (
                           <Badge 
                             key={citation.id} 
                             variant="outline"
-                            className="text-xs"
+                            className="flex items-center gap-1 break-words max-w-full min-w-0 overflow-hidden text-xs"
                           >
-                            {citation.title}
+                            <span className="break-words text-wrap truncate min-w-0 max-w-full">{citation.title}</span>
+                            {citation.url && (
+                              <a 
+                                href={citation.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex flex-shrink-0 ml-1"
+                              >
+                                <ExternalLink size={10} />
+                              </a>
+                            )}
                           </Badge>
                         ))}
                       </div>
