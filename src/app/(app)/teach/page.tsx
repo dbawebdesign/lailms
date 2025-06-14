@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import WelcomeCard from "@/components/dashboard/WelcomeCard";
 import { ActiveClassItem } from "@/components/dashboard/teacher/ActiveClassItem";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BookOpenCheck, ClipboardCheck, AlertTriangle, Info, Users, Sparkles, Activity, TrendingUp, BookOpen, CheckCircle, Target, Eye, Lightbulb, Search } from 'lucide-react';
+import { BookOpenCheck, ClipboardCheck, AlertTriangle, Info, Users, Sparkles, Activity, TrendingUp, BookOpen, CheckCircle, Target, Eye, Lightbulb, Search, Brain } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -241,6 +241,12 @@ export default async function TeacherDashboardPage() {
               <Link href="/teach/designer">
                 <Lightbulb className="mr-2 h-4 w-4" />
                 Create Content
+              </Link>
+            </Button>
+            <Button asChild className="w-full justify-start" variant="outline">
+              <Link href="/teach/knowledge-base/create">
+                <Brain className="mr-2 h-4 w-4" />
+                Create KB Course
               </Link>
             </Button>
             <Button asChild className="w-full justify-start" variant="outline">

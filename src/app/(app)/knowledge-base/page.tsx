@@ -8,6 +8,9 @@ import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
 import { Database } from '@learnologyai/types';
 import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Brain, BookOpen, Target, Lightbulb, ArrowRight } from 'lucide-react';
 
 export default function KnowledgeBasePage() {
   const [userOrgId, setUserOrgId] = useState<string | null>(null);
@@ -93,6 +96,59 @@ export default function KnowledgeBasePage() {
     <div className="container mx-auto p-4 space-y-6">
       <h1 className="text-3xl font-bold">Knowledge Base</h1>
       <p className="text-muted-foreground">Upload, manage, and search through your organization's documents.</p>
+
+      {/* Course Creation Call-to-Action */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Brain className="h-5 w-5 text-primary" />
+            <span>Create Courses from Your Knowledge Base</span>
+          </CardTitle>
+          <CardDescription>
+            Transform your knowledge base content into comprehensive, AI-generated courses with lessons, assessments, and structured learning paths.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-start space-x-3">
+              <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100">
+                <BookOpen className="h-4 w-4 text-blue-600" />
+              </div>
+              <div>
+                <h4 className="font-medium text-sm">KB Only Mode</h4>
+                <p className="text-xs text-muted-foreground">Generate content exclusively from your uploaded sources</p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-100">
+                <Target className="h-4 w-4 text-purple-600" />
+              </div>
+              <div>
+                <h4 className="font-medium text-sm">KB Priority Mode</h4>
+                <p className="text-xs text-muted-foreground">Prioritize your content, fill gaps with general knowledge</p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100">
+                <Lightbulb className="h-4 w-4 text-green-600" />
+              </div>
+              <div>
+                <h4 className="font-medium text-sm">KB Supplemented</h4>
+                <p className="text-xs text-muted-foreground">Use KB as foundation, expand with general knowledge</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button asChild className="px-6">
+              <Link href="/teach/knowledge-base/create">
+                <Brain className="mr-2 h-4 w-4" />
+                Create Course from Knowledge Base
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <>
         <Card>
