@@ -46,7 +46,7 @@ export async function GET(
     // Fetch base class information
     const { data: baseClass, error: baseClassError } = await supabase
       .from('base_classes')
-      .select('id, name, description')
+      .select('id, name, description, settings, organisation_id, created_at')
       .eq('id', baseClassId)
       .single();
 
@@ -88,6 +88,9 @@ export async function GET(
       id: baseClass.id,
       name: baseClass.name,
       description: baseClass.description,
+      settings: baseClass.settings,
+      organisation_id: baseClass.organisation_id,
+      created_at: baseClass.created_at,
       totalLessons: totalLessons,
       totalSections: totalSections
     });

@@ -4,6 +4,11 @@ import { Database } from '@learnologyai/types';
 
 export async function GET(request: Request) {
   const supabase = createSupabaseServerClient();
+  
+  const { searchParams } = new URL(request.url);
+  const baseClassId = searchParams.get('base_class_id');
+  const summaryParam = searchParams.get('summary');
+  const isRequestingSummary = summaryParam === 'true';
 
   const {
     data: { session },
@@ -19,38 +24,68 @@ export async function GET(request: Request) {
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', session.user.id)
-      .single(); // Use single() as a user should belong to exactly one org in this context
+      .single();
 
     if (profileError) {
       console.error('Error fetching profile record:', profileError);
-      // If profileError indicates "Row level security violation", it might mean the user exists but has no org
-      // or RLS prevents access. If it indicates "JSON object requested, multiple (or no) rows returned", 
-      // it means the user has multiple/no profile records.
-      if (profileError.code === 'PGRST116') { // Check for specific error code for no rows
+      if (profileError.code === 'PGRST116') {
          return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
       }
       return NextResponse.json({ error: 'Could not verify user organisation membership.' }, { status: 500 });
     }
 
     if (!profile || !profile.organisation_id) {
-      // This case might be redundant if single() throws an error for no rows, but good for clarity
       return NextResponse.json({ error: 'User is not associated with an organisation.' }, { status: 403 });
     }
 
     const userOrganisationId = profile.organisation_id;
 
-    // 2. Fetch documents for that organisation
-    const { data: documents, error: documentsError } = await supabase
+    // 2. Build query with filters
+    let query = supabase
       .from('documents')
-      .select('*') // Select all columns for now, adjust as needed for FileListTable
-      .eq('organisation_id', userOrganisationId)
-      .order('created_at', { ascending: false }); // Order by creation date, newest first
+      .select('*')
+      .eq('organisation_id', userOrganisationId);
+
+    // Filter by base class if provided
+    if (baseClassId) {
+      query = query.eq('base_class_id', baseClassId);
+    }
+
+    query = query.order('created_at', { ascending: false });
+
+    const { data: documents, error: documentsError } = await query;
 
     if (documentsError) {
       console.error('Error fetching documents:', documentsError);
       return NextResponse.json({ error: 'Failed to fetch documents.' }, { status: 500 });
     }
 
+    // 3. Return summary if requested
+    if (isRequestingSummary) {
+      const completedDocs = documents?.filter(doc => doc.status === 'completed') || [];
+      const fileTypes = [...new Set(completedDocs.map(doc => {
+        if (doc.file_name?.startsWith('URL -')) {
+          return doc.file_name.includes('youtube') ? 'YouTube Video' : 'Web Page';
+        }
+        switch (doc.file_type) {
+          case 'application/pdf': return 'PDF';
+          case 'text/plain': return 'Text';
+          case 'audio/mp3':
+          case 'audio/mpeg':
+          case 'audio/wav': return 'Audio';
+          case 'video/mp4': return 'Video';
+          default: return doc.file_type?.split('/')[1]?.toUpperCase() || 'File';
+        }
+      }))];
+
+      return NextResponse.json({
+        total: documents?.length || 0,
+        completed: completedDocs.length,
+        types: fileTypes
+      }, { status: 200 });
+    }
+
+    // 4. Return full document list
     return NextResponse.json(documents || [], { status: 200 });
 
   } catch (error) {

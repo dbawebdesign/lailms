@@ -7,10 +7,31 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, BookOpen, Brain, Lightbulb, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { 
+  Loader2, 
+  BookOpen, 
+  Brain, 
+  Lightbulb, 
+  CheckCircle, 
+  AlertCircle, 
+  Clock,
+  GraduationCap,
+  Target,
+  Settings,
+  FileText,
+  Users,
+  Calendar,
+  Layers,
+  Plus,
+  X
+} from 'lucide-react';
 
 interface KnowledgeBaseAnalysis {
   totalDocuments: number;
@@ -33,6 +54,18 @@ interface GenerationMode {
 
 interface CourseGenerationInterfaceProps {
   baseClassId: string;
+  baseClassInfo?: {
+    id: string;
+    name: string;
+    description: string;
+    settings?: {
+      course_metadata?: {
+        subject?: string;
+        learning_objectives?: string[];
+        target_audience?: string;
+      };
+    };
+  } | null;
   onCourseGenerated?: (courseOutlineId: string) => void;
 }
 
@@ -60,15 +93,26 @@ const GENERATION_MODE_DESCRIPTIONS = {
   }
 };
 
-export default function CourseGenerationInterface({ baseClassId, onCourseGenerated }: CourseGenerationInterfaceProps) {
+export default function CourseGenerationInterface({ baseClassId, baseClassInfo, onCourseGenerated }: CourseGenerationInterfaceProps) {
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(true);
   const [kbAnalysis, setKbAnalysis] = useState<KnowledgeBaseAnalysis | null>(null);
   const [generationModes, setGenerationModes] = useState<Record<string, GenerationMode>>({});
   const [selectedMode, setSelectedMode] = useState<string>('');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [title, setTitle] = useState(baseClassInfo?.name || '');
+  const [description, setDescription] = useState(baseClassInfo?.description || '');
   const [estimatedWeeks, setEstimatedWeeks] = useState(12);
+  const [academicLevel, setAcademicLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
+  const [lessonDetailLevel, setLessonDetailLevel] = useState<'basic' | 'detailed' | 'comprehensive'>('detailed');
+  const [includeAssessments, setIncludeAssessments] = useState(true);
+  const [includeQuizzes, setIncludeQuizzes] = useState(true);
+  const [includeFinalExam, setIncludeFinalExam] = useState(true);
+  const [lessonsPerWeek, setLessonsPerWeek] = useState([2]);
+  const [targetAudience, setTargetAudience] = useState(baseClassInfo?.settings?.course_metadata?.target_audience || '');
+  const [prerequisites, setPrerequisites] = useState('');
+  const [learningObjectives, setLearningObjectives] = useState<string[]>(
+    baseClassInfo?.settings?.course_metadata?.learning_objectives || []
+  );
   const [userGuidance, setUserGuidance] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [generationJob, setGenerationJob] = useState<any>(null);
@@ -127,6 +171,17 @@ export default function CourseGenerationInterface({ baseClassId, onCourseGenerat
           description: description.trim(),
           generationMode: selectedMode,
           estimatedDurationWeeks: estimatedWeeks,
+          academicLevel,
+          lessonDetailLevel,
+          targetAudience: targetAudience.trim(),
+          prerequisites: prerequisites.trim(),
+          lessonsPerWeek: lessonsPerWeek[0],
+          learningObjectives: learningObjectives.filter(obj => obj.trim().length > 0),
+          assessmentSettings: {
+            includeAssessments,
+            includeQuizzes,
+            includeFinalExam
+          },
           userGuidance: userGuidance.trim()
         }),
       });
@@ -276,56 +331,299 @@ export default function CourseGenerationInterface({ baseClassId, onCourseGenerat
       {/* Course Details Form */}
       <Card>
         <CardHeader>
-          <CardTitle>Course Details</CardTitle>
+          <CardTitle className="flex items-center space-x-2">
+            <Settings className="h-5 w-5" />
+            <span>Course Configuration</span>
+          </CardTitle>
           <CardDescription>
-            Provide information about the course you want to generate
+            Configure your course settings to match your educational goals
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Course Title *</Label>
-            <Input
-              id="title"
-              placeholder="Enter course title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
+        <CardContent className="space-y-6">
+          {/* Basic Information */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium flex items-center space-x-2">
+              <FileText className="h-4 w-4" />
+              <span>Basic Information</span>
+            </h4>
+            
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">Course Title *</Label>
+                <Input
+                  id="title"
+                  placeholder="Enter a descriptive course title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Course Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Describe what this course should cover"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="weeks">Estimated Duration (weeks)</Label>
-              <Input
-                id="weeks"
-                type="number"
-                min="1"
-                max="52"
-                value={estimatedWeeks}
-                onChange={(e) => setEstimatedWeeks(parseInt(e.target.value) || 12)}
-              />
+              <div className="space-y-2">
+                <Label htmlFor="description">Course Description</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Describe what this course covers and its learning objectives"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="guidance">Additional Guidance (Optional)</Label>
-            <Textarea
-              id="guidance"
-              placeholder="Any specific requirements, focus areas, or constraints"
-              value={userGuidance}
-              onChange={(e) => setUserGuidance(e.target.value)}
-              rows={3}
-            />
+          <Separator />
+
+          {/* Learning Objectives */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium flex items-center space-x-2">
+              <Target className="h-4 w-4" />
+              <span>Learning Objectives</span>
+            </h4>
+            
+            <div className="space-y-3">
+              {learningObjectives.map((objective, index) => (
+                <div key={index} className="flex items-start space-x-2">
+                  <Textarea
+                    value={objective}
+                    onChange={(e) => {
+                      const newObjectives = [...learningObjectives];
+                      newObjectives[index] = e.target.value;
+                      setLearningObjectives(newObjectives);
+                    }}
+                    placeholder={`Learning objective ${index + 1}`}
+                    className="flex-1 min-h-[60px]"
+                    rows={2}
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      const newObjectives = learningObjectives.filter((_, i) => i !== index);
+                      setLearningObjectives(newObjectives);
+                    }}
+                    className="mt-1"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setLearningObjectives([...learningObjectives, ''])}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Learning Objective
+              </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Academic Settings */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium flex items-center space-x-2">
+              <GraduationCap className="h-4 w-4" />
+              <span>Academic Settings</span>
+            </h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="academic-level">Academic Level</Label>
+                <Select value={academicLevel} onValueChange={(value: 'beginner' | 'intermediate' | 'advanced') => setAcademicLevel(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select academic level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="beginner">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>Beginner - No prior knowledge required</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="intermediate">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span>Intermediate - Basic knowledge assumed</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="advanced">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span>Advanced - Strong foundation required</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="lesson-detail">Lesson Detail Level</Label>
+                <Select value={lessonDetailLevel} onValueChange={(value: 'basic' | 'detailed' | 'comprehensive') => setLessonDetailLevel(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select detail level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="basic">
+                      <div className="flex items-center space-x-2">
+                        <Layers className="h-4 w-4" />
+                        <span>Basic - Key concepts and overviews</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="detailed">
+                      <div className="flex items-center space-x-2">
+                        <Layers className="h-4 w-4" />
+                        <span>Detailed - In-depth explanations</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="comprehensive">
+                      <div className="flex items-center space-x-2">
+                        <Layers className="h-4 w-4" />
+                        <span>Comprehensive - Expert-level detail</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="target-audience">Target Audience</Label>
+                <Input
+                  id="target-audience"
+                  placeholder="e.g., Software developers, Medical professionals"
+                  value={targetAudience}
+                  onChange={(e) => setTargetAudience(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="prerequisites">Prerequisites</Label>
+                <Input
+                  id="prerequisites"
+                  placeholder="e.g., Basic programming knowledge"
+                  value={prerequisites}
+                  onChange={(e) => setPrerequisites(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Course Structure */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium flex items-center space-x-2">
+              <Calendar className="h-4 w-4" />
+              <span>Course Structure</span>
+            </h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="weeks">Course Duration (weeks)</Label>
+                <Input
+                  id="weeks"
+                  type="number"
+                  min="1"
+                  max="52"
+                  value={estimatedWeeks}
+                  onChange={(e) => setEstimatedWeeks(parseInt(e.target.value) || 12)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Recommended: 8-16 weeks for comprehensive courses
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Lessons per Week: {lessonsPerWeek[0]}</Label>
+                <Slider
+                  value={lessonsPerWeek}
+                  onValueChange={setLessonsPerWeek}
+                  max={7}
+                  min={1}
+                  step={1}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Total lessons: ~{estimatedWeeks * lessonsPerWeek[0]}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Assessment Settings */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium flex items-center space-x-2">
+              <Target className="h-4 w-4" />
+              <span>Assessment & Progress Tracking</span>
+            </h4>
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium">Lesson Assessments</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Include knowledge checks and practice questions in each lesson
+                  </p>
+                </div>
+                <Switch
+                  checked={includeAssessments}
+                  onCheckedChange={setIncludeAssessments}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium">Module Quizzes</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Add comprehensive quizzes at the end of each module/path
+                  </p>
+                </div>
+                <Switch
+                  checked={includeQuizzes}
+                  onCheckedChange={setIncludeQuizzes}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium">Final Comprehensive Exam</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Include a final exam covering all course material for mastery verification
+                  </p>
+                </div>
+                <Switch
+                  checked={includeFinalExam}
+                  onCheckedChange={setIncludeFinalExam}
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Additional Guidance */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium flex items-center space-x-2">
+              <Brain className="h-4 w-4" />
+              <span>Additional Guidance</span>
+            </h4>
+            
+            <div className="space-y-2">
+              <Label htmlFor="guidance">Special Instructions (Optional)</Label>
+              <Textarea
+                id="guidance"
+                placeholder="Any specific teaching approaches, focus areas, constraints, or special requirements..."
+                value={userGuidance}
+                onChange={(e) => setUserGuidance(e.target.value)}
+                rows={3}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

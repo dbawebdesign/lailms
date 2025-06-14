@@ -12,6 +12,17 @@ export interface CourseGenerationRequest {
   description?: string;
   generationMode?: 'kb_only' | 'kb_priority' | 'kb_supplemented';
   estimatedDurationWeeks?: number;
+  academicLevel?: 'beginner' | 'intermediate' | 'advanced';
+  lessonDetailLevel?: 'basic' | 'detailed' | 'comprehensive';
+  targetAudience?: string;
+  prerequisites?: string;
+  lessonsPerWeek?: number;
+  learningObjectives?: string[];
+  assessmentSettings?: {
+    includeAssessments: boolean;
+    includeQuizzes: boolean;
+    includeFinalExam: boolean;
+  };
   userGuidance?: string; // Additional context from user
 }
 
@@ -25,6 +36,17 @@ export interface CourseOutline {
   modules: CourseModule[];
   knowledgeBaseAnalysis: KnowledgeBaseAnalysis;
   status: 'draft' | 'approved' | 'published' | 'archived';
+  // Configuration parameters
+  academicLevel?: 'beginner' | 'intermediate' | 'advanced';
+  lessonDetailLevel?: 'basic' | 'detailed' | 'comprehensive';
+  targetAudience?: string;
+  prerequisites?: string;
+  lessonsPerWeek?: number;
+  assessmentSettings?: {
+    includeAssessments: boolean;
+    includeQuizzes: boolean;
+    includeFinalExam: boolean;
+  };
 }
 
 export interface CourseModule {
@@ -223,7 +245,13 @@ export class CourseGenerator {
       estimatedDurationWeeks: request.estimatedDurationWeeks || structureSuggestion.overallStructure.estimatedWeeks,
       modules,
       knowledgeBaseAnalysis: kbAnalysis,
-      status: 'draft'
+      status: 'draft',
+      academicLevel: request.academicLevel,
+      lessonDetailLevel: request.lessonDetailLevel,
+      targetAudience: request.targetAudience,
+      prerequisites: request.prerequisites,
+      lessonsPerWeek: request.lessonsPerWeek,
+      assessmentSettings: request.assessmentSettings
     };
   }
 
@@ -270,7 +298,13 @@ export class CourseGenerator {
       estimatedDurationWeeks: request.estimatedDurationWeeks || outlineData.estimatedDurationWeeks || 12,
       modules: outlineData.modules || [],
       knowledgeBaseAnalysis: kbAnalysis,
-      status: 'draft'
+      status: 'draft',
+      academicLevel: request.academicLevel,
+      lessonDetailLevel: request.lessonDetailLevel,
+      targetAudience: request.targetAudience,
+      prerequisites: request.prerequisites,
+      lessonsPerWeek: request.lessonsPerWeek,
+      assessmentSettings: request.assessmentSettings
     };
   }
 
@@ -283,9 +317,27 @@ export class CourseGenerator {
     return `
 Create a comprehensive course outline for: "${request.title}"
 
-Course Description: ${request.description || 'Not provided'}
-Estimated Duration: ${request.estimatedDurationWeeks || 12} weeks
-Generation Mode: ${modeConfig.title}
+COURSE CONFIGURATION:
+- Title: ${request.title}
+- Description: ${request.description || 'Not provided'}
+- Estimated Duration: ${request.estimatedDurationWeeks || 12} weeks
+- Lessons per Week: ${request.lessonsPerWeek || 2}
+- Academic Level: ${request.academicLevel || 'intermediate'}
+- Lesson Detail Level: ${request.lessonDetailLevel || 'detailed'}
+- Target Audience: ${request.targetAudience || 'General learners'}
+- Prerequisites: ${request.prerequisites || 'None specified'}
+- Generation Mode: ${modeConfig.title}
+
+ASSESSMENT SETTINGS:
+- Include Lesson Assessments: ${request.assessmentSettings?.includeAssessments !== false}
+- Include Module Quizzes: ${request.assessmentSettings?.includeQuizzes !== false}
+- Include Final Exam: ${request.assessmentSettings?.includeFinalExam !== false}
+
+ACADEMIC LEVEL GUIDANCE:
+${this.getAcademicLevelGuidance(request.academicLevel)}
+
+LESSON DETAIL LEVEL GUIDANCE:
+${this.getLessonDetailGuidance(request.lessonDetailLevel)}
 
 Knowledge Base Analysis:
 - Total Documents: ${kbAnalysis.totalDocuments}
@@ -299,24 +351,35 @@ ${kbContent.slice(0, 5).map(chunk => `- ${chunk.summary || chunk.content.substri
 
 ${request.userGuidance ? `Additional User Guidance: ${request.userGuidance}` : ''}
 
+IMPORTANT INSTRUCTIONS:
+1. Create exactly ${Math.ceil((request.estimatedDurationWeeks || 12) / 3)} modules
+2. Each module should have ${(request.lessonsPerWeek || 2) * 3} lessons on average
+3. Tailor content complexity to ${request.academicLevel || 'intermediate'} level
+4. Use ${request.lessonDetailLevel || 'detailed'} explanations throughout
+5. Consider target audience: ${request.targetAudience || 'General learners'}
+6. Account for prerequisites: ${request.prerequisites || 'None specified'}
+7. ${request.assessmentSettings?.includeAssessments !== false ? 'Include knowledge checks in each lesson' : 'Focus on content delivery without assessments'}
+8. ${request.assessmentSettings?.includeQuizzes !== false ? 'Add comprehensive quizzes at module end' : 'Skip module quizzes'}
+9. ${request.assessmentSettings?.includeFinalExam !== false ? 'Plan for a final comprehensive exam' : 'No final exam needed'}
+
 Generate a JSON response with this structure:
 {
-  "description": "Course description",
+  "description": "Course description tailored to the academic level and audience",
   "learningObjectives": ["objective 1", "objective 2"],
-  "estimatedDurationWeeks": 12,
+  "estimatedDurationWeeks": ${request.estimatedDurationWeeks || 12},
   "modules": [
     {
       "id": "module-1",
       "title": "Module Title",
-      "description": "Module description",
+      "description": "Module description matching the detail level",
       "order": 1,
-      "estimatedDurationWeeks": 2,
+      "estimatedDurationWeeks": 3,
       "learningObjectives": ["objective 1", "objective 2"],
       "lessons": [
         {
           "id": "lesson-1",
           "title": "Lesson Title",
-          "description": "Lesson description",
+          "description": "Lesson description with appropriate complexity",
           "order": 1,
           "estimatedDurationHours": 2,
           "contentType": "lecture",
@@ -343,7 +406,8 @@ Generate a JSON response with this structure:
   ]
 }
 
-Important: Assessments should focus on "course_content" and test mastery of the actual course material, not just knowledge base facts.
+Remember: Assessments should focus on "course_content" and test mastery of the actual course material, not just knowledge base facts.
+All content should be appropriate for ${request.academicLevel || 'intermediate'} level learners with ${request.lessonDetailLevel || 'detailed'} explanations.
 `;
   }
 
@@ -373,7 +437,13 @@ Important: Assessments should focus on "course_content" and test mastery of the 
         },
         learning_objectives: outline.learningObjectives,
         estimated_duration_weeks: outline.estimatedDurationWeeks,
-        status: outline.status
+        status: outline.status,
+        academic_level: outline.academicLevel,
+        lesson_detail_level: outline.lessonDetailLevel,
+        target_audience: outline.targetAudience,
+        prerequisites: outline.prerequisites,
+        lessons_per_week: outline.lessonsPerWeek,
+        assessment_settings: outline.assessmentSettings
       })
       .select('id')
       .single();
@@ -395,7 +465,8 @@ Important: Assessments should focus on "course_content" and test mastery of the 
         const lessonContent = await this.generateLessonContentForLesson(
           lesson,
           outline.knowledgeBaseAnalysis.baseClassId,
-          generationMode
+          generationMode,
+          outline // Pass the full outline to access configuration
         );
 
         await this.supabase
@@ -421,7 +492,8 @@ Important: Assessments should focus on "course_content" and test mastery of the 
   private async generateLessonContentForLesson(
     lesson: ModuleLesson,
     baseClassId: string,
-    generationMode: 'kb_only' | 'kb_priority' | 'kb_supplemented'
+    generationMode: 'kb_only' | 'kb_priority' | 'kb_supplemented',
+    outline: CourseOutline
   ): Promise<any> {
     const modeConfig = COURSE_GENERATION_MODES[generationMode];
     
@@ -435,35 +507,62 @@ Important: Assessments should focus on "course_content" and test mastery of the 
     const prompt = `
 Generate detailed lesson content for: "${lesson.title}"
 
-Lesson Description: ${lesson.description}
-Content Type: ${lesson.contentType}
-Learning Objectives: ${lesson.learningObjectives.join(', ')}
-Estimated Duration: ${lesson.estimatedDurationHours} hours
+LESSON CONFIGURATION:
+- Title: ${lesson.title}
+- Description: ${lesson.description}
+- Content Type: ${lesson.contentType}
+- Learning Objectives: ${lesson.learningObjectives.join(', ')}
+- Estimated Duration: ${lesson.estimatedDurationHours} hours
 
-Generation Mode: ${modeConfig.title}
+COURSE CONFIGURATION:
+- Academic Level: ${outline.academicLevel || 'intermediate'}
+- Detail Level: ${outline.lessonDetailLevel || 'detailed'}
+- Target Audience: ${outline.targetAudience || 'General learners'}
+- Prerequisites: ${outline.prerequisites || 'None specified'}
+
+ACADEMIC LEVEL GUIDANCE:
+${this.getAcademicLevelGuidance(outline.academicLevel)}
+
+DETAIL LEVEL GUIDANCE:
+${this.getLessonDetailGuidance(outline.lessonDetailLevel)}
+
+GENERATION MODE: ${modeConfig.title}
 ${modeConfig.aiInstructions}
 
 Knowledge Base Content:
 ${kbContent.map(chunk => `- ${chunk.summary || chunk.content.substring(0, 300)}`).join('\n')}
 
+IMPORTANT INSTRUCTIONS:
+1. Tailor all content to ${outline.academicLevel || 'intermediate'} academic level
+2. Use ${outline.lessonDetailLevel || 'detailed'} level of explanation
+3. Consider the target audience: ${outline.targetAudience || 'General learners'}
+4. Account for prerequisites: ${outline.prerequisites || 'None specified'}
+5. ${outline.assessmentSettings?.includeAssessments !== false ? 'Include knowledge check questions within the content' : 'Focus purely on content delivery'}
+6. Ensure content complexity matches the academic level
+7. Use appropriate terminology and examples for the target audience
+
 Create comprehensive lesson content in JSON format:
 {
-  "introduction": "Lesson introduction text",
+  "introduction": "Lesson introduction appropriate for ${outline.academicLevel || 'intermediate'} level",
   "mainContent": {
     "sections": [
       {
         "title": "Section Title",
-        "content": "Section content",
-        "activities": ["activity 1", "activity 2"],
+        "content": "Section content with ${outline.lessonDetailLevel || 'detailed'} explanations",
+        "activities": ["activity 1 suitable for ${outline.targetAudience || 'general learners'}", "activity 2"],
         "keyPoints": ["point 1", "point 2"],
-        "citations": ["source reference"]
+        "citations": ["source reference"],
+        "knowledgeChecks": [${outline.assessmentSettings?.includeAssessments !== false ? '"Quick question to verify understanding"' : ''}]
       }
     ]
   },
-  "summary": "Lesson summary",
-  "nextSteps": "What comes next",
-  "resources": ["resource 1", "resource 2"]
+  "summary": "Lesson summary reinforcing key concepts at appropriate level",
+  "nextSteps": "What comes next, considering learner progression",
+  "resources": ["resource 1 appropriate for ${outline.academicLevel || 'intermediate'} level", "resource 2"],
+  "practiceExercises": ["exercise 1 matching target audience needs", "exercise 2"]
 }
+
+Ensure all content matches the specified academic level and detail requirements.
 `;
 
     const completion = await this.openai.chat.completions.create({
@@ -471,7 +570,11 @@ Create comprehensive lesson content in JSON format:
       messages: [
         {
           role: "system",
-          content: `You are an expert instructional designer. ${modeConfig.aiInstructions}`
+          content: `You are an expert instructional designer. ${modeConfig.aiInstructions} 
+          
+          Create content appropriate for ${outline.academicLevel || 'intermediate'} level learners with ${outline.lessonDetailLevel || 'detailed'} explanations. 
+          Target audience: ${outline.targetAudience || 'General learners'}.
+          Prerequisites: ${outline.prerequisites || 'None specified'}.`
         },
         {
           role: "user",
@@ -653,7 +756,13 @@ Generate JSON format:
       estimatedDurationWeeks: data.estimated_duration_weeks,
       modules: data.outline_structure?.modules || [],
       knowledgeBaseAnalysis: data.knowledge_base_analysis,
-      status: data.status
+      status: data.status,
+      academicLevel: data.academic_level,
+      lessonDetailLevel: data.lesson_detail_level,
+      targetAudience: data.target_audience,
+      prerequisites: data.prerequisites,
+      lessonsPerWeek: data.lessons_per_week,
+      assessmentSettings: data.assessment_settings
     };
   }
 
@@ -667,6 +776,70 @@ Generate JSON format:
     // For now, we'll just log that optimization was attempted
     console.log(`Course structure optimization completed for outline ${courseOutlineId}`);
     console.log(`Analyzed ${conceptMap.concepts.length} concepts and ${conceptMap.relationships.length} relationships`);
+  }
+
+  private getAcademicLevelGuidance(academicLevel?: string): string {
+    switch (academicLevel) {
+      case 'beginner':
+        return `
+- Use simple, clear language and avoid jargon
+- Start with basic concepts and build up gradually
+- Include plenty of examples and analogies
+- Provide step-by-step instructions
+- Assume no prior knowledge in the subject area
+- Focus on practical application over theory`;
+
+      case 'advanced':
+        return `
+- Use technical terminology appropriately
+- Dive deep into complex concepts and edge cases
+- Include theoretical frameworks and research references
+- Assume strong foundational knowledge
+- Challenge learners with sophisticated problems
+- Emphasize critical thinking and analysis`;
+
+      case 'intermediate':
+      default:
+        return `
+- Balance accessibility with depth
+- Introduce some technical terms with explanations
+- Build on assumed basic knowledge
+- Include both theory and practical applications
+- Mix guided practice with independent exploration
+- Encourage deeper understanding beyond surface level`;
+    }
+  }
+
+  private getLessonDetailGuidance(lessonDetailLevel?: string): string {
+    switch (lessonDetailLevel) {
+      case 'basic':
+        return `
+- Focus on key concepts and main points only
+- Provide concise explanations without extensive detail
+- Include essential examples but keep them brief
+- Aim for quick comprehension and overview understanding
+- Limit lesson content to core learning objectives
+- Use bullet points and summaries for clarity`;
+
+      case 'comprehensive':
+        return `
+- Provide exhaustive coverage of all aspects
+- Include detailed explanations, multiple examples, and edge cases
+- Add historical context, alternative approaches, and expert insights
+- Include extensive resources and further reading
+- Cover advanced applications and real-world scenarios
+- Provide in-depth analysis and critical evaluation`;
+
+      case 'detailed':
+      default:
+        return `
+- Provide thorough explanations with sufficient depth
+- Include relevant examples and case studies
+- Cover important details while maintaining focus
+- Balance comprehensiveness with practical time constraints
+- Include practical exercises and application opportunities
+- Provide enough detail for solid understanding without overwhelming`;
+    }
   }
 }
 

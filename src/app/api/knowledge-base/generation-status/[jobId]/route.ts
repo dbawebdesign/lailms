@@ -4,9 +4,10 @@ import { courseGenerator } from '@/lib/services/course-generator';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
+    const { jobId } = await params;
     const supabase = createSupabaseServerClient();
     
     // Check authentication
@@ -14,8 +15,6 @@ export async function GET(
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const { jobId } = params;
 
     // Verify user owns this job
     const { data: job, error: jobError } = await supabase

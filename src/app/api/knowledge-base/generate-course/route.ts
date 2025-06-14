@@ -20,6 +20,13 @@ export async function POST(request: NextRequest) {
       description, 
       generationMode, 
       estimatedDurationWeeks,
+      academicLevel,
+      lessonDetailLevel,
+      targetAudience,
+      prerequisites,
+      lessonsPerWeek,
+      learningObjectives,
+      assessmentSettings,
       userGuidance 
     } = body;
 
@@ -55,6 +62,13 @@ export async function POST(request: NextRequest) {
       description,
       generationMode: generationMode || undefined, // Let system determine if not specified
       estimatedDurationWeeks,
+      academicLevel,
+      lessonDetailLevel,
+      targetAudience,
+      prerequisites,
+      lessonsPerWeek,
+      learningObjectives,
+      assessmentSettings,
       userGuidance
     };
 

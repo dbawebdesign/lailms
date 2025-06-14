@@ -42,10 +42,11 @@ export type DocumentStatus = 'queued' | 'processing' | 'completed' | 'error'
 type Document = Database['public']['Tables']['documents']['Row']
 
 interface FileListTableProps {
-  organisationId: string
+  organisationId: string;
+  baseClassId?: string;
 }
 
-export function FileListTable({ organisationId }: FileListTableProps) {
+export function FileListTable({ organisationId, baseClassId }: FileListTableProps) {
   const [documents, setDocuments] = useState<Document[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,7 +59,12 @@ export function FileListTable({ organisationId }: FileListTableProps) {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/knowledge-base/documents`);
+        let url = `/api/knowledge-base/documents`;
+        if (baseClassId) {
+          url += `?base_class_id=${baseClassId}`;
+        }
+        
+        const response = await fetch(url);
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
@@ -77,7 +83,7 @@ export function FileListTable({ organisationId }: FileListTableProps) {
     }
 
     fetchDocuments();
-  }, [organisationId]);
+  }, [organisationId, baseClassId]);
 
   // Get status badge based on document status and processing stage
   const getStatusBadge = (status: DocumentStatus, metadata: any) => {
