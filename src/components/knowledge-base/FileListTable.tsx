@@ -12,7 +12,9 @@ import {
   RefreshCw,
   Download,
   MoreVertical,
-  MoreHorizontal
+  MoreHorizontal,
+  Eye,
+  ExternalLink
 } from 'lucide-react'
 import { formatBytes } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -214,6 +216,43 @@ export function FileListTable({ organisationId, baseClassId }: FileListTableProp
     }
   }
 
+  // Handle document viewing
+  const handleView = async (docId: string, fileName: string | null, status: DocumentStatus) => {
+    // For URL-type documents, we can view them even if not fully processed
+    // For file documents, we should wait until they're completed
+    const document = documents.find(doc => doc.id === docId);
+    const metadata = document?.metadata as any;
+    const isUrl = metadata?.originalUrl;
+    
+    if (!isUrl && status !== 'completed') {
+      toast.error('Please wait for the document to finish processing before viewing.');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/knowledge-base/documents/${docId}/view`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Open the URL in a new tab
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+      
+      // Show success message based on type
+      const viewType = data.type === 'url' ? 'original source' : 'document';
+      toast.success(`Opening ${viewType}...`);
+
+    } catch (err) {
+      console.error('Failed to view document:', err);
+      const message = err instanceof Error ? err.message : 'An unknown error occurred';
+      toast.error(`Failed to view document: ${message}`);
+    }
+  }
+
   // Format file size
   const formatFileSize = (bytes: number | null) => {
     if (!bytes) return '0 B';
@@ -279,6 +318,17 @@ export function FileListTable({ organisationId, baseClassId }: FileListTableProp
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem 
+                        onClick={() => handleView(doc.id, doc.file_name, doc.status as DocumentStatus)}
+                        disabled={!!deletingId}
+                      >
+                        {(doc.metadata as any)?.originalUrl ? (
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                        ) : (
+                          <Eye className="h-4 w-4 mr-2" />
+                        )}
+                        View
+                      </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => handleDelete(doc.id, doc.file_name)} 
                         className="text-red-600 focus:text-red-600" 
