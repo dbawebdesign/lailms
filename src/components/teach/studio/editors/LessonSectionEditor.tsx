@@ -207,8 +207,21 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
             text: typeof currentContent === 'string' ? currentContent : (editor ? editor.getText() : JSON.stringify(currentContent))
           };
         }
+      } else if (['introduction', 'core_concept', 'example', 'analysis', 'summary'].includes(currentSectionType)) {
+        // For structured content types, preserve metadata and update text
+        if (section.content && typeof section.content === 'object') {
+          contentToSave = {
+            ...section.content,
+            text: typeof currentContent === 'string' ? currentContent : String(currentContent)
+          };
+        } else {
+          // Create new structured content
+          contentToSave = {
+            text: typeof currentContent === 'string' ? currentContent : String(currentContent)
+          };
+        }
       } else {
-        // For non-text content types, save as-is
+        // For other content types (video_url, quiz, etc.), save as-is
         contentToSave = currentContent;
       }
       
@@ -264,8 +277,13 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
       return '';
     }
     
-    // For non-text types, extract production content or show raw content
-    if (section.content && typeof section.content === 'object' && section.content.text) {
+    // For structured content types (introduction, core_concept, etc.), extract text content
+    if (['introduction', 'core_concept', 'example', 'analysis', 'summary'].includes(sectionType) &&
+        section.content && typeof section.content === 'object' && section.content.text) {
+      return section.content.text;
+    }
+    // For other non-text types, extract production content or show raw content
+    else if (section.content && typeof section.content === 'object' && section.content.text) {
       return section.content.text;
     } else if (typeof section.content === 'string') {
       return section.content;
@@ -277,7 +295,11 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
   useEffect(() => {
     // Update contentInput if section.content changes and it's not a text type editor
     if (sectionType !== 'text') {
-      if (section.content && typeof section.content === 'object' && section.content.text) {
+      // For structured content types, prioritize text extraction
+      if (['introduction', 'core_concept', 'example', 'analysis', 'summary'].includes(sectionType) &&
+          section.content && typeof section.content === 'object' && section.content.text) {
+        setContentInput(section.content.text);
+      } else if (section.content && typeof section.content === 'object' && section.content.text) {
         setContentInput(section.content.text);
       } else if (typeof section.content === 'string') {
         setContentInput(section.content);
@@ -305,29 +327,7 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
             placeholder="Enter section title"
           />
         </div>
-        <div>
-            <label htmlFor="sectionTypeSelect" className="block text-sm font-medium text-foreground mb-1">
-                Section Type
-            </label>
-            <Select value={sectionType} onValueChange={(newType) => {
-                setSectionType(newType);
-                if (editor) editor.setEditable(newType === 'text');
-                 if (newType !== 'text') { // If switching away from text, preserve current non-text content
-                    setContentInput(typeof section.content === 'string' ? section.content : JSON.stringify(section.content || '', null, 2));
-                }
-            }}>
-                <SelectTrigger id="sectionTypeSelect" className="w-full max-w-sm">
-                    <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="text">Rich Text / Document</SelectItem>
-                    <SelectItem value="video_url">Video URL</SelectItem>
-                    <SelectItem value="quiz">Quiz (JSON)</SelectItem>
-                    <SelectItem value="document_embed">Document Embed URL</SelectItem>
-                    {/* Add other section types as needed */}
-                </SelectContent>
-            </Select>
-        </div>
+
         
         {sectionType === 'text' && (
           <div>
@@ -369,7 +369,7 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
               </div>
             ) : (
               <div className="border border-input rounded-md min-h-[200px] p-4 bg-background">
-                <ContentRenderer content={section.content} className="prose dark:prose-invert max-w-none" />
+                <ContentRenderer content={section.content} className="prose dark:prose-invert max-w-none" showStudentView={true} sectionType={sectionType} />
               </div>
             )}
           </div>
@@ -382,7 +382,12 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
               {sectionType === 'video_url' && "Video URL"}
               {sectionType === 'quiz' && "Quiz JSON Data"}
               {sectionType === 'document_embed' && "Document Embed URL"}
-              {/* Add other labels as needed */}
+              {sectionType === 'introduction' && "Introduction Content"}
+              {sectionType === 'core_concept' && "Core Concept Content"}
+              {sectionType === 'example' && "Example Content"}
+              {sectionType === 'analysis' && "Analysis Content"}
+              {sectionType === 'summary' && "Summary Content"}
+              {!['video_url', 'quiz', 'document_embed', 'introduction', 'core_concept', 'example', 'analysis', 'summary'].includes(sectionType) && "Content"}
             </label>
             <Button
               variant="outline"
@@ -405,17 +410,30 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
           </div>
           
           {isEditing ? (
-            <Textarea
-              id="nonTextContent"
-              value={contentInput}
-              onChange={(e) => setContentInput(e.target.value)}
-              placeholder={`Enter ${sectionType.replace('_', ' ')} content here`}
-              rows={sectionType === 'quiz' ? 10 : 3}
-              className="font-mono text-sm"
-            />
+            // For structured content types (introduction, core_concept, etc.), only show raw editing if it's truly raw data
+            ['introduction', 'core_concept', 'example', 'analysis', 'summary'].includes(sectionType) && 
+            section.content && typeof section.content === 'object' && section.content.text ? (
+              <Textarea
+                id="nonTextContent"
+                value={contentInput}
+                onChange={(e) => setContentInput(e.target.value)}
+                placeholder={`Enter ${sectionType.replace('_', ' ')} content here`}
+                rows={6}
+                className="text-sm"
+              />
+            ) : (
+              <Textarea
+                id="nonTextContent"
+                value={contentInput}
+                onChange={(e) => setContentInput(e.target.value)}
+                placeholder={`Enter ${sectionType.replace('_', ' ')} content here`}
+                rows={sectionType === 'quiz' ? 10 : 3}
+                className="font-mono text-sm"
+              />
+            )
           ) : (
             <div className="border border-input rounded-md min-h-[100px] p-4 bg-background">
-              <ContentRenderer content={section.content} />
+              <ContentRenderer content={section.content} showStudentView={true} sectionType={sectionType} />
             </div>
           )}
         </div>

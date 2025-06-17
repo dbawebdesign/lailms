@@ -206,11 +206,7 @@ export class CourseGenerator {
 
       // Run knowledge base analysis and get relevant content in parallel
       const [kbAnalysis, kbContentPromise] = await Promise.all([
-        knowledgeBaseAnalyzer.analyzeKnowledgeBase({
-          baseClassId: request.baseClassId,
-          organisationId: request.organisationId,
-          userId: request.userId
-        }),
+        knowledgeBaseAnalyzer.analyzeKnowledgeBase(request.baseClassId),
         this.getRelevantKnowledgeBaseContent(
           request.baseClassId,
           request.title,
@@ -221,33 +217,15 @@ export class CourseGenerator {
 
       await this.updateJobStatus(jobId, 'processing', 25);
 
-      // Generate concept map and structure suggestion in parallel
-      const [conceptMap, structureSuggestion] = await Promise.all([
-        knowledgeBaseAnalyzer.generateConceptMap({
-          baseClassId: request.baseClassId,
-          organisationId: request.organisationId,
-          userId: request.userId,
-          knowledgeBaseAnalysis: kbAnalysis
-        }),
-        knowledgeBaseAnalyzer.suggestCourseStructure({
-          baseClassId: request.baseClassId,
-          organisationId: request.organisationId,
-          userId: request.userId,
-          knowledgeBaseAnalysis: kbAnalysis,
-          courseTitle: request.title
-        })
-      ]);
-
-      await this.updateJobStatus(jobId, 'processing', 40);
-
-      // Generate course outline
-      const outline = await this.generateEnhancedCourseOutline(
+      // Generate course outline directly without concept map and structure suggestion
+      // (These methods don't exist in KnowledgeBaseAnalyzer)
+      const outline = await this.generateCourseOutline(
         request,
         kbAnalysis,
-        conceptMap,
-        structureSuggestion,
         request.generationMode || 'kb_priority'
       );
+
+      await this.updateJobStatus(jobId, 'processing', 40);
 
       await this.updateJobStatus(jobId, 'processing', 60);
 
@@ -280,7 +258,7 @@ export class CourseGenerator {
       });
     } catch (error) {
       console.error('Full analysis generation failed:', error);
-      await this.updateJobStatus(jobId, 'failed', 0, error.message);
+      await this.updateJobStatus(jobId, 'failed', 0, error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -1434,14 +1412,11 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
     );
 
     // Create all sections in parallel
-    const sectionPromises = contentOutline.map(async (sectionTitle, i) => {
-      // Determine section type based on position and content
-      let sectionType = 'main_content';
-      if (i === 0) sectionType = 'introduction';
-      if (i === contentOutline.length - 1) sectionType = 'summary';
-      if (sectionTitle.toLowerCase().includes('example')) sectionType = 'example';
-      if (sectionTitle.toLowerCase().includes('activity')) sectionType = 'activity';
-
+    const sectionPromises = contentOutline.map(async (sectionTitle: string, i: number) => {
+      const sectionType = i === 0 ? 'introduction' : 
+                         i === contentOutline.length - 1 ? 'summary' : 
+                         'main_content';
+      
       const sectionContent = allSectionContent[i] || {
         introduction: `Introduction to ${sectionTitle}`,
         main_content: [{ 
@@ -1607,7 +1582,7 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
 
         // Insert question options if multiple choice (in parallel)
         if (q.options && q.question_type === 'multiple_choice') {
-          const optionPromises = q.options.map(async (option, j) => {
+          const optionPromises = q.options.map(async (option: any, j: number) => {
             await supabase
               .from('lesson_question_options')
               .insert({
@@ -2101,7 +2076,7 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
 
       // Now create all entities with the pre-generated content
       for (let moduleIndex = 0; moduleIndex < outline.modules.length; moduleIndex++) {
-        const module = outline.modules[moduleIndex];
+        const courseModule = outline.modules[moduleIndex];
         const moduleContent = moduleContents[moduleIndex];
 
         // Create path
@@ -2110,8 +2085,8 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
           .insert({
             organisation_id: request.organisationId,
             base_class_id: request.baseClassId,
-            title: module.title,
-            description: module.description,
+            title: courseModule.title,
+            description: courseModule.description,
             level: request.academicLevel,
             order_index: moduleIndex,
             published: false,
@@ -2131,7 +2106,7 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
         // Process lessons with pre-generated content
         for (let lessonIndex = 0; lessonIndex < moduleContent.lessons.length; lessonIndex++) {
           const lessonContent = moduleContent.lessons[lessonIndex];
-          const lessonOutline = module.lessons[lessonIndex];
+          const lessonOutline = courseModule.lessons[lessonIndex];
 
           const { data: createdLesson, error: lessonError } = await supabase
             .from('lessons')
@@ -2273,7 +2248,7 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
         .single();
 
       if (!error && q.options) {
-        const optionPromises = q.options.map(async (option, optIndex) => {
+        const optionPromises = q.options.map(async (option: any, optIndex: number) => {
           await supabase
             .from('lesson_question_options')
             .insert({
@@ -2319,7 +2294,8 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
       .single();
 
     if (!quizError && quizData.questions) {
-      for (const q of quizData.questions) {
+      for (let i = 0; i < quizData.questions.length; i++) {
+        const q = quizData.questions[i];
         const { data: question, error } = await supabase
           .from('questions')
           .insert({

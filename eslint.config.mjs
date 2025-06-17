@@ -66,7 +66,8 @@ const eslintConfig = [
       ".next/**", 
       "node_modules/**", 
       "dist/**",
-      "src/types/supabase.ts" // Auto-generated Supabase types file
+      "src/types/supabase.ts", // Auto-generated Supabase types file
+      "src/lib/types/database.types.ts" // Auto-generated database types file
     ], // Add ignores for build/dependency dirs
   },
   ...compat.extends("next/core-web-vitals"), // Keep core web vitals separate maybe
