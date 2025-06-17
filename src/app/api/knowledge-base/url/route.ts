@@ -76,15 +76,31 @@ export async function POST(request: Request) {
 
     // Generate a unique identifier for the storage path
     const urlIdentifier = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const storagePath = `urls/${type}/${urlIdentifier}.url`;
     let insertedDocumentId: string | null = null;
+
+    // Upload URL content to storage first
+    const bucketName = `org-${userOrganisationId}-uploads`;
+    const { error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(storagePath, url, {
+        contentType: 'text/plain',
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Storage Upload Error:', uploadError);
+      throw new Error(`Failed to upload URL to storage: ${uploadError.message}`);
+    }
 
     // Insert document record
     const initialDocumentData: Database['public']['Tables']['documents']['Insert'] = {
       organisation_id: userOrganisationId,
       file_name: fileName,
-      storage_path: `urls/${type}/${urlIdentifier}.url`, // Placeholder path for URLs
+      storage_path: storagePath,
       file_type: type === 'youtube' ? 'video/youtube' : 'text/html',
-      file_size: null, // Unknown size for URLs
+      file_size: url.length, // URL content size
       uploaded_by: session.user.id,
       status: 'queued' as DocumentStatus,
       metadata: metadata

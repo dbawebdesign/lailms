@@ -82,13 +82,15 @@ export interface AlternativeStructure {
 
 export class KnowledgeExtractor {
   private openai: OpenAI;
-  private supabase: ReturnType<typeof createSupabaseServerClient>;
 
   constructor() {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
-    this.supabase = createSupabaseServerClient();
+  }
+
+  private getSupabaseClient() {
+    return createSupabaseServerClient();
   }
 
   async extractKnowledgeStructure(baseClassId: string): Promise<ConceptMap> {
@@ -118,7 +120,7 @@ export class KnowledgeExtractor {
   async suggestCourseStructure(
     conceptMap: ConceptMap,
     targetWeeks: number = 12,
-    targetAudience: 'beginner' | 'intermediate' | 'advanced' | 'mixed' = 'mixed'
+    targetAudience: 'beginner' | 'intermediate' | 'advanced' = 'intermediate'
   ): Promise<CourseStructureSuggestion> {
     const prompt = `
 Analyze the following concept map and suggest an optimal course structure:
@@ -202,7 +204,7 @@ Return a JSON response with the following structure:
 
   async optimizeLearningSequence(
     concepts: LearningConcept[],
-    targetDifficulty: 'beginner' | 'intermediate' | 'advanced' = 'mixed'
+    targetDifficulty: 'beginner' | 'intermediate' | 'advanced' = 'intermediate'
   ): Promise<string[]> {
     // Create dependency graph
     const dependencyGraph = this.buildDependencyGraph(concepts);
@@ -217,7 +219,8 @@ Return a JSON response with the following structure:
   }
 
   private async getDocumentChunks(baseClassId: string) {
-    const { data: chunks, error } = await this.supabase
+    const supabase = this.getSupabaseClient();
+    const { data: chunks, error } = await supabase
       .from('document_chunks')
       .select(`
         id,

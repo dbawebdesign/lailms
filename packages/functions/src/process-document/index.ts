@@ -637,7 +637,7 @@ async function getEmbedding(text: string, apiKey: string): Promise<number[]> {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ input: text, model: 'text-embedding-ada-002' }),
+    body: JSON.stringify({ input: text, model: 'text-embedding-3-small' }),
   });
   if (!response.ok) {
     const errorBody = await response.text();
@@ -841,7 +841,7 @@ serve(async (req: Request) => {
         chunk_index: chunk.chunk_index, // Use chunk_index from chunk object
         content: chunk.content,
         token_count: chunk.content.split(/\s+/).length, // More robust token count
-        embedding: embeddings && embeddings[index] ? embeddings[index].embedding : null,
+        embedding: embeddings && embeddings[index] ? embeddings[index] : null,
         metadata: chunk.metadata,
         section_identifier: chunk.section_identifier,
         citation_key: citationKey, // Added citation_key

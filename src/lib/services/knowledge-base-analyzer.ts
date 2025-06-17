@@ -53,18 +53,21 @@ export const COURSE_GENERATION_MODES: Record<string, CourseGenerationMode> = {
 
 export class KnowledgeBaseAnalyzer {
   private openai: OpenAI;
-  private supabase: ReturnType<typeof createSupabaseServerClient>;
 
   constructor() {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
-    this.supabase = createSupabaseServerClient();
+  }
+
+  private getSupabaseClient() {
+    return createSupabaseServerClient();
   }
 
   async analyzeKnowledgeBase(baseClassId: string): Promise<KnowledgeBaseAnalysis> {
     // 1. Get documents and chunks data
-    const { data: documents, error: docsError } = await this.supabase
+    const supabase = this.getSupabaseClient();
+    const { data: documents, error: docsError } = await supabase
       .from('documents')
       .select(`
         id,
@@ -82,10 +85,10 @@ export class KnowledgeBaseAnalyzer {
 
     if (docsError) throw new Error(`Failed to fetch documents: ${docsError.message}`);
 
-    const { data: chunks, error: chunksError } = await this.supabase
+    const { data: chunks, error: chunksError } = await supabase
       .from('document_chunks')
       .select('id, document_id, content, chunk_summary, section_identifier')
-      .in('document_id', documents?.map(d => d.id) || []);
+      .in('document_id', documents?.map((d: any) => d.id) || []);
 
     if (chunksError) throw new Error(`Failed to fetch chunks: ${chunksError.message}`);
 
@@ -253,19 +256,340 @@ Provide analysis in JSON format:
     section_identifier?: string;
     similarity: number;
   }>> {
-    const { data, error } = await this.supabase.rpc('search_knowledge_base', {
-      query_text: query,
-      base_class_filter: baseClassId,
-      match_count: limit,
-      similarity_threshold: 0.7
-    });
+    try {
+      // First, get the organization ID for the base class
+      const supabase = this.getSupabaseClient();
+      const { data: baseClass, error: baseClassError } = await supabase
+        .from('base_classes')
+        .select('organisation_id')
+        .eq('id', baseClassId)
+        .single();
 
-    if (error) {
-      console.error('Knowledge base search error:', error);
+      if (baseClassError || !baseClass) {
+        console.error('Failed to get base class:', baseClassError);
+        return [];
+      }
+
+      // Generate embedding for the query using OpenAI
+      const embeddingResponse = await this.openai.embeddings.create({
+        model: "text-embedding-3-small",
+        input: query,
+      });
+      
+      const queryEmbedding = embeddingResponse.data[0].embedding;
+
+      // Call the correct vector search function
+      const { data, error } = await (supabase as any).rpc('vector_search_with_base_class', {
+        query_embedding: queryEmbedding,
+        organisation_id: baseClass.organisation_id,
+        base_class_id: baseClassId,
+        match_threshold: 0.5,
+        match_count: limit
+      });
+
+      if (error) {
+        console.error('Knowledge base search error:', error);
+        return [];
+      }
+
+      // Transform the results to match the expected format
+      return (data || []).map((item: any) => ({
+        id: item.id,
+        content: item.content,
+        summary: item.chunk_summary,
+        document_name: item.file_name,
+        section_identifier: item.section_identifier,
+        similarity: item.similarity
+      }));
+
+    } catch (error) {
+      console.error('Knowledge base search failed:', error);
       return [];
     }
+  }
 
-    return data || [];
+  /**
+   * Enhanced search function that adapts strategy based on generation mode
+   */
+  async searchKnowledgeBaseForGeneration(
+    baseClassId: string,
+    query: string,
+    generationMode: 'kb_only' | 'kb_priority' | 'kb_supplemented',
+    context?: {
+      totalChunks?: number;
+      courseScope?: 'outline' | 'lesson' | 'module';
+    }
+  ): Promise<Array<{
+    id: string;
+    content: string;
+    summary?: string;
+    document_name: string;
+    section_identifier?: string;
+    similarity: number;
+    search_strategy?: string;
+  }>> {
+    try {
+      const supabase = this.getSupabaseClient();
+      
+      // Get base class organization info
+      const { data: baseClass, error: baseClassError } = await supabase
+        .from('base_classes')
+        .select('organisation_id')
+        .eq('id', baseClassId)
+        .single();
+
+      if (baseClassError || !baseClass) {
+        console.error('Failed to get base class:', baseClassError);
+        return [];
+      }
+
+      // Determine search strategy based on generation mode
+      const searchConfig = this.getSearchConfigForMode(generationMode, context);
+      
+      let allResults: any[] = [];
+      const seenChunkIds = new Set<string>();
+
+      // Execute multiple search strategies
+      for (const strategy of searchConfig.strategies) {
+        const strategyResults = await this.executeSearchStrategy(
+          supabase,
+          baseClass.organisation_id,
+          baseClassId,
+          query,
+          strategy
+        );
+
+        // Add unique results
+        for (const result of strategyResults) {
+          if (!seenChunkIds.has(result.id)) {
+            seenChunkIds.add(result.id);
+            allResults.push({
+              ...result,
+              search_strategy: strategy.name
+            });
+          }
+        }
+      }
+
+      // If no results found, use fallback strategy
+      if (allResults.length === 0) {
+        console.warn(`[KB Search] No vector search results found for query: "${query}". Using fallback strategy.`);
+        allResults = await this.getFallbackChunks(supabase, baseClassId, searchConfig.maxResults);
+      }
+
+      // Sort by relevance and apply final filtering
+      allResults.sort((a, b) => (b.similarity || 0.5) - (a.similarity || 0.5));
+      
+      // Apply mode-specific result selection
+      const finalResults = this.selectResultsForMode(allResults, searchConfig);
+
+      console.log(`[KB Search] Mode: ${generationMode}, Query: "${query}", Results: ${finalResults.length}/${allResults.length} chunks`);
+      
+      return finalResults.map((item: any) => ({
+        id: item.id,
+        content: item.content,
+        summary: item.chunk_summary || item.summary,
+        document_name: item.file_name,
+        section_identifier: item.section_identifier,
+        similarity: item.similarity || 0.5,
+        search_strategy: item.search_strategy || 'fallback'
+      }));
+
+    } catch (error) {
+      console.error('Enhanced knowledge base search failed:', error);
+      // Return fallback chunks on any error
+      return await this.getFallbackChunks(this.getSupabaseClient(), baseClassId, 10);
+    }
+  }
+
+  private getSearchConfigForMode(
+    mode: 'kb_only' | 'kb_priority' | 'kb_supplemented',
+    context?: { totalChunks?: number; courseScope?: 'outline' | 'lesson' | 'module' }
+  ) {
+    const baseConfig = {
+      'kb_only': {
+        // Comprehensive coverage for KB-only generation
+        strategies: [
+          { name: 'high_relevance', threshold: 0.7, limit: 15 },
+          { name: 'medium_relevance', threshold: 0.5, limit: 25 },
+          { name: 'broad_coverage', threshold: 0.3, limit: 35 },
+          { name: 'document_sampling', threshold: 0.0, limit: 10 } // Sample from each document
+        ],
+        maxResults: 50,
+        ensureDocumentCoverage: true,
+        requireMinimumChunks: true
+      },
+      'kb_priority': {
+        // Balanced approach with good coverage
+        strategies: [
+          { name: 'high_relevance', threshold: 0.6, limit: 20 },
+          { name: 'medium_relevance', threshold: 0.4, limit: 15 }
+        ],
+        maxResults: 30,
+        ensureDocumentCoverage: false,
+        requireMinimumChunks: false
+      },
+      'kb_supplemented': {
+        // Focused on most relevant content
+        strategies: [
+          { name: 'high_relevance', threshold: 0.6, limit: 15 }
+        ],
+        maxResults: 15,
+        ensureDocumentCoverage: false,
+        requireMinimumChunks: false
+      }
+    };
+
+    // Adjust based on context
+    const config = baseConfig[mode];
+    
+    if (context?.courseScope === 'outline') {
+      // For course outline, need broader coverage
+      config.strategies.forEach(s => s.limit = Math.ceil(s.limit * 1.5));
+      config.maxResults = Math.ceil(config.maxResults * 1.5);
+    } else if (context?.courseScope === 'lesson') {
+      // For individual lessons, can be more focused
+      config.strategies.forEach(s => s.limit = Math.ceil(s.limit * 0.7));
+      config.maxResults = Math.ceil(config.maxResults * 0.7);
+    }
+
+    return config;
+  }
+
+  private async executeSearchStrategy(
+    supabase: any,
+    organisationId: string,
+    baseClassId: string,
+    query: string,
+    strategy: { name: string; threshold: number; limit: number }
+  ): Promise<any[]> {
+    try {
+      // Generate embeddings for the query
+      const embeddingResponse = await this.openai.embeddings.create({
+        model: "text-embedding-3-small",
+        input: query,
+      });
+      
+      const queryEmbedding = embeddingResponse.data[0].embedding;
+
+      // Execute vector search with strategy parameters
+      const { data, error } = await (supabase as any).rpc('vector_search_with_base_class', {
+        query_embedding: queryEmbedding,
+        organisation_id: organisationId,
+        base_class_id: baseClassId,
+        match_threshold: strategy.threshold,
+        match_count: strategy.limit
+      });
+
+      if (error) {
+        console.warn(`Search strategy ${strategy.name} failed:`, error);
+        return [];
+      }
+
+      return data || [];
+
+    } catch (error) {
+      console.warn(`Error executing search strategy ${strategy.name}:`, error);
+      return [];
+    }
+  }
+
+  private selectResultsForMode(
+    results: any[],
+    config: {
+      maxResults: number;
+      ensureDocumentCoverage: boolean;
+      requireMinimumChunks: boolean;
+    }
+  ): any[] {
+    let selectedResults = [...results];
+
+    // Apply document coverage requirement for KB-only mode
+    if (config.ensureDocumentCoverage) {
+      selectedResults = this.ensureDocumentRepresentation(selectedResults);
+    }
+
+    // Apply result limit
+    selectedResults = selectedResults.slice(0, config.maxResults);
+
+    // Ensure minimum chunk requirement for comprehensive modes
+    if (config.requireMinimumChunks && selectedResults.length < 20) {
+      console.warn(`Only ${selectedResults.length} chunks found for comprehensive KB generation. Consider reviewing knowledge base content.`);
+    }
+
+    return selectedResults;
+  }
+
+  private ensureDocumentRepresentation(results: any[]): any[] {
+    // Group results by document
+    const documentGroups = new Map<string, any[]>();
+    
+    for (const result of results) {
+      const docId = result.document_id;
+      if (!documentGroups.has(docId)) {
+        documentGroups.set(docId, []);
+      }
+      documentGroups.get(docId)!.push(result);
+    }
+
+    // Ensure each document is represented
+    const balancedResults: any[] = [];
+    const documentsWithContent = Array.from(documentGroups.entries());
+    
+    // First pass: get best chunk from each document
+    for (const [docId, docResults] of documentsWithContent) {
+      const bestChunk = docResults.sort((a, b) => b.similarity - a.similarity)[0];
+      balancedResults.push(bestChunk);
+    }
+
+    // Second pass: add remaining high-quality chunks
+    const remainingResults = results.filter(r => 
+      !balancedResults.some(br => br.id === r.id)
+    );
+    
+    balancedResults.push(...remainingResults);
+
+    return balancedResults;
+  }
+
+  /**
+   * Fallback method to get sample chunks when vector search fails
+   */
+  private async getFallbackChunks(
+    supabase: any,
+    baseClassId: string,
+    limit: number
+  ): Promise<any[]> {
+    try {
+      // Get random sample of chunks for this base class
+      const { data: chunks, error } = await supabase
+        .from('document_chunks')
+        .select(`
+          id,
+          content,
+          chunk_summary,
+          section_identifier,
+          documents!inner(file_name, base_class_id)
+        `)
+        .eq('documents.base_class_id', baseClassId)
+        .limit(limit);
+
+      if (error) throw error;
+
+      return (chunks || []).map((chunk: any) => ({
+        id: chunk.id,
+        content: chunk.content,
+        chunk_summary: chunk.chunk_summary,
+        file_name: chunk.documents?.file_name || 'Unknown',
+        section_identifier: chunk.section_identifier,
+        similarity: 0.5, // Default similarity for fallback
+        search_strategy: 'fallback'
+      }));
+
+    } catch (error) {
+      console.error('Fallback chunk retrieval failed:', error);
+      return [];
+    }
   }
 }
 

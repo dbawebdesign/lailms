@@ -102,11 +102,15 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
   const [title, setTitle] = useState(baseClassInfo?.name || '');
   const [description, setDescription] = useState(baseClassInfo?.description || '');
   const [estimatedWeeks, setEstimatedWeeks] = useState(12);
-  const [academicLevel, setAcademicLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
+  const [academicLevel, setAcademicLevel] = useState<'kindergarten' | '1st-grade' | '2nd-grade' | '3rd-grade' | '4th-grade' | '5th-grade' | '6th-grade' | '7th-grade' | '8th-grade' | '9th-grade' | '10th-grade' | '11th-grade' | '12th-grade' | 'college' | 'graduate' | 'professional' | 'master'>('college');
   const [lessonDetailLevel, setLessonDetailLevel] = useState<'basic' | 'detailed' | 'comprehensive'>('detailed');
   const [includeAssessments, setIncludeAssessments] = useState(true);
   const [includeQuizzes, setIncludeQuizzes] = useState(true);
   const [includeFinalExam, setIncludeFinalExam] = useState(true);
+  const [assessmentDifficulty, setAssessmentDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [questionsPerLesson, setQuestionsPerLesson] = useState([3]);
+  const [questionsPerQuiz, setQuestionsPerQuiz] = useState([10]);
+  const [questionsPerExam, setQuestionsPerExam] = useState([20]);
   const [lessonsPerWeek, setLessonsPerWeek] = useState([2]);
   const [targetAudience, setTargetAudience] = useState(baseClassInfo?.settings?.course_metadata?.target_audience || '');
   const [prerequisites, setPrerequisites] = useState('');
@@ -122,13 +126,20 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
   }, [baseClassId]);
 
   useEffect(() => {
-    if (generationJob && generationJob.status === 'processing') {
-      const interval = setInterval(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (generationJob && (generationJob.status === 'processing' || generationJob.status === 'queued')) {
+      interval = setInterval(() => {
         checkJobStatus();
       }, 2000);
-      return () => clearInterval(interval);
     }
-  }, [generationJob]);
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [generationJob?.id, generationJob?.status]);
 
   const loadKnowledgeBaseAnalysis = async () => {
     try {
@@ -180,7 +191,11 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
           assessmentSettings: {
             includeAssessments,
             includeQuizzes,
-            includeFinalExam
+            includeFinalExam,
+            assessmentDifficulty,
+            questionsPerLesson: questionsPerLesson[0],
+            questionsPerQuiz: questionsPerQuiz[0],
+            questionsPerExam: questionsPerExam[0]
           },
           userGuidance: userGuidance.trim()
         }),
@@ -214,10 +229,13 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
       if (data.success) {
         setGenerationJob(data.job);
         
-        if (data.job.status === 'completed' && data.courseOutline?.id) {
-          onCourseGenerated?.(data.courseOutline.id);
+        if (data.job.status === 'completed') {
+          if (data.courseOutline?.id) {
+            onCourseGenerated?.(data.courseOutline.id);
+          }
         } else if (data.job.status === 'failed') {
           setError(data.job.error || 'Course generation failed');
+          setGenerationJob(null);
         }
       }
     } catch (err) {
@@ -258,9 +276,10 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
           <div className="text-sm">
             {generationJob.status === 'queued' && 'Waiting to start...'}
             {generationJob.status === 'processing' && generationJob.progress < 20 && 'Analyzing knowledge base...'}
-            {generationJob.status === 'processing' && generationJob.progress >= 20 && generationJob.progress < 60 && 'Generating course outline...'}
-            {generationJob.status === 'processing' && generationJob.progress >= 60 && generationJob.progress < 90 && 'Creating lesson content...'}
-            {generationJob.status === 'processing' && generationJob.progress >= 90 && 'Generating assessments...'}
+            {generationJob.status === 'processing' && generationJob.progress >= 20 && generationJob.progress < 50 && 'Generating course outline...'}
+            {generationJob.status === 'processing' && generationJob.progress >= 50 && generationJob.progress < 70 && 'Creating learning paths and lessons...'}
+            {generationJob.status === 'processing' && generationJob.progress >= 70 && generationJob.progress < 90 && 'Generating lesson content...'}
+            {generationJob.status === 'processing' && generationJob.progress >= 90 && 'Creating assessments and quizzes...'}
           </div>
         </CardContent>
       </Card>
@@ -432,27 +451,111 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="academic-level">Academic Level</Label>
-                <Select value={academicLevel} onValueChange={(value: 'beginner' | 'intermediate' | 'advanced') => setAcademicLevel(value)}>
+                <Select value={academicLevel} onValueChange={(value: 'kindergarten' | '1st-grade' | '2nd-grade' | '3rd-grade' | '4th-grade' | '5th-grade' | '6th-grade' | '7th-grade' | '8th-grade' | '9th-grade' | '10th-grade' | '11th-grade' | '12th-grade' | 'college' | 'graduate' | 'professional' | 'master') => setAcademicLevel(value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select academic level" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="beginner">
+                    <SelectItem value="kindergarten">
                       <div className="flex items-center space-x-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span>Beginner - No prior knowledge required</span>
+                        <span>Kindergarten</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="intermediate">
+                    <SelectItem value="1st-grade">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>1st Grade</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="2nd-grade">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>2nd Grade</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="3rd-grade">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>3rd Grade</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="4th-grade">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>4th Grade</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="5th-grade">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>5th Grade</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="6th-grade">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>6th Grade</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="7th-grade">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>7th Grade</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="8th-grade">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>8th Grade</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="9th-grade">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>9th Grade</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="10th-grade">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>10th Grade</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="11th-grade">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>11th Grade</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="12th-grade">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span>12th Grade</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="college">
                       <div className="flex items-center space-x-2">
                         <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <span>Intermediate - Basic knowledge assumed</span>
+                        <span>College - Undergraduate Level</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="advanced">
+                    <SelectItem value="graduate">
                       <div className="flex items-center space-x-2">
                         <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                        <span>Advanced - Strong foundation required</span>
+                        <span>Graduate - Master's Level</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="professional">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        <span>Professional - Working Professionals</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="master">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                        <span>Master - Expert/Advanced Practice</span>
                       </div>
                     </SelectItem>
                   </SelectContent>
@@ -469,19 +572,19 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
                     <SelectItem value="basic">
                       <div className="flex items-center space-x-2">
                         <Layers className="h-4 w-4" />
-                        <span>Basic - Key concepts and overviews</span>
+                        <span>Basic - Essential concepts (2-3 pages/section)</span>
                       </div>
                     </SelectItem>
                     <SelectItem value="detailed">
                       <div className="flex items-center space-x-2">
                         <Layers className="h-4 w-4" />
-                        <span>Detailed - In-depth explanations</span>
+                        <span>Detailed - Thorough coverage (4-6 pages/section)</span>
                       </div>
                     </SelectItem>
                     <SelectItem value="comprehensive">
                       <div className="flex items-center space-x-2">
                         <Layers className="h-4 w-4" />
-                        <span>Comprehensive - Expert-level detail</span>
+                        <span>Comprehensive - Deep dive (8-12 pages/section)</span>
                       </div>
                     </SelectItem>
                   </SelectContent>
@@ -568,7 +671,7 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
                 <div className="space-y-0.5">
                   <Label className="text-sm font-medium">Lesson Assessments</Label>
                   <p className="text-xs text-muted-foreground">
-                    Include knowledge checks and practice questions in each lesson
+                    Include knowledge checks and practice questions within each lesson
                   </p>
                 </div>
                 <Switch
@@ -577,11 +680,25 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
                 />
               </div>
 
+              {includeAssessments && (
+                <div className="ml-4 space-y-2">
+                  <Label>Questions per Lesson: {questionsPerLesson[0]}</Label>
+                  <Slider
+                    value={questionsPerLesson}
+                    onValueChange={setQuestionsPerLesson}
+                    max={10}
+                    min={1}
+                    step={1}
+                    className="w-full"
+                  />
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label className="text-sm font-medium">Module Quizzes</Label>
+                  <Label className="text-sm font-medium">Path Quizzes</Label>
                   <p className="text-xs text-muted-foreground">
-                    Add comprehensive quizzes at the end of each module/path
+                    Add comprehensive quizzes at the end of each learning path/module
                   </p>
                 </div>
                 <Switch
@@ -590,11 +707,25 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
                 />
               </div>
 
+              {includeQuizzes && (
+                <div className="ml-4 space-y-2">
+                  <Label>Questions per Quiz: {questionsPerQuiz[0]}</Label>
+                  <Slider
+                    value={questionsPerQuiz}
+                    onValueChange={setQuestionsPerQuiz}
+                    max={25}
+                    min={5}
+                    step={1}
+                    className="w-full"
+                  />
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label className="text-sm font-medium">Final Comprehensive Exam</Label>
+                  <Label className="text-sm font-medium">Class Exams</Label>
                   <p className="text-xs text-muted-foreground">
-                    Include a final exam covering all course material for mastery verification
+                    Include comprehensive final exams covering all course content
                   </p>
                 </div>
                 <Switch
@@ -602,6 +733,51 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
                   onCheckedChange={setIncludeFinalExam}
                 />
               </div>
+
+              {includeFinalExam && (
+                <div className="ml-4 space-y-2">
+                  <Label>Questions per Exam: {questionsPerExam[0]}</Label>
+                  <Slider
+                    value={questionsPerExam}
+                    onValueChange={setQuestionsPerExam}
+                    max={50}
+                    min={10}
+                    step={2}
+                    className="w-full"
+                  />
+                </div>
+              )}
+
+              {(includeAssessments || includeQuizzes || includeFinalExam) && (
+                <div className="space-y-2">
+                  <Label htmlFor="assessment-difficulty">Assessment Difficulty</Label>
+                  <Select value={assessmentDifficulty} onValueChange={(value: 'easy' | 'medium' | 'hard') => setAssessmentDifficulty(value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select difficulty level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="easy">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span>Easy - Basic recall and understanding</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="medium">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <span>Medium - Application and analysis</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="hard">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                          <span>Hard - Synthesis and evaluation</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           </div>
 

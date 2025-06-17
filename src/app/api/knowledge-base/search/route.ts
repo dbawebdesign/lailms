@@ -163,13 +163,12 @@ export async function POST(request: NextRequest) {
     })
 
     const queryEmbeddingArray = embeddingResponse.data[0].embedding
-    const queryEmbedding = `[${queryEmbeddingArray.join(',')}]`; // Convert to pgvector string format
     
     // Execute the vector similarity search using the RPC function
-    const { data, error: searchError } = await supabase.rpc(
+    const { data, error: searchError } = await (supabase as any).rpc(
       'vector_search',
       {
-        query_embedding: queryEmbedding,
+        query_embedding: queryEmbeddingArray, // Pass array directly, not as string
         organisation_id: organisationId,
         match_threshold: 0.5,
         match_count: limit
