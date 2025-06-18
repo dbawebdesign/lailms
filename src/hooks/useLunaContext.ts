@@ -371,7 +371,7 @@ export function useLunaContext(): LunaChatContextValue {
     } finally {
       setIsLoading(false);
     }
-  }, [context, lunaContext]);
+  }, [context, lunaContext, saveChatHistory]);
   
   // Helper methods for accessing context
   const getComponentContent = useCallback((type: string, role: string): Record<string, any> | null => {

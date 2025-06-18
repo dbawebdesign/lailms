@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -121,27 +121,7 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
   const [error, setError] = useState<string | null>(null);
   const [generationJob, setGenerationJob] = useState<any>(null);
 
-  useEffect(() => {
-    loadKnowledgeBaseAnalysis();
-  }, [baseClassId]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    
-    if (generationJob && (generationJob.status === 'processing' || generationJob.status === 'queued')) {
-      interval = setInterval(() => {
-        checkJobStatus();
-      }, 2000);
-    }
-    
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [generationJob?.id, generationJob?.status]);
-
-  const loadKnowledgeBaseAnalysis = async () => {
+  const loadKnowledgeBaseAnalysis = useCallback(async () => {
     try {
       setAnalyzing(true);
       const response = await fetch(`/api/knowledge-base/generate-course?baseClassId=${baseClassId}`);
@@ -159,7 +139,50 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
     } finally {
       setAnalyzing(false);
     }
-  };
+  }, [baseClassId]);
+
+  const onCourseGeneratedSafe = onCourseGenerated;
+  const checkJobStatus = useCallback(async () => {
+    if (!generationJob?.id) return;
+
+    try {
+      const response = await fetch(`/api/knowledge-base/generation-status/${generationJob.id}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setGenerationJob(data.job);
+        
+        if (data.job.status === 'completed') {
+          if (data.courseOutline?.id) {
+            onCourseGeneratedSafe?.(data.courseOutline.id);
+          }
+        } else if (data.job.status === 'failed') {
+          setError(data.job.error || 'Course generation failed');
+          setGenerationJob(null);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check job status:', err);
+    }
+  }, [generationJob, onCourseGeneratedSafe]);
+
+  useEffect(() => {
+    loadKnowledgeBaseAnalysis();
+  }, [loadKnowledgeBaseAnalysis]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (generationJob && (generationJob.status === 'processing' || generationJob.status === 'queued')) {
+      interval = setInterval(checkJobStatus, 2000);
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [generationJob, checkJobStatus]);
 
   const generateCourse = async () => {
     if (!title.trim()) {
@@ -216,30 +239,6 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
       setError('Failed to generate course');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const checkJobStatus = async () => {
-    if (!generationJob?.id) return;
-
-    try {
-      const response = await fetch(`/api/knowledge-base/generation-status/${generationJob.id}`);
-      const data = await response.json();
-
-      if (data.success) {
-        setGenerationJob(data.job);
-        
-        if (data.job.status === 'completed') {
-          if (data.courseOutline?.id) {
-            onCourseGenerated?.(data.courseOutline.id);
-          }
-        } else if (data.job.status === 'failed') {
-          setError(data.job.error || 'Course generation failed');
-          setGenerationJob(null);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to check job status:', err);
     }
   };
 

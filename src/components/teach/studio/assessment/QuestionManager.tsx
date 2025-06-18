@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -132,20 +132,7 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
     { id: 'sequence', label: 'Sequence', icon: HelpCircle, color: 'bg-yellow-100 text-yellow-700' }
   ];
 
-  // Load questions, quizzes, and available lessons
-  useEffect(() => {
-    loadQuestions();
-    loadQuizzes();
-    if (baseClassId) {
-      loadBaseClassInfo();
-    }
-    // Temporarily remove loadAvailableLessons to simplify debugging
-    // if (baseClassId) {
-    //   loadAvailableLessons();
-    // }
-  }, [lessonId, baseClassId]);
-
-  const loadQuestions = async () => {
+  const loadQuestions = useCallback(async () => {
     setIsLoading(true);
     try {
       // Fetch questions for this base class
@@ -163,9 +150,9 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [baseClassId]);
 
-  const loadQuizzes = async () => {
+  const loadQuizzes = useCallback(async () => {
     try {
       // TODO: Implement API call to fetch quizzes
       // const response = await fetch(`/api/teach/base-classes/${baseClassId}/quizzes`);
@@ -177,23 +164,9 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
     } catch (error) {
       console.error('Failed to load quizzes:', error);
     }
-  };
+  }, []);
 
-  const loadAvailableLessons = async () => {
-    try {
-      const response = await fetch(`/api/teach/base-classes/${baseClassId}/lessons`);
-      if (response.ok) {
-        const data = await response.json();
-        setAvailableLessons(data.lessons || []);
-      }
-    } catch (error) {
-      console.error('Failed to load available lessons:', error);
-      // Set empty array on error so UI can still function
-      setAvailableLessons([]);
-    }
-  };
-
-  const loadBaseClassInfo = async () => {
+  const loadBaseClassInfo = useCallback(async () => {
     try {
       // Fetch base class information from the API
       const response = await fetch(`/api/teach/base-classes/${baseClassId}/info`);
@@ -220,6 +193,33 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
         totalLessons: 0,
         totalSections: 0
       });
+    }
+  }, [baseClassId]);
+
+  // Load questions, quizzes, and available lessons
+  useEffect(() => {
+    loadQuestions();
+    loadQuizzes();
+    if (baseClassId) {
+      loadBaseClassInfo();
+    }
+    // Temporarily remove loadAvailableLessons to simplify debugging
+    // if (baseClassId) {
+    //   loadAvailableLessons();
+    // }
+  }, [baseClassId, loadQuestions, loadQuizzes, loadBaseClassInfo]);
+
+  const loadAvailableLessons = async () => {
+    try {
+      const response = await fetch(`/api/teach/base-classes/${baseClassId}/lessons`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableLessons(data.lessons || []);
+      }
+    } catch (error) {
+      console.error('Failed to load available lessons:', error);
+      // Set empty array on error so UI can still function
+      setAvailableLessons([]);
     }
   };
 

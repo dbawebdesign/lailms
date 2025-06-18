@@ -14,7 +14,7 @@ export default function AnimatedHero() {
         const delay = parseInt(word.getAttribute('data-delay') || '0')
         
         setTimeout(() => {
-          word.style.animation = 'word-appear 0.8s ease-out forwards'
+          (word as HTMLElement).style.animation = 'word-appear 0.8s ease-out forwards'
         }, delay)
       })
     }
@@ -130,10 +130,10 @@ export default function AnimatedHero() {
         </div>
 
         {/* Floating Elements */}
-        <div className="floating-element" style={{top: '25%', left: '15%', animationDelay: '5s'}}></div>
-        <div className="floating-element" style={{top: '60%', left: '85%', animationDelay: '5.5s'}}></div>
-        <div className="floating-element" style={{top: '40%', left: '10%', animationDelay: '6s'}}></div>
-        <div className="floating-element" style={{top: '75%', left: '90%', animationDelay: '6.5s'}}></div>
+        <div className="floating-element floating-element-1" style={{animationDelay: '5s'}}></div>
+        <div className="floating-element floating-element-2" style={{animationDelay: '5.5s'}}></div>
+        <div className="floating-element floating-element-3" style={{animationDelay: '6s'}}></div>
+        <div className="floating-element floating-element-4" style={{animationDelay: '6.5s'}}></div>
 
         {/* Top Text */}
         <div className="text-center mb-16">
