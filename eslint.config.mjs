@@ -63,14 +63,18 @@ const noLiteralStyleRule = {
 const eslintConfig = [
   {
     ignores: [
-      ".next/**", 
-      "node_modules/**", 
+      ".next/**",
+      "node_modules/**",
       "dist/**",
       "src/types/supabase.ts", // Auto-generated Supabase types file
-      "src/lib/types/database.types.ts" // Auto-generated database types file
+      "packages/types/db.ts", // Auto-generated database types file
     ], // Add ignores for build/dependency dirs
   },
-  ...compat.extends("next/core-web-vitals"), // Keep core web vitals separate maybe
+  ...compat.extends(
+    "next/core-web-vitals",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended",
+  ), // Keep core web vitals separate maybe
   { // Configuration for TS/JS files
     files: ["**/*.{js,mjs,cjs,ts,jsx,tsx}"],
     plugins: {
@@ -100,12 +104,12 @@ const eslintConfig = [
       // Configure the custom rule
       'custom-rules/no-literal-style': 'warn', // Set to 'warn' or 'error'
       // Temporarily disable problematic rules for deployment
+      'react/react-in-jsx-scope': 'off',
       'react/no-unescaped-entities': 'off',
-      'react-hooks/exhaustive-deps': 'warn',
-      'react-hooks/rules-of-hooks': 'warn',
       '@next/next/no-img-element': 'warn',
       // Add other rule overrides here
-      'react/no-unknown-property': ['error', { ignore: ['css'] }], // Example: Allow 'css' prop if using CSS-in-JS libs
+      'react/no-unknown-property': ['warn', { ignore: ['css'] }], // Example: Allow 'css' prop if using CSS-in-JS libs
+      'react/prop-types': 'off', // Disable prop-types validation for TypeScript projects
     },
   },
   // You might have other specific configs here from compat.extends("next/typescript")
