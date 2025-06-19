@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Database } from '../../../../../packages/types/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,45 +30,15 @@ import {
   Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { QuestionPreview } from './QuestionPreview';
 
-// Import the Question type from QuestionManager
-interface Question {
-  id: string;
-  quiz_id?: string;
-  question_text: string;
-  question_type: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'fill_in_blank' | 'matching' | 'drag_drop' | 'sequence';
-  points: number;
-  order_index: number;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-  options?: QuestionOption[];
-  metadata?: {
-    difficulty_level?: 'easy' | 'medium' | 'hard';
-    bloom_taxonomy?: 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
-    learning_objectives?: string[];
-    tags?: string[];
-    estimated_time?: number;
-    lesson_content_refs?: string[];
-    source_content?: string;
-    ai_generated?: boolean;
-    validation_status?: 'draft' | 'reviewed' | 'approved' | 'needs_revision';
-  };
-}
-
-interface QuestionOption {
-  id: string;
-  question_id: string;
-  option_text: string;
-  is_correct: boolean;
-  order_index: number;
-  created_at: string;
-  updated_at: string;
-}
+type Question = Database['public']['Tables']['questions']['Row'];
+type QuestionOption = Database['public']['Tables']['question_options']['Row'];
 
 interface QuestionEditorProps {
-  question: Question;
-  onSave: (question: Question) => void;
+  question: Partial<Question> | null;
+  onSave: (question: Partial<Question>) => void;
   onCancel: () => void;
   lessonId?: string;
   baseClassId: string;
@@ -80,7 +51,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
   lessonId,
   baseClassId
 }) => {
-  const [question, setQuestion] = useState<Question>(initialQuestion);
+  const [question, setQuestion] = useState<Partial<Question>>(initialQuestion || {});
   const [activeTab, setActiveTab] = useState<'content' | 'settings' | 'preview'>('content');
   const [isGeneratingFromContent, setIsGeneratingFromContent] = useState(false);
   const [lessonContent, setLessonContent] = useState<string>('');
@@ -109,40 +80,33 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
     setQuestion(prev => ({ ...prev, ...updates }));
   };
 
-  const updateMetadata = (updates: Partial<Question['metadata']>) => {
-    setQuestion(prev => ({
-      ...prev,
-      metadata: { ...prev.metadata, ...updates }
-    }));
+  const getOptions = (): Partial<QuestionOption>[] => {
+    return Array.isArray(question.options) ? question.options : [];
   };
 
-  const updateOptions = (options: QuestionOption[]) => {
-    setQuestion(prev => ({ ...prev, options }));
+  const updateOptions = (newOptions: Partial<QuestionOption>[]) => {
+    updateQuestion({ options: newOptions as any });
   };
 
   const addOption = () => {
-    const newOption: QuestionOption = {
-      id: `temp-option-${Date.now()}`,
-      question_id: question.id,
+    const options = getOptions();
+    const newOption: Partial<QuestionOption> = {
       option_text: '',
       is_correct: false,
-      order_index: question.options?.length || 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      order_index: options.length,
     };
-    
-    updateOptions([...(question.options || []), newOption]);
+    updateOptions([...options, newOption]);
   };
 
-  const removeOption = (optionId: string) => {
-    updateOptions(question.options?.filter(opt => opt.id !== optionId) || []);
+  const removeOption = (index: number) => {
+    const options = getOptions();
+    updateOptions(options.filter((_, i) => i !== index));
   };
 
-  const updateOption = (optionId: string, updates: Partial<QuestionOption>) => {
+  const updateOption = (index: number, updates: Partial<QuestionOption>) => {
+    const options = getOptions();
     updateOptions(
-      question.options?.map(opt => 
-        opt.id === optionId ? { ...opt, ...updates } : opt
-      ) || []
+      options.map((opt, i) => (i === index ? { ...opt, ...updates } : opt))
     );
   };
 
@@ -177,19 +141,15 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
       updateQuestion({ question_text: mockGenerated.question_text });
       
       if (question.question_type === 'multiple_choice' && mockGenerated.options) {
-        const generatedOptions: QuestionOption[] = mockGenerated.options.map((opt, index) => ({
-          id: `generated-option-${index}`,
-          question_id: question.id,
+        const generatedOptions: Partial<QuestionOption>[] = mockGenerated.options.map((opt, index) => ({
           option_text: opt.option_text,
           is_correct: opt.is_correct,
           order_index: index,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
         }));
         updateOptions(generatedOptions);
       }
       
-      updateMetadata({ ai_generated: true });
+      updateQuestion({ ai_generated: true });
     } catch (error) {
       console.error('Failed to generate question from content:', error);
     } finally {
@@ -236,7 +196,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
             </div>
             
             <div className="space-y-3">
-              {question.options?.map((option, index) => (
+              {getOptions().map((option, index) => (
                 <Card key={option.id} className="p-3">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
@@ -245,21 +205,21 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
                       </Badge>
                       <Switch
                         checked={option.is_correct}
-                        onCheckedChange={(checked) => updateOption(option.id, { is_correct: checked })}
+                        onCheckedChange={(checked) => updateOption(index, { is_correct: checked })}
                       />
                     </div>
                     
                     <Input
                       placeholder={`Option ${String.fromCharCode(65 + index)}`}
                       value={option.option_text}
-                      onChange={(e) => updateOption(option.id, { option_text: e.target.value })}
+                      onChange={(e) => updateOption(index, { option_text: e.target.value })}
                       className="flex-1"
                     />
                     
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => removeOption(option.id)}
+                      onClick={() => removeOption(index)}
                       disabled={question.options && question.options.length <= 2}
                     >
                       <Minus className="h-4 w-4" />
@@ -282,9 +242,9 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
             <div className="flex gap-4">
               <Card 
                 className={cn("p-4 cursor-pointer border-2", 
-                  question.metadata?.correct_answer === 'true' ? 'border-green-500 bg-green-50' : 'border-gray-200'
+                  question.correct_answer === 'true' ? 'border-green-500 bg-green-50' : 'border-gray-200'
                 )}
-                onClick={() => updateMetadata({ correct_answer: 'true' })}
+                onClick={() => updateQuestion({ correct_answer: 'true' })}
               >
                 <div className="text-center">
                   <CheckCircle className="h-6 w-6 mx-auto mb-2 text-green-600" />
@@ -293,9 +253,9 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
               </Card>
               <Card 
                 className={cn("p-4 cursor-pointer border-2", 
-                  question.metadata?.correct_answer === 'false' ? 'border-red-500 bg-red-50' : 'border-gray-200'
+                  question.correct_answer === 'false' ? 'border-red-500 bg-red-50' : 'border-gray-200'
                 )}
-                onClick={() => updateMetadata({ correct_answer: 'false' })}
+                onClick={() => updateQuestion({ correct_answer: 'false' })}
               >
                 <div className="text-center">
                   <X className="h-6 w-6 mx-auto mb-2 text-red-600" />
@@ -317,8 +277,8 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
               </p>
               <Textarea
                 placeholder="Enter a model answer..."
-                value={question.metadata?.model_answer || ''}
-                onChange={(e) => updateMetadata({ model_answer: e.target.value })}
+                value={question.model_answer || ''}
+                onChange={(e) => updateQuestion({ model_answer: e.target.value })}
                 rows={question.question_type === 'essay' ? 6 : 3}
               />
             </div>
@@ -327,8 +287,8 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
               <Label className="text-base font-medium">Grading Rubric</Label>
               <Textarea
                 placeholder="Enter grading criteria and rubric..."
-                value={question.metadata?.grading_rubric || ''}
-                onChange={(e) => updateMetadata({ grading_rubric: e.target.value })}
+                value={question.grading_rubric || ''}
+                onChange={(e) => updateQuestion({ grading_rubric: e.target.value })}
                 rows={4}
               />
             </div>
@@ -339,8 +299,8 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
                 <Input
                   type="number"
                   placeholder="e.g., 100"
-                  value={question.metadata?.max_words || ''}
-                  onChange={(e) => updateMetadata({ max_words: parseInt(e.target.value) || undefined })}
+                  value={question.max_words || ''}
+                  onChange={(e) => updateQuestion({ max_words: parseInt(e.target.value) || undefined })}
                 />
               </div>
             )}
@@ -364,8 +324,8 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
               </p>
               <Textarea
                 placeholder="Answer 1&#10;Answer 2&#10;Answer 3"
-                value={question.metadata?.correct_answers?.join('\n') || ''}
-                onChange={(e) => updateMetadata({ 
+                value={question.correct_answers?.join('\n') || ''}
+                onChange={(e) => updateQuestion({ 
                   correct_answers: e.target.value.split('\n').filter(a => a.trim()) 
                 })}
                 rows={4}
@@ -395,7 +355,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
             {question.id ? 'Edit Question' : 'Create New Question'}
           </h3>
           <p className="text-sm text-muted-foreground">
-            {question.question_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} Question
+            {question.question_type?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} Question
           </p>
         </div>
         
@@ -426,7 +386,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
             <Label className="text-base font-medium">Question Text</Label>
             <Textarea
               placeholder="Enter your question here..."
-              value={question.question_text}
+              value={question.question_text || ''}
               onChange={(e) => updateQuestion({ question_text: e.target.value })}
               rows={3}
               className="text-base"
@@ -459,19 +419,16 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
                 
                 <div>
                   <Label>Difficulty Level</Label>
-                  <Select 
-                    value={question.metadata?.difficulty_level || 'medium'} 
-                    onValueChange={(value) => updateMetadata({ difficulty_level: value as any })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="easy">Easy</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="hard">Hard</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Slider
+                    defaultValue={[question.difficulty_score || 2]}
+                    min={1} max={3} step={1}
+                    onValueChange={(value) => updateQuestion({ difficulty_score: value[0] })}
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>Easy</span>
+                    <span>Medium</span>
+                    <span>Hard</span>
+                  </div>
                 </div>
                 
                 <div>
@@ -479,8 +436,8 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
                   <Input
                     type="number"
                     min="1"
-                    value={question.metadata?.estimated_time || 2}
-                    onChange={(e) => updateMetadata({ estimated_time: parseInt(e.target.value) || 2 })}
+                    value={question.estimated_time || 2}
+                    onChange={(e) => updateQuestion({ estimated_time: parseInt(e.target.value) || 2 })}
                   />
                 </div>
               </CardContent>
@@ -493,10 +450,10 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
               </CardHeader>
               <CardContent className="p-0 space-y-4">
                 <div>
-                  <Label>Bloom's Taxonomy Level</Label>
+                  <Label>Cognitive Level (Bloom's Taxonomy)</Label>
                   <Select 
-                    value={question.metadata?.bloom_taxonomy || 'understand'} 
-                    onValueChange={(value) => updateMetadata({ bloom_taxonomy: value as any })}
+                    value={question.cognitive_level || 'understand'} 
+                    onValueChange={(value) => updateQuestion({ cognitive_level: value })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -516,8 +473,8 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
                   <Label>Tags</Label>
                   <Input
                     placeholder="Enter tags separated by commas"
-                    value={question.metadata?.tags?.join(', ') || ''}
-                    onChange={(e) => updateMetadata({ 
+                    value={(question.tags as string[])?.join(', ') || ''}
+                    onChange={(e) => updateQuestion({ 
                       tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) 
                     })}
                   />
@@ -527,8 +484,8 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
                   <Label>Learning Objectives</Label>
                   <Textarea
                     placeholder="Enter learning objectives, one per line"
-                    value={question.metadata?.learning_objectives?.join('\n') || ''}
-                    onChange={(e) => updateMetadata({ 
+                    value={(question.learning_objectives as string[])?.join('\n') || ''}
+                    onChange={(e) => updateQuestion({ 
                       learning_objectives: e.target.value.split('\n').filter(Boolean) 
                     })}
                     rows={3}
@@ -546,7 +503,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium">Preview</h4>
                 <div className="flex items-center gap-2">
-                  <Badge>{question.metadata?.difficulty_level}</Badge>
+                  <Badge>{question.difficulty_score ? 'Difficulty: ' + question.difficulty_score : 'No difficulty score'}</Badge>
                   <Badge variant="outline">{question.points} pts</Badge>
                 </div>
               </div>
@@ -554,9 +511,9 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
               <div className="prose max-w-none">
                 <p className="text-base">{question.question_text || 'Enter question text to see preview'}</p>
                 
-                {question.question_type === 'multiple_choice' && question.options && (
+                {question.question_type === 'multiple_choice' && getOptions().length > 0 && (
                   <div className="mt-4 space-y-2">
-                    {question.options.map((option, index) => (
+                    {getOptions().map((option, index) => (
                       <div 
                         key={option.id} 
                         className={cn(
@@ -576,10 +533,10 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
                 
                 {question.question_type === 'true_false' && (
                   <div className="mt-4 flex gap-4">
-                    <Button variant={question.metadata?.correct_answer === 'true' ? 'default' : 'outline'}>
+                    <Button variant={question.correct_answer === 'true' ? 'default' : 'outline'}>
                       True
                     </Button>
-                    <Button variant={question.metadata?.correct_answer === 'false' ? 'default' : 'outline'}>
+                    <Button variant={question.correct_answer === 'false' ? 'default' : 'outline'}>
                       False
                     </Button>
                   </div>
@@ -594,7 +551,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Clock className="h-4 w-4" />
-          <span>Estimated time: {question.metadata?.estimated_time || 2} minutes</span>
+          <span>Estimated time: {question.estimated_time || 2} minutes</span>
         </div>
         
         <div className="flex items-center gap-3">

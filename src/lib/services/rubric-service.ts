@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { Database } from '@/lib/database.types';
+import { Database } from '../../../packages/types/db';
 
 type Rubric = Database['public']['Tables']['rubrics']['Row'];
 type RubricInsert = Database['public']['Tables']['rubrics']['Insert'];
@@ -92,7 +92,7 @@ export class RubricService {
         description: criterion.description,
         weight: criterion.weight,
         max_points: criterion.maxPoints,
-        performance_levels: criterion.performanceLevels,
+        performance_levels: criterion.performanceLevels as any, // Cast to Json type
         order_index: criterion.orderIndex
       }));
 

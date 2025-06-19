@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { Database } from '@/types/supabase'
+import { Database } from '../../../../../packages/types/db'
 import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 import { NextRequest } from 'next/server';

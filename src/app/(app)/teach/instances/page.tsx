@@ -85,7 +85,7 @@ export default function AllInstancesPage() {
   };
   
   const handleViewInstanceDetails = (instance: EnrichedClassInstance) => {
-    router.push(`/teach/base-classes/${instance.baseClassId}`);
+    router.push(`/teach/base-classes/${instance.base_class_id}`);
   };
 
   if (isLoading) {

@@ -3,7 +3,6 @@
 import React, { useEffect, useState, use } from 'react';
 import { supabase } from '@/utils/supabase/browser'; // Corrected Supabase client import path
 import type { StudioBaseClass, Path, Lesson, LessonSection } from '@/types/lesson';
-import type { BaseClass } from '@/types/teach'; // NEW: Import BaseClass for casting
 import { Loader2, Menu, Info } from 'lucide-react'; // For loading indicator and menu icon, added Info for Knowledge Base
 import StudioNavigationTree from '@/components/teach/studio/StudioNavigationTree';
 import BaseClassEditor from '@/components/teach/studio/editors/BaseClassEditor'; // Added import

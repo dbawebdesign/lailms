@@ -1,0 +1,213 @@
+# Assessment System Rebuild - Product Requirements Document
+
+## Project Overview
+Complete rebuild of the questions and assessment system from scratch, replacing the current fragmented system with a unified, configurable architecture that supports lesson assessments, path quizzes, and class exams.
+
+## Current System Issues
+- Multiple fragmented tables (lesson_assessments, path_assessments, class_assessments, lesson_questions)
+- Poor integration with course generation workflow
+- Limited question management capabilities
+- Inconsistent assessment structure
+- No unified question bank system
+
+## New System Requirements
+
+### Core Architecture
+1. **Single Questions Table**: Unified storage for all questions with flexible tagging system
+2. **Assessment Entities**: Standalone assessment records that reference questions via tags
+3. **Configuration-Driven**: All assessments optional based on user preferences set before course generation
+4. **Content-Based Generation**: Questions generated from actual lesson/path/class content using OpenAI GPT-4.1-mini
+
+### Database Schema
+
+#### Questions Table
+- id (UUID, primary key)
+- content (TEXT, the actual question)
+- options (JSONB, for multiple choice questions)
+- correct_answer (TEXT, supports all question types)
+- question_type (VARCHAR, multiple_choice/true_false/short_answer/essay)
+- tags (TEXT[], flexible tagging for assignment)
+- base_class_id (UUID, reference to base class)
+- created_at, updated_at timestamps
+
+#### Assessments Table
+- id (UUID, primary key)
+- title (VARCHAR, assessment name)
+- type (VARCHAR, lesson_assessment/path_quiz/class_exam)
+- base_class_id (UUID, reference to base class)
+- lesson_id (UUID, nullable, for lesson assessments)
+- path_id (UUID, nullable, for path quizzes)
+- is_enabled (BOOLEAN, default true)
+- settings (JSONB, time limits, attempts, etc.)
+- created_at timestamp
+
+#### Assessment Configuration
+- Add assessment_config JSONB column to base_classes table
+- Structure: lesson_assessments{enabled, question_count}, path_quizzes{enabled, question_count}, class_exams{enabled, question_count}
+
+### Assessment Types
+
+#### 1. Lesson Assessments
+- **Trigger**: After individual lesson content creation
+- **Content Source**: Specific lesson sections and content
+- **Tagging**: `lesson_<lesson_id>`
+- **Configuration**: Optional, user-configurable question count
+
+#### 2. Path Quizzes
+- **Trigger**: After all lessons in a path are completed
+- **Content Source**: Aggregated content from all lessons within the path
+- **Tagging**: `path_<path_id>`
+- **Configuration**: Optional, user-configurable question count
+
+#### 3. Class Exams
+- **Trigger**: After all paths and lessons in base class are completed
+- **Content Source**: All content across the entire base class
+- **Tagging**: `class_<base_class_id>`
+- **Configuration**: Optional, user-configurable question count
+
+### Question Generation Workflow
+
+#### Content Analysis and Question Generation
+1. Extract text content from lessons/sections/paths
+2. Use OpenAI GPT-4.1-mini to analyze content and generate contextually relevant questions
+3. Support multiple question types (multiple choice, true/false, short answer, essay)
+4. Ensure questions test comprehension of specific content
+5. Automatically tag and store questions with appropriate identifiers
+
+#### Integration Points
+- **Course Generation Workflow**: Hook into existing course generation process
+- **Conditional Generation**: Only generate assessments if enabled in base class configuration
+- **Content Extraction**: Pull content from existing lesson sections and media
+- **AI Processing**: Use OpenAI GPT-4.1-mini for intelligent question generation
+
+### API Structure
+
+#### Assessment Management
+- GET /api/assessments/ (list assessments)
+- POST /api/assessments/ (create assessment)
+- GET /api/assessments/[id] (get assessment details)
+- PUT /api/assessments/[id] (update assessment)
+- DELETE /api/assessments/[id] (delete assessment)
+
+#### Question Management
+- GET /api/questions/ (list questions with filtering)
+- POST /api/questions/ (create question)
+- GET /api/questions/[id] (get question details)
+- PUT /api/questions/[id] (update question)
+- DELETE /api/questions/[id] (delete question)
+
+#### Question Generation
+- POST /api/generate/questions/from-lesson (generate from lesson content)
+- POST /api/generate/questions/from-path (generate from path content)
+- POST /api/generate/questions/from-class (generate from class content)
+
+#### Assessment Taking
+- POST /api/take-assessment/start (begin assessment)
+- POST /api/take-assessment/submit-answer (submit individual answer)
+- POST /api/take-assessment/complete (complete assessment)
+
+#### Configuration
+- GET /api/base-classes/[id]/assessment-config (get assessment configuration)
+- PUT /api/base-classes/[id]/assessment-config (update assessment configuration)
+
+### Frontend Components
+
+#### Student Interface
+- AssessmentList: View available assessments
+- AssessmentTaker: Take assessment interface with question display
+- AssessmentResults: View completed assessment results
+- ProgressTracker: Show assessment progress in course outline
+
+#### Teacher/Admin Interface
+- QuestionManager: Admin interface for question management
+- AssessmentSettings: Configure assessment parameters
+- AssessmentAnalytics: View assessment performance and analytics
+- QuestionBank: Browse and manage question library
+
+### Integration Requirements
+
+#### Course Generation Integration
+- Modify existing course generation workflow to include conditional assessment generation
+- Add hooks after lesson completion, path completion, and class completion
+- Respect user configuration settings for assessment enablement
+- Ensure proper sequencing and dependencies
+
+#### Studio Interface Integration
+- Add assessment management to studio navigation
+- Integrate question bank management
+- Provide assessment configuration interface
+- Show assessment status in course outline
+
+#### Student Experience Integration
+- Display assessments in course navigation
+- Show assessment requirements and progress
+- Integrate with existing progress tracking
+- Maintain consistent UI/UX with existing course interface
+
+### Technical Requirements
+
+#### Database Operations
+- Complete removal of existing assessment tables
+- Migration scripts for data cleanup
+- New table creation with proper indexes and constraints
+- Foreign key relationships and referential integrity
+
+#### AI Integration
+- OpenAI GPT-4.1-mini integration for question generation
+- Content extraction and preprocessing
+- Question quality validation
+- Error handling for AI service failures
+
+#### Performance Considerations
+- Efficient question querying with tag-based filtering
+- Bulk question generation optimization
+- Assessment loading performance
+- Database indexing strategy
+
+### Implementation Phases
+
+#### Phase 1: System Cleanup and Database Migration
+- Remove existing assessment-related code and database tables
+- Create new database schema
+- Set up migration scripts
+- Prepare clean foundation
+
+#### Phase 2: Core System Implementation
+- Implement new database models and types
+- Create basic CRUD operations for questions and assessments
+- Set up question generation service with OpenAI integration
+- Implement tagging system
+
+#### Phase 3: Course Generation Integration
+- Modify course generation workflow
+- Add conditional assessment generation hooks
+- Implement content extraction for question generation
+- Test integration with existing course creation process
+
+#### Phase 4: Frontend Development
+- Create assessment management interfaces
+- Implement student assessment taking interface
+- Build teacher/admin question management tools
+- Integrate with existing studio interface
+
+#### Phase 5: Testing and Optimization
+- Comprehensive testing of all assessment types
+- Performance optimization
+- User acceptance testing
+- Bug fixes and refinements
+
+### Success Criteria
+- Complete replacement of existing assessment system
+- Seamless integration with course generation workflow
+- User-configurable assessment options working correctly
+- High-quality, content-relevant questions generated automatically
+- Improved user experience for both students and teachers
+- System performance meets or exceeds current standards
+
+### Technical Stack
+- Database: Supabase PostgreSQL
+- Backend: Next.js API routes
+- Frontend: React/Next.js with TypeScript
+- AI: OpenAI GPT-4.1-mini
+- Styling: Tailwind CSS with existing design system
+- State Management: React hooks and context 

@@ -1,14 +1,15 @@
 'use client';
 
 import React from 'react';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Database } from '../../../../../packages/types/db';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { 
   CheckCircle, 
   Clock, 
@@ -19,48 +20,59 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface Question {
-  id: string;
-  quiz_id?: string;
-  question_text: string;
-  question_type: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'fill_in_blank' | 'matching' | 'drag_drop' | 'sequence';
-  points: number;
-  order_index: number;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-  options?: QuestionOption[];
-  metadata?: {
-    difficulty_level?: 'easy' | 'medium' | 'hard';
-    bloom_taxonomy?: 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
-    learning_objectives?: string[];
-    tags?: string[];
-    estimated_time?: number;
-    lesson_content_refs?: string[];
-    source_content?: string;
-    ai_generated?: boolean;
-    validation_status?: 'draft' | 'reviewed' | 'approved' | 'needs_revision';
-  };
-}
+type Question = Database['public']['Tables']['questions']['Row'];
 
+// Helper type for question options
 interface QuestionOption {
   id: string;
-  question_id: string;
   option_text: string;
-  is_correct: boolean;
-  order_index: number;
-  created_at: string;
-  updated_at: string;
+  is_correct?: boolean;
 }
 
 interface QuestionPreviewProps {
-  question: Question;
+  question: Partial<Question>;
   showAnswers?: boolean;
   showMetadata?: boolean;
   interactive?: boolean;
   className?: string;
   questionNumber?: number;
 }
+
+// Helper function to safely parse options from JSONB
+const parseOptions = (options: Question['options']): QuestionOption[] => {
+  if (!options) return [];
+  
+  try {
+    if (Array.isArray(options)) {
+      return options as unknown as QuestionOption[];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+};
+
+// Helper function to safely parse answer key from JSONB
+const parseAnswerKey = (answerKey: Question['answer_key']): any => {
+  if (!answerKey) return null;
+  
+  try {
+    return answerKey;
+  } catch {
+    return null;
+  }
+};
+
+// Helper function to safely parse rubric from JSONB
+const parseRubric = (rubric: Question['rubric']): any => {
+  if (!rubric) return null;
+  
+  try {
+    return rubric;
+  } catch {
+    return null;
+  }
+};
 
 export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
   question,
@@ -70,7 +82,11 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
   className,
   questionNumber
 }) => {
-  const getDifficultyColor = (difficulty?: string) => {
+  if (!question) {
+    return null;
+  }
+
+  const getDifficultyColor = (difficulty?: string | null) => {
     switch (difficulty) {
       case 'easy':
         return 'bg-green-100 text-green-700 border-green-200';
@@ -84,13 +100,18 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
   };
 
   const renderQuestionContent = () => {
+    const questionText = question.question_text || 'No question text provided.';
+    
     switch (question.question_type) {
       case 'multiple_choice':
+        const options = parseOptions(question.options || null);
+        const answerKey = parseAnswerKey(question.answer_key || null);
+        
         return (
           <div className="space-y-3">
-            {question.options?.map((option, index) => (
+            {options.map((option: QuestionOption, index: number) => (
               <div 
-                key={option.id}
+                key={option.id || index}
                 className={cn(
                   "flex items-center gap-3 p-3 rounded-lg border transition-colors",
                   showAnswers && option.is_correct 
@@ -102,8 +123,8 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
                 {interactive ? (
                   <RadioGroup>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value={option.id} id={option.id} />
-                      <Label htmlFor={option.id} className="cursor-pointer">
+                      <RadioGroupItem value={option.id || String(index)} id={option.id || String(index)} />
+                      <Label htmlFor={option.id || String(index)} className="cursor-pointer">
                         <span className="font-medium text-sm mr-2">
                           {String.fromCharCode(65 + index)}.
                         </span>
@@ -128,12 +149,14 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
         );
 
       case 'true_false':
+        const correctAnswer = question.correct_answer;
+        
         return (
           <div className="flex gap-4">
             <div 
               className={cn(
                 "flex-1 p-4 rounded-lg border-2 text-center transition-colors",
-                showAnswers && question.metadata?.correct_answer === 'true'
+                showAnswers && correctAnswer === 'true'
                   ? "bg-green-50 border-green-500"
                   : "bg-gray-50 border-gray-200",
                 interactive && "cursor-pointer hover:bg-gray-100"
@@ -142,7 +165,7 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
               <div className="flex items-center justify-center gap-2">
                 {interactive && <RadioGroupItem value="true" />}
                 <span className="font-medium">True</span>
-                {showAnswers && question.metadata?.correct_answer === 'true' && (
+                {showAnswers && correctAnswer === 'true' && (
                   <CheckCircle className="h-5 w-5 text-green-600" />
                 )}
               </div>
@@ -150,7 +173,7 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
             <div 
               className={cn(
                 "flex-1 p-4 rounded-lg border-2 text-center transition-colors",
-                showAnswers && question.metadata?.correct_answer === 'false'
+                showAnswers && correctAnswer === 'false'
                   ? "bg-green-50 border-green-500"
                   : "bg-gray-50 border-gray-200",
                 interactive && "cursor-pointer hover:bg-gray-100"
@@ -159,7 +182,7 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
               <div className="flex items-center justify-center gap-2">
                 {interactive && <RadioGroupItem value="false" />}
                 <span className="font-medium">False</span>
-                {showAnswers && question.metadata?.correct_answer === 'false' && (
+                {showAnswers && correctAnswer === 'false' && (
                   <CheckCircle className="h-5 w-5 text-green-600" />
                 )}
               </div>
@@ -182,17 +205,11 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
               </div>
             )}
             
-            {showAnswers && question.metadata?.model_answer && (
+            {showAnswers && question.correct_answer && (
               <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h5 className="font-medium text-blue-900 mb-2">Model Answer:</h5>
-                <p className="text-blue-800">{question.metadata.model_answer}</p>
+                <h5 className="font-medium text-blue-900 mb-2">Correct Answer:</h5>
+                <p className="text-blue-800">{question.correct_answer}</p>
               </div>
-            )}
-            
-            {question.metadata?.max_words && (
-              <p className="text-sm text-muted-foreground">
-                Maximum {question.metadata.max_words} words
-              </p>
             )}
           </div>
         );
@@ -212,24 +229,35 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
               </div>
             )}
             
-            {showAnswers && question.metadata?.model_answer && (
+            {showAnswers && question.correct_answer && (
               <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h5 className="font-medium text-blue-900 mb-2">Model Answer:</h5>
-                <p className="text-blue-800 whitespace-pre-wrap">{question.metadata.model_answer}</p>
+                <h5 className="font-medium text-blue-900 mb-2">Sample Response:</h5>
+                <p className="text-blue-800 whitespace-pre-wrap">{question.correct_answer}</p>
               </div>
             )}
             
-            {showAnswers && question.metadata?.grading_rubric && (
+            {showAnswers && question.rubric && (
               <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
                 <h5 className="font-medium text-purple-900 mb-2">Grading Rubric:</h5>
-                <p className="text-purple-800 whitespace-pre-wrap">{question.metadata.grading_rubric}</p>
+                <p className="text-purple-800 whitespace-pre-wrap">{JSON.stringify(question.rubric, null, 2)}</p>
               </div>
             )}
           </div>
         );
 
       case 'fill_in_blank':
-        const questionWithBlanks = question.question_text.split('_____').map((part, index, array) => (
+        if (!questionText.includes('_____')) {
+          return (
+            <div className="text-center py-8">
+              <HelpCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">
+                Fill-in-the-blank questions should contain _____ placeholders
+              </p>
+            </div>
+          );
+        }
+
+        const questionWithBlanks = questionText.split('_____').map((part: string, index: number, array: string[]) => (
           <React.Fragment key={index}>
             {part}
             {index < array.length - 1 && (
@@ -253,14 +281,10 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
               {questionWithBlanks}
             </div>
             
-            {showAnswers && question.metadata?.correct_answers && (
+            {showAnswers && question.correct_answer && (
               <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <h5 className="font-medium text-green-900 mb-2">Correct Answers:</h5>
-                <ul className="text-green-800 space-y-1">
-                  {question.metadata.correct_answers.map((answer, index) => (
-                    <li key={index}>• {answer}</li>
-                  ))}
-                </ul>
+                <h5 className="font-medium text-green-900 mb-2">Correct Answer:</h5>
+                <p className="text-green-800">{question.correct_answer}</p>
               </div>
             )}
           </div>
@@ -271,7 +295,7 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
           <div className="text-center py-8">
             <HelpCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">
-              Preview for {question.question_type.replace('_', ' ')} questions coming soon
+              Preview for {question.question_type?.replace('_', ' ')} questions coming soon
             </p>
           </div>
         );
@@ -280,92 +304,93 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
 
   return (
     <Card className={cn("p-6", className)}>
-      {/* Question Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          {questionNumber && (
-            <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-medium text-sm">
-              {questionNumber}
+      <CardHeader>
+        <CardTitle>Preview</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            {questionNumber && (
+              <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-medium text-sm">
+                {questionNumber}
+              </div>
+            )}
+            <div>
+              <Badge variant="outline" className="text-xs">
+                {question.question_type?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              </Badge>
+              {question.ai_generated && (
+                <Badge variant="secondary" className="text-xs ml-2">
+                  <Brain className="h-3 w-3 mr-1" />
+                  AI Generated
+                </Badge>
+              )}
             </div>
-          )}
-          <div>
+          </div>
+          
+          <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-xs">
-              {question.question_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              {question.points || 0} pt{question.points !== 1 ? 's' : ''}
             </Badge>
-            {question.metadata?.ai_generated && (
-              <Badge variant="secondary" className="text-xs ml-2">
-                <Brain className="h-3 w-3 mr-1" />
-                AI Generated
+            {question.difficulty_score && (
+              <Badge 
+                className={cn("text-xs", getDifficultyColor(question.difficulty_score.toString()))}
+              >
+                Difficulty: {question.difficulty_score}
               </Badge>
             )}
+            {question.estimated_time && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                {question.estimated_time}m
+              </div>
+            )}
           </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs">
-            {question.points} pt{question.points !== 1 ? 's' : ''}
-          </Badge>
-          {question.metadata?.difficulty_level && (
-            <Badge 
-              className={cn("text-xs", getDifficultyColor(question.metadata.difficulty_level))}
-            >
-              {question.metadata.difficulty_level}
-            </Badge>
-          )}
-          {question.metadata?.estimated_time && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              {question.metadata.estimated_time}m
-            </div>
-          )}
+
+        <div className="mb-6">
+          <h4 className="text-lg font-medium leading-relaxed mb-2">
+            {question.question_text || 'No question text provided.'}
+          </h4>
         </div>
-      </div>
 
-      {/* Question Text */}
-      <div className="mb-6">
-        <h4 className="text-lg font-medium leading-relaxed mb-2">
-          {question.question_text || 'Question text not provided'}
-        </h4>
-      </div>
+        <div className="mb-6">
+          {renderQuestionContent()}
+        </div>
 
-      {/* Question Content */}
-      <div className="mb-6">
-        {renderQuestionContent()}
-      </div>
-
-      {/* Metadata */}
-      {showMetadata && question.metadata && (
-        <div className="border-t pt-4 space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            {question.metadata.bloom_taxonomy && (
-              <div>
-                <span className="font-medium text-muted-foreground">Bloom's Taxonomy: </span>
-                <span className="capitalize">{question.metadata.bloom_taxonomy}</span>
-              </div>
-            )}
-            
-            {question.metadata.learning_objectives && question.metadata.learning_objectives.length > 0 && (
-              <div>
-                <span className="font-medium text-muted-foreground">Learning Objectives: </span>
-                <span>{question.metadata.learning_objectives.join(', ')}</span>
-              </div>
-            )}
-            
-            {question.metadata.tags && question.metadata.tags.length > 0 && (
-              <div className="md:col-span-2">
-                <span className="font-medium text-muted-foreground">Tags: </span>
-                <div className="inline-flex gap-1 mt-1">
-                  {question.metadata.tags.map(tag => (
-                    <Badge key={tag} variant="secondary" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
+        {showMetadata && (
+          <div className="border-t pt-4 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              {question.cognitive_level && (
+                <div>
+                  <span className="font-medium text-muted-foreground">Cognitive Level: </span>
+                  <span className="capitalize">{question.cognitive_level}</span>
                 </div>
-              </div>
-            )}
+              )}
+              
+              {question.learning_objectives && Array.isArray(question.learning_objectives) && question.learning_objectives.length > 0 && (
+                <div>
+                  <span className="font-medium text-muted-foreground">Learning Objectives: </span>
+                  <span>{question.learning_objectives.join(', ')}</span>
+                </div>
+              )}
+              
+              {question.tags && Array.isArray(question.tags) && question.tags.length > 0 && (
+                <div className="md:col-span-2">
+                  <span className="font-medium text-muted-foreground">Tags: </span>
+                  <div className="inline-flex gap-1 mt-1">
+                    {question.tags.map((tag: string, index: number) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </CardContent>
     </Card>
   );
 };

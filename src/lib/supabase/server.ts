@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-import { Database } from "@/types/supabase";
+import { Database } from "../../../packages/types/db";
 
 // Define createServerClient for server-side contexts (Route Handlers, Server Actions, Server Components)
 // Passes the `cookies` function from `next/headers` directly to the Supabase client.

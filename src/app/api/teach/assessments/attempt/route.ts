@@ -53,8 +53,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fetch the full assessment details
+    const { data: assessmentDetails, error: assessmentError } = await supabase
+      .from('assessments')
+      .select('*')
+      .eq('id', assessmentId)
+      .single();
+
+    if (assessmentError) {
+      console.error('Error fetching assessment details:', assessmentError);
+      return NextResponse.json(
+        { error: 'Failed to fetch assessment details' },
+        { status: 500 }
+      );
+    }
+
+    // Fetch questions for the assessment
+    const { data: assessmentQuestions, error: questionsError } = await supabase
+      .from('assessment_questions')
+      .select('question_id')
+      .eq('assessment_id', assessmentId);
+
+    if (questionsError) {
+      console.error('Error fetching assessment questions:', questionsError);
+      return NextResponse.json(
+        { error: 'Failed to fetch assessment questions' },
+        { status: 500 }
+      );
+    }
+
+    const questionIds = assessmentQuestions
+      .map(q => q.question_id)
+      .filter((id): id is string => id !== null);
+
+    const { data: questions, error: questionsDetailsError } = await supabase
+      .from('questions')
+      .select(`
+        *,
+        options:question_options(*)
+      `)
+      .in('id', questionIds);
+    
+    if (questionsDetailsError) {
+      console.error('Error fetching question details:', questionsDetailsError);
+      return NextResponse.json(
+        { error: 'Failed to fetch question details' },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
       attempt,
+      assessment: assessmentDetails,
+      questions,
       message: 'Assessment attempt started successfully'
     }, { status: 201 });
 
@@ -117,9 +168,31 @@ export async function PUT(request: NextRequest) {
     let maxPossibleScore = 0;
 
     for (const response of responses) {
+      // Fetch the question details from the database to get the correct answer and other metadata
+      const { data: question, error: questionError } = await supabase
+        .from('questions')
+        .select(`
+          *,
+          options:question_options(*)
+        `)
+        .eq('id', response.questionId)
+        .single();
+
+      if (questionError || !question) {
+        console.error(`Question not found for ID: ${response.questionId}`, questionError);
+        // Optionally, add a marker to processedResponses for the client
+        processedResponses.push({
+          questionId: response.questionId,
+          validation: null,
+          error: 'Question not found',
+          saved: false
+        });
+        continue; // Skip to the next response
+      }
+      
       try {
         // Validate and grade the response
-        const validationResult = await validationService.validateResponse(response);
+        const validationResult = await validationService.validateAnswer(question, response);
         
         totalScore += validationResult.score;
         maxPossibleScore += validationResult.maxScore;
@@ -221,7 +294,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// GET /api/teach/assessments/attempt?attemptId=... - Get attempt details
+// GET /api/teach/assessments/attempt?attemptId=<id> - Get assessment results
 export async function GET(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
@@ -235,41 +308,13 @@ export async function GET(request: NextRequest) {
     }
 
     if (!attemptId) {
-      return NextResponse.json(
-        { error: 'Attempt ID is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Attempt ID is required' }, { status: 400 });
     }
 
-    // Get attempt details with responses
+    // Fetch attempt details
     const { data: attempt, error: attemptError } = await supabase
       .from('assessment_attempts')
-      .select(`
-        id,
-        assessment_id,
-        assessment_type,
-        user_id,
-        status,
-        started_at,
-        completed_at,
-        time_limit,
-        total_score,
-        max_possible_score,
-        percentage_score,
-        assessment_responses(
-          id,
-          question_id,
-          question_type,
-          student_answer,
-          is_correct,
-          score,
-          max_score,
-          feedback,
-          detailed_feedback,
-          time_spent,
-          grading_notes
-        )
-      `)
+      .select('*')
       .eq('id', attemptId)
       .eq('user_id', user.id)
       .single();
@@ -278,10 +323,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Assessment attempt not found' }, { status: 404 });
     }
 
-    return NextResponse.json({
-      attempt,
-      message: 'Assessment attempt retrieved successfully'
-    });
+    // Fetch responses for the attempt, including the question details
+    const { data: responses, error: responsesError } = await supabase
+      .from('assessment_responses')
+      .select(`
+        *,
+        question:questions(*)
+      `)
+      .eq('attempt_id', attemptId);
+
+    if (responsesError) {
+      console.error('Error fetching assessment responses:', responsesError);
+      return NextResponse.json(
+        { error: 'Failed to fetch assessment responses' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ attempt, responses });
 
   } catch (error) {
     console.error('Error in assessment attempt GET:', error);

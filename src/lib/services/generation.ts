@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 import { createBrowserClient } from '@supabase/ssr';
-import { Database } from '@/types/supabase';
+import { Database } from '../../../packages/types/db';
 
 // Initialize OpenAI client
 const openai = new OpenAI({

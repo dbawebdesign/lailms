@@ -30,55 +30,15 @@ import {
   Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Database } from '../../../../../packages/types/db';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { TwitterPicker } from 'react-color';
+import { QuestionPreview } from './QuestionPreview';
+import { Droppable, Draggable } from '@hello-pangea/dnd';
 
-interface Question {
-  id: string;
-  quiz_id?: string;
-  question_text: string;
-  question_type: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'fill_in_blank' | 'matching' | 'drag_drop' | 'sequence';
-  points: number;
-  order_index: number;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-  options?: QuestionOption[];
-  metadata?: {
-    difficulty_level?: 'easy' | 'medium' | 'hard';
-    bloom_taxonomy?: 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
-    learning_objectives?: string[];
-    tags?: string[];
-    estimated_time?: number;
-    lesson_content_refs?: string[];
-    source_content?: string;
-    ai_generated?: boolean;
-    validation_status?: 'draft' | 'reviewed' | 'approved' | 'needs_revision';
-    category?: string;
-    folder_id?: string;
-    starred?: boolean;
-    archived?: boolean;
-  };
-}
-
-interface QuestionOption {
-  id: string;
-  question_id: string;
-  option_text: string;
-  is_correct: boolean;
-  order_index: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface QuestionFolder {
-  id: string;
-  name: string;
-  description?: string;
-  parent_id?: string;
-  created_at: string;
-  updated_at: string;
-  color?: string;
-  question_count?: number;
-}
+type Question = Database['public']['Tables']['questions']['Row'];
+type QuestionOption = Database['public']['Tables']['question_options']['Row'];
+type QuestionFolder = Database['public']['Tables']['question_folders']['Row'];
 
 interface QuestionBankManagerProps {
   questions: Question[];
@@ -91,6 +51,7 @@ export const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({
   onQuestionsUpdate,
   baseClassId
 }) => {
+  const [activeQuestion, setActiveQuestion] = useState<Question | null>(null);
   const [folders, setFolders] = useState<QuestionFolder[]>([]);
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>('all');
@@ -100,477 +61,208 @@ export const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderDescription, setNewFolderDescription] = useState('');
   const [newFolderColor, setNewFolderColor] = useState('#3B82F6');
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
 
-  // Get all unique tags from questions
-  const allTags = Array.from(
-    new Set(
-      questions.flatMap(q => q.metadata?.tags || [])
-    )
-  ).sort();
-
-  // Get all unique categories
-  const allCategories = Array.from(
-    new Set(
-      questions.map(q => q.metadata?.category).filter(Boolean)
-    )
-  ).sort();
+  // const allTags = Array.from(new Set(questions.flatMap(q => q.tags || []))).sort();
+  // const allCategories = Array.from(new Set(questions.map(q => q.category).filter(Boolean))).sort() as string[];
 
   useEffect(() => {
+    const loadFolders = async () => {
+      if (!baseClassId) return;
+      
+      // Basic UUID validation
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(baseClassId)) {
+        console.error('Invalid baseClassId format:', baseClassId);
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/teach/question-folders?base_class_id=${baseClassId}`);
+        const data = await response.json();
+        if (response.ok) {
+          setFolders(data);
+        } else {
+          throw new Error(data.error || 'Failed to fetch folders');
+        }
+      } catch (error) {
+        console.error('Failed to load folders:', error);
+        // Set empty folders array so UI doesn't break
+        setFolders([]);
+      }
+    };
     loadFolders();
   }, [baseClassId]);
 
-  const loadFolders = async () => {
-    try {
-      // TODO: Implement API call to fetch folders
-      // const response = await fetch(`/api/teach/base-classes/${baseClassId}/question-folders`);
-      // const data = await response.json();
-      // setFolders(data.folders || []);
-      
-      // Mock folders for now
-      setFolders([
-        {
-          id: '1',
-          name: 'Chapter 1 - Introduction',
-          description: 'Questions for the introduction chapter',
-          color: '#3B82F6',
-          question_count: 5,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          name: 'Midterm Review',
-          description: 'Questions for midterm preparation',
-          color: '#059669',
-          question_count: 12,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ]);
-    } catch (error) {
-      console.error('Failed to load folders:', error);
+  useEffect(() => {
+    if (questions.length > 0 && !activeQuestion) {
+      setActiveQuestion(questions[0]);
     }
-  };
+  }, [questions, activeQuestion]);
 
   const createFolder = async () => {
     if (!newFolderName.trim()) return;
-
-    try {
-      // TODO: Implement API call to create folder
-      const newFolder: QuestionFolder = {
-        id: `temp-folder-${Date.now()}`,
-        name: newFolderName.trim(),
-        description: newFolderDescription.trim() || undefined,
-        color: newFolderColor,
-        question_count: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      setFolders(prev => [...prev, newFolder]);
-      setNewFolderName('');
-      setNewFolderDescription('');
-      setIsCreateFolderOpen(false);
-    } catch (error) {
-      console.error('Failed to create folder:', error);
-    }
-  };
-
-  const handleBulkOperation = async (operation: string) => {
-    if (selectedQuestions.length === 0) return;
-
-    try {
-      const updatedQuestions = questions.map(question => {
-        if (!selectedQuestions.includes(question.id)) return question;
-
-        switch (operation) {
-          case 'star':
-            return {
-              ...question,
-              metadata: { ...question.metadata, starred: true }
-            };
-          case 'unstar':
-            return {
-              ...question,
-              metadata: { ...question.metadata, starred: false }
-            };
-          case 'archive':
-            return {
-              ...question,
-              metadata: { ...question.metadata, archived: true }
-            };
-          case 'unarchive':
-            return {
-              ...question,
-              metadata: { ...question.metadata, archived: false }
-            };
-          default:
-            return question;
-        }
-      });
-
-      onQuestionsUpdate(updatedQuestions);
-      setSelectedQuestions([]);
-    } catch (error) {
-      console.error('Failed to perform bulk operation:', error);
-    }
-  };
-
-  const moveQuestionsToFolder = async (folderId: string) => {
-    if (selectedQuestions.length === 0) return;
-
-    try {
-      const updatedQuestions = questions.map(question => {
-        if (!selectedQuestions.includes(question.id)) return question;
-        
-        return {
-          ...question,
-          metadata: { ...question.metadata, folder_id: folderId }
-        };
-      });
-
-      onQuestionsUpdate(updatedQuestions);
-      setSelectedQuestions([]);
-    } catch (error) {
-      console.error('Failed to move questions:', error);
-    }
-  };
-
-  const addTagsToSelected = async (newTags: string[]) => {
-    if (selectedQuestions.length === 0 || newTags.length === 0) return;
-
-    try {
-      const updatedQuestions = questions.map(question => {
-        if (!selectedQuestions.includes(question.id)) return question;
-        
-        const existingTags = question.metadata?.tags || [];
-        const combinedTags = Array.from(new Set([...existingTags, ...newTags]));
-        
-        return {
-          ...question,
-          metadata: { ...question.metadata, tags: combinedTags }
-        };
-      });
-
-      onQuestionsUpdate(updatedQuestions);
-      setSelectedQuestions([]);
-    } catch (error) {
-      console.error('Failed to add tags:', error);
-    }
+    const newFolder: QuestionFolder = {
+      id: `temp-folder-${Date.now()}`, name: newFolderName.trim(),
+      description: newFolderDescription.trim() || null, color: newFolderColor,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      base_class_id: baseClassId, created_by: 'user-1', parent_id: null,
+    };
+    setFolders(prev => [...prev, newFolder]);
+    setNewFolderName('');
+    setNewFolderDescription('');
+    setIsCreateFolderOpen(false);
   };
 
   const filteredQuestions = questions.filter(question => {
-    // Filter by folder
     if (selectedFolder !== 'all') {
-      if (selectedFolder === 'starred' && !question.metadata?.starred) return false;
-      if (selectedFolder === 'archived' && !question.metadata?.archived) return false;
-      if (selectedFolder === 'unfoldered' && question.metadata?.folder_id) return false;
-      if (selectedFolder !== 'starred' && selectedFolder !== 'archived' && selectedFolder !== 'unfoldered' && 
-          question.metadata?.folder_id !== selectedFolder) return false;
+      // if (selectedFolder === 'starred' && !question.is_starred) return false;
+      // if (selectedFolder === 'archived' && !question.is_archived) return false;
+      if (selectedFolder === 'unfoldered' && question.folder_id) return false;
+      if (!['starred', 'archived', 'unfoldered'].includes(selectedFolder) && question.folder_id !== selectedFolder) return false;
     }
-
-    // Filter by tags
-    if (selectedTags.length > 0) {
-      const questionTags = question.metadata?.tags || [];
-      if (!selectedTags.some(tag => questionTags.includes(tag))) return false;
-    }
-
-    // Hide archived questions unless specifically viewing archived
-    if (selectedFolder !== 'archived' && question.metadata?.archived) return false;
-
+    // if (selectedFolder !== 'archived' && question.is_archived) return false;
     return true;
   });
 
-  const folderColors = [
-    '#3B82F6', '#059669', '#DC2626', '#7C3AED',
-    '#EA580C', '#0891B2', '#BE123C', '#4338CA'
-  ];
+  const folderColors = ['#3B82F6', '#059669', '#DC2626', '#7C3AED', '#EA580C', '#0891B2', '#BE123C', '#4338CA'];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Organize Questions</h3>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsCreateFolderOpen(true)}
-          >
-            <FolderPlus className="h-4 w-4 mr-2" />
-            New Folder
+    <div className="flex h-full min-h-[calc(100vh-200px)]">
+      {/* Sidebar */}
+      <div className="w-64 border-r p-4 flex flex-col gap-4">
+        {/* Actions */}
+        <div>
+          <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Actions</h3>
+          <Button variant="outline" size="sm" className="w-full justify-start gap-2" onClick={() => { /* Implement create question */ }}>
+            <Plus className="h-4 w-4" /> Create Question
           </Button>
-          
-          {selectedQuestions.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsBulkEditOpen(true)}
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Bulk Edit ({selectedQuestions.length})
+          <Button variant="outline" size="sm" className="w-full justify-start gap-2 mt-2" onClick={() => setIsCreateFolderOpen(true)}>
+            <FolderPlus className="h-4 w-4" /> Create Folder
+          </Button>
+        </div>
+
+        {/* Filters */}
+        <div>
+          <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Filters</h3>
+          <div className="flex flex-col gap-1 text-sm">
+            <Button variant={selectedFolder === 'all' ? 'secondary' : 'ghost'} size="sm" className="w-full justify-start gap-2" onClick={() => setSelectedFolder('all')}>
+              <Folder className="h-4 w-4" />
+              <span className="flex-1">All Questions</span>
+              {/* <Badge variant="secondary" className="text-xs">{questions.filter(q => !q.is_archived).length}</Badge> */}
             </Button>
-          )}
+            <Button variant={selectedFolder === 'starred' ? 'secondary' : 'ghost'} size="sm" className="w-full justify-start gap-2" onClick={() => setSelectedFolder('starred')}>
+              <Star className="h-4 w-4" />
+              <span className="flex-1">Starred</span>
+              {/* <Badge variant="secondary" className="text-xs">{questions.filter(q => q.is_starred && !q.is_archived).length}</Badge> */}
+            </Button>
+            <Button variant={selectedFolder === 'unfoldered' ? 'secondary' : 'ghost'} size="sm" className="w-full justify-start gap-2" onClick={() => setSelectedFolder('unfoldered')}>
+              <Folder className="h-4 w-4" />
+              <span className="flex-1">Unfoldered</span>
+              {/* <Badge variant="secondary" className="text-xs">{questions.filter(q => !q.folder_id && !q.is_archived).length}</Badge> */}
+            </Button>
+            <Button variant={selectedFolder === 'archived' ? 'secondary' : 'ghost'} size="sm" className="w-full justify-start gap-2" onClick={() => setSelectedFolder('archived')}>
+              <Archive className="h-4 w-4" />
+              <span className="flex-1">Archived</span>
+              {/* <Badge variant="secondary" className="text-xs">{questions.filter(q => q.is_archived).length}</Badge> */}
+            </Button>
+          </div>
+        </div>
+
+        {/* Folders */}
+        <div>
+          <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Folders</h3>
+          <div className="flex flex-col gap-1 text-sm">
+            {folders.map(folder => (
+              <Button key={folder.id} variant={selectedFolder === folder.id ? 'secondary' : 'ghost'} size="sm" className="w-full justify-start gap-2" onClick={() => setSelectedFolder(folder.id)}>
+                <Folder className="h-4 w-4" style={{ color: folder.color || undefined }}/>
+                <span className="flex-1">{folder.name}</span>
+                {/* <Badge variant="secondary" className="text-xs">{questions.filter(q => q.folder_id === folder.id && !q.is_archived).length}</Badge> */}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <Tabs defaultValue="folders" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="folders">Folders</TabsTrigger>
-          <TabsTrigger value="tags">Tags</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-        </TabsList>
-
-        {/* Folders Tab */}
-        <TabsContent value="folders" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Folder Sidebar */}
-            <div className="space-y-3">
-              <div className="font-medium text-sm text-muted-foreground">FOLDERS</div>
-              
-              <div 
-                className={cn(
-                  "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors",
-                  selectedFolder === 'all' ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/50"
-                )}
-                onClick={() => setSelectedFolder('all')}
-              >
-                <Folder className="h-4 w-4" />
-                <span className="flex-1">All Questions</span>
-                <Badge variant="secondary" className="text-xs">
-                  {questions.filter(q => !q.metadata?.archived).length}
-                </Badge>
-              </div>
-
-              <div 
-                className={cn(
-                  "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors",
-                  selectedFolder === 'starred' ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/50"
-                )}
-                onClick={() => setSelectedFolder('starred')}
-              >
-                <Star className="h-4 w-4" />
-                <span className="flex-1">Starred</span>
-                <Badge variant="secondary" className="text-xs">
-                  {questions.filter(q => q.metadata?.starred && !q.metadata?.archived).length}
-                </Badge>
-              </div>
-
-              <div 
-                className={cn(
-                  "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors",
-                  selectedFolder === 'unfoldered' ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/50"
-                )}
-                onClick={() => setSelectedFolder('unfoldered')}
-              >
-                <Folder className="h-4 w-4" />
-                <span className="flex-1">Unfoldered</span>
-                <Badge variant="secondary" className="text-xs">
-                  {questions.filter(q => !q.metadata?.folder_id && !q.metadata?.archived).length}
-                </Badge>
-              </div>
-
-              {folders.map(folder => (
-                <div 
-                  key={folder.id}
-                  className={cn(
-                    "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors",
-                    selectedFolder === folder.id ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/50"
-                  )}
-                  onClick={() => setSelectedFolder(folder.id)}
-                >
-                  <div 
-                    className="w-4 h-4 rounded"
-                    style={{ backgroundColor: folder.color }}
-                  />
-                  <span className="flex-1">{folder.name}</span>
-                  <Badge variant="secondary" className="text-xs">
-                    {questions.filter(q => q.metadata?.folder_id === folder.id && !q.metadata?.archived).length}
-                  </Badge>
-                </div>
-              ))}
-
-              <div 
-                className={cn(
-                  "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors",
-                  selectedFolder === 'archived' ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/50"
-                )}
-                onClick={() => setSelectedFolder('archived')}
-              >
-                <Archive className="h-4 w-4" />
-                <span className="flex-1">Archived</span>
-                <Badge variant="secondary" className="text-xs">
-                  {questions.filter(q => q.metadata?.archived).length}
-                </Badge>
-              </div>
+      {/* Main Content */}
+      <div className="flex-1 p-6">
+        <Card className="h-full flex flex-col">
+          <CardHeader>
+            <CardTitle>All Questions</CardTitle>
+            <div className="flex items-center gap-2 mt-2">
+              <Input placeholder="Search questions..." className="max-w-xs" />
+              {/* Add more filters (type, difficulty, etc.) here */}
             </div>
-
-            {/* Questions List */}
-            <div className="lg:col-span-2 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="font-medium text-sm text-muted-foreground">
-                  QUESTIONS ({filteredQuestions.length})
-                </div>
-                
-                {filteredQuestions.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      checked={selectedQuestions.length === filteredQuestions.length}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedQuestions(filteredQuestions.map(q => q.id));
-                        } else {
-                          setSelectedQuestions([]);
-                        }
-                      }}
-                    />
-                    <Label className="text-xs text-muted-foreground">Select All</Label>
-                  </div>
-                )}
-              </div>
-
-              {filteredQuestions.length === 0 ? (
-                <div className="text-center py-8">
-                  <Folder className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No questions in this folder</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {filteredQuestions.map(question => (
-                    <Card key={question.id} className="p-3">
-                      <div className="flex items-center gap-3">
-                        <Checkbox
-                          checked={selectedQuestions.includes(question.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedQuestions(prev => [...prev, question.id]);
-                            } else {
-                              setSelectedQuestions(prev => prev.filter(id => id !== question.id));
-                            }
-                          }}
-                        />
-                        
-                        <div className="flex-1">
-                          <p className="font-medium text-sm line-clamp-1">
-                            {question.question_text || 'Untitled Question'}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">
-                              {question.question_type.replace('_', ' ')}
-                            </Badge>
-                            {question.metadata?.starred && (
-                              <Star className="h-3 w-3 text-yellow-500 fill-current" />
-                            )}
-                            {question.metadata?.tags && question.metadata.tags.length > 0 && (
-                              <div className="flex items-center gap-1">
-                                <TagIcon className="h-3 w-3 text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">
-                                  {question.metadata.tags.slice(0, 2).join(', ')}
-                                  {question.metadata.tags.length > 2 && ` +${question.metadata.tags.length - 2}`}
-                                </span>
-                              </div>
-                            )}
-                          </div>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-y-auto">
+            <h3 className="text-lg font-semibold p-4">Questions</h3>
+            <Droppable droppableId="question-bank" isDropDisabled={true}>
+              {(provided, snapshot) => (
+                <div 
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className="space-y-2 p-4"
+                >
+                  {filteredQuestions.map((q, index) => (
+                    <Draggable key={q.id} draggableId={q.id} index={index}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          onClick={() => setActiveQuestion(q)}
+                          className={`cursor-pointer ${activeQuestion?.id === q.id ? 'border-primary' : ''} ${snapshot.isDragging ? 'opacity-50' : ''}`}
+                        >
+                          <Card>
+                            <CardContent className="p-4">
+                              <p className="font-medium truncate">{q.question_text}</p>
+                              <p className="text-xs text-muted-foreground">{q.question_type?.replace('_', ' ')}</p>
+                            </CardContent>
+                          </Card>
                         </div>
-                        
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </Card>
+                      )}
+                    </Draggable>
                   ))}
+                  {provided.placeholder}
                 </div>
               )}
+            </Droppable>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Side Panel for Tags/Analytics */}
+      <div className="w-72 border-l p-4">
+        <Tabs defaultValue="tags" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="tags">Tags</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          </TabsList>
+          <TabsContent value="tags">
+            <div className="space-y-2 mt-4">
+              <h4 className="text-sm font-semibold">Top Tags</h4>
+              {/* {allTags.slice(0, 10).map(tag => {
+                const count = questions.filter(q => (q.tags || []).includes(tag) && !q.is_archived).length;
+                const percentage = questions.length > 0 ? (count / questions.length) * 100 : 0;
+                return (
+                  <div key={tag}>
+                    <div className="flex justify-between items-center text-sm">
+                      <span>{tag}</span>
+                      <span>{count}</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-1.5">
+                      <div className="bg-primary h-1.5 rounded-full" style={{ width: `${percentage}%` }}></div>
+                    </div>
+                  </div>
+                );
+              })} */}
             </div>
-          </div>
-        </TabsContent>
-
-        {/* Tags Tab */}
-        <TabsContent value="tags" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="p-4">
-              <CardHeader className="p-0 pb-4">
-                <CardTitle className="text-base">All Tags</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="flex flex-wrap gap-2">
-                  {allTags.map(tag => {
-                    const questionCount = questions.filter(q => 
-                      q.metadata?.tags?.includes(tag) && !q.metadata?.archived
-                    ).length;
-                    
-                    return (
-                      <div
-                        key={tag}
-                        className={cn(
-                          "flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors",
-                          selectedTags.includes(tag) 
-                            ? "bg-primary/10 border-primary/20" 
-                            : "hover:bg-muted/50"
-                        )}
-                        onClick={() => {
-                          if (selectedTags.includes(tag)) {
-                            setSelectedTags(prev => prev.filter(t => t !== tag));
-                          } else {
-                            setSelectedTags(prev => [...prev, tag]);
-                          }
-                        }}
-                      >
-                        <TagIcon className="h-3 w-3" />
-                        <span className="text-sm">{tag}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {questionCount}
-                        </Badge>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="p-4">
-              <CardHeader className="p-0 pb-4">
-                <CardTitle className="text-base">Tag Analytics</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="space-y-3">
-                  {allTags.slice(0, 10).map(tag => {
-                    const questionCount = questions.filter(q => 
-                      q.metadata?.tags?.includes(tag) && !q.metadata?.archived
-                    ).length;
-                    const percentage = questions.length > 0 ? (questionCount / questions.length) * 100 : 0;
-                    
-                    return (
-                      <div key={tag} className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-medium">{tag}</span>
-                            <span className="text-xs text-muted-foreground">{questionCount}</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-primary h-2 rounded-full" 
-                              style={{ width: `${percentage}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Categories Tab */}
-        <TabsContent value="categories" className="space-y-4">
-          <div className="text-center py-8">
-            <Settings className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Category management coming soon</p>
-          </div>
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+          <TabsContent value="analytics">
+            <p className="text-sm text-muted-foreground mt-4">Analytics are coming soon.</p>
+          </TabsContent>
+        </Tabs>
+      </div>
 
       {/* Create Folder Dialog */}
       <Dialog open={isCreateFolderOpen} onOpenChange={setIsCreateFolderOpen}>
@@ -578,115 +270,46 @@ export const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({
           <DialogHeader>
             <DialogTitle>Create New Folder</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Folder Name</Label>
-              <Input
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="Enter folder name"
-              />
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="folder-name" className="text-right">Name</Label>
+              <Input id="folder-name" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} className="col-span-3" />
             </div>
-            
-            <div>
-              <Label>Description (Optional)</Label>
-              <Input
-                value={newFolderDescription}
-                onChange={(e) => setNewFolderDescription(e.target.value)}
-                placeholder="Enter folder description"
-              />
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="folder-desc" className="text-right">Description</Label>
+              <Input id="folder-desc" value={newFolderDescription} onChange={(e) => setNewFolderDescription(e.target.value)} className="col-span-3" />
             </div>
-            
-            <div>
-              <Label>Color</Label>
-              <div className="flex gap-2 mt-2">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Color</Label>
+              <div className="col-span-3 flex gap-2">
                 {folderColors.map(color => (
-                  <div
+                  <Button
                     key={color}
-                    className={cn(
-                      "w-8 h-8 rounded cursor-pointer border-2",
-                      newFolderColor === color ? "border-gray-900" : "border-gray-300"
-                    )}
-                    style={{ backgroundColor: color }}
+                    size="icon"
+                    variant={newFolderColor === color ? 'default' : 'outline'}
+                    className="h-8 w-8 rounded-full"
+                    style={{ backgroundColor: newFolderColor === color ? color : undefined, borderColor: color }}
                     onClick={() => setNewFolderColor(color)}
-                  />
+                  >
+                    <div className="h-4 w-4 rounded-full" style={{ backgroundColor: color }}></div>
+                  </Button>
                 ))}
               </div>
             </div>
-            
-            <div className="flex items-center gap-3 pt-4">
-              <Button variant="outline" onClick={() => setIsCreateFolderOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={createFolder} disabled={!newFolderName.trim()}>
-                Create Folder
-              </Button>
-            </div>
           </div>
+          <Button onClick={createFolder} className="w-full">Create Folder</Button>
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Edit Dialog */}
-      <Dialog open={isBulkEditOpen} onOpenChange={setIsBulkEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Bulk Edit Questions ({selectedQuestions.length})</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                variant="outline"
-                onClick={() => handleBulkOperation('star')}
-                className="flex items-center gap-2"
-              >
-                <Star className="h-4 w-4" />
-                Star All
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => handleBulkOperation('unstar')}
-                className="flex items-center gap-2"
-              >
-                <Star className="h-4 w-4" />
-                Unstar All
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => handleBulkOperation('archive')}
-                className="flex items-center gap-2"
-              >
-                <Archive className="h-4 w-4" />
-                Archive All
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => handleBulkOperation('unarchive')}
-                className="flex items-center gap-2"
-              >
-                <Archive className="h-4 w-4" />
-                Unarchive All
-              </Button>
-            </div>
-            
-            <div>
-              <Label>Move to Folder</Label>
-              <Select onValueChange={moveQuestionsToFolder}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a folder" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">No folder</SelectItem>
-                  {folders.map(folder => (
-                    <SelectItem key={folder.id} value={folder.id}>
-                      {folder.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      <div className="w-1/2 border-l p-4 flex flex-col">
+        {activeQuestion ? (
+          <QuestionPreview question={activeQuestion} />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <p>Select a question to see the preview</p>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+      </div>
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
-import { Database } from '@/types/supabase'
+import { Database } from '../../../../../packages/types/db'
 
 // Define the expected structure for the user role check
 interface MemberProfile {

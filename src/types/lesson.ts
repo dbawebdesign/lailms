@@ -78,4 +78,65 @@ export interface StudioBaseClass {
   updated_at: string;
   user_id: string | null; // FK to profiles.user_id (which is auth.users.id)
   paths?: Path[]; // For holding fetched paths for UI
+}
+
+// ##################################################################
+// #                           ASSESSMENTS                          #
+// ##################################################################
+
+
+// Question types
+export type QuestionType = 'multiple_choice' | 'true_false' | 'short_answer' | 'essay';
+
+export interface Question {
+  id: string;
+  content: string;
+  options?: {
+    text: string;
+    value: string;
+  }[];
+  correct_answer: string;
+  question_type: QuestionType;
+  tags: string[];
+  base_class_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Assessment types
+export type AssessmentType = 'lesson_assessment' | 'path_quiz' | 'class_exam';
+
+export interface Assessment {
+  id: string;
+  title: string;
+  type: AssessmentType;
+  base_class_id: string;
+  lesson_id?: string;
+  path_id?: string;
+  is_enabled: boolean;
+  settings: {
+    time_limit?: number; // in minutes
+    attempts_allowed?: number;
+    passing_score?: number;
+    show_correct_answers?: boolean;
+    randomize_questions?: boolean;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+// Assessment configuration
+export interface AssessmentConfig {
+  lesson_assessments: {
+    enabled: boolean;
+    question_count: number;
+  };
+  path_quizzes: {
+    enabled: boolean;
+    question_count: number;
+  };
+  class_exams: {
+    enabled: boolean;
+    question_count: number;
+  };
 } 

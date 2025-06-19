@@ -2,7 +2,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import { knowledgeBaseAnalyzer, KnowledgeBaseAnalysis, COURSE_GENERATION_MODES } from './knowledge-base-analyzer';
 import { knowledgeExtractor, ConceptMap, CourseStructureSuggestion } from './knowledge-extractor';
-import type { Database } from '@/lib/types/database.types';
+import type { Database } from '@learnologyai/types';
+import { AssessmentGenerationService } from './assessment-generation-service'; // Import the new service
+import { AssessmentConfig } from '@/types/assessment';
 
 export interface CourseGenerationRequest {
   baseClassId: string;
@@ -99,11 +101,13 @@ export interface GenerationJob {
 
 export class CourseGenerator {
   private openai: OpenAI;
+  private assessmentGenerator: AssessmentGenerationService; // Instantiate the new service
 
   constructor() {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
+    this.assessmentGenerator = new AssessmentGenerationService();
   }
 
   private getSupabaseClient() {
@@ -192,8 +196,9 @@ export class CourseGenerator {
     await this.generateLessonContent(courseOutlineId, outline, generationMode, request);
     await this.updateJobStatus(jobId, 'processing', 85);
 
-    // Step 7: Generate assessments (95% progress)
-    await this.generateAssessments(courseOutlineId, outline, request);
+    // Step 7: Assessments are now generated within createLMSEntities, so this step is removed.
+    // await this.generateAssessments(courseOutlineId, outline, request);
+    
     await this.updateJobStatus(jobId, 'processing', 95);
 
     // Step 8: Complete (100% progress)
@@ -805,100 +810,8 @@ Remember: Every element should contribute to TEACHING and helping students achie
   }
 
   private async generateAssessmentContent(assessment: ModuleAssessment, module: CourseModule): Promise<any> {
-    const prompt = `
-You are an expert assessment designer creating evaluations that truly measure student learning and mastery.
-
-ASSESSMENT CONTEXT:
-- Title: ${assessment.title}
-- Type: ${assessment.type}
-- Duration: ${assessment.estimatedDurationMinutes} minutes
-- Mastery Threshold: ${assessment.masteryThreshold}%
-
-MODULE CONTEXT:
-- Module: ${module.title}
-- Learning Objectives: ${module.learningObjectives.join(', ')}
-- Lessons Covered: ${module.lessons.map(l => l.title).join(', ')}
-
-CRITICAL INSTRUCTIONS:
-1. Create assessments that test UNDERSTANDING and APPLICATION, not just recall
-2. Include questions at various Bloom's Taxonomy levels
-3. Ensure questions directly align with the stated learning objectives
-4. Make questions clear, unambiguous, and educationally sound
-5. Include detailed explanations for why answers are correct/incorrect
-6. Design questions that reveal common misconceptions
-7. Balance difficulty to accurately measure student progress
-
-Generate comprehensive assessment content:
-{
-  "instructions": "Clear instructions for students on how to approach this assessment",
-  "questions": [
-    {
-      "id": "q1",
-      "type": "multiple_choice|short_answer|essay|practical|true_false",
-      "question": "Well-crafted question that tests understanding",
-      "bloomLevel": "remember|understand|apply|analyze|evaluate|create",
-      "points": 10,
-      "estimatedTime": 3,
-      "options": [
-        {
-          "text": "Option text",
-          "correct": true/false,
-          "explanation": "Why this is correct/incorrect"
-        }
-      ],
-      "correctAnswer": "For non-multiple choice questions",
-      "gradingCriteria": "For essay/practical questions",
-      "sampleAnswer": "Example of a strong answer",
-      "commonMistakes": ["Typical errors to watch for"],
-      "learningObjective": "Which specific objective this assesses"
-    }
-  ],
-  "rubric": {
-    "criteria": [
-      {
-        "criterion": "Understanding of key concepts",
-        "excellent": "Demonstrates comprehensive understanding...",
-        "good": "Shows solid grasp of main ideas...",
-        "satisfactory": "Basic understanding present...",
-        "needsImprovement": "Limited understanding shown..."
-      }
-    ],
-    "masteryIndicators": [
-      "Student can explain concepts in their own words",
-      "Student can apply knowledge to new situations",
-      "Student can identify relationships between concepts"
-    ]
-  },
-  "timeAllocation": {
-    "suggested": "How to allocate time across questions",
-    "tips": "Strategies for time management"
-  },
-  "adaptations": {
-    "advanced": "How to make this more challenging",
-    "support": "How to provide additional scaffolding"
-  }
-}
-
-Remember: Good assessments don't just test - they teach and reinforce learning through the assessment process itself.`;
-
-          const completion = await this.openai.chat.completions.create({
-        model: "gpt-4.1-mini",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert educational assessment designer focused on creating meaningful evaluations that measure true understanding and promote learning."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.7,
-        max_tokens: 3000
-      });
-
-    return JSON.parse(completion.choices[0]?.message?.content || '{}');
+    // This method is now deprecated and its logic is handled by AssessmentGenerationService
+    return {};
   }
 
   private async updateJobStatus(

@@ -224,8 +224,9 @@ export default function TeachBaseClassesPage() {
       const generatedOutline: GeneratedOutline = await outlineResponse.json(); 
 
       setCurrentProcessStatus("Step 3/4: Saving outline to base class...");
+      const existingSettings = createdBaseClass?.settings;
       const updatedSettings = { 
-          ...(createdBaseClass?.settings || {}), 
+          ...(existingSettings && typeof existingSettings === 'object' && !Array.isArray(existingSettings) ? existingSettings : {}), 
           generatedOutline: generatedOutline 
       };
 

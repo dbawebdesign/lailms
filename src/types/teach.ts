@@ -1,126 +1,85 @@
-export interface BaseClass {
-  id: string;
+import { Database } from '../../packages/types/db';
+
+// Extract table types from database schema
+type BaseClassRow = Database['public']['Tables']['base_classes']['Row'];
+type ClassInstanceRow = Database['public']['Tables']['class_instances']['Row'];
+
+// Base class types
+export interface BaseClass extends BaseClassRow {
+  // Add any additional computed fields that might be used in the frontend
+  subject?: string;
+  gradeLevel?: string;
+  lengthInWeeks?: number;
+}
+
+export interface BaseClassCreationData {
   name: string;
-  description?: string; // Optional
-  subject?: string;     // Optional
-  gradeLevel?: string;  // Optional
-  lengthInWeeks: number; // e.g., 1 to 52
-  creationDate: string;  // ISO date string
-  settings?: {
-    generatedOutline?: GeneratedOutline;
-    subject?: string;
-    gradeLevel?: string;
-    lengthInWeeks?: number;
-    [key: string]: any; // Allows for other arbitrary settings
-  };
-  organisation_id: string; // Changed to non-optional
-  created_by?: string; // Assuming this might store auth.uid()
-  // Add other relevant fields later, e.g., status (active, archived)
-}
-
-export interface BaseClassCreationData extends Omit<BaseClass, 'id' | 'creationDate' | 'lengthInWeeks'> {
-  lengthInWeeks: number;
-  settings?: {
-    generatedOutline?: GeneratedOutline;
-    subject?: string;
-    gradeLevel?: string;
-    [key: string]: any;
-  };
-}
-
-export interface ClassInstance {
-  id: string;
-  baseClassId: string;
-  name: string; // e.g., "Spring 2024 - Section A", "Period 3 Class"
-  enrollmentCode: string;
-  startDate?: string; // ISO date string
-  endDate?: string;   // ISO date string
-  period?: string;    // e.g., "Period 3", "Mon/Wed/Fri 10:00 AM"
-  capacity?: number;
-  status: "active" | "archived" | "upcoming" | "completed";
-  creationDate: string; // ISO date string
-  createdAt: string; // ISO Date string
-  updatedAt: string; // ISO Date string
-  // studentCount?: number; // Could be added later
-}
-
-export interface ClassInstanceCreationData extends Omit<ClassInstance, "id" | "enrollmentCode" | "creationDate" | "status" | "createdAt" | "updatedAt"> {
-  // baseClassId is already part of Omit, but explicitly stating it is fine if needed for clarity
-  // status will likely be set server-side or defaulted to 'upcoming'/'active'
-}
-
-// Basic placeholder interfaces for content structure - to be expanded later
-export interface Path {
-  id: string;
-  baseClassId: string;
-  title: string;
   description?: string;
-  // order?: number;
+  organisation_id: string;
+  settings?: any;
+  lengthInWeeks?: number;
+  subject?: string;
+  gradeLevel?: string;
 }
 
-export interface Lesson {
-  id: string;
-  baseClassId: string; // or pathId if lessons belong to paths
-  title: string;
-  description?: string;
-  // content?: any; // To be defined: Rich text, video links, etc.
-  // order?: number;
+// Class instance types
+export interface ClassInstance extends ClassInstanceRow {
+  // Add any additional computed fields that might be used in the frontend
+  base_class?: BaseClass;
 }
 
-export interface Quiz {
-  id: string;
-  baseClassId: string; // or lessonId if quizzes are tied to lessons
-  title: string;
-  description?: string;
-  // questions?: any[]; // To be defined
-  // order?: number;
+export interface ClassInstanceCreationData {
+  name: string;
+  base_class_id: string;
+  start_date?: string;
+  end_date?: string;
+  settings?: any;
 }
 
-// New type for the AllInstancesTable
 export interface EnrichedClassInstance extends ClassInstance {
-  baseClassName: string;
-  baseClassSubject?: string; // Optional, if you want to show subject from base class
-  // studentCount?: number; // Placeholder for future data
+  base_class: BaseClass;
+  student_count?: number;
+  instructor_count?: number;
 }
 
-// Represents the structure of a lesson section, aligning with the database and API
-export interface LessonSection {
-  id: string; // UUID
-  lesson_id: string; // UUID, Foreign key to lessons table
+// Course generation types
+export interface GeneratedOutline {
   title: string;
-  content: any; // JSONB from Tiptap, Prisma typically maps this to `JsonValue` or `any`
-  order_index: number;
-  section_type: string; // e.g., 'text-editor', 'quiz', 'video'
-  created_at: string; // ISO date string
-  updated_at: string; // ISO date string
-  created_by: string; // UUID, Foreign key to auth.users table
+  description?: string;
+  paths?: {
+    title: string;
+    description?: string;
+    lessons?: {
+      title: string;
+      description?: string;
+      sections?: {
+        title: string;
+        content?: string;
+        section_type?: string;
+      }[];
+    }[];
+  }[];
 }
 
-// Represents a version of a lesson section's content
+// Lesson section version (used by teachService)
 export interface LessonSectionVersion {
-  id: string; // UUID
-  lesson_section_id: string; // UUID, Foreign key to lesson_sections table
-  content: any; // JSONB from Tiptap (the content of this specific version)
-  creator_user_id: string | null; // UUID, Foreign key to auth.users table, null if user deleted
-  created_at: string; // ISO date string
+  id: string;
+  lesson_section_id: string;
+  content: any;
+  member_id: string | null;
+  created_at: string;
   version_number: number;
 }
 
-// New interfaces for defining structure from BaseClass.settings.generatedOutline
-export interface GeneratedLesson {
-  title: string;
-  description: string;
-  objective?: string;
-}
-
-export interface GeneratedModule {
-  title: string;
-  description: string;
-  topics?: string[];
-  suggestedLessons: GeneratedLesson[];
-  suggestedAssessments?: any[];
-}
-
-export interface GeneratedOutline {
-  modules: GeneratedModule[];
-} 
+// Re-export commonly used types from lesson.ts for convenience
+export type { 
+  StudioBaseClass, 
+  Path, 
+  Lesson, 
+  LessonSection,
+  Question,
+  Assessment,
+  AssessmentConfig,
+  QuestionType,
+  AssessmentType
+} from './lesson'; 

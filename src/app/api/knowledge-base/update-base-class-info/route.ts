@@ -65,7 +65,9 @@ export async function POST(request: NextRequest) {
 
     // Update the base class with the approved course information
     const updatedSettings = {
-      ...baseClass.settings,
+      ...(typeof baseClass.settings === 'object' && baseClass.settings
+        ? baseClass.settings
+        : {}),
       knowledge_base_enabled: true,
       course_generation_enabled: true,
       created_via: 'knowledge_base_wizard',

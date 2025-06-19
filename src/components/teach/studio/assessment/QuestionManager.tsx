@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Database } from '../../../../../packages/types/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,54 +40,10 @@ import { QuestionEditor } from './QuestionEditor';
 import { QuestionPreview } from './QuestionPreview';
 import { QuestionBankManager } from './QuestionBankManager';
 import { QuestionDistributionDialog } from './QuestionDistributionDialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-// Types based on our existing database schema
-interface Question {
-  id: string;
-  quiz_id?: string;
-  question_text: string;
-  question_type: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'fill_in_blank' | 'matching' | 'drag_drop' | 'sequence';
-  points: number;
-  order_index: number;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-  options?: QuestionOption[];
-  metadata?: {
-    difficulty_level?: 'easy' | 'medium' | 'hard';
-    bloom_taxonomy?: 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
-    learning_objectives?: string[];
-    tags?: string[];
-    estimated_time?: number; // in minutes
-    lesson_content_refs?: string[]; // References to lesson content that this question tests
-    source_content?: string; // Original lesson content this question was derived from
-    ai_generated?: boolean;
-    validation_status?: 'draft' | 'reviewed' | 'approved' | 'needs_revision';
-  };
-}
-
-interface QuestionOption {
-  id: string;
-  question_id: string;
-  option_text: string;
-  is_correct: boolean;
-  order_index: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface Quiz {
-  id: string;
-  lesson_id?: string;
-  title: string;
-  description?: string;
-  time_limit?: number;
-  pass_threshold?: number;
-  shuffle_questions?: boolean;
-  created_by?: string;
-  created_at: string;
-  updated_at: string;
-}
+type Question = Database['public']['Tables']['questions']['Row'];
+type Quiz = Database['public']['Tables']['quizzes']['Row'];
 
 interface QuestionManagerProps {
   lessonId?: string;
@@ -229,16 +186,14 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
       question_text: '',
       points: 1,
       order_index: questions.length,
-      metadata: {
-        difficulty_level: 'medium',
-        bloom_taxonomy: 'understand',
-        learning_objectives: [],
-        tags: [],
-        estimated_time: 2,
-        lesson_content_refs: lessonId ? [lessonId] : [],
-        ai_generated: false,
-        validation_status: 'draft'
-      }
+      difficulty_score: 2, // Corresponds to medium
+      cognitive_level: 'understand',
+      learning_objectives: [],
+      tags: [],
+      estimated_time: 2,
+      lesson_content_refs: lessonId ? [lessonId] : [],
+      ai_generated: false,
+      validation_status: 'draft'
     };
     
     setSelectedQuestion(newQuestion as Question);
@@ -260,21 +215,36 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
     }
   };
 
-  const handleSaveQuestion = async (question: Question) => {
+  const handleSaveQuestion = async (questionData: Partial<Question>) => {
     try {
-      // TODO: Implement API call to save question
-      if (question.id) {
-        // Update existing question
-        setQuestions(prev => prev.map(q => q.id === question.id ? question : q));
+      const questionToSave = { ...selectedQuestion, ...questionData };
+      
+      const response = await fetch(
+        questionToSave.id 
+          ? `/api/teach/questions/${questionToSave.id}` 
+          : '/api/teach/questions', 
+        {
+          method: questionToSave.id ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...questionToSave, base_class_id: baseClassId }),
+        }
+      );
+
+      if (response.ok) {
+        const savedQuestion = await response.json();
+        if (questionToSave.id) {
+          setQuestions(questions.map(q => q.id === savedQuestion.id ? savedQuestion : q));
+        } else {
+          setQuestions([...questions, savedQuestion]);
+        }
+        setIsEditorOpen(false);
+        setSelectedQuestion(null);
       } else {
-        // Create new question
-        const newQuestion = { ...question, id: `temp-${Date.now()}` };
-        setQuestions(prev => [...prev, newQuestion]);
+        // TODO: Add user-facing error handling
+        console.error('Failed to save question');
       }
-      setIsEditorOpen(false);
-      setSelectedQuestion(null);
     } catch (error) {
-      console.error('Failed to save question:', error);
+      console.error('Error saving question:', error);
     }
   };
 
@@ -340,97 +310,91 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
 
   // Filter questions based on search and filters
   const filteredQuestions = questions.filter(question => {
-    const matchesSearch = question.question_text.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         question.metadata?.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesType = selectedQuestionType === 'all' || question.question_type === selectedQuestionType;
-    const matchesDifficulty = selectedDifficulty === 'all' || question.metadata?.difficulty_level === selectedDifficulty;
-    const matchesTags = selectedTags.length === 0 || 
-                       selectedTags.some(tag => question.metadata?.tags?.includes(tag));
-    
-    return matchesSearch && matchesType && matchesDifficulty && matchesTags;
+    const searchTermMatch = question.question_text?.toLowerCase().includes(searchTerm.toLowerCase());
+    const typeMatch = selectedQuestionType === 'all' || question.question_type === selectedQuestionType;
+    const difficultyMatch = selectedDifficulty === 'all' || (question.difficulty_score && difficultyMap[question.difficulty_score] === selectedDifficulty);
+    const tagsMatch = selectedTags.length === 0 || selectedTags.every(tag => question.tags?.includes(tag));
+    return searchTermMatch && typeMatch && difficultyMatch && tagsMatch;
   });
 
+  const difficultyMap: { [key: number]: string } = {
+    1: 'easy',
+    2: 'medium',
+    3: 'hard'
+  };
+
+  const allTags = Array.from(new Set(questions.flatMap(q => q.tags || [])));
+
   const renderQuestionCard = (question: Question) => {
-    const questionTypeConfig = questionTypes.find(t => t.id === question.question_type);
-    const Icon = questionTypeConfig?.icon || HelpCircle;
+    const typeInfo = questionTypes.find(t => t.id === question.question_type);
 
     return (
-      <Card key={question.id} className="p-4 hover:shadow-md transition-shadow">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <div className={cn("p-1 rounded", questionTypeConfig?.color)}>
-                <Icon className="h-4 w-4" />
-              </div>
-              <Badge variant="secondary" className="text-xs">
-                {questionTypeConfig?.label}
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                {question.points} pt{question.points !== 1 ? 's' : ''}
-              </Badge>
-              {question.metadata?.difficulty_level && (
-                <Badge 
-                  variant={question.metadata.difficulty_level === 'easy' ? 'default' : 
-                          question.metadata.difficulty_level === 'medium' ? 'secondary' : 'destructive'}
-                  className="text-xs"
-                >
-                  {question.metadata.difficulty_level}
+      <Card key={question.id} className="mb-4 group hover:shadow-lg transition-shadow duration-200">
+        <CardContent className="p-4">
+          <div className="flex justify-between items-start">
+            <div className="flex-grow">
+              <p className="font-semibold">{question.question_text || 'Untitled Question'}</p>
+              <div className="flex items-center text-sm text-muted-foreground mt-2 flex-wrap">
+                {typeInfo && (
+                  <Badge variant="outline" className={cn('mr-2 mb-1', typeInfo.color)}>
+                    <typeInfo.icon className="w-3 h-3 mr-1" />
+                    {typeInfo.label}
+                  </Badge>
+                )}
+                <Badge variant="secondary" className="mr-2 mb-1">
+                  <Star className="w-3 h-3 mr-1" />
+                  {question.points} pts
                 </Badge>
-              )}
+                {question.tags && question.tags.map((tag: string, index: number) => (
+                  <Badge key={index} variant="secondary" className="mr-2 mb-1">
+                    <Tag className="w-3 h-3 mr-1" />
+                    {tag}
+                  </Badge>
+                ))}
+                {question.estimated_time && (
+                   <Badge variant="secondary" className="mr-2 mb-1">
+                    <Clock className="w-3 h-3 mr-1" />
+                    {question.estimated_time} min
+                  </Badge>
+                )}
+                {question.cognitive_level && (
+                  <Badge variant="secondary" className="mr-2 mb-1">
+                    <Brain className="w-3 h-3 mr-1" />
+                    {question.cognitive_level}
+                  </Badge>
+                )}
+              </div>
             </div>
-            
-            <p className="text-sm text-foreground mb-2 line-clamp-2">
-              {question.question_text || 'Untitled Question'}
-            </p>
-            
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              {question.metadata?.estimated_time && (
-                <div className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {question.metadata.estimated_time}m
-                </div>
-              )}
-              {question.metadata?.tags && question.metadata.tags.length > 0 && (
-                <div className="flex items-center gap-1">
-                  <Tag className="h-3 w-3" />
-                  {question.metadata.tags.slice(0, 2).join(', ')}
-                  {question.metadata.tags.length > 2 && ` +${question.metadata.tags.length - 2}`}
-                </div>
-              )}
-              {question.metadata?.ai_generated && (
-                <div className="flex items-center gap-1">
-                  <Brain className="h-3 w-3" />
-                  AI Generated
-                </div>
-              )}
+            <div className="flex-shrink-0 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button variant="ghost" size="icon" onClick={() => handleEditQuestion(question)}>
+                <Edit className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => { /* copy logic */ }}>
+                <Copy className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => handleDeleteQuestion(question.id)}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => setSelectedQuestion(question)}>
+                    <BookOpen className="w-4 h-4 mr-2" />
+                    Preview
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Advanced Settings
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
-          
-          <div className="flex items-center gap-1 ml-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleEditQuestion(question)}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {/* TODO: Implement duplicate */}}
-            >
-              <Copy className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDeleteQuestion(question.id)}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        </CardContent>
       </Card>
     );
   };
@@ -563,10 +527,10 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
 
         {/* Organize & Tag Tab */}
         <TabsContent value="organize" className="space-y-4">
-          <QuestionBankManager 
+          <QuestionBankManager
+            baseClassId={baseClassId}
             questions={questions}
             onQuestionsUpdate={setQuestions}
-            baseClassId={baseClassId}
           />
         </TabsContent>
       </Tabs>
@@ -581,13 +545,13 @@ export const QuestionManager: React.FC<QuestionManagerProps> = ({
           </DialogHeader>
           {selectedQuestion && (
             <QuestionEditor
+              key={selectedQuestion.id}
               question={selectedQuestion}
               onSave={handleSaveQuestion}
               onCancel={() => {
                 setIsEditorOpen(false);
                 setSelectedQuestion(null);
               }}
-              lessonId={lessonId}
               baseClassId={baseClassId}
             />
           )}

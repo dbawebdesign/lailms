@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { Database } from '@/types/supabase';
+import { Database } from '../../../packages/types/db';
 
 type QuizResponse = Database['public']['Tables']['quiz_responses']['Row'];
 type QuizAttempt = Database['public']['Tables']['quiz_attempts']['Row'];
