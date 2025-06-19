@@ -57,14 +57,25 @@ export async function GET(
     }
 
     // Check if user has access to this path
-    const baseClass = (path.base_classes as any);
-    if (baseClass.created_by !== user.id) {
-      // Check if user is enrolled or has other permissions
+    const baseClass = (path as any).base_classes;
+    if (!baseClass || baseClass.created_by !== user.id) {
+      // Check if user is enrolled in any class instance for this base class
+      const { data: classInstances, error: instanceError } = await supabase
+        .from('class_instances')
+        .select('id')
+        .eq('base_class_id', baseClass.id);
+
+      if (instanceError || !classInstances || classInstances.length === 0) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
+
+      const classInstanceIds = classInstances.map(ci => ci.id);
+      
       const { data: enrollment } = await supabase
-        .from('enrollments')
+        .from('rosters')
         .select('id, role')
-        .eq('base_class_id', baseClass.id)
-        .eq('user_id', user.id)
+        .in('class_instance_id', classInstanceIds)
+        .eq('profile_id', user.id)
         .single();
 
       if (!enrollment) {
@@ -73,18 +84,19 @@ export async function GET(
     }
 
     // For now, return a simplified response since we need to create the path_assessments table
+    const pathData = path as any;
     const response = {
       assessments: [],
       path: {
-        id: path.id,
-        title: path.title,
-        description: path.description,
-        level: path.level,
+        id: pathData.id,
+        title: pathData.title,
+        description: pathData.description,
+        level: pathData.level,
         baseClass: {
           id: baseClass.id,
           name: baseClass.name
         },
-        lessons: includeLessons ? (path.lessons || []) : undefined
+        lessons: includeLessons ? (pathData.lessons || []) : undefined
       },
       pagination: {
         page,

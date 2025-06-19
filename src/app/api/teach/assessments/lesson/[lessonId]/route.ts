@@ -14,11 +14,18 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     
     // Get query parameters
-    const assessmentType = searchParams.get('type'); // practice, lesson_quiz, etc.
+    const assessmentTypeParam = searchParams.get('type'); // practice, lesson_quiz, etc.
     const includeQuestions = searchParams.get('includeQuestions') === 'true';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
     const offset = (page - 1) * limit;
+    
+    // Validate assessment type
+    const validAssessmentTypes = ['practice', 'lesson_quiz', 'path_exam', 'final_exam', 'diagnostic', 'benchmark'] as const;
+    type ValidAssessmentType = typeof validAssessmentTypes[number];
+    const assessmentType: ValidAssessmentType | null = assessmentTypeParam && validAssessmentTypes.includes(assessmentTypeParam as ValidAssessmentType) 
+      ? assessmentTypeParam as ValidAssessmentType
+      : null;
 
     // Verify user authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -55,12 +62,23 @@ export async function GET(
     // Check if user has access to this lesson
     const baseClass = (lesson.paths as any).base_classes;
     if (baseClass.created_by !== user.id) {
-      // Check if user is enrolled or has other permissions
+      // Check if user is enrolled in any class instance for this base class
+      const { data: classInstances, error: instanceError } = await supabase
+        .from('class_instances')
+        .select('id')
+        .eq('base_class_id', baseClass.id);
+
+      if (instanceError || !classInstances || classInstances.length === 0) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
+
+      const classInstanceIds = classInstances.map(ci => ci.id);
+      
       const { data: enrollment } = await supabase
-        .from('enrollments')
+        .from('rosters')
         .select('id, role')
-        .eq('base_class_id', baseClass.id)
-        .eq('user_id', user.id)
+        .in('class_instance_id', classInstanceIds)
+        .eq('profile_id', user.id)
         .single();
 
       if (!enrollment) {
@@ -70,40 +88,31 @@ export async function GET(
 
     // Build query for lesson assessments
     let query = supabase
-      .from('lesson_assessments')
+      .from('assessments')
       .select(`
         id,
         title,
         description,
         assessment_type,
-        difficulty_level,
-        time_limit,
-        max_attempts,
-        passing_score,
-        instructions,
         settings,
-        is_published,
         created_at,
         updated_at,
         ${includeQuestions ? `
-        lesson_questions!inner(
+        assessment_questions!inner(
           id,
-          question_text,
-          question_type,
-          difficulty_level,
-          bloom_taxonomy_level,
-          points,
-          correct_answer,
-          explanation,
-          learning_objectives,
-          tags,
-          estimated_time,
-          ai_generated,
-          lesson_question_options(
+          display_order,
+          questions!inner(
             id,
-            option_text,
-            is_correct,
-            order_index
+            question_text,
+            question_type,
+            points,
+            metadata,
+            question_options(
+              id,
+              option_text,
+              is_correct,
+              order_index
+            )
           )
         )
         ` : ''}
@@ -129,7 +138,7 @@ export async function GET(
 
     // Get total count for pagination
     let countQuery = supabase
-      .from('lesson_assessments')
+      .from('assessments')
       .select('id', { count: 'exact', head: true })
       .eq('lesson_id', lessonId);
 
@@ -224,7 +233,7 @@ export async function POST(
     const {
       title,
       description,
-      assessmentType = 'practice',
+      assessmentType: rawAssessmentType = 'practice',
       difficultyLevel = 'medium',
       timeLimit,
       maxAttempts,
@@ -234,6 +243,13 @@ export async function POST(
       generateQuestions = false,
       questionGenerationOptions
     } = body;
+    
+    // Validate assessment type
+    const validAssessmentTypes = ['practice', 'lesson_quiz', 'path_exam', 'final_exam', 'diagnostic', 'benchmark'] as const;
+    type ValidAssessmentType = typeof validAssessmentTypes[number];
+    const assessmentType: ValidAssessmentType = validAssessmentTypes.includes(rawAssessmentType as ValidAssessmentType) 
+      ? rawAssessmentType as ValidAssessmentType
+      : 'practice';
 
     if (!title) {
       return NextResponse.json(
@@ -244,20 +260,21 @@ export async function POST(
 
     // Create the assessment
     const { data: assessment, error: createError } = await supabase
-      .from('lesson_assessments')
+      .from('assessments')
       .insert({
         lesson_id: lessonId,
         title,
         description,
         assessment_type: assessmentType,
-        difficulty_level: difficultyLevel,
-        time_limit: timeLimit,
-        max_attempts: maxAttempts,
-        passing_score: passingScore,
-        instructions,
-        settings,
-        created_by: user.id,
-        is_published: false
+        settings: {
+          ...settings,
+          difficultyLevel,
+          timeLimit,
+          maxAttempts,
+          passingScore,
+          instructions,
+          isPublished: false
+        }
       })
       .select()
       .single();
@@ -274,7 +291,7 @@ export async function POST(
     let generatedQuestions = null;
     if (generateQuestions && questionGenerationOptions) {
       try {
-        const questionService = new QuestionGenerationService(supabase);
+        const questionService = new QuestionGenerationService();
         
         // Get lesson content for question generation
         const { data: lessonSections } = await supabase
@@ -288,21 +305,19 @@ export async function POST(
             .map(section => `${section.title}: ${JSON.stringify(section.content)}`)
             .join('\n\n');
 
-          const questionOptions = {
-            lessonId,
-            lessonTitle: lesson.title,
-            lessonContent,
-            questionCount: questionGenerationOptions.questionCount || 5,
-            difficultyLevels: questionGenerationOptions.difficultyLevels || ['medium'],
-            questionTypes: questionGenerationOptions.questionTypes || ['multiple_choice'],
-            bloomTaxonomyLevels: questionGenerationOptions.bloomTaxonomyLevels || ['understand'],
-            learningObjectives: questionGenerationOptions.learningObjectives || [],
-            userId: user.id,
-            saveToDatabase: true
-          };
+          const questionCount = questionGenerationOptions.questionCount || 5;
+          const questionTypes = questionGenerationOptions.questionTypes || ['multiple_choice'];
+          const baseClassId = baseClass.id;
+          const tags = questionGenerationOptions.tags || [];
 
-          const result = await questionService.generateLessonQuestions(questionOptions);
-          generatedQuestions = result.questions;
+          const result = await questionService.generateQuestionsFromContent(
+            lessonContent,
+            questionCount,
+            questionTypes,
+            baseClassId,
+            tags
+          );
+          generatedQuestions = result;
         }
       } catch (questionError) {
         console.error('Error generating questions:', questionError);

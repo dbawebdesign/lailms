@@ -1,120 +1,110 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Database } from '../../../../../../packages/types/db';
 import { QuestionValidationService } from '@/lib/services/question-validation-service';
+
+type Assessment = Database['public']['Tables']['assessments']['Row'];
 
 // POST /api/teach/assessments/attempt - Start a new assessment attempt
 export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
-    const body = await request.json();
-
-    // Verify user authentication
+    
+    // Get the authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const {
-      assessmentId,
-      assessmentType, // 'lesson', 'path', 'final'
-      lessonId,
-      pathId,
-      baseClassId
-    } = body;
-
-    if (!assessmentId || !assessmentType) {
-      return NextResponse.json(
-        { error: 'Assessment ID and type are required' },
-        { status: 400 }
-      );
+    const { assessmentId } = await request.json();
+    
+    if (!assessmentId) {
+      return NextResponse.json({ error: 'Assessment ID is required' }, { status: 400 });
     }
 
-    // Create new attempt
-    const { data: attempt, error: attemptError } = await supabase
-      .from('assessment_attempts')
-      .insert({
-        assessment_id: assessmentId,
-        assessment_type: assessmentType,
-        user_id: user.id,
-        lesson_id: lessonId || null,
-        path_id: pathId || null,
-        base_class_id: baseClassId || null,
-        started_at: new Date().toISOString(),
-        status: 'in_progress'
-      })
-      .select()
-      .single();
-
-    if (attemptError) {
-      console.error('Error creating assessment attempt:', attemptError);
-      return NextResponse.json(
-        { error: 'Failed to start assessment attempt' },
-        { status: 500 }
-      );
-    }
-
-    // Fetch the full assessment details
-    const { data: assessmentDetails, error: assessmentError } = await supabase
+    // Get assessment details
+    const { data: assessment, error: assessmentError } = await supabase
       .from('assessments')
       .select('*')
       .eq('id', assessmentId)
       .single();
 
-    if (assessmentError) {
-      console.error('Error fetching assessment details:', assessmentError);
-      return NextResponse.json(
-        { error: 'Failed to fetch assessment details' },
-        { status: 500 }
-      );
+    if (assessmentError || !assessment) {
+      return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
     }
 
-    // Fetch questions for the assessment
-    const { data: assessmentQuestions, error: questionsError } = await supabase
-      .from('assessment_questions')
-      .select('question_id')
-      .eq('assessment_id', assessmentId);
+    // Check if user is enrolled in a class instance for this base class
+    if (assessment.base_class_id) {
+      const { data: classInstances, error: instanceError } = await supabase
+        .from('class_instances')
+        .select('id')
+        .eq('base_class_id', assessment.base_class_id);
 
-    if (questionsError) {
-      console.error('Error fetching assessment questions:', questionsError);
-      return NextResponse.json(
-        { error: 'Failed to fetch assessment questions' },
-        { status: 500 }
-      );
+      if (instanceError || !classInstances || classInstances.length === 0) {
+        return NextResponse.json({ error: 'No class instances found for this assessment' }, { status: 404 });
+      }
+
+      const classInstanceIds = classInstances.map(ci => ci.id);
+      
+      const { data: enrollment, error: enrollmentError } = await supabase
+        .from('rosters')
+        .select('*')
+        .in('class_instance_id', classInstanceIds)
+        .eq('profile_id', user.id)
+        .single();
+
+      if (enrollmentError || !enrollment) {
+        return NextResponse.json({ error: 'Not enrolled in this class' }, { status: 403 });
+      }
     }
 
-    const questionIds = assessmentQuestions
-      .map(q => q.question_id)
-      .filter((id): id is string => id !== null);
+    // Check if there's already an active attempt
+    const { data: existingAttempt, error: attemptError } = await supabase
+      .from('assessment_attempts')
+      .select('*')
+      .eq('assessment_id', assessmentId)
+      .eq('user_id', user.id)
+      .eq('status', 'in_progress')
+      .single();
 
-    const { data: questions, error: questionsDetailsError } = await supabase
-      .from('questions')
-      .select(`
-        *,
-        options:question_options(*)
-      `)
-      .in('id', questionIds);
-    
-    if (questionsDetailsError) {
-      console.error('Error fetching question details:', questionsDetailsError);
-      return NextResponse.json(
-        { error: 'Failed to fetch question details' },
-        { status: 500 }
-      );
+    if (existingAttempt && !attemptError) {
+      return NextResponse.json({ 
+        message: 'Active attempt found',
+        attemptId: existingAttempt.id 
+      });
+    }
+
+    // Create new attempt
+    const { data: newAttempt, error: createError } = await supabase
+      .from('assessment_attempts')
+      .insert({
+        assessment_id: assessmentId,
+        assessment_type: assessment.assessment_type,
+        user_id: user.id,
+        status: 'in_progress',
+        started_at: new Date().toISOString(),
+        attempt_number: 1, // TODO: Calculate actual attempt number
+        total_questions: 0, // TODO: Calculate from assessment questions
+        base_class_id: assessment.base_class_id,
+        lesson_id: assessment.lesson_id,
+        path_id: assessment.path_id
+      })
+      .select()
+      .single();
+
+    if (createError || !newAttempt) {
+      return NextResponse.json({ error: 'Failed to create assessment attempt' }, { status: 500 });
     }
 
     return NextResponse.json({
-      attempt,
-      assessment: assessmentDetails,
-      questions,
-      message: 'Assessment attempt started successfully'
-    }, { status: 201 });
+      message: 'Assessment attempt created successfully',
+      attemptId: newAttempt.id
+    });
 
   } catch (error) {
-    console.error('Error in assessment attempt POST:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Error creating assessment attempt:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
