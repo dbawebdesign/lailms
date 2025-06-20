@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -106,11 +106,7 @@ export default function GeneratedCourseViewer({ courseOutlineId, onDeployToCours
   const [deploying, setDeploying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadCourseOutline();
-  }, [courseOutlineId]);
-
-  const loadCourseOutline = async () => {
+  const loadCourseOutline = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/knowledge-base/generation-status/${courseOutlineId}`);
@@ -126,7 +122,11 @@ export default function GeneratedCourseViewer({ courseOutlineId, onDeployToCours
     } finally {
       setLoading(false);
     }
-  };
+  }, [courseOutlineId]);
+
+  useEffect(() => {
+    loadCourseOutline();
+  }, [loadCourseOutline]);
 
   const handleDeployToCourse = async () => {
     if (!courseOutline) return;

@@ -154,7 +154,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     if (userId) {
       loadConversations();
     }
-  }, [userId]);
+  }, [userId, loadConversations]);
 
   // Check database connectivity and auth on mount
   useEffect(() => {
