@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { QuestionBankManager } from '@/components/teach/studio/assessment/QuestionBankManager';
 import { AssessmentBuilder } from '@/components/teach/studio/assessment/AssessmentBuilder';
@@ -9,7 +9,7 @@ import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 
 type Question = Database['public']['Tables']['questions']['Row'];
 
-const CreateAssessmentPage = () => {
+const CreateAssessmentContent = () => {
     const searchParams = useSearchParams();
     const baseClassId = searchParams.get('baseClassId');
   
@@ -101,6 +101,14 @@ const CreateAssessmentPage = () => {
                 </div>
             </div>
         </DragDropContext>
+    );
+};
+
+const CreateAssessmentPage = () => {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+            <CreateAssessmentContent />
+        </Suspense>
     );
 };
 
