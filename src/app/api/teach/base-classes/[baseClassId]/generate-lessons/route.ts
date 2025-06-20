@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { BaseClass } from '@/types/teach';
+import { BaseClass } from '../../../../../../types/teach';
 
 // TODO: Generate Supabase types and uncomment Database import above. 
 // Example: npx supabase gen types typescript --project-id <YOUR_PROJECT_ID> > src/types/supabase.ts
@@ -57,7 +57,8 @@ export async function POST(
     console.log(`[generate-lessons] Fetched baseClassData for ${baseClassId}:`, JSON.stringify(baseClassData, null, 2));
     
     const typedBaseClass = baseClassData as BaseClass;
-    const generatedOutline = typedBaseClass.settings?.generatedOutline;
+    const settings = typedBaseClass.settings as any;
+    const generatedOutline = settings?.generatedOutline;
     console.log(`[generate-lessons] Extracted generatedOutline for ${baseClassId}:`, JSON.stringify(generatedOutline, null, 2));
 
     if (!generatedOutline || !generatedOutline.modules || generatedOutline.modules.length === 0) {

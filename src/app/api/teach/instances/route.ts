@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { ClassInstance, EnrichedClassInstance } from '@/types/teach'; // Our frontend types
+import { ClassInstance, EnrichedClassInstance } from '../../../../types/teach'; // Our frontend types
 
 // Database representation for class_instances and base_classes (relevant fields)
 interface DbClassInstance {
@@ -42,18 +42,26 @@ function mapDbToEnrichedUi(dbInst: DbClassInstance): EnrichedClassInstance {
 
   return {
     id: dbInst.id,
-    baseClassId: dbInst.base_class_id,
+    base_class_id: dbInst.base_class_id,
     name: dbInst.name,
-    enrollmentCode: dbInst.enrollment_code,
-    startDate: dbInst.start_date || undefined,
-    endDate: dbInst.end_date || undefined,
-    period: dbInst.settings?.period,
-    capacity: dbInst.settings?.capacity,
+    enrollment_code: dbInst.enrollment_code,
+    start_date: dbInst.start_date || null,
+    end_date: dbInst.end_date || null,
+    settings: dbInst.settings || null,
     status: currentStatus,
-    creationDate: dbInst.created_at,
-    createdAt: dbInst.created_at,
-    updatedAt: dbInst.updated_at,
-    baseClassName: dbInst.base_classes?.name || 'Unknown Base Class',
+    created_at: dbInst.created_at,
+    updated_at: dbInst.updated_at,
+    base_class: {
+      id: dbInst.base_class_id,
+      organisation_id: '', // We don't have this from the join
+      name: dbInst.base_classes?.name || 'Unknown Base Class',
+      description: null,
+      settings: null,
+      created_at: '',
+      updated_at: '',
+      user_id: null,
+      assessment_config: null,
+    },
   };
 }
 

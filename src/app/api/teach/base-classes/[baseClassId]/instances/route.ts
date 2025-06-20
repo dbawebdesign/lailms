@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { ClassInstanceCreationData, ClassInstance } from '@/types/teach';
+import { ClassInstanceCreationData, ClassInstance } from '../../../../../../types/teach';
 
 // DB Representation (subset for what we insert/select)
 interface DbClassInstance {
@@ -34,17 +34,15 @@ function mapDbToUiInstance(dbInst: DbClassInstance): ClassInstance {
 
   return {
     id: dbInst.id,
-    baseClassId: dbInst.base_class_id,
+    base_class_id: dbInst.base_class_id,
     name: dbInst.name,
-    enrollmentCode: dbInst.enrollment_code,
-    startDate: dbInst.start_date || undefined,
-    endDate: dbInst.end_date || undefined,
-    period: dbInst.settings?.period,
-    capacity: dbInst.settings?.capacity,
+    enrollment_code: dbInst.enrollment_code,
+    start_date: dbInst.start_date || null,
+    end_date: dbInst.end_date || null,
+    settings: dbInst.settings || null,
     status: currentStatus,
-    creationDate: dbInst.created_at,
-    createdAt: dbInst.created_at,
-    updatedAt: dbInst.updated_at,
+    created_at: dbInst.created_at,
+    updated_at: dbInst.updated_at,
   };
 }
 
@@ -65,8 +63,8 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
 
   try {
-    const body = await request.json() as Omit<ClassInstanceCreationData, 'baseClassId'>;
-    const { name, startDate, endDate, period, capacity, ...otherSettings } = body;
+    const body = await request.json() as Omit<ClassInstanceCreationData, 'base_class_id'>;
+    const { name, start_date, end_date, settings, ...otherSettings } = body;
 
     // Retrieve organisation information from the profiles table
     const { data: profileData, error: profileError } = await supabase
@@ -92,9 +90,9 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
     
     let calculatedStatus: ClassInstance['status'] = 'upcoming';
-    if (startDate && new Date(startDate) > new Date()) {
+    if (start_date && new Date(start_date) > new Date()) {
         calculatedStatus = 'upcoming';
-    } else if (startDate && new Date(startDate) <= new Date()) {
+    } else if (start_date && new Date(start_date) <= new Date()) {
         calculatedStatus = 'active';
     }
     // end_date could also influence status to 'completed' if in the past, but POST usually implies new/future
@@ -102,13 +100,9 @@ export async function POST(request: Request, { params }: RouteParams) {
     const dbInsertData = {
       base_class_id: base_class_id_from_param,
       name,
-      start_date: startDate ? new Date(startDate).toISOString().split('T')[0] : null, // Format as YYYY-MM-DD for DATE type
-      end_date: endDate ? new Date(endDate).toISOString().split('T')[0] : null,
-      settings: {
-        period: period || undefined,
-        capacity: capacity || undefined,
-        ...otherSettings
-      },
+      start_date: start_date ? new Date(start_date).toISOString().split('T')[0] : null, // Format as YYYY-MM-DD for DATE type
+      end_date: end_date ? new Date(end_date).toISOString().split('T')[0] : null,
+      settings: settings || null,
       status: calculatedStatus, // Explicitly set status
       // enrollment_code has a DB default
     };

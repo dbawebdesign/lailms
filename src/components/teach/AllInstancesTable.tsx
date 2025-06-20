@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { EnrichedClassInstance } from "@/types/teach";
+import { EnrichedClassInstance } from "../../types/teach";
 import {
   Table,
   TableBody,
@@ -54,7 +54,7 @@ export const AllInstancesTable: React.FC<AllInstancesTableProps> = ({
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [sortColumn, setSortColumn] = useState<SortableColumn>("creationDate");
+  const [sortColumn, setSortColumn] = useState<SortableColumn>("created_at");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const copyToClipboard = (text: string, fieldName: string) => {
@@ -80,8 +80,8 @@ export const AllInstancesTable: React.FC<AllInstancesTableProps> = ({
       const lowerSearchTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(inst => 
         inst.name.toLowerCase().includes(lowerSearchTerm) ||
-        inst.baseClassName.toLowerCase().includes(lowerSearchTerm) ||
-        inst.enrollmentCode.toLowerCase().includes(lowerSearchTerm)
+        (inst.base_class?.name || '').toLowerCase().includes(lowerSearchTerm) ||
+        inst.enrollment_code.toLowerCase().includes(lowerSearchTerm)
       );
     }
 
@@ -95,7 +95,7 @@ export const AllInstancesTable: React.FC<AllInstancesTableProps> = ({
         valB_raw = 0;
       }
       
-      if (sortColumn === "creationDate" || sortColumn === "startDate" || sortColumn === "endDate") {
+      if (sortColumn === "created_at" || sortColumn === "start_date" || sortColumn === "end_date") {
         valA_raw = a[sortColumn] ? new Date(a[sortColumn]!).getTime() : 0;
         valB_raw = b[sortColumn] ? new Date(b[sortColumn]!).getTime() : 0;
       }
@@ -204,10 +204,10 @@ export const AllInstancesTable: React.FC<AllInstancesTableProps> = ({
             {/* Implement clickable sortable headers */}
             <TableRow>
               <TableHead onClick={() => handleSort('name')} className="cursor-pointer hover:bg-muted/50 font-semibold">Instance Name {sortColumn === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}</TableHead>
-              <TableHead onClick={() => handleSort('baseClassName')} className="cursor-pointer hover:bg-muted/50 font-semibold">Base Class {sortColumn === 'baseClassName' && (sortOrder === 'asc' ? '↑' : '↓')}</TableHead>
+              <TableHead className="font-semibold">Base Class</TableHead>
               <TableHead className="font-semibold">Enroll. Code</TableHead>
               <TableHead onClick={() => handleSort('status')} className="cursor-pointer hover:bg-muted/50 font-semibold">Status {sortColumn === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}</TableHead>
-              <TableHead onClick={() => handleSort('startDate')} className="cursor-pointer hover:bg-muted/50 font-semibold">Start Date {sortColumn === 'startDate' && (sortOrder === 'asc' ? '↑' : '↓')}</TableHead>
+              <TableHead onClick={() => handleSort('start_date')} className="cursor-pointer hover:bg-muted/50 font-semibold">Start Date {sortColumn === 'start_date' && (sortOrder === 'asc' ? '↑' : '↓')}</TableHead>
               <TableHead className="font-semibold">Period</TableHead>
               <TableHead className="text-right font-semibold">Enrolled</TableHead>
               <TableHead className="text-right font-semibold">Actions</TableHead>
@@ -219,13 +219,13 @@ export const AllInstancesTable: React.FC<AllInstancesTableProps> = ({
                 <TableCell className="font-medium text-foreground py-3">{instance.name}</TableCell>
                 <TableCell className="text-muted-foreground py-3">
                     <Button variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary" onClick={() => onViewInstanceDetails(instance)}>
-                        {instance.baseClassName} <ExternalLink className="ml-1 h-3 w-3" />
+                        {instance.base_class?.name || 'N/A'} <ExternalLink className="ml-1 h-3 w-3" />
                     </Button>
                 </TableCell>
                 <TableCell className="text-muted-foreground py-3">
                   <div className="flex items-center gap-1">
-                    <span>{instance.enrollmentCode}</span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(instance.enrollmentCode, "Enrollment Code")}>
+                    <span>{instance.enrollment_code}</span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(instance.enrollment_code, "Enrollment Code")}>
                       <Copy className="h-3 w-3" />
                     </Button>
                   </div>
@@ -236,10 +236,10 @@ export const AllInstancesTable: React.FC<AllInstancesTableProps> = ({
                   </Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground py-3">
-                  {instance.startDate ? format(new Date(instance.startDate), "MMM d, yyyy") : "N/A"}
+                  {instance.start_date ? format(new Date(instance.start_date), "MMM d, yyyy") : "N/A"}
                 </TableCell>
-                <TableCell className="text-muted-foreground py-3">{instance.period || "N/A"}</TableCell>
-                <TableCell className="text-right text-muted-foreground py-3">{/* Placeholder */ 0 } / {instance.capacity ?? "∞"}</TableCell>
+                <TableCell className="text-muted-foreground py-3">N/A</TableCell>
+                <TableCell className="text-right text-muted-foreground py-3">0 / ∞</TableCell>
                 <TableCell className="text-right py-3">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

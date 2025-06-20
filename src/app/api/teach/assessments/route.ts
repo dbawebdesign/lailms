@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { Assessment } from '@/types/assessment';
 
 // GET /api/teach/assessments - List assessments
 export async function GET(request: NextRequest) {
@@ -49,21 +48,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body: Partial<Assessment> = await request.json();
+    const body: any = await request.json();
 
-    if (!body.title || !body.type || !body.base_class_id) {
+    if (!body.title || !body.assessment_type || !body.base_class_id) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+
+    // Validate assessment type
+    const validAssessmentTypes = ['practice', 'lesson_quiz', 'path_exam', 'final_exam', 'diagnostic', 'benchmark'] as const;
+    type ValidAssessmentType = typeof validAssessmentTypes[number];
+    const assessmentType: ValidAssessmentType = validAssessmentTypes.includes(body.assessment_type as ValidAssessmentType) 
+      ? body.assessment_type as ValidAssessmentType
+      : 'practice';
 
     const { data, error } = await supabase
       .from('assessments')
       .insert({
         title: body.title,
-        type: body.type,
+        assessment_type: assessmentType,
         base_class_id: body.base_class_id,
+        lesson_id: body.lesson_id || null,
+        path_id: body.path_id || null,
         description: body.description,
         settings: body.settings ?? {},
-        created_by: user.id,
       })
       .select()
       .single();

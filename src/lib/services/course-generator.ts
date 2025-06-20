@@ -4,7 +4,7 @@ import { knowledgeBaseAnalyzer, KnowledgeBaseAnalysis, COURSE_GENERATION_MODES }
 import { knowledgeExtractor, ConceptMap, CourseStructureSuggestion } from './knowledge-extractor';
 import type { Database } from '@learnologyai/types';
 import { AssessmentGenerationService } from './assessment-generation-service'; // Import the new service
-import { AssessmentConfig } from '@/types/assessment';
+import { AssessmentConfig } from '@/types/lesson';
 
 export interface CourseGenerationRequest {
   baseClassId: string;
@@ -769,7 +769,20 @@ Remember: Every element should contribute to TEACHING and helping students achie
       max_tokens: 4000
     });
 
-    return JSON.parse(completion.choices[0]?.message?.content || '{}');
+    try {
+      const content = completion.choices[0]?.message?.content || '{}';
+      return JSON.parse(content);
+    } catch (parseError) {
+      console.error('Failed to parse lesson content JSON:', parseError);
+      console.log('Raw content:', completion.choices[0]?.message?.content);
+      // Return a fallback structure to prevent total failure
+      return {
+        title: "Content Generation Error",
+        sections: [],
+        activities: [],
+        assessments: []
+      };
+    }
   }
 
   private async generateAssessments(
@@ -1265,19 +1278,13 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
           // Create sections and assessments in parallel
           const sectionAndAssessmentPromises = [];
 
-          // Add section creation promise
-          sectionAndAssessmentPromises.push(
-            this.createLessonSectionsBatch(createdLesson.id, lesson, request)
-          );
+          // Create sections first
+          await this.createLessonSectionsBatch(createdLesson.id, lesson, request);
 
-          // Add assessment creation promise if enabled
+          // Then create assessments based on the actual lesson content
           if (request.assessmentSettings?.includeAssessments) {
-            sectionAndAssessmentPromises.push(
-              this.createLessonAssessmentsBatch(createdLesson.id, lesson, request)
-            );
+            await this.createLessonAssessmentsBatch(createdLesson.id, lesson, request);
           }
-
-          await Promise.all(sectionAndAssessmentPromises);
         });
 
         // Wait for all lessons to be created
@@ -1423,22 +1430,33 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
       const content = completion.choices[0]?.message?.content;
       if (!content) return contentOutline.map(() => ({ error: 'Failed to generate content' }));
 
-      // Parse JSON, handling potential markdown wrapping
-      const jsonMatch = content.match(/```(?:json)?\s*(\[[\s\S]*\])\s*```/) || [null, content];
-      const sections = JSON.parse(jsonMatch[1]);
-      
-      // Map sections by title to ensure correct order
-      return contentOutline.map(title => {
-        const section = sections.find((s: any) => 
-          s.sectionTitle?.toLowerCase().includes(title.toLowerCase()) ||
-          title.toLowerCase().includes(s.sectionTitle?.toLowerCase())
-        );
-        return section || {
+      // Parse JSON with proper error handling
+      try {
+        const jsonMatch = content.match(/```(?:json)?\s*(\[[\s\S]*\])\s*```/) || [null, content];
+        const sections = JSON.parse(jsonMatch[1]);
+        
+        // Map sections by title to ensure correct order
+        return contentOutline.map(title => {
+          const section = sections.find((s: any) => 
+            s.sectionTitle?.toLowerCase().includes(title.toLowerCase()) ||
+            title.toLowerCase().includes(s.sectionTitle?.toLowerCase())
+          );
+          return section || {
+            introduction: `Introduction to ${title}`,
+            main_content: [{ heading: title, content: "Content to be added." }],
+            key_takeaways: ["Key concepts"]
+          };
+        });
+      } catch (parseError) {
+        console.error('Failed to parse sections JSON:', parseError);
+        console.log('Raw content:', content);
+        // Return fallback content for each section
+        return contentOutline.map(title => ({
           introduction: `Introduction to ${title}`,
           main_content: [{ heading: title, content: "Content to be added." }],
           key_takeaways: ["Key concepts"]
-        };
-      });
+        }));
+      }
     } catch (error) {
       console.error('Failed to generate section content:', error);
       return contentOutline.map(title => ({
@@ -1457,33 +1475,66 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
     lesson: any,
     request: CourseGenerationRequest
   ): Promise<void> {
+    if (!request.assessmentSettings?.includeAssessments) return;
+
     const supabase = this.getSupabaseClient();
-    const questionsPerLesson = request.assessmentSettings?.questionsPerLesson || 3;
 
     try {
-      // Generate all questions in a single AI call
-      const questions = await this.generateLessonQuestions(
+      // First, get the actual lesson content that was created
+      const { data: lessonSections, error: sectionsError } = await supabase
+        .from('lesson_sections')
+        .select('*')
+        .eq('lesson_id', lessonId)
+        .order('order_index');
+
+      if (sectionsError || !lessonSections || lessonSections.length === 0) {
+        console.log('No lesson sections found, skipping assessment generation');
+        return;
+      }
+
+      // Create a question folder for this lesson
+      const { data: folder, error: folderError } = await supabase
+        .from('question_folders')
+        .insert({
+          name: `${lesson.title} - Questions`,
+          description: `Assessment questions for lesson: ${lesson.title}`,
+          base_class_id: request.baseClassId,
+          created_by: request.userId
+        })
+        .select()
+        .single();
+
+      if (folderError) {
+        console.error('Failed to create question folder:', folderError);
+        return;
+      }
+
+      // Generate questions based on actual lesson content
+      const questionsPerLesson = request.assessmentSettings?.questionsPerLesson || 5;
+      const questions = await this.generateQuestionsFromLessonContent(
+        lessonSections,
         lesson,
         questionsPerLesson,
         request
       );
 
-      // Create all questions and their options in parallel
-      const questionPromises = questions.map(async (q, i) => {
-        // Insert lesson question
-        const { data: lessonQuestion, error: questionError } = await supabase
-          .from('lesson_questions')
+      if (questions.length === 0) return;
+
+      // Create all questions with proper folder_id
+      const questionPromises = questions.map(async (q: any, i: number) => {
+        const { data: lessonQuestion, error: questionError } = await (supabase as any)
+          .from('questions')
           .insert({
+            folder_id: folder.id,
             lesson_id: lessonId,
             question_text: q.question_text,
             question_type: q.question_type,
             points: q.points || 10,
-            difficulty_level: q.difficulty_level || 'medium',
-            bloom_taxonomy: q.bloom_taxonomy || 'understand',
             learning_objectives: q.learning_objectives || [],
             order_index: i,
-            is_active: true,
-            created_by: request.userId
+            created_by: request.userId,
+            options: q.options || null,
+            answer_key: q.options ? { correct_answers: q.options.filter((opt: any) => opt.is_correct).map((opt: any) => opt.option_text) } : null
           })
           .select()
           .single();
@@ -1491,22 +1542,6 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
         if (questionError) {
           console.error('Failed to create lesson question:', questionError);
           return;
-        }
-
-        // Insert question options if multiple choice (in parallel)
-        if (q.options && q.question_type === 'multiple_choice') {
-          const optionPromises = q.options.map(async (option: any, j: number) => {
-            await supabase
-              .from('lesson_question_options')
-              .insert({
-                question_id: lessonQuestion.id,
-                option_text: option.option_text,
-                is_correct: option.is_correct,
-                explanation: option.explanation,
-                order_index: j
-              });
-          });
-          await Promise.all(optionPromises);
         }
 
         console.log(`❓ Created lesson question: ${q.question_text.substring(0, 50)}...`);
@@ -1519,7 +1554,88 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
   }
 
   /**
-   * Generate all lesson questions in a single AI call
+   * Generate questions based on actual lesson content
+   */
+  private async generateQuestionsFromLessonContent(
+    lessonSections: any[],
+    lesson: any,
+    questionsPerLesson: number,
+    request: CourseGenerationRequest
+  ): Promise<any[]> {
+    try {
+      // Collect actual content from lesson sections
+      const sectionContent = lessonSections.map(section => ({
+        title: section.title,
+        content: section.content || section.description,
+        order: section.order_index
+      }));
+
+      const prompt = `
+      Create ${questionsPerLesson} assessment questions based on this ACTUAL lesson content:
+      
+      Lesson: ${lesson.title}
+      Description: ${lesson.description}
+      Academic Level: ${request.academicLevel}
+      
+      ACTUAL LESSON CONTENT:
+      ${sectionContent.map(section => `
+      Section ${section.order + 1}: ${section.title}
+      Content: ${section.content}
+      `).join('\n')}
+      
+      ${this.getAcademicLevelGuidance(request.academicLevel)}
+      
+      Generate questions as a valid JSON array. Questions must be based on the actual content provided above:
+      [
+        {
+          "question_text": "Question directly based on the lesson content above",
+          "question_type": "multiple_choice",
+          "points": 10,
+          "learning_objectives": ["Specific objective tested"],
+          "options": [
+            { "option_text": "Option A", "is_correct": false, "explanation": "Why this is incorrect" },
+            { "option_text": "Option B", "is_correct": true, "explanation": "Why this is the correct answer" },
+            { "option_text": "Option C", "is_correct": false, "explanation": "Why this is incorrect" },
+            { "option_text": "Option D", "is_correct": false, "explanation": "Why this is incorrect" }
+          ]
+        }
+      ]
+      
+      IMPORTANT: 
+      - Questions must be directly based on the actual content provided
+      - Use a mix of multiple choice, true/false, and short answer questions
+      - Questions should test understanding of the specific content, not general knowledge
+      - Return ONLY valid JSON, no markdown formatting
+      `;
+
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.6,
+        max_tokens: 3000
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) return [];
+
+      // Better JSON parsing with error handling
+      try {
+        const jsonMatch = content.match(/```(?:json)?\s*(\[[\s\S]*\])\s*```/) || [null, content];
+        const parsedQuestions = JSON.parse(jsonMatch[1]);
+        return Array.isArray(parsedQuestions) ? parsedQuestions : [];
+      } catch (parseError) {
+        console.error('Failed to parse question JSON:', parseError);
+        console.log('Raw content:', content);
+        return [];
+      }
+    } catch (error) {
+      console.error('Failed to generate questions from lesson content:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Generate all lesson questions in a single AI call (legacy method)
    */
   private async generateLessonQuestions(
     lesson: any,
@@ -1561,7 +1677,7 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
       `;
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.6,
         max_tokens: 3000
@@ -1586,6 +1702,8 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
     module: any,
     request: CourseGenerationRequest
   ): Promise<void> {
+    if (!request.assessmentSettings?.includeQuizzes) return;
+
     const supabase = this.getSupabaseClient();
     const questionsPerQuiz = request.assessmentSettings?.questionsPerQuiz || 10;
 
@@ -1601,7 +1719,7 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
       
       This should be a CUMULATIVE assessment covering all lessons in this path.
       
-      Generate quiz structure as JSON:
+      Generate quiz structure as valid JSON (no markdown formatting):
       {
         "title": "${module.title} - Module Quiz",
         "description": "Comprehensive assessment covering all lessons in this module",
@@ -1612,7 +1730,6 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
             "question_text": "Question covering multiple lessons?",
             "question_type": "multiple_choice",
             "points": 15,
-            "difficulty_level": "medium",
             "options": [
               { "option_text": "Option A", "is_correct": false },
               { "option_text": "Option B", "is_correct": true },
@@ -1622,10 +1739,12 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
           }
         ]
       }
+      
+      IMPORTANT: Return ONLY valid JSON, no markdown code blocks.
       `;
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.6,
         max_tokens: 4000
@@ -1634,8 +1753,16 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
       const content = completion.choices[0]?.message?.content;
       if (!content) return;
 
-      const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || [null, content];
-      const quizData = JSON.parse(jsonMatch[1]);
+      let quizData: any;
+      try {
+        // Try to parse JSON with better error handling
+        const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || [null, content];
+        quizData = JSON.parse(jsonMatch[1]);
+      } catch (parseError) {
+        console.error('Failed to parse quiz JSON:', parseError);
+        console.log('Raw content:', content);
+        return;
+      }
 
       // Insert quiz
       const { data: quiz, error: quizError } = await supabase
@@ -1661,82 +1788,91 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
         return;
       }
 
-      // Insert quiz questions
-      for (let i = 0; i < quizData.questions.length; i++) {
-        const q = quizData.questions[i];
-        
-        const { data: question, error: questionError } = await supabase
-          .from('questions')
-          .insert({
-            quiz_id: quiz.id,
-            question_text: q.question_text,
-            question_type: q.question_type,
-            points: q.points || 15,
-            difficulty_level: q.difficulty_level || 'medium',
-            order_index: i
-          })
-          .select()
-          .single();
+      // Create question folder for quiz questions
+      const { data: folder, error: folderError } = await supabase
+        .from('question_folders')
+        .insert({
+          name: `${quizData.title} - Questions`,
+          description: `Questions for quiz: ${quizData.title}`,
+          base_class_id: request.baseClassId,
+          created_by: request.userId
+        })
+        .select()
+        .single();
 
-        if (questionError) continue;
+      if (folderError) {
+        console.error('Failed to create quiz question folder:', folderError);
+        return;
+      }
 
-        // Insert question options
-        if (q.options) {
-          for (let j = 0; j < q.options.length; j++) {
-            const option = q.options[j];
-            await supabase
-              .from('question_options')
-              .insert({
-                question_id: question.id,
-                option_text: option.option_text,
-                is_correct: option.is_correct,
-                order_index: j
-              });
+      // Insert quiz questions with proper folder_id
+      if (quizData.questions && Array.isArray(quizData.questions)) {
+        for (let i = 0; i < quizData.questions.length; i++) {
+          const q = quizData.questions[i];
+          
+          const { data: question, error: questionError } = await (supabase as any)
+            .from('questions')
+            .insert({
+              quiz_id: quiz.id,
+              question_text: q.question_text,
+              question_type: q.question_type,
+              points: q.points || 15,
+              order_index: i,
+              created_by: request.userId,
+              options: q.options || null,
+              answer_key: q.options ? { correct_answers: q.options.filter((opt: any) => opt.is_correct).map((opt: any) => opt.option_text) } : null
+            })
+            .select()
+            .single();
+
+          if (questionError) {
+            console.error('Failed to create quiz question:', questionError);
+            continue;
           }
         }
       }
 
-      console.log(`📝 Created path quiz: ${quiz.title}`);
+      console.log(`📝 Created path quiz: ${quizData.title}`);
     } catch (error) {
       console.error('Failed to create path quiz:', error);
     }
   }
 
   /**
-   * Create class-level comprehensive exam
+   * Create comprehensive final exam for entire course
    */
   private async createClassExam(
     outline: CourseOutline,
     request: CourseGenerationRequest
   ): Promise<void> {
+    if (!request.assessmentSettings?.includeFinalExam) return;
+
     const supabase = this.getSupabaseClient();
-    const questionsPerExam = request.assessmentSettings?.questionsPerExam || 20;
+    const questionsPerExam = request.assessmentSettings?.questionsPerExam || 25;
 
     try {
       const prompt = `
       Create a comprehensive final exam for this entire course:
       
-      Course: ${outline.title || request.title}
+      Course: ${outline.title}
+      Description: ${outline.description}
       Modules: ${outline.modules.map(m => m.title).join(', ')}
-      Total Lessons: ${outline.modules.reduce((sum, m) => sum + m.lessons.length, 0)}
       Question Count: ${questionsPerExam}
       Academic Level: ${request.academicLevel}
       
-      This should be a COMPREHENSIVE exam covering all modules and lessons.
-      Include questions that test synthesis and application across the entire course.
+      This should be a COMPREHENSIVE final exam covering all modules and lessons.
       
-      Generate exam structure as JSON:
+      Generate exam structure as valid JSON (no markdown formatting):
       {
-        "title": "Comprehensive Final Exam - ${outline.title || request.title}",
-        "description": "Final exam covering all course content and modules",
+        "title": "Comprehensive Final Exam - ${outline.title}",
+        "description": "Comprehensive final examination covering all course material",
         "time_limit": 120,
         "pass_threshold": 75,
         "questions": [
           {
-            "question_text": "Comprehensive question requiring synthesis across modules?",
+            "question_text": "Comprehensive question covering multiple modules?",
             "question_type": "multiple_choice",
             "points": 20,
-            "difficulty_level": "hard",
             "options": [
               { "option_text": "Option A", "is_correct": false },
               { "option_text": "Option B", "is_correct": true },
@@ -1746,40 +1882,45 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
           }
         ]
       }
+      
+      IMPORTANT: Return ONLY valid JSON, no markdown code blocks.
       `;
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.6,
-        max_tokens: 5000
+        max_tokens: 6000
       });
 
       const content = completion.choices[0]?.message?.content;
       if (!content) return;
 
-      const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || [null, content];
-      const examData = JSON.parse(jsonMatch[1]);
+      let examData: any;
+      try {
+        // Try to parse JSON with better error handling
+        const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || [null, content];
+        examData = JSON.parse(jsonMatch[1]);
+      } catch (parseError) {
+        console.error('Failed to parse exam JSON:', parseError);
+        console.log('Raw content:', content);
+        return;
+      }
 
-      // Insert exam (as a quiz with assessment_type = 'exam')  
+      // Insert exam (final exams are not tied to specific paths/lessons)
       const { data: exam, error: examError } = await supabase
         .from('quizzes')
         .insert({
-          // Note: No path_id - this is a class-level exam
           title: examData.title,
           description: examData.description,
-          assessment_type: 'exam',
+          assessment_type: 'final_exam',
           time_limit: examData.time_limit,
           pass_threshold: examData.pass_threshold,
           shuffle_questions: true,
-          max_attempts: 2,
-          show_feedback: false, // No immediate feedback on final exams
+          max_attempts: 1,
+          show_feedback: false,
           auto_grade: true,
-          created_by: request.userId,
-          settings: {
-            class_exam: true,
-            base_class_id: request.baseClassId
-          }
+          created_by: request.userId
         })
         .select()
         .single();
@@ -1789,42 +1930,51 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
         return;
       }
 
-      // Insert exam questions  
-      for (let i = 0; i < examData.questions.length; i++) {
-        const q = examData.questions[i];
-        
-        const { data: question, error: questionError } = await supabase
-          .from('questions')
-          .insert({
-            quiz_id: exam.id,
-            question_text: q.question_text,
-            question_type: q.question_type,
-            points: q.points || 20,
-            difficulty_level: q.difficulty_level || 'hard',
-            order_index: i
-          })
-          .select()
-          .single();
+      // Create question folder for exam questions
+      const { data: folder, error: folderError } = await supabase
+        .from('question_folders')
+        .insert({
+          name: `${examData.title} - Questions`,
+          description: `Questions for exam: ${examData.title}`,
+          base_class_id: request.baseClassId,
+          created_by: request.userId
+        })
+        .select()
+        .single();
 
-        if (questionError) continue;
+      if (folderError) {
+        console.error('Failed to create exam question folder:', folderError);
+        return;
+      }
 
-        // Insert question options
-        if (q.options) {
-          for (let j = 0; j < q.options.length; j++) {
-            const option = q.options[j];
-            await supabase
-              .from('question_options')
-              .insert({
-                question_id: question.id,
-                option_text: option.option_text,
-                is_correct: option.is_correct,
-                order_index: j
-              });
+      // Insert exam questions with proper folder_id
+      if (examData.questions && Array.isArray(examData.questions)) {
+        for (let i = 0; i < examData.questions.length; i++) {
+          const q = examData.questions[i];
+          
+          const { data: question, error: questionError } = await (supabase as any)
+            .from('questions')
+            .insert({
+              quiz_id: exam.id,
+              question_text: q.question_text,
+              question_type: q.question_type,
+              points: q.points || 20,
+              order_index: i,
+              created_by: request.userId,
+              options: q.options || null,
+              answer_key: q.options ? { correct_answers: q.options.filter((opt: any) => opt.is_correct).map((opt: any) => opt.option_text) } : null
+            })
+            .select()
+            .single();
+
+          if (questionError) {
+            console.error('Failed to create exam question:', questionError);
+            continue;
           }
         }
       }
 
-      console.log(`🎓 Created class exam: ${exam.title}`);
+      console.log(`🎓 Created class exam: ${examData.title}`);
     } catch (error) {
       console.error('Failed to create class exam:', error);
     }
@@ -2143,44 +2293,56 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
   ): Promise<void> {
     const supabase = this.getSupabaseClient();
     
-    const questionPromises = questions.map(async (q, index) => {
-      const { data: lessonQuestion, error } = await supabase
-        .from('lesson_questions')
+    try {
+      // Create a question folder for this lesson
+      const { data: folder, error: folderError } = await supabase
+        .from('question_folders')
         .insert({
-          lesson_id: lessonId,
-          question_text: q.questionText,
-          question_type: q.questionType,
-          points: q.points || 10,
-          difficulty_level: q.difficultyLevel || 'medium',
-          bloom_taxonomy: 'understand',
-          order_index: index,
-          is_active: true,
+          name: `Lesson Questions - ${lessonId}`,
+          description: `Questions for lesson ${lessonId}`,
           created_by: userId
         })
         .select()
         .single();
 
-      if (!error && q.options) {
-        const optionPromises = q.options.map(async (option: any, optIndex: number) => {
-          await supabase
-            .from('lesson_question_options')
-            .insert({
-              question_id: lessonQuestion.id,
-              option_text: option.text,
-              is_correct: option.correct,
-              explanation: option.explanation,
-              order_index: optIndex
-            });
-        });
-        await Promise.all(optionPromises);
+      if (folderError) {
+        console.error('Failed to create question folder:', folderError);
+        return;
       }
-    });
 
-    await Promise.all(questionPromises);
+      const questionPromises = questions.map(async (q: any, index: number) => {
+        const { data: lessonQuestion, error } = await (supabase as any)
+          .from('questions')
+          .insert({
+            folder_id: folder.id,
+            lesson_id: lessonId,
+            question_text: q.questionText || q.question_text,
+            question_type: q.questionType || q.question_type,
+            points: q.points || 10,
+            order_index: index,
+            created_by: userId,
+            options: q.options || null,
+            answer_key: q.options ? { correct_answers: q.options.filter((opt: any) => opt.correct || opt.is_correct).map((opt: any) => opt.text || opt.option_text) } : null
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Failed to create question:', error);
+          return;
+        }
+
+        console.log(`❓ Created question: ${q.questionText || q.question_text}`);
+      });
+
+      await Promise.all(questionPromises);
+    } catch (error) {
+      console.error('Failed to create questions from generated content:', error);
+    }
   }
 
   /**
-   * Helper to create quiz from pre-generated content
+   * Helper to create quiz from pre-generated content  
    */
   private async createQuizFromGeneratedContent(
     pathId: string,
@@ -2188,54 +2350,79 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
     userId: string
   ): Promise<void> {
     const supabase = this.getSupabaseClient();
-    
-    const { data: quiz, error: quizError } = await supabase
-      .from('quizzes')
-      .insert({
-        path_id: pathId,
-        title: quizData.title,
-        description: quizData.description,
-        assessment_type: 'quiz',
-        time_limit: 60,
-        pass_threshold: 70,
-        max_attempts: 3,
-        show_feedback: true,
-        auto_grade: true,
-        created_by: userId
-      })
-      .select()
-      .single();
 
-    if (!quizError && quizData.questions) {
-      for (let i = 0; i < quizData.questions.length; i++) {
-        const q = quizData.questions[i];
-        const { data: question, error } = await supabase
-          .from('questions')
-          .insert({
-            quiz_id: quiz.id,
-            question_text: q.questionText,
-            question_type: q.questionType,
-            points: q.points || 15,
-            difficulty_level: q.difficultyLevel || 'medium',
-            order_index: i
-          })
-          .select()
-          .single();
+    try {
+      // Insert quiz
+      const { data: quiz, error: quizError } = await supabase
+        .from('quizzes')
+        .insert({
+          path_id: pathId,
+          title: quizData.title,
+          description: quizData.description,
+          assessment_type: 'quiz',
+          time_limit: quizData.timeLimit || quizData.time_limit || 60,
+          pass_threshold: quizData.passThreshold || quizData.pass_threshold || 70,
+          shuffle_questions: true,
+          max_attempts: 3,
+          show_feedback: true,
+          auto_grade: true,
+          created_by: userId
+        })
+        .select()
+        .single();
 
-        if (!error && q.options) {
-          for (let j = 0; j < q.options.length; j++) {
-            const option = q.options[j];
-            await supabase
-              .from('question_options')
-              .insert({
-                question_id: question.id,
-                option_text: option.text,
-                is_correct: option.correct,
-                order_index: j
-              });
+      if (quizError) {
+        console.error('Failed to create quiz:', quizError);
+        return;
+      }
+
+      // Create question folder for quiz questions
+      const { data: folder, error: folderError } = await supabase
+        .from('question_folders')
+        .insert({
+          name: `${quizData.title} - Questions`,
+          description: `Questions for quiz: ${quizData.title}`,
+          created_by: userId
+        })
+        .select()
+        .single();
+
+      if (folderError) {
+        console.error('Failed to create quiz question folder:', folderError);
+        return;
+      }
+
+      // Insert quiz questions with proper folder_id
+      if (quizData.questions && Array.isArray(quizData.questions)) {
+        for (let i = 0; i < quizData.questions.length; i++) {
+          const q = quizData.questions[i];
+          
+          const { data: question, error: questionError } = await (supabase as any)
+            .from('questions')
+            .insert({
+              folder_id: folder.id,
+              quiz_id: quiz.id,
+              question_text: q.questionText || q.question_text,
+              question_type: q.questionType || q.question_type,
+              points: q.points || 15,
+              order_index: i,
+              created_by: userId,
+              options: q.options || null,
+              answer_key: q.options ? { correct_answers: q.options.filter((opt: any) => opt.correct || opt.is_correct).map((opt: any) => opt.text || opt.option_text) } : null
+            })
+            .select()
+            .single();
+
+          if (questionError) {
+            console.error('Failed to create quiz question:', questionError);
+            continue;
           }
         }
       }
+
+      console.log(`📝 Created quiz: ${quizData.title}`);
+    } catch (error) {
+      console.error('Failed to create quiz from generated content:', error);
     }
   }
 }

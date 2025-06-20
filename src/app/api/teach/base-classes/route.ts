@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { BaseClassCreationData, BaseClass, GeneratedOutline } from '@/types/teach'; // Added GeneratedOutline
+import { BaseClassCreationData, BaseClass, GeneratedOutline } from '../../../../types/teach'; // Added GeneratedOutline
 import { createClient } from '@supabase/supabase-js';
 
 // Database representation (subset, focusing on what we insert/select)
@@ -18,6 +18,8 @@ interface DbBaseClass {
   } | null;
   created_at: string;
   updated_at: string;
+  user_id?: string | null;
+  assessment_config?: any | null;
 }
 
 // Helper function to map database row to UI model
@@ -26,18 +28,12 @@ function mapDbToUi(dbClass: DbBaseClass | any): BaseClass {
     id: dbClass.id,
     organisation_id: dbClass.organisation_id,
     name: dbClass.name,
-    description: dbClass.description || '',
-    subject: dbClass.settings?.subject || '',
-    gradeLevel: dbClass.settings?.gradeLevel || '',
-    lengthInWeeks: dbClass.settings?.lengthInWeeks || 0,
-    creationDate: dbClass.created_at,
-    settings: {
-      generatedOutline: dbClass.settings?.generatedOutline || undefined,
-      subject: dbClass.settings?.subject,
-      gradeLevel: dbClass.settings?.gradeLevel,
-      lengthInWeeks: dbClass.settings?.lengthInWeeks,
-      ...dbClass.settings
-    },
+    description: dbClass.description || null,
+    settings: dbClass.settings || null,
+    created_at: dbClass.created_at,
+    updated_at: dbClass.updated_at,
+    user_id: dbClass.user_id || null,
+    assessment_config: dbClass.assessment_config || null,
   };
 }
 
@@ -205,7 +201,7 @@ export async function POST(request: Request) {
     const newBaseClassId = newDbBaseClass.id;
 
     // Trigger lesson and path generation
-    if (newBaseClassId && newDbBaseClass.settings?.generatedOutline?.modules?.length) {
+    if (newBaseClassId && newDbBaseClass.settings?.generatedOutline?.paths?.length) {
       try {
         // Construct the full URL for the internal fetch call
         const currentUrl = new URL(request.url);

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { BaseClass } from "@/types/teach";
+import { BaseClass } from "../../types/teach";
 import { BaseClassCard } from "./BaseClassCard";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,7 +25,7 @@ interface BaseClassCardGridProps {
   // onCreateNew?: () => void; 
 }
 
-type SortKey = "name" | "creationDate" | "lengthInWeeks";
+type SortKey = "name" | "created_at" | "lengthInWeeks";
 type SortOrder = "asc" | "desc";
 
 export const BaseClassCardGrid: React.FC<BaseClassCardGridProps> = ({
@@ -37,7 +37,7 @@ export const BaseClassCardGrid: React.FC<BaseClassCardGridProps> = ({
   onDelete,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("creationDate");
+  const [sortKey, setSortKey] = useState<SortKey>("created_at");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
   const filteredAndSortedClasses = useMemo(() => {
@@ -46,12 +46,12 @@ export const BaseClassCardGrid: React.FC<BaseClassCardGridProps> = ({
     );
 
     classes.sort((a, b) => {
-      let valA = a[sortKey];
-      let valB = b[sortKey];
+      let valA: any = a[sortKey];
+      let valB: any = b[sortKey];
 
-      if (sortKey === "creationDate") {
-        valA = new Date(a.creationDate).getTime();
-        valB = new Date(b.creationDate).getTime();
+      if (sortKey === "created_at") {
+        valA = new Date(a.created_at).getTime();
+        valB = new Date(b.created_at).getTime();
       }
       
       // Ensure consistent comparison for numbers or strings
@@ -101,7 +101,7 @@ export const BaseClassCardGrid: React.FC<BaseClassCardGridProps> = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="creationDate">Creation Date</SelectItem>
+              <SelectItem value="created_at">Creation Date</SelectItem>
               <SelectItem value="lengthInWeeks">Length</SelectItem>
             </SelectContent>
           </Select>

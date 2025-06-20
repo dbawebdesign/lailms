@@ -170,7 +170,7 @@ export async function POST(
           return NextResponse.json({ error: 'Responses array is required for AI-assisted grading' }, { status: 400 });
         }
 
-        const aiGradedRecords = await rubricService.aiAssistedGrading(sessionId, responses, session.rubric_id);
+        const aiGradedRecords = await rubricService.aiAssistedGrading(sessionId, responses, session.rubric_id || undefined);
         return NextResponse.json({
           success: true,
           records: aiGradedRecords
@@ -181,12 +181,13 @@ export async function POST(
         const finalGrade = await rubricService.calculateFinalGrade(sessionId);
         
         // Mark session as completed
+        const existingMetadata = session.metadata && typeof session.metadata === 'object' ? session.metadata : {};
         const { error: updateError } = await supabase
           .from('grading_sessions')
           .update({
             completed_at: new Date().toISOString(),
             metadata: {
-              ...session.metadata,
+              ...existingMetadata,
               final_grade: finalGrade
             }
           })

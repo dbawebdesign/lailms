@@ -1,56 +1,41 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { type ClassInstance, type ClassInstanceCreationData } from '@/types/teach'; // Assuming types
+import { type ClassInstance, type ClassInstanceCreationData } from '../../../../../../../types/teach'; // Assuming types
 import { cookies } from 'next/headers';
 
 // Helper to map database row to ClassInstance UI model
 function mapDbInstanceToUi(dbInstance: any): ClassInstance {
   return {
     id: dbInstance.id,
-    baseClassId: dbInstance.base_class_id,
+    base_class_id: dbInstance.base_class_id,
     name: dbInstance.name,
-    enrollmentCode: dbInstance.enrollment_code,
-    startDate: dbInstance.start_date,
-    endDate: dbInstance.end_date,
-    status: dbInstance.status, // Assuming status is directly mapped or calculated
-    createdAt: dbInstance.created_at,
-    updatedAt: dbInstance.updated_at,
-    creationDate: dbInstance.created_at, // Map to creationDate as well
-    // Map settings from JSONB
-    period: dbInstance.settings?.period,
-    capacity: dbInstance.settings?.capacity,
-    // Add other fields as necessary
+    enrollment_code: dbInstance.enrollment_code,
+    start_date: dbInstance.start_date,
+    end_date: dbInstance.end_date,
+    status: dbInstance.status,
+    created_at: dbInstance.created_at,
+    updated_at: dbInstance.updated_at,
+    settings: dbInstance.settings,
   };
 }
 
 // Helper to map ClassInstanceCreationData UI model to database row for insert/update
-function mapUiInstanceToDb(uiInstanceData: Partial<ClassInstanceCreationData | ClassInstance>, baseClassId: string, organisationId: string) {
+function mapUiInstanceToDb(uiInstanceData: Partial<ClassInstanceCreationData | ClassInstance>, baseClassId: string) {
   const dbRow: any = {
     base_class_id: baseClassId,
-    organisation_id: organisationId,
   };
   if (uiInstanceData.name) dbRow.name = uiInstanceData.name;
-  if (uiInstanceData.startDate) dbRow.start_date = uiInstanceData.startDate;
-  if (uiInstanceData.endDate) dbRow.end_date = uiInstanceData.endDate;
+  if (uiInstanceData.start_date) dbRow.start_date = uiInstanceData.start_date;
+  if (uiInstanceData.end_date) dbRow.end_date = uiInstanceData.end_date;
   
   // Handle status carefully. It might be derived or set explicitly.
   // For simplicity, if provided, we set it. Otherwise, it might be set by a trigger or default.
   if ('status' in uiInstanceData && uiInstanceData.status) dbRow.status = uiInstanceData.status;
 
-
-  // Consolidate settings into JSONB
-  const settings: any = {};
-  if (uiInstanceData.period) settings.period = uiInstanceData.period;
-  if (uiInstanceData.capacity) settings.capacity = uiInstanceData.capacity;
-  // Add other settings fields as necessary
-
-  if (Object.keys(settings).length > 0) {
-    dbRow.settings = settings;
-  } else if (uiInstanceData.hasOwnProperty('period') || uiInstanceData.hasOwnProperty('capacity')) {
-    // If keys are explicitly set to null/undefined, ensure settings is at least an empty object
-    dbRow.settings = {};
+  // Handle settings
+  if (uiInstanceData.settings) {
+    dbRow.settings = uiInstanceData.settings;
   }
-
 
   return dbRow;
 }
@@ -193,7 +178,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Class instance not found or access denied for update.' }, { status: 404 });
     }
 
-    const dbRowData = mapUiInstanceToDb(updatedInstanceData, baseClassId, organisationId);
+    const dbRowData = mapUiInstanceToDb(updatedInstanceData, baseClassId);
     
     // Ensure we don't try to update base_class_id or organisation_id via this route directly
     // (they are fixed by the route params and auth)

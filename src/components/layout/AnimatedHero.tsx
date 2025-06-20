@@ -14,7 +14,7 @@ export default function AnimatedHero() {
         const delay = parseInt(word.getAttribute('data-delay') || '0')
         
         setTimeout(() => {
-          word.style.animation = 'word-appear 0.8s ease-out forwards'
+          (word as HTMLElement).style.animation = 'word-appear 0.8s ease-out forwards'
         }, delay)
       })
     }

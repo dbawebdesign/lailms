@@ -9,7 +9,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Users, Clock } from 'lucide-react';
 import { format } from 'date-fns';
-import type { ClassInstanceCreationData } from '@/types/teach';
+// Define the type locally since the import is not available
+interface ClassInstanceCreationData {
+  name: string;
+  start_date?: string;
+  end_date?: string;
+  period?: string;
+  capacity?: number;
+  baseClassId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 interface CreateInstanceModalProps {
   isOpen: boolean;
@@ -51,8 +61,8 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
     try {
       const requestData: Omit<ClassInstanceCreationData, 'baseClassId' | 'createdAt' | 'updatedAt'> = {
         name: formData.name.trim(),
-        startDate: formData.startDate?.toISOString(),
-        endDate: formData.endDate?.toISOString(),
+        start_date: formData.startDate?.toISOString(),
+        end_date: formData.endDate?.toISOString(),
         period: formData.period || undefined,
         capacity: formData.capacity || undefined,
       };

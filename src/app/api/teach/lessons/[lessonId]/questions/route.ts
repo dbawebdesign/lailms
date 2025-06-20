@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { QuestionGenerationService } from '@/lib/services/question-generation-service';
+import { Database } from '@learnologyai/types';
+
+type QuestionType = Database['public']['Enums']['question_type'];
 
 export async function GET(
   request: NextRequest,
@@ -17,37 +20,21 @@ export async function GET(
     }
 
     const { searchParams } = new URL(request.url);
-    const assessmentId = searchParams.get('assessment_id');
     const questionType = searchParams.get('type');
-    const difficultyLevel = searchParams.get('difficulty');
 
-    // Build query for lesson questions
-    let query = supabase
-      .from('lesson_questions')
-      .select(`
-        *,
-        lesson:lessons(id, title, base_class_id),
-        assessment:lesson_assessments(id, title, assessment_type)
-      `)
-      .eq('lesson_id', lessonId)
-      .eq('is_active', true);
+    // Build query for lesson questions - use explicit typing to avoid recursion
+    const baseQuery = (supabase as any)
+      .from('questions')
+      .select('*')
+      .eq('lesson_id', lessonId);
 
-    // Filter by assessment if provided
-    if (assessmentId) {
-      query = query.eq('assessment_id', assessmentId);
-    }
-
-    // Filter by question type if provided
+    // Apply filters
+    let filteredQuery = baseQuery;
     if (questionType) {
-      query = query.eq('question_type', questionType);
+      filteredQuery = filteredQuery.eq('question_type', questionType);
     }
 
-    // Filter by difficulty level if provided
-    if (difficultyLevel) {
-      query = query.eq('difficulty_level', difficultyLevel);
-    }
-
-    const { data: questions, error } = await query.order('order_index', { ascending: true });
+    const { data: questions, error } = await filteredQuery.order('order_index', { ascending: true });
 
     if (error) {
       console.error('Error fetching lesson questions:', error);
@@ -79,33 +66,29 @@ export async function POST(
 
     const {
       action,
-      assessment_id,
       question_count = 5,
-      difficulty_levels = ['easy', 'medium', 'hard'],
       question_types = ['multiple_choice', 'true_false', 'short_answer'],
-      bloom_taxonomy_levels = ['remember', 'understand', 'apply'],
       learning_objectives = [],
       // Manual question creation fields
       question_text,
       question_type,
       options,
       correct_answer,
-      explanation,
-      difficulty_level,
-      bloom_taxonomy,
+      cognitive_level,
+      difficulty_score = 5,
       points = 1,
       tags = []
     } = body;
 
     // Verify lesson exists and user has access
-    const { data: lesson, error: lessonError } = await supabase
+    const { data: lesson, error: lessonError } = await (supabase as any)
       .from('lessons')
       .select(`
         id, 
         title, 
         base_class_id, 
-        content,
-        base_classes(created_by)
+        description,
+        created_by
       `)
       .eq('id', lessonId)
       .single();
@@ -114,8 +97,8 @@ export async function POST(
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 });
     }
 
-    // Check if user owns the base class
-    if (lesson.base_classes?.created_by !== user.id) {
+    // Check if user owns the lesson
+    if (lesson.created_by !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -125,41 +108,39 @@ export async function POST(
         const questionService = new QuestionGenerationService();
         
         // Generate questions based on lesson content only
-        const generatedQuestions = await questionService.generateLessonQuestions({
-          lessonId,
-          lessonTitle: lesson.title,
-          lessonContent: lesson.content || '',
-          questionCount,
-          difficultyLevels: difficulty_levels,
-          questionTypes: question_types,
-          bloomTaxonomyLevels: bloom_taxonomy_levels,
-          learningObjectives: learning_objectives
-        });
+        const generatedQuestions = await questionService.generateQuestionsFromContent(
+          lesson.description || '',
+          question_count,
+          question_types as QuestionType[],
+          lesson.base_class_id,
+          tags
+        );
 
         // Save generated questions to database
         const questionsToInsert = generatedQuestions.map((q, index) => ({
           lesson_id: lessonId,
-          assessment_id: assessment_id || null,
-          question_text: q.question,
-          question_type: q.type,
-          points: q.points || 1,
-          difficulty_level: q.difficulty,
-          bloom_taxonomy: q.bloomLevel,
-          learning_objectives: q.learningObjectives || [],
+          base_class_id: lesson.base_class_id,
+          question_text: q.question_text,
+          question_type: q.question_type,
+          points: points || 1,
+          difficulty_score: difficulty_score,
+          cognitive_level: cognitive_level || 'remember',
+          learning_objectives: learning_objectives || [],
           tags: q.tags || [],
           order_index: index + 1,
-          metadata: {
-            options: q.options,
-            correct_answer: q.correctAnswer,
-            explanation: q.explanation,
+          options: q.options || null,
+          correct_answer: q.correct_answer,
+          ai_generated: true,
+          created_by: user.id,
+          author_id: user.id,
+          legacy_metadata: {
             generated_at: new Date().toISOString(),
             generation_context: 'lesson_content'
-          },
-          created_by: user.id
+          }
         }));
 
-        const { data: insertedQuestions, error: insertError } = await supabase
-          .from('lesson_questions')
+        const { data: insertedQuestions, error: insertError } = await (supabase as any)
+          .from('questions')
           .insert(questionsToInsert)
           .select();
 
@@ -183,32 +164,30 @@ export async function POST(
 
     } else if (action === 'create') {
       // Manual question creation
-      if (!question_text || !question_type || !difficulty_level) {
+      if (!question_text || !question_type) {
         return NextResponse.json(
-          { error: 'Question text, type, and difficulty level are required for manual creation' },
+          { error: 'Question text and type are required for manual creation' },
           { status: 400 }
         );
       }
 
-      const { data: question, error: createError } = await supabase
-        .from('lesson_questions')
+      const { data: question, error: createError } = await (supabase as any)
+        .from('questions')
         .insert({
           lesson_id: lessonId,
-          assessment_id: assessment_id || null,
+          base_class_id: lesson.base_class_id,
           question_text,
           question_type,
           points,
-          difficulty_level,
-          bloom_taxonomy: bloom_taxonomy || 'remember',
+          difficulty_score,
+          cognitive_level: cognitive_level || 'remember',
           learning_objectives,
           tags,
-          metadata: {
-            options,
-            correct_answer,
-            explanation,
-            created_manually: true
-          },
-          created_by: user.id
+          options: options || null,
+          correct_answer,
+          ai_generated: false,
+          created_by: user.id,
+          author_id: user.id
         })
         .select()
         .single();

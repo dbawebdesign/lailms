@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { BaseClass } from "@/types/teach";
+import { BaseClass } from "../../types/teach";
 import {
   Card,
   CardContent,
@@ -103,7 +103,7 @@ export const BaseClassCard: React.FC<BaseClassCardProps> = ({
           </>
           <>
             <span className="font-medium text-foreground">Created:</span>
-            <span className="text-muted-foreground">{new Date(baseClass.creationDate).toLocaleDateString()}</span>
+            <span className="text-muted-foreground">{new Date(baseClass.created_at).toLocaleDateString()}</span>
           </>
         </div>
       </CardContent>

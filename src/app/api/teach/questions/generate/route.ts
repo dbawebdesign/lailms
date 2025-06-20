@@ -35,11 +35,15 @@ export async function POST(request: NextRequest) {
     if (sourceType === 'lesson') {
       content = await contentExtractionService.extractLessonContent(sourceId);
       const { data: lessonData } = await supabase.from('lessons').select('base_class_id').eq('id', sourceId).single();
-      if (lessonData) baseClassId = lessonData.base_class_id;
+      if (lessonData && lessonData.base_class_id) {
+        baseClassId = lessonData.base_class_id;
+      }
     } else if (sourceType === 'path') {
       content = await contentExtractionService.extractPathContent(sourceId);
       const { data: pathData } = await supabase.from('paths').select('base_class_id').eq('id', sourceId).single();
-      if (pathData) baseClassId = pathData.base_class_id;
+      if (pathData && pathData.base_class_id) {
+        baseClassId = pathData.base_class_id;
+      }
     } else if (sourceType === 'class') {
       content = await contentExtractionService.extractClassContent(sourceId);
       baseClassId = sourceId;
@@ -68,10 +72,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'AI failed to generate questions.' }, { status: 500 });
     }
 
+    // Map generated questions to database schema
+    const questionsToInsert = questions.map((q, index) => ({
+      question_text: q.question_text,
+      question_type: q.question_type,
+      correct_answer: q.correct_answer,
+      options: q.options ? JSON.stringify(q.options) : null,
+      base_class_id: baseClassId,
+      author_id: user.id,
+      tags: q.tags || [],
+      ai_generated: true,
+      validation_status: 'draft',
+      order_index: index + 1,
+      points: 1,
+      difficulty_score: 5,
+      cognitive_level: 'understand',
+      estimated_time: 2
+    }));
+
     // Save questions to the database
-    const { data: savedQuestions, error: saveError } = await supabase
+    const { data: savedQuestions, error: saveError } = await (supabase as any)
       .from('questions')
-      .insert(questions.map(q => ({ ...q }))) // Ensure we have a clean array of objects
+      .insert(questionsToInsert)
       .select();
 
     if (saveError) {

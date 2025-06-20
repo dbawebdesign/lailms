@@ -8,37 +8,34 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
 import { 
   Plus, 
-  Minus, 
-  Move, 
-  Eye, 
   Save, 
   X, 
-  Brain, 
-  BookOpen, 
-  Target,
-  Clock,
-  Tag,
-  AlertCircle,
-  CheckCircle,
-  HelpCircle,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Checkbox } from '@/components/ui/checkbox';
 import { QuestionPreview } from './QuestionPreview';
+import { createClient } from '@supabase/supabase-js';
+import { toast } from 'sonner';
 
 type Question = Database['public']['Tables']['questions']['Row'];
-type QuestionOption = Database['public']['Tables']['question_options']['Row'];
+type QuestionInsert = Database['public']['Tables']['questions']['Insert'];
+type Json = Database['public']['Tables']['questions']['Row']['options'];
+
+// Define the structure for question options as stored in the JSONB field
+interface QuestionOptionData {
+  id: string;
+  option_text: string;
+  is_correct: boolean;
+  order_index?: number;
+  explanation?: string;
+}
 
 interface QuestionEditorProps {
-  question: Partial<Question> | null;
-  onSave: (question: Partial<Question>) => void;
+  question: Question | null;
+  onSave: (question: Question) => void;
   onCancel: () => void;
   lessonId?: string;
   baseClassId: string;
@@ -51,519 +48,442 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
   lessonId,
   baseClassId
 }) => {
-  const [question, setQuestion] = useState<Partial<Question>>(initialQuestion || {});
+  const [editedQuestion, setEditedQuestion] = useState<Partial<Question>>({
+    question_text: '',
+    question_type: 'multiple_choice',
+    points: 1,
+    options: null,
+    correct_answer: '',
+    difficulty_score: 5,
+    cognitive_level: 'knowledge',
+    tags: [],
+    learning_objectives: [],
+    estimated_time: 5,
+    lesson_id: lessonId || '',
+    legacy_question_text: ''
+  });
+  
+  const [options, setOptions] = useState<QuestionOptionData[]>([]);
   const [activeTab, setActiveTab] = useState<'content' | 'settings' | 'preview'>('content');
-  const [isGeneratingFromContent, setIsGeneratingFromContent] = useState(false);
-  const [lessonContent, setLessonContent] = useState<string>('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   useEffect(() => {
-    if (lessonId) {
-      loadLessonContent();
-    }
-  }, [lessonId]);
-
-  const loadLessonContent = async () => {
-    try {
-      // TODO: Implement API call to fetch lesson content
-      // const response = await fetch(`/api/teach/lessons/${lessonId}/content`);
-      // const data = await response.json();
-      // setLessonContent(data.content || '');
+    if (initialQuestion) {
+      setEditedQuestion(initialQuestion);
       
-      // Mock content for now
-      setLessonContent('Sample lesson content about photosynthesis...');
-    } catch (error) {
-      console.error('Failed to load lesson content:', error);
+      // Parse options from the JSONB field if it exists
+      if (initialQuestion.options && initialQuestion.question_type === 'multiple_choice') {
+        try {
+          const parsedOptions = Array.isArray(initialQuestion.options) 
+            ? (initialQuestion.options as unknown as QuestionOptionData[])
+            : [];
+          setOptions(parsedOptions);
+        } catch (error) {
+          console.error('Error parsing question options:', error);
+          setOptions([]);
+        }
+      } else {
+        setOptions([]);
+      }
+    } else {
+      // Reset for new question
+      setEditedQuestion({
+        question_text: '',
+        question_type: 'multiple_choice',
+        points: 1,
+        options: null,
+        correct_answer: '',
+        difficulty_score: 5,
+        cognitive_level: 'knowledge',
+        tags: [],
+        learning_objectives: [],
+        estimated_time: 5,
+        lesson_id: lessonId || '',
+        legacy_question_text: ''
+      });
+      setOptions([
+        { id: '1', option_text: '', is_correct: false, order_index: 0 },
+        { id: '2', option_text: '', is_correct: false, order_index: 1 },
+      ]);
     }
-  };
+  }, [initialQuestion, lessonId]);
 
   const updateQuestion = (updates: Partial<Question>) => {
-    setQuestion(prev => ({ ...prev, ...updates }));
+    setEditedQuestion(prev => ({ ...prev, ...updates }));
   };
 
-  const getOptions = (): Partial<QuestionOption>[] => {
-    return Array.isArray(question.options) ? question.options : [];
+  const validateQuestion = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    // Validate question text
+    const questionText = editedQuestion.question_text?.trim();
+    if (!questionText) {
+      newErrors.question_text = 'Question text is required';
+    }
+
+    // Validate multiple choice questions
+    if (editedQuestion.question_type === 'multiple_choice') {
+      if (!options || options.length < 2) {
+        newErrors.options = 'Multiple choice questions must have at least 2 options';
+      } else if (!options.some(opt => opt.is_correct)) {
+        newErrors.correct_answer = 'Multiple choice questions must have at least one correct answer';
+      }
+    }
+
+    // Validate other question types
+    if ((editedQuestion.question_type === 'short_answer' || editedQuestion.question_type === 'long_answer') 
+        && !editedQuestion.correct_answer?.trim()) {
+      newErrors.correct_answer = 'Answer key is required for this question type';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const updateOptions = (newOptions: Partial<QuestionOption>[]) => {
-    updateQuestion({ options: newOptions as any });
+  const handleSave = async () => {
+    if (!validateQuestion()) {
+      toast.error('Please fix the validation errors before saving');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const questionData: QuestionInsert = {
+        question_text: editedQuestion.question_text?.trim() || '',
+        question_type: editedQuestion.question_type || 'multiple_choice',
+        points: editedQuestion.points || 1,
+        options: editedQuestion.question_type === 'multiple_choice' ? (options as unknown as Json) : null,
+        correct_answer: editedQuestion.correct_answer || '',
+        difficulty_score: editedQuestion.difficulty_score || 5,
+        cognitive_level: editedQuestion.cognitive_level || 'knowledge',
+        tags: editedQuestion.tags || [],
+        learning_objectives: editedQuestion.learning_objectives || [],
+        estimated_time: editedQuestion.estimated_time || 5,
+        lesson_id: lessonId || '',
+        legacy_question_text: editedQuestion.question_text?.trim() || '',
+        base_class_id: baseClassId,
+      };
+
+      if (initialQuestion?.id) {
+        // Update existing question
+        const { data, error } = await supabase
+          .from('questions')
+          .update(questionData)
+          .eq('id', initialQuestion.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        onSave(data);
+        toast.success('Question updated successfully');
+      } else {
+        // Create new question
+        const { data, error } = await supabase
+          .from('questions')
+          .insert(questionData)
+          .select()
+          .single();
+
+        if (error) throw error;
+        onSave(data);
+        toast.success('Question created successfully');
+      }
+    } catch (error) {
+      console.error('Error saving question:', error);
+      toast.error('Failed to save question');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const addOption = () => {
-    const options = getOptions();
-    const newOption: Partial<QuestionOption> = {
+    const newOption: QuestionOptionData = {
+      id: Date.now().toString(),
       option_text: '',
       is_correct: false,
       order_index: options.length,
     };
-    updateOptions([...options, newOption]);
+    setOptions([...options, newOption]);
   };
 
   const removeOption = (index: number) => {
-    const options = getOptions();
-    updateOptions(options.filter((_, i) => i !== index));
-  };
-
-  const updateOption = (index: number, updates: Partial<QuestionOption>) => {
-    const options = getOptions();
-    updateOptions(
-      options.map((opt, i) => (i === index ? { ...opt, ...updates } : opt))
-    );
-  };
-
-  const generateQuestionFromContent = async () => {
-    if (!lessonContent) return;
-    
-    setIsGeneratingFromContent(true);
-    try {
-      // TODO: Implement AI generation from lesson content
-      // const response = await fetch('/api/teach/questions/generate-from-content', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     content: lessonContent,
-      //     questionType: question.question_type,
-      //     difficulty: question.metadata?.difficulty_level
-      //   })
-      // });
-      // const data = await response.json();
-      
-      // Mock generated content
-      const mockGenerated = {
-        question_text: `What is the primary function of chlorophyll in photosynthesis?`,
-        options: [
-          { option_text: 'To absorb light energy', is_correct: true },
-          { option_text: 'To produce oxygen', is_correct: false },
-          { option_text: 'To create glucose', is_correct: false },
-          { option_text: 'To release carbon dioxide', is_correct: false }
-        ]
-      };
-      
-      updateQuestion({ question_text: mockGenerated.question_text });
-      
-      if (question.question_type === 'multiple_choice' && mockGenerated.options) {
-        const generatedOptions: Partial<QuestionOption>[] = mockGenerated.options.map((opt, index) => ({
-          option_text: opt.option_text,
-          is_correct: opt.is_correct,
-          order_index: index,
-        }));
-        updateOptions(generatedOptions);
-      }
-      
-      updateQuestion({ ai_generated: true });
-    } catch (error) {
-      console.error('Failed to generate question from content:', error);
-    } finally {
-      setIsGeneratingFromContent(false);
+    if (options.length > 2) {
+      setOptions(options.filter((_, i) => i !== index));
     }
   };
 
-  const handleSave = () => {
-    // Validate question before saving
-    if (!question.question_text.trim()) {
-      alert('Please enter a question text');
-      return;
-    }
-    
-    if (question.question_type === 'multiple_choice' && (!question.options || question.options.length < 2)) {
-      alert('Multiple choice questions must have at least 2 options');
-      return;
-    }
-    
-    if (question.question_type === 'multiple_choice' && !question.options?.some(opt => opt.is_correct)) {
-      alert('Please mark at least one option as correct');
-      return;
-    }
-    
-    onSave(question);
+  const updateOption = (index: number, field: keyof QuestionOptionData, value: string | boolean | number) => {
+    const updatedOptions = [...options];
+    updatedOptions[index] = { ...updatedOptions[index], [field]: value };
+    setOptions(updatedOptions);
+  };
+
+  const setCorrectOption = (index: number) => {
+    const updatedOptions = options.map((opt, i) => ({
+      ...opt,
+      is_correct: i === index,
+    }));
+    setOptions(updatedOptions);
   };
 
   const renderQuestionTypeEditor = () => {
-    switch (question.question_type) {
+    switch (editedQuestion.question_type) {
       case 'multiple_choice':
         return (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-base font-medium">Answer Options</Label>
+            <div className="flex justify-between items-center">
+              <Label>Answer Options</Label>
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 onClick={addOption}
-                disabled={question.options && question.options.length >= 6}
+                className="flex items-center gap-2"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4" />
                 Add Option
               </Button>
             </div>
             
             <div className="space-y-3">
-              {getOptions().map((option, index) => (
-                <Card key={option.id} className="p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="w-8 h-8 flex items-center justify-center">
-                        {String.fromCharCode(65 + index)}
-                      </Badge>
-                      <Switch
-                        checked={option.is_correct}
-                        onCheckedChange={(checked) => updateOption(index, { is_correct: checked })}
-                      />
-                    </div>
-                    
-                    <Input
-                      placeholder={`Option ${String.fromCharCode(65 + index)}`}
-                      value={option.option_text}
-                      onChange={(e) => updateOption(index, { option_text: e.target.value })}
-                      className="flex-1"
-                    />
-                    
+              {options.map((option, index) => (
+                <div key={option.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                  <input
+                    type="radio"
+                    name="correctAnswer"
+                    checked={option.is_correct}
+                    onChange={() => setCorrectOption(index)}
+                    className="h-4 w-4"
+                  />
+                  <Input
+                    value={option.option_text}
+                    onChange={(e) => updateOption(index, 'option_text', e.target.value)}
+                    placeholder={`Option ${index + 1}`}
+                    className="flex-1"
+                  />
+                  {options.length > 2 && (
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => removeOption(index)}
-                      disabled={question.options && question.options.length <= 2}
+                      className="text-red-500 hover:text-red-700"
                     >
-                      <Minus className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
-                  </div>
-                </Card>
-              )) || []}
-            </div>
-            
-            <p className="text-sm text-muted-foreground">
-              Toggle the switches to mark correct answers. Multiple correct answers are allowed.
-            </p>
-          </div>
-        );
-      
-      case 'true_false':
-        return (
-          <div className="space-y-4">
-            <Label className="text-base font-medium">Correct Answer</Label>
-            <div className="flex gap-4">
-              <Card 
-                className={cn("p-4 cursor-pointer border-2", 
-                  question.correct_answer === 'true' ? 'border-green-500 bg-green-50' : 'border-gray-200'
-                )}
-                onClick={() => updateQuestion({ correct_answer: 'true' })}
-              >
-                <div className="text-center">
-                  <CheckCircle className="h-6 w-6 mx-auto mb-2 text-green-600" />
-                  <p className="font-medium">True</p>
+                  )}
                 </div>
-              </Card>
-              <Card 
-                className={cn("p-4 cursor-pointer border-2", 
-                  question.correct_answer === 'false' ? 'border-red-500 bg-red-50' : 'border-gray-200'
-                )}
-                onClick={() => updateQuestion({ correct_answer: 'false' })}
-              >
-                <div className="text-center">
-                  <X className="h-6 w-6 mx-auto mb-2 text-red-600" />
-                  <p className="font-medium">False</p>
-                </div>
-              </Card>
-            </div>
-          </div>
-        );
-      
-      case 'short_answer':
-      case 'essay':
-        return (
-          <div className="space-y-4">
-            <div>
-              <Label className="text-base font-medium">Model Answer (Optional)</Label>
-              <p className="text-sm text-muted-foreground mb-2">
-                Provide a sample answer for grading reference
-              </p>
-              <Textarea
-                placeholder="Enter a model answer..."
-                value={question.model_answer || ''}
-                onChange={(e) => updateQuestion({ model_answer: e.target.value })}
-                rows={question.question_type === 'essay' ? 6 : 3}
-              />
+              ))}
             </div>
             
-            <div>
-              <Label className="text-base font-medium">Grading Rubric</Label>
-              <Textarea
-                placeholder="Enter grading criteria and rubric..."
-                value={question.grading_rubric || ''}
-                onChange={(e) => updateQuestion({ grading_rubric: e.target.value })}
-                rows={4}
-              />
-            </div>
-            
-            {question.question_type === 'short_answer' && (
-              <div>
-                <Label className="text-base font-medium">Maximum Word Count</Label>
-                <Input
-                  type="number"
-                  placeholder="e.g., 100"
-                  value={question.max_words || ''}
-                  onChange={(e) => updateQuestion({ max_words: parseInt(e.target.value) || undefined })}
-                />
-              </div>
+            {errors.options && (
+              <p className="text-sm text-red-500">{errors.options}</p>
+            )}
+            {errors.correct_answer && (
+              <p className="text-sm text-red-500">{errors.correct_answer}</p>
             )}
           </div>
         );
-      
-      case 'fill_in_blank':
+
+      case 'true_false':
         return (
           <div className="space-y-4">
-            <div>
-              <Label className="text-base font-medium">Instructions</Label>
-              <p className="text-sm text-muted-foreground mb-2">
-                Use underscores _____ to mark blanks in your question text above
-              </p>
-            </div>
-            
-            <div>
-              <Label className="text-base font-medium">Correct Answers</Label>
-              <p className="text-sm text-muted-foreground mb-2">
-                Enter possible correct answers, one per line
-              </p>
-              <Textarea
-                placeholder="Answer 1&#10;Answer 2&#10;Answer 3"
-                value={question.correct_answers?.join('\n') || ''}
-                onChange={(e) => updateQuestion({ 
-                  correct_answers: e.target.value.split('\n').filter(a => a.trim()) 
-                })}
-                rows={4}
-              />
-            </div>
+            <Label>Correct Answer</Label>
+            <Select
+              value={editedQuestion.correct_answer || 'true'}
+              onValueChange={(value) => updateQuestion({ correct_answer: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select correct answer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">True</SelectItem>
+                <SelectItem value="false">False</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         );
-      
-      default:
+
+      case 'short_answer':
+      case 'long_answer':
         return (
-          <div className="text-center py-8">
-            <HelpCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">
-              This question type editor is coming soon
-            </p>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="correctAnswer">Answer Key</Label>
+              <Textarea
+                id="correctAnswer"
+                value={editedQuestion.correct_answer || ''}
+                onChange={(e) => updateQuestion({ correct_answer: e.target.value })}
+                placeholder="Enter the correct answer or acceptable answers separated by |"
+                className={errors.correct_answer ? 'border-red-500' : ''}
+              />
+              {errors.correct_answer && (
+                <p className="text-sm text-red-500">{errors.correct_answer}</p>
+              )}
+            </div>
           </div>
         );
+
+      default:
+        return null;
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">
-            {question.id ? 'Edit Question' : 'Create New Question'}
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            {question.question_type?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} Question
-          </p>
-        </div>
-        
-        {lessonContent && (
-          <Button
-            variant="outline"
-            onClick={generateQuestionFromContent}
-            disabled={isGeneratingFromContent}
-          >
-            <Brain className="h-4 w-4 mr-2" />
-            {isGeneratingFromContent ? 'Generating...' : 'Generate from Content'}
-          </Button>
-        )}
-      </div>
+    <Card className="w-full max-w-4xl mx-auto">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>{initialQuestion ? 'Edit Question' : 'Create New Question'}</span>
+        </CardTitle>
+      </CardHeader>
 
-      {/* Main Editor */}
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="content">Content</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-          <TabsTrigger value="preview">Preview</TabsTrigger>
-        </TabsList>
+      <CardContent>
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="content">Content</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="preview">Preview</TabsTrigger>
+          </TabsList>
 
-        {/* Content Tab */}
-        <TabsContent value="content" className="space-y-6">
-          {/* Question Text */}
-          <div className="space-y-2">
-            <Label className="text-base font-medium">Question Text</Label>
-            <Textarea
-              placeholder="Enter your question here..."
-              value={question.question_text || ''}
-              onChange={(e) => updateQuestion({ question_text: e.target.value })}
-              rows={3}
-              className="text-base"
-            />
-          </div>
-
-          {/* Question Type Specific Editor */}
-          {renderQuestionTypeEditor()}
-        </TabsContent>
-
-        {/* Settings Tab */}
-        <TabsContent value="settings" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Basic Settings */}
-            <Card className="p-4">
-              <CardHeader className="p-0 pb-4">
-                <CardTitle className="text-base">Basic Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0 space-y-4">
-                <div>
-                  <Label>Points Value</Label>
-                  <Input
-                    type="number"
-                    min="0.1"
-                    step="0.1"
-                    value={question.points}
-                    onChange={(e) => updateQuestion({ points: parseFloat(e.target.value) || 1 })}
-                  />
-                </div>
-                
-                <div>
-                  <Label>Difficulty Level</Label>
-                  <Slider
-                    defaultValue={[question.difficulty_score || 2]}
-                    min={1} max={3} step={1}
-                    onValueChange={(value) => updateQuestion({ difficulty_score: value[0] })}
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>Easy</span>
-                    <span>Medium</span>
-                    <span>Hard</span>
-                  </div>
-                </div>
-                
-                <div>
-                  <Label>Estimated Time (minutes)</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={question.estimated_time || 2}
-                    onChange={(e) => updateQuestion({ estimated_time: parseInt(e.target.value) || 2 })}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Educational Metadata */}
-            <Card className="p-4">
-              <CardHeader className="p-0 pb-4">
-                <CardTitle className="text-base">Educational Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0 space-y-4">
-                <div>
-                  <Label>Cognitive Level (Bloom's Taxonomy)</Label>
-                  <Select 
-                    value={question.cognitive_level || 'understand'} 
-                    onValueChange={(value) => updateQuestion({ cognitive_level: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="remember">Remember</SelectItem>
-                      <SelectItem value="understand">Understand</SelectItem>
-                      <SelectItem value="apply">Apply</SelectItem>
-                      <SelectItem value="analyze">Analyze</SelectItem>
-                      <SelectItem value="evaluate">Evaluate</SelectItem>
-                      <SelectItem value="create">Create</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label>Tags</Label>
-                  <Input
-                    placeholder="Enter tags separated by commas"
-                    value={(question.tags as string[])?.join(', ') || ''}
-                    onChange={(e) => updateQuestion({ 
-                      tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) 
-                    })}
-                  />
-                </div>
-                
-                <div>
-                  <Label>Learning Objectives</Label>
-                  <Textarea
-                    placeholder="Enter learning objectives, one per line"
-                    value={(question.learning_objectives as string[])?.join('\n') || ''}
-                    onChange={(e) => updateQuestion({ 
-                      learning_objectives: e.target.value.split('\n').filter(Boolean) 
-                    })}
-                    rows={3}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Preview Tab */}
-        <TabsContent value="preview" className="space-y-4">
-          <Card className="p-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-lg font-medium">Preview</h4>
-                <div className="flex items-center gap-2">
-                  <Badge>{question.difficulty_score ? 'Difficulty: ' + question.difficulty_score : 'No difficulty score'}</Badge>
-                  <Badge variant="outline">{question.points} pts</Badge>
-                </div>
-              </div>
-              
-              <div className="prose max-w-none">
-                <p className="text-base">{question.question_text || 'Enter question text to see preview'}</p>
-                
-                {question.question_type === 'multiple_choice' && getOptions().length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    {getOptions().map((option, index) => (
-                      <div 
-                        key={option.id} 
-                        className={cn(
-                          "p-3 rounded border flex items-center gap-3",
-                          option.is_correct ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"
-                        )}
-                      >
-                        <div className="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center text-sm">
-                          {String.fromCharCode(65 + index)}
-                        </div>
-                        <span>{option.option_text || `Option ${String.fromCharCode(65 + index)}`}</span>
-                        {option.is_correct && <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                {question.question_type === 'true_false' && (
-                  <div className="mt-4 flex gap-4">
-                    <Button variant={question.correct_answer === 'true' ? 'default' : 'outline'}>
-                      True
-                    </Button>
-                    <Button variant={question.correct_answer === 'false' ? 'default' : 'outline'}>
-                      False
-                    </Button>
-                  </div>
-                )}
-              </div>
+          <TabsContent value="content" className="space-y-6">
+            {/* Question Type */}
+            <div className="space-y-2">
+              <Label htmlFor="questionType">Question Type</Label>
+              <Select
+                value={editedQuestion.question_type || 'multiple_choice'}
+                onValueChange={(value) => updateQuestion({ question_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select question type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                  <SelectItem value="true_false">True/False</SelectItem>
+                  <SelectItem value="short_answer">Short Answer</SelectItem>
+                  <SelectItem value="long_answer">Long Answer</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </Card>
-        </TabsContent>
-      </Tabs>
 
-      {/* Actions */}
-      <div className="flex items-center justify-between pt-4 border-t">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock className="h-4 w-4" />
-          <span>Estimated time: {question.estimated_time || 2} minutes</span>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={onCancel}>
+            {/* Question Text */}
+            <div className="space-y-2">
+              <Label htmlFor="questionText">Question Text</Label>
+              <Textarea
+                id="questionText"
+                value={editedQuestion.question_text || ''}
+                onChange={(e) => updateQuestion({ question_text: e.target.value })}
+                placeholder="Enter your question here..."
+                rows={3}
+                className={errors.question_text ? 'border-red-500' : ''}
+              />
+              {errors.question_text && (
+                <p className="text-sm text-red-500">{errors.question_text}</p>
+              )}
+            </div>
+
+            {/* Question Type Specific Editor */}
+            {renderQuestionTypeEditor()}
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-6">
+            {/* Points */}
+            <div className="space-y-2">
+              <Label htmlFor="points">Points</Label>
+              <Input
+                id="points"
+                type="number"
+                min="1"
+                max="100"
+                value={editedQuestion.points || 1}
+                onChange={(e) => updateQuestion({ points: parseInt(e.target.value) || 1 })}
+              />
+            </div>
+
+            {/* Difficulty */}
+            <div className="space-y-2">
+              <Label htmlFor="difficulty">Difficulty (1-10)</Label>
+              <Input
+                id="difficulty"
+                type="number"
+                min="1"
+                max="10"
+                value={editedQuestion.difficulty_score || 5}
+                onChange={(e) => updateQuestion({ difficulty_score: parseInt(e.target.value) || 5 })}
+              />
+            </div>
+
+            {/* Cognitive Level */}
+            <div className="space-y-2">
+              <Label htmlFor="cognitiveLevel">Cognitive Level</Label>
+              <Select
+                value={editedQuestion.cognitive_level || 'knowledge'}
+                onValueChange={(value) => updateQuestion({ cognitive_level: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select cognitive level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="knowledge">Knowledge</SelectItem>
+                  <SelectItem value="comprehension">Comprehension</SelectItem>
+                  <SelectItem value="application">Application</SelectItem>
+                  <SelectItem value="analysis">Analysis</SelectItem>
+                  <SelectItem value="synthesis">Synthesis</SelectItem>
+                  <SelectItem value="evaluation">Evaluation</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Estimated Time */}
+            <div className="space-y-2">
+              <Label htmlFor="estimatedTime">Estimated Time (minutes)</Label>
+              <Input
+                id="estimatedTime"
+                type="number"
+                min="1"
+                max="60"
+                value={editedQuestion.estimated_time || 5}
+                onChange={(e) => updateQuestion({ estimated_time: parseInt(e.target.value) || 5 })}
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="preview" className="space-y-6">
+            <QuestionPreview 
+              question={{
+                ...editedQuestion,
+                options: editedQuestion.question_type === 'multiple_choice' ? (options as unknown as Json) : null
+              } as Question} 
+            />
+          </TabsContent>
+        </Tabs>
+
+        {/* Action Buttons */}
+        <div className="flex justify-end gap-3 pt-6 mt-6 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isLoading}
+          >
+            <X className="h-4 w-4 mr-2" />
             Cancel
           </Button>
-          <Button onClick={handleSave}>
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={isLoading}
+          >
             <Save className="h-4 w-4 mr-2" />
-            Save Question
+            {isLoading ? 'Saving...' : 'Save Question'}
           </Button>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
-};
+}; 

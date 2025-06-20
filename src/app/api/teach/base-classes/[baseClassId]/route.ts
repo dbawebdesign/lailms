@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
-import { BaseClassCreationData, BaseClass } from '@/types/teach'; // BaseClass for return, BaseClassCreationData for PUT body
+import { BaseClassCreationData, BaseClass } from '../../../../../types/teach'; // BaseClass for return, BaseClassCreationData for PUT body
 
 // DB Representation and Mapper (can be shared if moved to a common util)
 interface DbBaseClass {
@@ -18,6 +18,8 @@ interface DbBaseClass {
   } | null;
   created_at: string;
   updated_at: string;
+  user_id?: string | null;
+  assessment_config?: any | null;
 }
 
 function mapDbToUi(dbClass: DbBaseClass): BaseClass {
@@ -25,12 +27,12 @@ function mapDbToUi(dbClass: DbBaseClass): BaseClass {
     id: dbClass.id,
     organisation_id: dbClass.organisation_id,
     name: dbClass.name,
-    description: dbClass.description || undefined,
-    subject: dbClass.settings?.subject,
-    gradeLevel: dbClass.settings?.gradeLevel,
-    lengthInWeeks: dbClass.settings?.lengthInWeeks ?? 0, 
-    creationDate: dbClass.created_at,
-    // settings: dbClass.settings, // if you want to pass the whole settings object
+    description: dbClass.description || null,
+    settings: dbClass.settings || null,
+    created_at: dbClass.created_at,
+    updated_at: dbClass.updated_at,
+    user_id: dbClass.user_id || null,
+    assessment_config: dbClass.assessment_config || null,
   };
 }
 

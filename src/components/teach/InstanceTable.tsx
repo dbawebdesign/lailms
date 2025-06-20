@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ClassInstance } from "@/types/teach";
+import { ClassInstance } from "../../types/teach";
 import {
   Table,
   TableBody,
@@ -94,12 +94,12 @@ export const InstanceTable: React.FC<InstanceTableProps> = ({
             <TableCell className="font-medium text-foreground">{instance.name}</TableCell>
             <TableCell className="text-muted-foreground">
               <div className="flex items-center gap-2">
-                <span>{instance.enrollmentCode}</span>
+                <span>{instance.enrollment_code}</span>
                 <Button 
                   variant="ghost" 
                   size="icon" 
                   className="h-7 w-7"
-                  onClick={() => copyToClipboard(instance.enrollmentCode, "Enrollment Code")}
+                  onClick={() => copyToClipboard(instance.enrollment_code, "Enrollment Code")}
                 >
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
@@ -111,12 +111,12 @@ export const InstanceTable: React.FC<InstanceTableProps> = ({
               </Badge>
             </TableCell>
             <TableCell>
-              {instance.startDate ? format(new Date(instance.startDate), "MMM d, yyyy") : "N/A"}
+              {instance.start_date ? format(new Date(instance.start_date), "MMM d, yyyy") : "N/A"}
               {" - "}
-              {instance.endDate ? format(new Date(instance.endDate), "MMM d, yyyy") : "N/A"}
+              {instance.end_date ? format(new Date(instance.end_date), "MMM d, yyyy") : "N/A"}
             </TableCell>
-            <TableCell>{instance.period || "N/A"}</TableCell>
-            <TableCell className="text-right">{instance.capacity ?? "N/A"}</TableCell>
+            <TableCell>N/A</TableCell>
+            <TableCell className="text-right">N/A</TableCell>
             <TableCell className="text-right">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

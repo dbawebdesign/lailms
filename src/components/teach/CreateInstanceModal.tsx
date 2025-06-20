@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils"; // Assuming you have a utility for classnames
-import { ClassInstance, ClassInstanceCreationData } from "@/types/teach";
+import { ClassInstance, ClassInstanceCreationData } from "../../types/teach";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -72,11 +72,11 @@ export const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
       if (isEditing && initialData) {
         form.reset({
           name: initialData.name,
-          startDate: initialData.startDate ? new Date(initialData.startDate) : undefined,
-          endDate: initialData.endDate ? new Date(initialData.endDate) : undefined,
-          period: initialData.period || "",
-          capacity: initialData.capacity || undefined,
-          baseClassId: initialData.baseClassId,
+          startDate: initialData.start_date ? new Date(initialData.start_date) : undefined,
+          endDate: initialData.end_date ? new Date(initialData.end_date) : undefined,
+          period: "",
+          capacity: undefined,
+          baseClassId: initialData.base_class_id,
         });
       } else {
         form.reset({
@@ -93,9 +93,11 @@ export const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
 
   const handleFormSubmit = async (values: InstanceFormValues) => {
     const submissionData: ClassInstanceCreationData = {
-      ...values,
-      startDate: values.startDate ? values.startDate.toISOString() : undefined,
-      endDate: values.endDate ? values.endDate.toISOString() : undefined,
+      name: values.name,
+      base_class_id: values.baseClassId,
+      start_date: values.startDate ? values.startDate.toISOString() : undefined,
+      end_date: values.endDate ? values.endDate.toISOString() : undefined,
+      settings: null,
     };
 
     try {
