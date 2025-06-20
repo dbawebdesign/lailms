@@ -149,6 +149,42 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const loadConversations = useCallback(async () => {
+    try {
+      console.log('🔍 Loading conversations for user:', userId);
+      
+      const { data, error } = await supabase
+        .from('luna_conversations')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log('🔍 No conversations found (empty result)');
+          setConversations([]);
+          return;
+        }
+        
+        if (error.code === '42P01') {
+          console.error('❌ Luna conversations table does not exist. Please run the SQL script in Supabase dashboard:', error);
+          setError('Luna conversations table not found. Please contact support.');
+          return;
+        }
+        
+        console.error('❌ Failed to load conversations:', error);
+        return;
+      }
+
+      const conversations = data || [];
+      setConversations(conversations);
+      
+      console.log('✅ Loaded conversations:', conversations.length);
+    } catch (error) {
+      console.error('❌ Failed to load conversations:', error);
+    }
+  }, [userId, supabase]);
+
   // Load conversations on mount
   useEffect(() => {
     if (userId) {
@@ -209,42 +245,6 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     };
     
     checkDatabase();
-  }, [userId, supabase]);
-
-  const loadConversations = useCallback(async () => {
-    try {
-      console.log('🔍 Loading conversations for user:', userId);
-      
-      const { data, error } = await supabase
-        .from('luna_conversations')
-        .select('*')
-        .eq('user_id', userId)
-        .order('updated_at', { ascending: false });
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          console.log('🔍 No conversations found (empty result)');
-          setConversations([]);
-          return;
-        }
-        
-        if (error.code === '42P01') {
-          console.error('❌ Luna conversations table does not exist. Please run the SQL script in Supabase dashboard:', error);
-          setError('Luna conversations table not found. Please contact support.');
-          return;
-        }
-        
-        console.error('❌ Failed to load conversations:', error);
-        return;
-      }
-
-      const conversations = data || [];
-      setConversations(conversations);
-      
-      console.log('✅ Loaded conversations:', conversations.length);
-    } catch (error) {
-      console.error('❌ Failed to load conversations:', error);
-    }
   }, [userId, supabase]);
 
   const loadMessages = async (conversationId: string) => {
