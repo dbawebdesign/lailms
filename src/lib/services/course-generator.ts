@@ -102,6 +102,7 @@ export interface GenerationJob {
 export class CourseGenerator {
   private openai: OpenAI;
   private assessmentGenerator: AssessmentGenerationService; // Instantiate the new service
+  private kbContentCache: Map<string, any[]> = new Map(); // Cache for KB content to avoid repeated searches
 
   constructor() {
     this.openai = new OpenAI({
@@ -576,45 +577,29 @@ Remember: This is an EDUCATIONAL course that must TEACH students, not just list 
     generationMode: 'kb_only' | 'kb_priority' | 'kb_supplemented',
     request: CourseGenerationRequest
   ): Promise<void> {
-    // This will be implemented to generate actual lesson content
-    // For now, we'll create placeholders in the database
-    
-    for (const courseModule of outline.modules) {
-      for (const lesson of courseModule.lessons) {
-        const lessonContent = await this.generateLessonContentForLesson(
-          lesson,
-          outline.knowledgeBaseAnalysis.baseClassId,
-          generationMode,
-          outline // Pass the full outline to access configuration
-        );
-
-        // Filter out invalid UUIDs from source references
-        const validSourceChunks = lesson.sourceReferences?.filter(ref => this.isValidUUID(ref)) || [];
-
-        const supabase = this.getSupabaseClient();
-        const { error } = await (supabase as any)
-          .from('generated_lesson_content')
-          .insert({
-            course_outline_id: courseOutlineId,
-            organisation_id: request.organisationId,
-            content_type: 'main_content',
-            generated_content: lessonContent,
-            source_chunks: validSourceChunks.length > 0 ? validSourceChunks : null,
-            generation_metadata: {
-              model: 'gpt-4o',
-              generation_mode: generationMode,
-              timestamp: new Date().toISOString()
-            },
-            status: 'draft',
-            user_id: request.userId
-          });
-
-        if (error) {
-          console.error(`Failed to save lesson content for ${lesson.title}:`, error);
-          throw new Error(`Failed to save lesson content: ${error.message}`);
-        }
-      }
+    // Pre-fetch and cache KB content once for the entire course to avoid repeated searches
+    const cacheKey = `${outline.knowledgeBaseAnalysis.baseClassId}-${generationMode}`;
+    if (!this.kbContentCache.has(cacheKey)) {
+      console.log('🔍 Fetching KB content for course-wide use...');
+      const courseKbContent = await knowledgeBaseAnalyzer.searchKnowledgeBaseForGeneration(
+        outline.knowledgeBaseAnalysis.baseClassId,
+        `${request.title} ${request.description || ''}`,
+        generationMode,
+        { courseScope: 'outline' }
+      );
+      this.kbContentCache.set(cacheKey, courseKbContent);
+      console.log(`📚 Cached ${courseKbContent.length} KB chunks for course generation`);
     }
+    
+    // Note: Educational content generation has been moved to lesson sections
+    // This method now only handles KB content caching for later use in section generation
+    // All actual teaching content is generated in createLessonSectionsWithComprehensiveContent
+    
+    console.log('✅ Course-level KB content cached. Educational content will be generated per lesson section.');
+    
+    // Clear cache after course generation to prevent memory leaks
+    this.kbContentCache.clear();
+    console.log('🧹 Cleared KB content cache after course generation');
   }
 
   private async generateLessonContentForLesson(
@@ -625,13 +610,22 @@ Remember: This is an EDUCATIONAL course that must TEACH students, not just list 
   ): Promise<any> {
     const modeConfig = COURSE_GENERATION_MODES[generationMode];
     
-    // Get relevant knowledge base content for this lesson
-    const kbContent = await knowledgeBaseAnalyzer.searchKnowledgeBaseForGeneration(
-      baseClassId,
-      `${lesson.title} ${lesson.description}`,
-      generationMode,
-      { courseScope: 'lesson' }
-    );
+    // Use cached KB content instead of making individual searches per lesson
+    const cacheKey = `${baseClassId}-${generationMode}`;
+    let kbContent = this.kbContentCache.get(cacheKey) || [];
+    
+    // Filter cached content to be more relevant to this specific lesson
+    const lessonKeywords = `${lesson.title} ${lesson.description} ${lesson.learningObjectives.join(' ')}`.toLowerCase();
+    const relevantKbContent = kbContent.filter(chunk => {
+      const chunkText = (chunk.summary || chunk.content || '').toLowerCase();
+      return lesson.learningObjectives.some(objective => 
+        chunkText.includes(objective.toLowerCase()) ||
+        lessonKeywords.split(' ').some(keyword => keyword.length > 3 && chunkText.includes(keyword))
+      );
+    }).slice(0, 10); // Limit to top 10 most relevant chunks
+    
+    // Use the filtered content, or fall back to all cached content if no specific matches
+    const finalKbContent = relevantKbContent.length > 0 ? relevantKbContent : kbContent.slice(0, 15);
 
     const prompt = `
 You are a master educator creating comprehensive lesson content that will TEACH students, not just inform them.
@@ -657,7 +651,7 @@ GENERATION MODE: ${modeConfig.title}
 ${modeConfig.aiInstructions}
 
 KNOWLEDGE BASE CONTENT:
-${kbContent.map(chunk => `- ${chunk.summary || chunk.content.substring(0, 500)}`).join('\n')}
+${finalKbContent.map(chunk => `- ${chunk.summary || chunk.content.substring(0, 500)}`).join('\n')}
 
 CRITICAL INSTRUCTIONS FOR EDUCATIONAL CONTENT:
 1. Create content that ACTIVELY TEACHES, not just presents information
@@ -673,79 +667,50 @@ CRITICAL INSTRUCTIONS FOR EDUCATIONAL CONTENT:
 
 Generate comprehensive educational lesson content in JSON format:
 {
-  "introduction": {
-    "hookOrAttentionGrabber": "Engaging opening that captures interest and shows relevance",
-    "learningObjectivesPresentation": "Clear statement of what students will learn and be able to do",
-    "priorKnowledgeActivation": "Questions or activities that connect to what students already know",
-    "lessonRoadmap": "Brief overview of how the lesson will unfold"
-  },
-  "mainContent": {
+  "introduction": "Engaging lesson introduction that includes: attention-grabbing hook, clear learning objectives presentation, activation of prior knowledge, and lesson roadmap. Should be 2-3 substantial paragraphs that set up the entire lesson.",
     "sections": [
       {
         "title": "Clear, Descriptive Section Title",
-        "teachingStrategy": "How this content will be taught (e.g., direct instruction, guided discovery)",
-        "content": "Comprehensive educational content that explains, demonstrates, and teaches the concept thoroughly. This should be several paragraphs of actual teaching content, not an outline.",
+      "content": "Comprehensive educational content that explains, demonstrates, and teaches the concept thoroughly. This should be several detailed paragraphs of actual teaching content that progressively builds understanding. Include explanations, demonstrations, and guided discovery as appropriate.",
         "examples": [
           {
             "type": "worked_example|real_world|analogy",
-            "description": "Detailed example that illuminates the concept",
-            "explanation": "Step-by-step walkthrough of the example"
-          }
-        ],
-        "commonMisconceptions": ["List of things students often get wrong"],
-        "clarifications": ["Proactive explanations to prevent confusion"],
-        "activities": [
-          {
-            "type": "guided_practice|independent_practice|discussion",
-            "instructions": "Clear directions for the activity",
-            "expectedOutcome": "What students should learn or produce"
-          }
-        ],
-        "keyPoints": ["Essential takeaways from this section"],
-        "checkForUnderstanding": ["Questions to verify student comprehension"],
-        "visualAids": ["Descriptions of diagrams, charts, or visuals that would help"]
-      }
-    ]
+          "description": "Detailed example that illuminates the concept with step-by-step explanation"
+        }
+      ],
+      "key_points": ["Essential takeaways from this section that students must understand"],
+      "common_misconceptions": ["Things students often get wrong with explanations of why"],
+      "check_understanding": ["Specific questions or activities to verify comprehension before moving on"]
+    }
+  ],
+  "activities": [
+    {
+      "type": "guided_practice|independent_practice|discussion|reflection",
+      "title": "Activity Name",
+      "instructions": "Clear, detailed directions for the activity including expected outcomes",
+      "duration": "Estimated time",
+      "scaffolding": "How to support students who need help",
+      "differentiation": "How to adjust for different skill levels"
+    }
+  ],
+  "summary": "Comprehensive review that synthesizes all key concepts, explicitly connects back to learning objectives, and includes a meaningful closure activity. Should be 2-3 paragraphs that help students consolidate their learning.",
+  "assessment_opportunities": [
+    {
+      "type": "formative|summative",
+      "description": "Specific way to assess student understanding",
+      "criteria": "What successful completion looks like"
+    }
+  ],
+  "extension_support": {
+    "enrichment": ["Activities for students who master content quickly"],
+    "remediation": ["Additional support strategies for struggling students"],
+    "real_world_connections": ["How this lesson applies beyond the classroom"]
   },
-  "practiceAndApplication": {
-    "guidedPractice": [
-      {
-        "activity": "Practice activity with teacher support",
-        "scaffolding": "How the teacher provides support",
-        "gradualRelease": "How support is reduced over time"
-      }
-    ],
-    "independentPractice": [
-      {
-        "activity": "What students do on their own",
-        "differentiationOptions": "How to adjust for different skill levels",
-        "expectedMastery": "What successful completion looks like"
-      }
-    ]
-  },
-  "summary": {
-    "keyConceptsReview": "Comprehensive review of main ideas taught",
-    "connectionToObjectives": "How we met each learning objective",
-    "synthesisActivity": "Activity that brings everything together"
-  },
-  "assessment": {
-    "formativeAssessment": ["Quick checks during the lesson"],
-    "summativeOptions": ["Ways to assess mastery at lesson end"],
-    "selfAssessment": "How students can evaluate their own learning"
-  },
-  "extensionAndRemediation": {
-    "enrichmentActivities": ["For students who master quickly"],
-    "additionalSupport": ["For students who need more help"],
-    "realWorldConnections": ["How this applies beyond the classroom"]
-  },
-  "resources": {
-    "required": ["Essential materials or tools"],
-    "supplementary": ["Additional resources for deeper learning"],
-    "references": ["Sources and citations used"]
-  }
+  "required_resources": ["Essential materials, tools, or technologies needed"],
+  "supplementary_resources": ["Additional resources for deeper learning"]
 }
 
-Remember: Every element should contribute to TEACHING and helping students achieve mastery. This is not a lesson plan for teachers - this is the actual educational content that students will engage with.`;
+Remember: Every element should contribute to TEACHING and helping students achieve mastery. Focus on creating actual educational content that guides learning, not just information delivery.`;
 
     const completion = await this.openai.chat.completions.create({
       model: "gpt-4.1-mini",
@@ -766,23 +731,106 @@ Remember: Every element should contribute to TEACHING and helping students achie
       ],
       response_format: { type: "json_object" },
       temperature: 0.7,
-      max_tokens: 4000
+      max_tokens: 10000
     });
 
     try {
       const content = completion.choices[0]?.message?.content || '{}';
-      return JSON.parse(content);
+      const parsedContent = JSON.parse(content);
+      
+      // Validate that we have the essential structure
+      if (!parsedContent.introduction || !parsedContent.sections || !Array.isArray(parsedContent.sections)) {
+        console.warn('Generated content missing essential structure, using fallback');
+        return this.createFallbackLessonContent(lesson);
+      }
+      
+      return parsedContent;
     } catch (parseError) {
       console.error('Failed to parse lesson content JSON:', parseError);
-      console.log('Raw content:', completion.choices[0]?.message?.content);
-      // Return a fallback structure to prevent total failure
-      return {
-        title: "Content Generation Error",
-        sections: [],
-        activities: [],
-        assessments: []
-      };
+      console.log('Raw content length:', completion.choices[0]?.message?.content?.length);
+      console.log('Raw content preview:', completion.choices[0]?.message?.content?.substring(0, 500));
+      
+      // Try to repair common JSON issues
+      const repairedContent = this.repairJsonContent(completion.choices[0]?.message?.content || '{}');
+      if (repairedContent) {
+        return repairedContent;
+      }
+      
+      // Return a structured fallback to prevent total failure
+      return this.createFallbackLessonContent(lesson);
     }
+  }
+
+  private repairJsonContent(rawContent: string): any | null {
+    try {
+      // Remove common markdown formatting
+      let cleaned = rawContent.replace(/```json\s*|\s*```/g, '');
+      
+      // Try to fix unterminated strings by finding the last complete object
+      const lastCompleteObject = cleaned.lastIndexOf('}');
+      if (lastCompleteObject > 0) {
+        cleaned = cleaned.substring(0, lastCompleteObject + 1);
+      }
+      
+      // Attempt to parse the cleaned content
+      const parsed = JSON.parse(cleaned);
+      
+      // Validate essential structure
+      if (parsed.introduction && parsed.sections && Array.isArray(parsed.sections)) {
+        console.log('Successfully repaired JSON content');
+        return parsed;
+      }
+    } catch (repairError) {
+      console.error('JSON repair failed:', repairError);
+    }
+    
+    return null;
+  }
+
+  private createFallbackLessonContent(lesson: ModuleLesson): any {
+      return {
+      introduction: `This lesson covers ${lesson.title}. ${lesson.description} By the end of this lesson, students will be able to: ${lesson.learningObjectives.join(', ')}.`,
+      sections: [
+        {
+          title: lesson.title,
+          content: `${lesson.description} This section will cover the fundamental concepts and provide practical examples to help students understand the material.`,
+          examples: [
+            {
+              type: "practical",
+              description: "Real-world application of the concepts covered in this lesson"
+            }
+          ],
+          key_points: lesson.learningObjectives,
+          common_misconceptions: ["Common misunderstandings will be addressed as they arise"],
+          check_understanding: ["Students will demonstrate understanding through practice exercises"]
+        }
+      ],
+      activities: [
+        {
+          type: "guided_practice",
+          title: "Practice Activity",
+          instructions: "Students will practice the concepts learned in this lesson with instructor guidance",
+          duration: "15 minutes",
+          scaffolding: "Instructor provides support as needed",
+          differentiation: "Activities can be adjusted based on student needs"
+        }
+      ],
+      summary: `This lesson covered ${lesson.title}. Students should now understand: ${lesson.learningObjectives.join(', ')}. These concepts will be built upon in future lessons.`,
+      assessment_opportunities: [
+        {
+          type: "formative",
+          description: "Quick check for understanding through questioning and observation",
+          criteria: "Students can explain key concepts and apply them in practice"
+        }
+      ],
+      extension_support: {
+        enrichment: ["Additional challenging problems for advanced students"],
+        remediation: ["Extra practice and support for students who need it"],
+        real_world_connections: ["Examples of how this lesson applies to real-world situations"]
+      },
+      required_resources: lesson.requiredResources || ["Standard classroom materials"],
+      supplementary_resources: ["Additional reading materials and online resources"]
+    };
   }
 
   private async generateAssessments(
@@ -1219,6 +1267,7 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
     request: CourseGenerationRequest
   ): Promise<void> {
     console.log('🏗️  Creating LMS entities from course outline...');
+    const generationMode = outline.generationMode || 'kb_supplemented';
     
     try {
       const supabase = this.getSupabaseClient();
@@ -1275,15 +1324,18 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
 
           console.log(`📖 Created lesson: ${createdLesson.title}`);
 
-          // Create sections and assessments in parallel
-          const sectionAndAssessmentPromises = [];
+          // Create comprehensive lesson sections with educational content
+          await this.createLessonSectionsWithComprehensiveContent(
+            createdLesson.id, 
+            lesson, 
+            request, 
+            outline,
+            generationMode
+          );
 
-          // Create sections first
-          await this.createLessonSectionsBatch(createdLesson.id, lesson, request);
-
-          // Then create assessments based on the actual lesson content
+          // Then create assessments based on the actual lesson section content
           if (request.assessmentSettings?.includeAssessments) {
-            await this.createLessonAssessmentsBatch(createdLesson.id, lesson, request);
+            await this.createLessonAssessmentsFromSectionContent(createdLesson.id, lesson, request);
           }
         });
 
@@ -2264,11 +2316,12 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
     const supabase = this.getSupabaseClient();
     
     const sectionPromises = sections.map(async (section, index) => {
+      try {
       let sectionType = 'main_content';
       if (index === 0) sectionType = 'introduction';
       if (index === sections.length - 1) sectionType = 'summary';
       
-      await supabase
+        const { error } = await supabase
         .from('lesson_sections')
         .insert({
           lesson_id: lessonId,
@@ -2278,6 +2331,33 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
           order_index: index,
           created_by: userId
         });
+
+        if (error) {
+          // Handle constraint violations gracefully
+          if (error.code === '23505') { // Unique constraint violation
+            console.warn(`Duplicate section detected for lesson ${lessonId}, index ${index}, skipping...`);
+            return;
+          }
+          if (error.code === '23503') { // Foreign key constraint violation
+            console.error(`Invalid reference in section creation for lesson ${lessonId}:`, error);
+            throw new Error(`Database reference error: ${error.message}`);
+          }
+          if (error.code === '23514') { // Check constraint violation
+            console.error(`Data validation failed for section in lesson ${lessonId}:`, error);
+            throw new Error(`Data validation error: ${error.message}`);
+          }
+          
+          console.error(`Failed to create section ${index} for lesson ${lessonId}:`, error);
+          throw new Error(`Failed to create lesson section: ${error.message}`);
+        }
+      } catch (dbError: any) {
+        if (dbError.code?.startsWith('23')) {
+          // Database constraint error - log and continue with next section
+          console.warn(`Database constraint error for section ${index}, continuing:`, dbError.message);
+          return;
+        }
+        throw dbError;
+      }
     });
 
     await Promise.all(sectionPromises);
@@ -2423,6 +2503,518 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
       console.log(`📝 Created quiz: ${quizData.title}`);
     } catch (error) {
       console.error('Failed to create quiz from generated content:', error);
+    }
+  }
+
+  /**
+   * Create lesson sections with comprehensive educational content
+   * This replaces the old lesson content generation and creates rich, progressive educational content
+   */
+  private async createLessonSectionsWithComprehensiveContent(
+    lessonId: string,
+    lesson: ModuleLesson,
+    request: CourseGenerationRequest,
+    outline: CourseOutline,
+    generationMode: 'kb_only' | 'kb_priority' | 'kb_supplemented'
+  ): Promise<void> {
+    const supabase = this.getSupabaseClient();
+    const modeConfig = COURSE_GENERATION_MODES[generationMode];
+    
+    // Get cached KB content for this lesson
+    const cacheKey = `${outline.knowledgeBaseAnalysis.baseClassId}-${generationMode}`;
+    let kbContent = this.kbContentCache.get(cacheKey) || [];
+    
+    // Filter KB content to be relevant to this specific lesson
+    const lessonKeywords = `${lesson.title} ${lesson.description} ${lesson.learningObjectives.join(' ')}`.toLowerCase();
+    const relevantKbContent = kbContent.filter(chunk => {
+      const chunkText = (chunk.summary || chunk.content || '').toLowerCase();
+      return lesson.learningObjectives.some(objective => 
+        chunkText.includes(objective.toLowerCase()) ||
+        lessonKeywords.split(' ').some(keyword => keyword.length > 3 && chunkText.includes(keyword))
+      );
+    }).slice(0, 10);
+    
+    const finalKbContent = relevantKbContent.length > 0 ? relevantKbContent : kbContent.slice(0, 15);
+    
+    console.log(`🎓 Generating comprehensive educational content for lesson: ${lesson.title}`);
+    
+    const prompt = `
+You are a master educator creating comprehensive lesson sections that will TEACH students, not just inform them.
+
+LESSON CONTEXT:
+- Title: ${lesson.title}
+- Description: ${lesson.description}
+- Learning Objectives: ${lesson.learningObjectives.join(', ')}
+- Content Type: ${lesson.contentType}
+- Duration: ${lesson.estimatedDurationHours} hours
+- Sections to Create: ${lesson.contentOutline.join(', ')}
+
+COURSE CONTEXT:
+- Academic Level: ${request.academicLevel || 'college'}
+- Content Depth: ${request.lessonDetailLevel || 'detailed'}
+- Target Audience: ${request.targetAudience || 'General learners'}
+- Prerequisites: ${request.prerequisites || 'None specified'}
+
+${this.getAcademicLevelGuidance(request.academicLevel)}
+${this.getLessonDetailGuidance(request.lessonDetailLevel)}
+
+GENERATION MODE: ${modeConfig.title}
+${modeConfig.aiInstructions}
+
+KNOWLEDGE BASE CONTENT:
+${finalKbContent.map(chunk => `- ${chunk.summary || chunk.content.substring(0, 500)}`).join('\n')}
+
+CRITICAL EDUCATIONAL PRINCIPLES:
+1. **Progressive Learning**: Each section builds upon previous knowledge
+2. **Active Teaching**: Content actively teaches, doesn't just present information
+3. **Mastery Focus**: Use "I do, We do, You do" gradual release model
+4. **Clear Connections**: Explicitly connect all content to learning objectives
+5. **Multiple Examples**: Include varied examples, demonstrations, and practice
+6. **Misconception Prevention**: Address common student misunderstandings
+7. **Real-World Relevance**: Use analogies, stories, and practical connections
+8. **Comprehension Checks**: Include understanding verification throughout
+9. **Engaging Delivery**: Make content memorable and interesting
+10. **Differentiated Support**: Provide scaffolding and extension opportunities
+
+Generate comprehensive educational content for ALL lesson sections as a JSON array:
+[
+  {
+    "title": "Section Title (from contentOutline)",
+    "section_type": "introduction|main_content|activity|summary",
+    "educational_content": {
+      "introduction": "Engaging section introduction that connects to prior knowledge and previews what students will learn (2-3 paragraphs)",
+      "main_teaching_content": [
+        {
+          "concept_title": "Key Concept Name",
+          "explanation": "Comprehensive explanation that teaches the concept step-by-step. This should be multiple detailed paragraphs of actual teaching content that guides student understanding progressively.",
+          "examples": [
+            {
+              "type": "worked_example|real_world|analogy|case_study",
+              "title": "Example Title",
+              "content": "Detailed example with step-by-step explanation that illuminates the concept"
+            }
+          ],
+          "guided_practice": {
+            "activity": "Specific practice activity students can do with guidance",
+            "instructions": "Clear step-by-step instructions",
+            "expected_outcome": "What students should be able to demonstrate"
+          }
+        }
+      ],
+      "key_concepts": ["Essential concepts students must master from this section"],
+      "common_misconceptions": [
+        {
+          "misconception": "What students often get wrong",
+          "explanation": "Why this misconception occurs",
+          "correction": "How to address and correct it"
+        }
+      ],
+      "comprehension_checks": [
+        {
+          "type": "question|activity|reflection",
+          "prompt": "Specific way to check understanding",
+          "purpose": "What this check reveals about student learning"
+        }
+      ],
+      "independent_practice": {
+        "activity": "What students can do on their own to practice",
+        "scaffolding": "Support for students who need help",
+        "extension": "Challenge for advanced students"
+      },
+      "section_summary": "Clear summary that reinforces key learning and connects to lesson objectives (1-2 paragraphs)"
+    },
+    "assessment_integration": {
+      "formative_opportunities": ["Ways to assess understanding during this section"],
+      "key_questions": ["Essential questions that could be used for assessment"]
+    },
+    "resources_needed": ["Materials, tools, or technologies required for this section"],
+    "estimated_time": "Realistic time estimate for this section"
+  }
+]
+
+QUALITY REQUIREMENTS:
+- Each section must contain substantial, detailed educational content
+- Content should be appropriate for ${request.academicLevel} level with ${request.lessonDetailLevel} depth
+- All content must directly support the learning objectives
+- Include specific examples, not generic placeholders
+- Ensure logical flow and progression between concepts
+- Make content engaging and accessible to the target audience
+
+Generate the complete educational content now:`;
+
+    try {
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are a master educator creating comprehensive lesson sections. ${modeConfig.aiInstructions} 
+            
+            Create detailed educational content for ${request.academicLevel || 'college'} level learners with ${request.lessonDetailLevel || 'detailed'} depth. 
+            Your content should actively teach and guide student learning progressively.
+            Target audience: ${request.targetAudience || 'General learners'}.
+            Prerequisites: ${request.prerequisites || 'None specified'}.`
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+        max_tokens: 16000
+      });
+
+      const content = completion.choices[0]?.message?.content || '{}';
+      let sectionsData: any[];
+      
+      try {
+        const parsedContent = JSON.parse(content);
+        sectionsData = Array.isArray(parsedContent) ? parsedContent : parsedContent.sections || [];
+      } catch (parseError) {
+        console.error(`Failed to parse AI response for lesson ${lesson.title}:`, parseError);
+        // Create fallback sections based on contentOutline
+        sectionsData = lesson.contentOutline.map((title, index) => ({
+          title,
+          section_type: index === 0 ? 'introduction' : 
+                       index === lesson.contentOutline.length - 1 ? 'summary' : 'main_content',
+          educational_content: {
+            introduction: `This section covers ${title} as part of ${lesson.title}.`,
+            main_teaching_content: [{
+              concept_title: title,
+              explanation: `Comprehensive content for ${title} will be developed based on the lesson objectives: ${lesson.learningObjectives.join(', ')}.`,
+              examples: [{ type: "practical", title: "Example", content: "Practical example will be provided." }]
+            }],
+            key_concepts: [title],
+            section_summary: `This section covered the key concepts of ${title}.`
+          },
+          estimated_time: `${Math.ceil(lesson.estimatedDurationHours / lesson.contentOutline.length * 60)} minutes`
+        }));
+      }
+
+      // Create database entries for each section
+      const sectionPromises = sectionsData.map(async (sectionData, index) => {
+        try {
+          const { data: section, error: sectionError } = await supabase
+            .from('lesson_sections')
+            .insert({
+              lesson_id: lessonId,
+              title: sectionData.title || lesson.contentOutline[index] || `Section ${index + 1}`,
+              content: sectionData.educational_content || sectionData,
+              section_type: sectionData.section_type || (
+                index === 0 ? 'introduction' : 
+                index === sectionsData.length - 1 ? 'summary' : 
+                'main_content'
+              ),
+              order_index: index,
+              created_by: request.userId
+            })
+            .select()
+            .single();
+
+          if (sectionError) {
+            console.error(`Failed to create section ${sectionData.title}:`, sectionError);
+            throw sectionError;
+          } else {
+            console.log(`📖 Created comprehensive section: ${section.title}`);
+          }
+
+          return section;
+        } catch (error: any) {
+          console.error(`Database error creating section ${index}:`, error);
+          // Try to create with minimal content as fallback
+          const { data: fallbackSection, error: fallbackError } = await supabase
+            .from('lesson_sections')
+            .insert({
+              lesson_id: lessonId,
+              title: lesson.contentOutline[index] || `Section ${index + 1}`,
+              content: { 
+                text: `Educational content for ${lesson.contentOutline[index] || 'this section'} - to be enhanced.`,
+                fallback: true 
+              },
+              section_type: index === 0 ? 'introduction' : 
+                           index === sectionsData.length - 1 ? 'summary' : 'main_content',
+              order_index: index,
+              created_by: request.userId
+            })
+            .select()
+            .single();
+
+          if (fallbackError) {
+            console.error(`Failed to create fallback section:`, fallbackError);
+            throw fallbackError;
+          }
+
+          return fallbackSection;
+        }
+      });
+
+      await Promise.all(sectionPromises);
+      console.log(`✅ Created ${sectionsData.length} comprehensive educational sections for: ${lesson.title}`);
+
+    } catch (error: any) {
+      console.error(`Failed to generate comprehensive content for lesson ${lesson.title}:`, error);
+      throw new Error(`Failed to create lesson sections: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create lesson assessments based on the actual lesson section content
+   * This replaces KB-based question generation with content-based generation
+   */
+  private async createLessonAssessmentsFromSectionContent(
+    lessonId: string,
+    lesson: ModuleLesson,
+    request: CourseGenerationRequest
+  ): Promise<void> {
+    if (!request.assessmentSettings?.includeAssessments) return;
+
+    const supabase = this.getSupabaseClient();
+
+    try {
+      console.log(`📝 Creating assessments from lesson section content for: ${lesson.title}`);
+
+      // First, get the actual lesson sections that were just created
+      const { data: lessonSections, error: sectionsError } = await supabase
+        .from('lesson_sections')
+        .select('*')
+        .eq('lesson_id', lessonId)
+        .order('order_index');
+
+      if (sectionsError || !lessonSections || lessonSections.length === 0) {
+        console.log('No lesson sections found for assessment generation');
+        return;
+      }
+
+      // Create a question folder for this lesson
+      const { data: folder, error: folderError } = await supabase
+        .from('question_folders')
+        .insert({
+          name: `${lesson.title} - Questions`,
+          description: `Assessment questions for lesson: ${lesson.title}`,
+          base_class_id: request.baseClassId,
+          created_by: request.userId
+        })
+        .select()
+        .single();
+
+      if (folderError) {
+        console.error('Failed to create question folder:', folderError);
+        return;
+      }
+
+      // Generate questions based on actual lesson section content
+      const questionsPerLesson = request.assessmentSettings?.questionsPerLesson || 5;
+      const questions = await this.generateQuestionsFromActualSectionContent(
+        lessonSections,
+        lesson,
+        questionsPerLesson,
+        request
+      );
+
+      if (questions.length === 0) {
+        console.log('No questions generated from section content');
+        return;
+      }
+
+      // Insert questions into database
+      const questionPromises = questions.map(async (question: any) => {
+        const { data: createdQuestion, error: questionError } = await supabase
+          .from('questions')
+          .insert({
+            base_class_id: request.baseClassId,
+            lesson_id: lessonId,
+            legacy_question_text: question.questionText,
+            question_text: question.questionText,
+            question_type: question.questionType,
+            options: question.options,
+            correct_answer: question.correctAnswer,
+            answer_key: question.options ? { correct: question.correctAnswer, explanation: question.explanation } : null,
+            points: question.points || 1,
+            difficulty_score: this.mapDifficultyToScore(question.difficultyLevel || 'medium'),
+            cognitive_level: question.bloomTaxonomy || 'understand',
+            ai_generated: true,
+            source_content: `Generated from lesson sections for: ${lesson.title}`,
+            created_by: request.userId,
+            estimated_time: 2,
+            validation_status: 'draft',
+            tags: [lesson.title.toLowerCase().replace(/\s+/g, '-')],
+            learning_objectives: lesson.learningObjectives || [lesson.title]
+          })
+          .select()
+          .single();
+
+        if (questionError) {
+          console.error('Failed to create question:', questionError);
+          return null;
+        }
+
+        return createdQuestion;
+      });
+
+      const createdQuestions = await Promise.all(questionPromises);
+      const successfulQuestions = createdQuestions.filter(q => q !== null);
+
+      console.log(`✅ Created ${successfulQuestions.length} assessment questions from lesson section content for: ${lesson.title}`);
+
+    } catch (error: any) {
+      console.error(`Failed to create assessments from section content for lesson ${lesson.title}:`, error);
+      throw new Error(`Failed to create lesson assessments: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate questions based on actual lesson section content (not KB search)
+   */
+  private async generateQuestionsFromActualSectionContent(
+    lessonSections: any[],
+    lesson: ModuleLesson,
+    questionsPerLesson: number,
+    request: CourseGenerationRequest
+  ): Promise<any[]> {
+    try {
+      // Extract the actual educational content from lesson sections
+      const sectionContent = lessonSections.map(section => ({
+        title: section.title,
+        content: section.content,
+        order: section.order_index,
+        type: section.section_type
+      }));
+
+      // Build comprehensive content summary from sections
+      let contentSummary = `Lesson: ${lesson.title}\n`;
+      contentSummary += `Description: ${lesson.description}\n`;
+      contentSummary += `Learning Objectives: ${lesson.learningObjectives.join(', ')}\n\n`;
+      
+      contentSummary += 'LESSON SECTION CONTENT:\n';
+      sectionContent.forEach(section => {
+        contentSummary += `\nSection: ${section.title}\n`;
+        
+        if (section.content && typeof section.content === 'object') {
+          // Extract educational content from the structured format
+          if (section.content.educational_content) {
+            const eduContent = section.content.educational_content;
+            
+            if (eduContent.introduction) {
+              contentSummary += `Introduction: ${eduContent.introduction}\n`;
+            }
+            
+            if (eduContent.main_teaching_content && Array.isArray(eduContent.main_teaching_content)) {
+              eduContent.main_teaching_content.forEach((concept: any) => {
+                contentSummary += `Concept: ${concept.concept_title || 'Key Concept'}\n`;
+                contentSummary += `Explanation: ${concept.explanation || ''}\n`;
+                
+                if (concept.examples && Array.isArray(concept.examples)) {
+                  concept.examples.forEach((example: any) => {
+                    contentSummary += `Example: ${example.content || example.description || ''}\n`;
+                  });
+                }
+              });
+            }
+            
+            if (eduContent.key_concepts && Array.isArray(eduContent.key_concepts)) {
+              contentSummary += `Key Concepts: ${eduContent.key_concepts.join(', ')}\n`;
+            }
+            
+            if (eduContent.section_summary) {
+              contentSummary += `Summary: ${eduContent.section_summary}\n`;
+            }
+          } else {
+            // Fallback for other content formats
+            contentSummary += `Content: ${JSON.stringify(section.content).substring(0, 1000)}\n`;
+          }
+        } else if (typeof section.content === 'string') {
+          contentSummary += `Content: ${section.content}\n`;
+        }
+      });
+
+      const prompt = `
+Create ${questionsPerLesson} assessment questions based on this ACTUAL lesson content (not external knowledge):
+
+${contentSummary}
+
+ASSESSMENT REQUIREMENTS:
+- Academic Level: ${request.academicLevel || 'college'}
+- Questions must test understanding of the SPECIFIC content taught in the lesson sections above
+- Focus on the learning objectives: ${lesson.learningObjectives.join(', ')}
+- Use only information present in the lesson content provided
+- Create a mix of question types appropriate for the academic level
+- Ensure questions test different levels of understanding (recall, comprehension, application)
+
+${this.getAcademicLevelGuidance(request.academicLevel)}
+
+Generate questions as JSON array:
+[
+  {
+    "questionText": "Question based on the lesson content?",
+    "questionType": "multiple_choice",
+    "options": [
+      { "text": "Option A", "correct": false, "explanation": "Why this is incorrect based on lesson content" },
+      { "text": "Option B", "correct": true, "explanation": "Why this is correct based on lesson content" },
+      { "text": "Option C", "correct": false, "explanation": "Why this is incorrect based on lesson content" },
+      { "text": "Option D", "correct": false, "explanation": "Why this is incorrect based on lesson content" }
+    ],
+    "correctAnswer": "Option B",
+    "explanation": "Detailed explanation referencing specific lesson content",
+    "points": 10,
+    "difficultyLevel": "easy|medium|hard",
+    "bloomTaxonomy": "remember|understand|apply|analyze|evaluate|create",
+    "lessonObjectiveAligned": "Which learning objective this tests"
+  }
+]
+
+CRITICAL: Questions must be based ONLY on the actual lesson content provided above. Do not use external knowledge or make assumptions beyond what was taught in the lesson sections.`;
+
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are an assessment specialist creating questions based on specific lesson content. 
+            Create questions for ${request.academicLevel || 'college'} level learners.
+            Base all questions on the provided lesson content only - do not use external knowledge.
+            Ensure questions align with the stated learning objectives.`
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+        max_tokens: 8000
+      });
+
+      const content = completion.choices[0]?.message?.content || '{}';
+      
+      try {
+        const parsedContent = JSON.parse(content);
+        const questions = Array.isArray(parsedContent) ? parsedContent : parsedContent.questions || [];
+        
+        // Validate and clean questions
+        return questions.filter((q: any) => q.questionText && q.options && q.correctAnswer);
+        
+      } catch (parseError) {
+        console.error(`Failed to parse questions for lesson ${lesson.title}:`, parseError);
+        return [];
+      }
+
+    } catch (error: any) {
+      console.error(`Failed to generate questions from section content for lesson ${lesson.title}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Map difficulty level to numerical score for database storage
+   */
+  private mapDifficultyToScore(difficulty: string): number {
+    switch (difficulty.toLowerCase()) {
+      case 'easy': return 3;
+      case 'medium': return 5;
+      case 'hard': return 8;
+      case 'expert': return 10;
+      default: return 5;
     }
   }
 }
