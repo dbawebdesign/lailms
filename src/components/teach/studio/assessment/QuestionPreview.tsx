@@ -89,13 +89,13 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
   const getDifficultyColor = (difficulty?: string | null) => {
     switch (difficulty) {
       case 'easy':
-        return 'bg-green-100 text-green-700 border-green-200';
+        return 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800';
       case 'medium':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+        return 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800';
       case 'hard':
-        return 'bg-red-100 text-red-700 border-red-200';
+        return 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800';
       default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
+        return 'bg-gray-100 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-800';
     }
   };
 
@@ -115,8 +115,8 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
                 className={cn(
                   "flex items-center gap-3 p-3 rounded-lg border transition-colors",
                   showAnswers && option.is_correct 
-                    ? "bg-green-50 border-green-200" 
-                    : "bg-gray-50 border-gray-200 hover:bg-gray-100",
+                    ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800" 
+                    : "bg-muted/50 border-border hover:bg-muted/70",
                   interactive && "cursor-pointer"
                 )}
               >
@@ -134,7 +134,7 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
                   </RadioGroup>
                 ) : (
                   <>
-                    <div className="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center text-sm font-medium">
+                    <div className="w-6 h-6 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center text-sm font-medium">
                       {String.fromCharCode(65 + index)}
                     </div>
                     <span className="flex-1">{option.option_text}</span>
@@ -157,9 +157,9 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
               className={cn(
                 "flex-1 p-4 rounded-lg border-2 text-center transition-colors",
                 showAnswers && correctAnswer === 'true'
-                  ? "bg-green-50 border-green-500"
-                  : "bg-gray-50 border-gray-200",
-                interactive && "cursor-pointer hover:bg-gray-100"
+                  ? "bg-green-50 dark:bg-green-900/20 border-green-500 dark:border-green-600"
+                  : "bg-muted/50 border-border",
+                interactive && "cursor-pointer hover:bg-muted/70"
               )}
             >
               <div className="flex items-center justify-center gap-2">
@@ -174,9 +174,9 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
               className={cn(
                 "flex-1 p-4 rounded-lg border-2 text-center transition-colors",
                 showAnswers && correctAnswer === 'false'
-                  ? "bg-green-50 border-green-500"
-                  : "bg-gray-50 border-gray-200",
-                interactive && "cursor-pointer hover:bg-gray-100"
+                  ? "bg-green-50 dark:bg-green-900/20 border-green-500 dark:border-green-600"
+                  : "bg-muted/50 border-border",
+                interactive && "cursor-pointer hover:bg-muted/70"
               )}
             >
               <div className="flex items-center justify-center gap-2">
@@ -200,15 +200,15 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
                 className="w-full"
               />
             ) : (
-              <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                <p className="text-gray-500 italic">Student answer will appear here</p>
+              <div className="p-4 bg-muted/50 border border-border rounded-lg">
+                <p className="text-muted-foreground italic">Student answer will appear here</p>
               </div>
             )}
             
             {showAnswers && question.correct_answer && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h5 className="font-medium text-blue-900 mb-2">Correct Answer:</h5>
-                <p className="text-blue-800">{question.correct_answer}</p>
+              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <h5 className="font-medium text-blue-900 dark:text-blue-300 mb-2">Correct Answer:</h5>
+                <p className="text-blue-800 dark:text-blue-200">{question.correct_answer}</p>
               </div>
             )}
           </div>
@@ -224,22 +224,22 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
                 className="w-full"
               />
             ) : (
-              <div className="p-6 bg-gray-50 border border-gray-200 rounded-lg min-h-[200px]">
-                <p className="text-gray-500 italic">Student essay will appear here</p>
+              <div className="p-6 bg-muted/50 border border-border rounded-lg min-h-[200px]">
+                <p className="text-muted-foreground italic">Student essay will appear here</p>
               </div>
             )}
             
             {showAnswers && question.correct_answer && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h5 className="font-medium text-blue-900 mb-2">Sample Response:</h5>
-                <p className="text-blue-800 whitespace-pre-wrap">{question.correct_answer}</p>
+              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <h5 className="font-medium text-blue-900 dark:text-blue-300 mb-2">Sample Response:</h5>
+                <p className="text-blue-800 dark:text-blue-200 whitespace-pre-wrap">{question.correct_answer}</p>
               </div>
             )}
             
             {showAnswers && question.rubric && (
-              <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                <h5 className="font-medium text-purple-900 mb-2">Grading Rubric:</h5>
-                <p className="text-purple-800 whitespace-pre-wrap">{JSON.stringify(question.rubric, null, 2)}</p>
+              <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                <h5 className="font-medium text-purple-900 dark:text-purple-300 mb-2">Grading Rubric:</h5>
+                <p className="text-purple-800 dark:text-purple-200 whitespace-pre-wrap">{JSON.stringify(question.rubric, null, 2)}</p>
               </div>
             )}
           </div>
@@ -267,7 +267,7 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
                   placeholder="____"
                 />
               ) : (
-                <span className="inline-block w-32 mx-2 px-2 py-1 bg-gray-100 border border-gray-300 rounded">
+                <span className="inline-block w-32 mx-2 px-2 py-1 bg-muted/50 border border-border rounded">
                   ____
                 </span>
               )
@@ -282,9 +282,9 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
             </div>
             
             {showAnswers && question.correct_answer && (
-              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <h5 className="font-medium text-green-900 mb-2">Correct Answer:</h5>
-                <p className="text-green-800">{question.correct_answer}</p>
+              <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <h5 className="font-medium text-green-900 dark:text-green-300 mb-2">Correct Answer:</h5>
+                <p className="text-green-800 dark:text-green-200">{question.correct_answer}</p>
               </div>
             )}
           </div>

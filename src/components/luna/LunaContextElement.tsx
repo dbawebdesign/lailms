@@ -35,10 +35,15 @@ const LunaContextElement: React.FC<LunaContextElementProps> = ({
   const [componentId, setComponentId] = useState<string | null>(null);
   const lunaContext = useLunaContext();
   
-  // Memoize the content, state, and metadata to prevent unnecessary re-renders
-  const memoizedContent = useMemo(() => content, [content]);
-  const memoizedState = useMemo(() => state, [state]);
-  const memoizedMetadata = useMemo(() => metadata, [metadata]);
+  // Use JSON.stringify for deep comparison to prevent infinite loops
+  const contentString = useMemo(() => JSON.stringify(content), [content]);
+  const stateString = useMemo(() => JSON.stringify(state), [state]);
+  const metadataString = useMemo(() => JSON.stringify(metadata), [metadata]);
+  
+  // Memoize the actual objects using the stringified versions as dependencies
+  const memoizedContent = useMemo(() => content, [contentString]);
+  const memoizedState = useMemo(() => state, [stateString]);
+  const memoizedMetadata = useMemo(() => metadata, [metadataString]);
 
   // Stabilize the lunaContext functions to prevent re-registration
   const lunaContextRef = useRef(lunaContext);
@@ -71,9 +76,9 @@ const LunaContextElement: React.FC<LunaContextElementProps> = ({
   }, [
     type, 
     role, 
-    memoizedContent,
-    memoizedState,
-    memoizedMetadata,
+    contentString,
+    stateString,
+    metadataString,
     parentId
   ]);
 
@@ -86,7 +91,7 @@ const LunaContextElement: React.FC<LunaContextElementProps> = ({
         metadata: memoizedMetadata
       });
     }
-  }, [componentId, memoizedContent, memoizedState, memoizedMetadata]);
+  }, [componentId, contentString, stateString, metadataString]);
 
   // Register click event handler
   const handleInteraction = (e: React.MouseEvent) => {
