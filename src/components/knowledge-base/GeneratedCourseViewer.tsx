@@ -21,7 +21,9 @@ import {
   Loader2,
   Copy,
   Download,
-  Share2
+  Share2,
+  Plus,
+  Sparkles
 } from 'lucide-react';
 
 interface CourseOutline {
@@ -71,6 +73,7 @@ interface ModuleAssessment {
 
 interface GeneratedCourseViewerProps {
   courseOutlineId: string;
+  baseClassId?: string;
   onDeployToCourse?: (courseOutlineId: string) => void;
 }
 
@@ -100,11 +103,12 @@ const CONTENT_TYPE_ICONS = {
   lab: <BarChart3 className="h-4 w-4" />
 };
 
-export default function GeneratedCourseViewer({ courseOutlineId, onDeployToCourse }: GeneratedCourseViewerProps) {
+export default function GeneratedCourseViewer({ courseOutlineId, baseClassId, onDeployToCourse }: GeneratedCourseViewerProps) {
   const [courseOutline, setCourseOutline] = useState<CourseOutline | null>(null);
   const [loading, setLoading] = useState(true);
   const [deploying, setDeploying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [creatingAssessments, setCreatingAssessments] = useState<Set<string>>(new Set());
 
   const loadCourseOutline = useCallback(async () => {
     try {
@@ -161,6 +165,66 @@ export default function GeneratedCourseViewer({ courseOutlineId, onDeployToCours
     );
   };
 
+  const handleCreateAssessment = async (assessment: ModuleAssessment, moduleTitle: string, lessonId?: string, pathId?: string) => {
+    if (!baseClassId) {
+      setError('Base class ID required for assessment creation');
+      return;
+    }
+
+    setCreatingAssessments(prev => new Set(prev).add(assessment.id));
+    
+    try {
+      let assessmentType = 'class_exam';
+      if (lessonId) assessmentType = 'lesson_assessment';
+      else if (pathId) assessmentType = 'path_quiz';
+
+      const assessmentData = {
+        title: assessment.title,
+        description: `${assessment.type.charAt(0).toUpperCase() + assessment.type.slice(1)} for ${moduleTitle}`,
+        instructions: `Complete this ${assessment.type} to demonstrate mastery of the learning objectives.`,
+        assessment_type: assessmentType,
+        base_class_id: baseClassId,
+        lesson_id: lessonId || null,
+        path_id: pathId || null,
+        time_limit_minutes: assessment.estimatedDurationMinutes,
+        passing_score_percentage: assessment.masteryThreshold,
+        ai_grading_enabled: true,
+        metadata: {
+          learningObjectives: assessment.learningObjectives,
+          contentFocus: assessment.contentFocus,
+          generatedFromOutline: true,
+          sourceModuleId: assessment.id
+        }
+      };
+
+      const response = await fetch('/api/teach/assessments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(assessmentData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create assessment');
+      }
+
+      const result = await response.json();
+      
+      alert(`Assessment "${assessment.title}" created successfully! You can now add questions and configure it in the studio.`);
+      
+    } catch (err) {
+      console.error('Error creating assessment:', err);
+      setError(`Failed to create assessment: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setCreatingAssessments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(assessment.id);
+        return newSet;
+      });
+    }
+  };
+
   if (loading) {
     return (
       <Card className="w-full">
@@ -186,7 +250,6 @@ export default function GeneratedCourseViewer({ courseOutlineId, onDeployToCours
 
   return (
     <div className="w-full space-y-6">
-      {/* Course Header */}
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between">
@@ -355,19 +418,59 @@ export default function GeneratedCourseViewer({ courseOutlineId, onDeployToCours
 
                 {module.assessments.length > 0 && (
                   <div>
-                    <h4 className="font-medium mb-2">Assessments ({module.assessments.length})</h4>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium">Assessments ({module.assessments.length})</h4>
+                      {baseClassId && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            module.assessments.forEach(assessment => {
+                              handleCreateAssessment(assessment, module.title);
+                            });
+                          }}
+                          disabled={module.assessments.some(a => creatingAssessments.has(a.id))}
+                          className="text-xs"
+                        >
+                          {module.assessments.some(a => creatingAssessments.has(a.id)) ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <Plus className="h-3 w-3 mr-1" />
+                          )}
+                          Create All
+                        </Button>
+                      )}
+                    </div>
                     <div className="space-y-2">
                       {module.assessments.map((assessment) => (
                         <div key={assessment.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
+                          <div className="flex-1">
                             <div className="font-medium">{assessment.title}</div>
                             <div className="text-sm text-muted-foreground">
                               {assessment.type} • {assessment.estimatedDurationMinutes} min • {assessment.masteryThreshold}% mastery
                             </div>
                           </div>
-                          <Badge variant={assessment.contentFocus === 'course_content' ? 'default' : 'secondary'}>
-                            {assessment.contentFocus === 'course_content' ? 'Course Focus' : 'KB Supplemented'}
-                          </Badge>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant={assessment.contentFocus === 'course_content' ? 'default' : 'secondary'}>
+                              {assessment.contentFocus === 'course_content' ? 'Course Focus' : 'KB Supplemented'}
+                            </Badge>
+                            <Badge variant="outline">{assessment.type}</Badge>
+                            {baseClassId && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleCreateAssessment(assessment, module.title)}
+                                disabled={creatingAssessments.has(assessment.id)}
+                              >
+                                {creatingAssessments.has(assessment.id) ? (
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                ) : (
+                                  <Sparkles className="h-3 w-3 mr-1" />
+                                )}
+                                Create
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -420,10 +523,38 @@ export default function GeneratedCourseViewer({ courseOutlineId, onDeployToCours
         <TabsContent value="assessments" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Assessment Strategy Overview</CardTitle>
-              <CardDescription>
-                How assessments are designed to test mastery of course content
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Assessment Strategy Overview</CardTitle>
+                  <CardDescription>
+                    How assessments are designed to test mastery of course content
+                  </CardDescription>
+                </div>
+                {baseClassId && calculateTotalAssessments() > 0 && (
+                  <Button
+                    variant="default"
+                    onClick={() => {
+                      courseOutline.modules.forEach(module => {
+                        module.assessments.forEach(assessment => {
+                          handleCreateAssessment(assessment, module.title);
+                        });
+                      });
+                    }}
+                    disabled={courseOutline.modules.some(m => 
+                      m.assessments.some(a => creatingAssessments.has(a.id))
+                    )}
+                  >
+                    {courseOutline.modules.some(m => 
+                      m.assessments.some(a => creatingAssessments.has(a.id))
+                    ) ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2" />
+                    )}
+                    Create All Assessments
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <Alert>
@@ -440,7 +571,28 @@ export default function GeneratedCourseViewer({ courseOutlineId, onDeployToCours
             module.assessments.length > 0 && (
               <Card key={module.id}>
                 <CardHeader>
-                  <CardTitle className="text-lg">Module {module.order}: {module.title}</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Module {module.order}: {module.title}</CardTitle>
+                    {baseClassId && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          module.assessments.forEach(assessment => {
+                            handleCreateAssessment(assessment, module.title);
+                          });
+                        }}
+                        disabled={module.assessments.some(a => creatingAssessments.has(a.id))}
+                      >
+                        {module.assessments.some(a => creatingAssessments.has(a.id)) ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <Plus className="h-3 w-3 mr-1" />
+                        )}
+                        Create Module Assessments
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {module.assessments.map((assessment) => (
@@ -452,6 +604,21 @@ export default function GeneratedCourseViewer({ courseOutlineId, onDeployToCours
                             {assessment.contentFocus === 'course_content' ? 'Course Focus' : 'KB Supplemented'}
                           </Badge>
                           <Badge variant="outline">{assessment.type}</Badge>
+                          {baseClassId && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCreateAssessment(assessment, module.title)}
+                              disabled={creatingAssessments.has(assessment.id)}
+                            >
+                              {creatingAssessments.has(assessment.id) ? (
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              ) : (
+                                <Sparkles className="h-3 w-3 mr-1" />
+                              )}
+                              Create Assessment
+                            </Button>
+                          )}
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">

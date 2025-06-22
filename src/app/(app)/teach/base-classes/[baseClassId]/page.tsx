@@ -11,7 +11,7 @@ import LessonEditor from '@/components/teach/studio/editors/LessonEditor'; // Ad
 import LessonSectionEditor from '@/components/teach/studio/editors/LessonSectionEditor'; // Added import
 import ContentRenderer from '@/components/teach/studio/editors/ContentRenderer';
 import { KnowledgeBaseEditor } from '@/components/teach/studio/editors/KnowledgeBaseEditor'; // NEW: Import KnowledgeBaseEditor
-import { QuestionManager } from '@/components/teach/studio/assessment/QuestionManager'; // NEW: Import QuestionManager
+import AssessmentManagementPanel from '@/components/teach/studio/assessment/AssessmentManagementPanel'; // NEW: Import AssessmentManagementPanel
 import LunaContextElement from '@/components/luna/LunaContextElement'; // NEW: Import Luna context
 import { RealTimeUpdater, useRealTimeContentUpdates } from '@/components/ui/real-time-updater';
 
@@ -904,9 +904,21 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
           return <KnowledgeBaseEditor baseClass={studioBaseClass} />;
         }
         return <p className="p-6 text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin inline-block"/>Loading Knowledge Base...</p>; // Fallback if studioBaseClass isn't ready
-      case 'assessments': // NEW: Render QuestionManager
+      case 'assessments': // NEW: Render AssessmentManagementPanel
         if (studioBaseClass) { // Ensure studioBaseClass is loaded
-          return <QuestionManager baseClassId={studioBaseClass.id} mode="standalone" />;
+          return (
+            <AssessmentManagementPanel 
+              baseClassId={studioBaseClass.id}
+              onCreateAssessment={(type) => {
+                // TODO: Navigate to assessment creation page or open modal
+                console.log('Create assessment of type:', type);
+              }}
+              onEditAssessment={(assessmentId) => {
+                // TODO: Navigate to assessment editing page or open modal
+                console.log('Edit assessment:', assessmentId);
+              }}
+            />
+          );
         }
         return <p className="p-6 text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin inline-block"/>Loading Assessments...</p>; // Fallback if studioBaseClass isn't ready
       default:

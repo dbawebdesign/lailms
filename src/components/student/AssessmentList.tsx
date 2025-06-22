@@ -1,19 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Database } from '@learnologyai/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { NewSchemaAssessment, NewSchemaStudentAttempt } from '@/components/assessments/v2/types/newSchemaTypes';
 
-type Assessment = Database['public']['Tables']['assessments']['Row'];
-type AssessmentAttempt = Database['public']['Tables']['assessment_attempts']['Row'];
-
-export type AssessmentWithAttempt = Assessment & {
-  // Assuming the API returns the latest attempt for the current user
-  latest_attempt?: Pick<AssessmentAttempt, 'status' | 'score' | 'completed_at'>;
-  due_date?: string; // This might come from assessment.settings or elsewhere
+export type AssessmentWithAttempt = NewSchemaAssessment & {
+  // Latest attempt data for the current user
+  latest_attempt?: Pick<NewSchemaStudentAttempt, 'status' | 'percentage_score' | 'submitted_at'>;
+  due_date?: string; // From assessment metadata or class settings
 };
 
 const AssessmentList = ({ baseClassId }: { baseClassId: string }) => {
@@ -70,11 +67,11 @@ const AssessmentList = ({ baseClassId }: { baseClassId: string }) => {
 
   const handleAction = (assessment: AssessmentWithAttempt) => {
     const attemptStatus = assessment.latest_attempt?.status;
-    if (attemptStatus === 'completed' || attemptStatus === 'passed' || attemptStatus === 'failed') {
-      // Assuming a results page exists
+    if (attemptStatus === 'completed' || attemptStatus === 'graded') {
+      // Show results for completed/graded assessments
       router.push(`/assessments/${assessment.id}/results`);
     } else {
-      // Takes to the assessment page, which would handle 'pending' or 'in-progress'
+      // Takes to the assessment page, which would handle 'in_progress' or start new attempt
       router.push(`/assessments/take/${assessment.id}`);
     }
   };
@@ -82,38 +79,40 @@ const AssessmentList = ({ baseClassId }: { baseClassId: string }) => {
   const getStatusBadgeVariant = (status?: string): "secondary" | "default" | "destructive" | "outline" => {
     switch (status) {
       case 'completed':
-      case 'passed':
+      case 'graded':
         return 'default'; // Green in shadcn UI
-      case 'in-progress':
+      case 'in_progress':
         return 'outline'; // Blueish in shadcn UI
-      case 'failed':
+      case 'grading':
+        return 'secondary'; // Gray in shadcn UI for AI grading
+      case 'abandoned':
         return 'destructive'; // Red in shadcn UI
-      case 'pending':
       default:
-        return 'secondary'; // Gray in shadcn UI
+        return 'secondary'; // Gray in shadcn UI for not started
     }
   }
 
   const getActionText = (status?: string): string => {
     switch (status) {
       case 'completed':
-      case 'passed':
-      case 'failed':
+      case 'graded':
         return 'Review';
-      case 'in-progress':
+      case 'in_progress':
         return 'Continue';
-      case 'pending':
+      case 'grading':
+        return 'View Status';
+      case 'abandoned':
+        return 'Restart';
       default:
         return 'Start';
     }
   }
 
-  // Calculate percentage score from score and total questions if available
-  const calculatePercentageScore = (attempt?: Pick<AssessmentAttempt, 'status' | 'score' | 'completed_at'>) => {
-    if (!attempt || !attempt.score) return null;
-    // This would need to be calculated based on the assessment's total possible points
-    // For now, assuming score is already a percentage or needs to be calculated differently
-    return Math.round(attempt.score);
+  // Calculate percentage score from the attempt data
+  const calculatePercentageScore = (attempt?: Pick<NewSchemaStudentAttempt, 'status' | 'percentage_score' | 'submitted_at'>) => {
+    if (!attempt || !attempt.percentage_score) return null;
+    // The percentage_score is already calculated in the new schema
+    return Math.round(attempt.percentage_score);
   };
 
   if (loading) return <div>Loading assessments...</div>;
@@ -175,7 +174,7 @@ const AssessmentList = ({ baseClassId }: { baseClassId: string }) => {
                   <p className="text-sm text-muted-foreground">{assessment.description}</p>
                   <div className="mt-4 flex gap-2">
                       <Badge variant={getStatusBadgeVariant(assessment.latest_attempt?.status)}>
-                        {assessment.latest_attempt?.status?.replace('-', ' ') ?? 'Not Started'}
+                        {assessment.latest_attempt?.status?.replace('_', ' ') ?? 'Not Started'}
                       </Badge>
                       {percentageScore !== null && (
                           <Badge variant="secondary">

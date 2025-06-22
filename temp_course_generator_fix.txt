@@ -1,0 +1,8 @@
+        // Create path quiz using the new AssessmentGenerationService
+        if (request.assessmentSettings?.includeQuizzes) {
+          await this.createPathQuiz(
+            path.id,
+            path.title,
+            request
+          );
+        } 

@@ -3,8 +3,7 @@ import OpenAI from 'openai';
 import { knowledgeBaseAnalyzer, KnowledgeBaseAnalysis, COURSE_GENERATION_MODES } from './knowledge-base-analyzer';
 import { knowledgeExtractor, ConceptMap, CourseStructureSuggestion } from './knowledge-extractor';
 import type { Database } from '@learnologyai/types';
-import { AssessmentGenerationService } from './assessment-generation-service'; // Import the new service
-import { AssessmentConfig } from '@/types/lesson';
+import { AssessmentGenerationService } from './assessment-generation-service';
 
 export interface CourseGenerationRequest {
   baseClassId: string;
@@ -101,7 +100,7 @@ export interface GenerationJob {
 
 export class CourseGenerator {
   private openai: OpenAI;
-  private assessmentGenerator: AssessmentGenerationService; // Instantiate the new service
+  private assessmentGenerator: AssessmentGenerationService;
   private kbContentCache: Map<string, any[]> = new Map(); // Cache for KB content to avoid repeated searches
 
   constructor() {
@@ -717,12 +716,12 @@ Remember: Every element should contribute to TEACHING and helping students achie
       messages: [
         {
           role: "system",
-          content: `You are a master educator creating lesson content. ${modeConfig.aiInstructions} 
+          content: `You are a master educator creating comprehensive lesson sections. ${modeConfig.aiInstructions} 
           
-          Create comprehensive educational content for ${outline.academicLevel || 'college'} level learners with ${outline.lessonDetailLevel || 'detailed'} depth. 
-          Your content should actively teach, not just inform.
-          Target audience: ${outline.targetAudience || 'General learners'}.
-          Prerequisites: ${outline.prerequisites || 'None specified'}.`
+          Create detailed educational content for ${request.academicLevel || 'college'} level learners with ${request.lessonDetailLevel || 'detailed'} depth. 
+          Your content should actively teach and guide student learning progressively.
+          Target audience: ${request.targetAudience || 'General learners'}.
+          Prerequisites: ${request.prerequisites || 'None specified'}.`
         },
         {
           role: "user",
@@ -731,7 +730,7 @@ Remember: Every element should contribute to TEACHING and helping students achie
       ],
       response_format: { type: "json_object" },
       temperature: 0.7,
-      max_tokens: 10000
+      max_tokens: 16000
     });
 
     try {
@@ -833,694 +832,8 @@ Remember: Every element should contribute to TEACHING and helping students achie
     };
   }
 
-  private async generateAssessments(
-    courseOutlineId: string, 
-    outline: CourseOutline,
-    request: CourseGenerationRequest
-  ): Promise<void> {
-    // Generate assessments that prioritize course content over knowledge base
-    for (const courseModule of outline.modules) {
-      for (const assessment of courseModule.assessments) {
-        const assessmentContent = await this.generateAssessmentContent(assessment, courseModule);
-
-        const supabase = this.getSupabaseClient();
-        const { error } = await (supabase as any)
-          .from('generated_lesson_content')
-          .insert({
-            course_outline_id: courseOutlineId,
-            organisation_id: request.organisationId,
-            content_type: 'assessment',
-            generated_content: assessmentContent,
-            generation_metadata: {
-              model: 'gpt-4.1-mini',
-              assessment_type: assessment.type,
-              mastery_threshold: assessment.masteryThreshold,
-              content_focus: assessment.contentFocus,
-              timestamp: new Date().toISOString()
-            },
-            status: 'draft',
-            user_id: request.userId
-          });
-
-        if (error) {
-          console.error(`Failed to save assessment content for ${assessment.title}:`, error);
-          throw new Error(`Failed to save assessment content: ${error.message}`);
-        }
-      }
-    }
-  }
-
-  private async generateAssessmentContent(assessment: ModuleAssessment, module: CourseModule): Promise<any> {
-    // This method is now deprecated and its logic is handled by AssessmentGenerationService
-    return {};
-  }
-
-  private async updateJobStatus(
-    jobId: string, 
-    status: string, 
-    progress: number, 
-    error?: string | null, 
-    result?: any
-  ): Promise<void> {
-    const updateData: any = {
-      status,
-      progress_percentage: progress,
-      updated_at: new Date().toISOString()
-    };
-
-    if (status === 'processing' && !updateData.started_at) {
-      updateData.started_at = new Date().toISOString();
-    }
-
-    if (status === 'completed' || status === 'failed') {
-      updateData.completed_at = new Date().toISOString();
-    }
-
-    if (error) {
-      updateData.error_message = error;
-    }
-
-    if (result) {
-      updateData.result_data = result;
-    }
-
-    const supabase = this.getSupabaseClient();
-    const { error: updateError } = await (supabase as any)
-      .from('course_generation_jobs')
-      .update(updateData)
-      .eq('id', jobId);
-
-    if (updateError) {
-      console.error('Failed to update job status:', updateError);
-    }
-  }
-
-  async getGenerationJob(jobId: string): Promise<GenerationJob | null> {
-    const supabase = this.getSupabaseClient();
-    const { data, error } = await (supabase as any)
-      .from('course_generation_jobs')
-      .select('*')
-      .eq('id', jobId)
-      .single();
-
-    if (error || !data) return null;
-
-    return {
-      id: data.id,
-      status: data.status,
-      progress: data.progress_percentage,
-      result: data.result_data,
-      error: data.error_message
-    };
-  }
-
-  async getCourseOutline(outlineId: string): Promise<CourseOutline | null> {
-    const supabase = this.getSupabaseClient();
-    const { data, error } = await (supabase as any)
-      .from('course_outlines')
-      .select('*')
-      .eq('id', outlineId)
-      .single();
-
-    if (error || !data) return null;
-
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description,
-      generationMode: data.generation_mode,
-      learningObjectives: data.learning_objectives,
-      estimatedDurationWeeks: data.estimated_duration_weeks,
-      modules: data.outline_structure?.modules || [],
-      knowledgeBaseAnalysis: data.knowledge_base_analysis,
-      status: data.status,
-      academicLevel: data.academic_level,
-      lessonDetailLevel: data.lesson_detail_level,
-      targetAudience: data.target_audience,
-      prerequisites: data.prerequisites,
-      lessonsPerWeek: data.lessons_per_week,
-      assessmentSettings: data.assessment_settings
-    };
-  }
-
-  private async optimizeCourseStructure(courseOutlineId: string, conceptMap: ConceptMap): Promise<void> {
-    // Optional optimization step that could:
-    // 1. Analyze the generated course structure
-    // 2. Suggest improvements based on concept relationships
-    // 3. Optimize learning sequences
-    // 4. Identify potential gaps or redundancies
-    
-    // For now, we'll just log that optimization was attempted
-    console.log(`Course structure optimization completed for outline ${courseOutlineId}`);
-    console.log(`Analyzed ${conceptMap.concepts.length} concepts and ${conceptMap.relationships.length} relationships`);
-  }
-
-  private getAcademicLevelGuidance(academicLevel?: string): string {
-    switch (academicLevel) {
-      case 'kindergarten':
-        return `
-EDUCATIONAL APPROACH FOR KINDERGARTEN:
-- Use very simple language with short sentences
-- Focus on basic concepts through play and exploration
-- Heavy use of visuals, songs, and hands-on activities
-- Introduce one concept at a time with lots of repetition
-- 5-10 minute attention span activities
-- Use stories and characters to teach concepts
-- Focus on social skills alongside academic content
-- Lots of positive reinforcement and encouragement`;
-
-      case '1st-grade':
-        return `
-EDUCATIONAL APPROACH FOR 1ST GRADE:
-- Simple vocabulary with phonics support
-- Begin connecting ideas with basic logic
-- Use manipulatives and visual aids extensively
-- 10-15 minute focused activities
-- Introduce basic reading and math concepts
-- Lots of guided practice with gradual independence
-- Use games and interactive activities
-- Connect learning to their immediate world`;
-
-      case '2nd-grade':
-        return `
-EDUCATIONAL APPROACH FOR 2ND GRADE:
-- Expanding vocabulary with context clues
-- Building on foundational reading and math skills
-- More complex instructions with 2-3 steps
-- 15-20 minute focused activities
-- Introduce simple problem-solving
-- Begin abstract thinking with concrete supports
-- Use collaborative learning activities
-- Connect to broader community concepts`;
-
-      case '3rd-grade':
-        return `
-EDUCATIONAL APPROACH FOR 3RD GRADE:
-- Transition to more academic language
-- Multi-step problems and instructions
-- 20-25 minute focused activities
-- Introduce research and investigation skills
-- More independent work with teacher support
-- Begin comparing and contrasting concepts
-- Use graphic organizers and note-taking
-- Real-world applications become important`;
-
-      case '4th-grade':
-        return `
-EDUCATIONAL APPROACH FOR 4TH GRADE:
-- Academic vocabulary with subject-specific terms
-- Complex multi-step problems
-- 25-30 minute focused activities
-- Develop critical thinking skills
-- More abstract concepts with less concrete support
-- Begin analyzing cause and effect
-- Introduce basic essay writing
-- Connect to state/national contexts`;
-
-      case '5th-grade':
-        return `
-EDUCATIONAL APPROACH FOR 5TH GRADE:
-- Sophisticated vocabulary and concepts
-- Abstract thinking with minimal concrete support
-- 30-35 minute focused activities
-- Independent research projects
-- Complex problem-solving across subjects
-- Analyze multiple perspectives
-- Develop study skills and organization
-- Prepare for middle school transition`;
-
-      case '6th-grade':
-        return `
-EDUCATIONAL APPROACH FOR 6TH GRADE:
-- Middle school level academic language
-- Abstract and theoretical concepts
-- 35-40 minute class periods
-- Independent learning with guidance
-- Cross-curricular connections
-- Develop arguments with evidence
-- Begin specialized subject knowledge
-- Focus on time management skills`;
-
-      case '7th-grade':
-        return `
-EDUCATIONAL APPROACH FOR 7TH GRADE:
-- Advanced academic vocabulary
-- Complex theoretical concepts
-- Full class period engagement (40-45 min)
-- Self-directed learning projects
-- Analyze complex texts and data
-- Form and defend opinions with research
-- Deeper subject specialization
-- Develop metacognitive skills`;
-
-      case '8th-grade':
-        return `
-EDUCATIONAL APPROACH FOR 8TH GRADE:
-- Pre-high school academic rigor
-- Abstract reasoning and analysis
-- Extended focus periods (45-50 min)
-- Independent research and synthesis
-- Complex problem-solving strategies
-- Evaluate sources and arguments
-- Prepare for high school level work
-- Focus on academic writing skills`;
-
-      case '9th-grade':
-        return `
-EDUCATIONAL APPROACH FOR 9TH GRADE:
-- High school level academic language
-- Introduction to discipline-specific thinking
-- Full class periods with homework
-- Foundation building for advanced courses
-- Develop academic research skills
-- Critical analysis of primary sources
-- Begin college prep mindset
-- Balance breadth and depth of content`;
-
-      case '10th-grade':
-        return `
-EDUCATIONAL APPROACH FOR 10TH GRADE:
-- Sophisticated academic discourse
-- Complex theoretical frameworks
-- In-depth subject exploration
-- Independent inquiry projects
-- Synthesize information from multiple sources
-- Develop academic arguments
-- Standardized test preparation
-- Career exploration connections`;
-
-      case '11th-grade':
-        return `
-EDUCATIONAL APPROACH FOR 11TH GRADE:
-- College-level preparatory content
-- Advanced analytical thinking
-- Extended research projects
-- AP/IB level rigor where appropriate
-- Original thought and analysis
-- Complex academic writing
-- College application preparation
-- Real-world professional connections`;
-
-      case '12th-grade':
-        return `
-EDUCATIONAL APPROACH FOR 12TH GRADE:
-- College-ready academic skills
-- Capstone-level projects
-- Independent scholarly work
-- Transition to higher education
-- Original research and thesis work
-- Professional-level presentations
-- Career and college readiness
-- Adult learning responsibilities`;
-
-      case 'college':
-        return `
-EDUCATIONAL APPROACH FOR COLLEGE STUDENTS:
-- Present material at undergraduate level with academic rigor
-- Balance theoretical foundations with practical applications
-- Introduce discipline-specific terminology with clear definitions
-- Develop analytical and research skills
-- Include case studies and real-world applications
-- Encourage independent thinking and problem-solving
-- Reference current research and contemporary issues
-- Build on assumed high school knowledge base
-- Foster intellectual curiosity and deeper exploration
-- Include opportunities for collaborative learning
-- Prepare students for professional or graduate studies`;
-
-      case 'graduate':
-        return `
-EDUCATIONAL APPROACH FOR GRADUATE STUDENTS:
-- Engage with advanced theoretical frameworks and methodologies
-- Emphasize research, analysis, and synthesis of complex ideas
-- Use sophisticated academic language and field-specific terminology
-- Explore nuanced perspectives and competing theories
-- Include primary sources and seminal works in the field
-- Develop expertise through in-depth examination of topics
-- Foster original thinking and contribution to the field
-- Connect to current research and emerging trends
-- Encourage critical evaluation of existing knowledge
-- Prepare for doctoral research or advanced professional practice
-- Include interdisciplinary connections and applications`;
-
-      case 'professional':
-        return `
-EDUCATIONAL APPROACH FOR WORKING PROFESSIONALS:
-- Focus on practical, immediately applicable knowledge
-- Emphasize best practices and industry standards
-- Include real-world case studies and scenarios
-- Provide tools, templates, and actionable frameworks
-- Address common workplace challenges and solutions
-- Balance theory with extensive practical application
-- Include time-efficient learning strategies
-- Reference current industry trends and innovations
-- Develop skills for leadership and advanced practice
-- Include networking and professional development aspects
-- Focus on ROI and business impact of learning`;
-
-      case 'master':
-        return `
-EDUCATIONAL APPROACH FOR MASTERY-LEVEL LEARNING:
-- Explore the most advanced concepts and cutting-edge developments
-- Examine expert-level nuances and sophisticated applications
-- Include comprehensive historical context and evolution of ideas
-- Address complex edge cases and advanced problem-solving
-- Foster innovation and original contributions to the field
-- Include meta-learning and teaching others
-- Explore interdisciplinary synthesis at the highest level
-- Challenge existing paradigms and explore future directions
-- Develop thought leadership capabilities
-- Include opportunities to mentor and guide others
-- Focus on pushing boundaries of current knowledge`;
-
-      default:
-        return `
-EDUCATIONAL APPROACH FOR GENERAL LEARNERS:
-- Provide comprehensive, well-structured educational content
-- Balance accessibility with appropriate depth
-- Include varied learning approaches for different learning styles
-- Build knowledge progressively from fundamentals to advanced topics
-- Use clear explanations with relevant examples
-- Foster both understanding and practical application
-- Encourage active learning and engagement
-- Include self-assessment opportunities
-- Adapt to diverse backgrounds and learning goals`;
-    }
-  }
-
-  private getLessonDetailGuidance(lessonDetailLevel?: string): string {
-    switch (lessonDetailLevel) {
-      case 'basic':
-        return `
-CONTENT DEPTH - BASIC LEVEL:
-- Provide substantial educational content covering all essential concepts
-- Include clear explanations of fundamental principles
-- Use 3-5 concrete examples for each major concept
-- Present information in digestible sections with clear headings
-- Include visual representations where helpful
-- Focus on "what" and "how" with practical applications
-- Ensure comprehensive coverage of core learning objectives
-- Provide summaries and key takeaways
-- Include practice exercises for skill reinforcement
-APPROXIMATE CONTENT: 2-3 pages of rich educational material per lesson section`;
-
-      case 'comprehensive':
-        return `
-CONTENT DEPTH - COMPREHENSIVE LEVEL:
-- Deliver extensive, encyclopedic coverage of all topics
-- Provide exhaustive explanations with multiple perspectives
-- Include 10+ varied examples, case studies, and applications
-- Deep dive into theoretical foundations and advanced concepts
-- Explore historical context, evolution, and future directions
-- Address edge cases, exceptions, and nuanced scenarios
-- Include expert insights, research findings, and citations
-- Provide comparative analysis of different approaches
-- Include advanced exercises, projects, and research opportunities
-- Cover interdisciplinary connections and applications
-- Add supplementary deep-dive sections for curious learners
-APPROXIMATE CONTENT: 8-12 pages of dense, detailed educational material per lesson section`;
-
-      case 'detailed':
-      default:
-        return `
-CONTENT DEPTH - DETAILED LEVEL:
-- Provide thorough, in-depth educational content
-- Include comprehensive explanations with multiple examples
-- Use 5-8 varied examples and real-world applications
-- Balance theoretical understanding with practical application
-- Include relevant case studies and scenario-based learning
-- Explore important variations and common misconceptions
-- Provide both guided practice and independent exercises
-- Include enrichment content for advanced learners
-- Address common questions and clarifications
-- Include multimedia references and additional resources
-APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson section`;
-    }
-  }
-
   /**
-   * NEW: Create actual LMS entities from generated course outline
-   */
-  private async createLMSEntities(
-    courseOutlineId: string,
-    outline: CourseOutline,
-    request: CourseGenerationRequest
-  ): Promise<void> {
-    console.log('🏗️  Creating LMS entities from course outline...');
-    const generationMode = outline.generationMode || 'kb_supplemented';
-    
-    try {
-      const supabase = this.getSupabaseClient();
-      
-      // Process all modules in parallel
-      const modulePromises = outline.modules.map(async (module, moduleIndex) => {
-        // Create path
-        const { data: path, error: pathError } = await supabase
-          .from('paths')
-          .insert({
-            organisation_id: request.organisationId,
-            base_class_id: request.baseClassId,
-            title: module.title,
-            description: module.description,
-            level: request.academicLevel,
-            order_index: moduleIndex,
-            published: false, // Draft initially
-            created_by: request.userId,
-            creator_user_id: request.userId
-          })
-          .select()
-          .single();
-
-        if (pathError) {
-          console.error('Failed to create path:', pathError);
-          return;
-        }
-
-        console.log(`📁 Created path: ${path.title}`);
-
-        // Process all lessons for this path in parallel
-        const lessonPromises = module.lessons.map(async (lesson, lessonIndex) => {
-          const { data: createdLesson, error: lessonError } = await supabase
-            .from('lessons')
-            .insert({
-              path_id: path.id,
-              base_class_id: request.baseClassId,
-              title: lesson.title,
-              description: lesson.description,
-              level: request.academicLevel,
-              order_index: lessonIndex,
-              estimated_time: lesson.estimatedDurationHours ? lesson.estimatedDurationHours * 60 : 45, // Convert to minutes
-              published: false,
-              created_by: request.userId,
-              creator_user_id: request.userId
-            })
-            .select()
-            .single();
-
-          if (lessonError) {
-            console.error('Failed to create lesson:', lessonError);
-            return;
-          }
-
-          console.log(`📖 Created lesson: ${createdLesson.title}`);
-
-          // Create comprehensive lesson sections with educational content
-          await this.createLessonSectionsWithComprehensiveContent(
-            createdLesson.id, 
-            lesson, 
-            request, 
-            outline,
-            generationMode
-          );
-
-          // Then create assessments based on the actual lesson section content
-          if (request.assessmentSettings?.includeAssessments) {
-            await this.createLessonAssessmentsFromSectionContent(createdLesson.id, lesson, request);
-          }
-        });
-
-        // Wait for all lessons to be created
-        await Promise.all(lessonPromises);
-
-        // Create path quiz if enabled
-        if (request.assessmentSettings?.includeQuizzes) {
-          await this.createPathQuiz(path.id, module, request);
-        }
-      });
-
-      // Wait for all modules to be processed
-      await Promise.all(modulePromises);
-
-      // Create class exam if enabled
-      if (request.assessmentSettings?.includeFinalExam) {
-        await this.createClassExam(outline, request);
-      }
-
-      console.log('✅ LMS entities created successfully!');
-    } catch (error) {
-      console.error('❌ Failed to create LMS entities:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Create lesson sections in batch for better performance
-   */
-  private async createLessonSectionsBatch(
-    lessonId: string,
-    lesson: any,
-    request: CourseGenerationRequest
-  ): Promise<void> {
-    const supabase = this.getSupabaseClient();
-    const contentOutline = lesson.contentOutline || [];
-
-    if (contentOutline.length === 0) return;
-
-    // Generate all section content in a single AI call
-    const allSectionContent = await this.generateAllSectionsContent(
-      lesson,
-      contentOutline,
-      request
-    );
-
-    // Create all sections in parallel
-    const sectionPromises = contentOutline.map(async (sectionTitle: string, i: number) => {
-      const sectionType = i === 0 ? 'introduction' : 
-                         i === contentOutline.length - 1 ? 'summary' : 
-                         'main_content';
-      
-      const sectionContent = allSectionContent[i] || {
-        introduction: `Introduction to ${sectionTitle}`,
-        main_content: [{ 
-          heading: sectionTitle, 
-          content: "Content to be added." 
-        }],
-        key_takeaways: ["Key concepts from this section"]
-      };
-
-      const { data: section, error: sectionError } = await supabase
-        .from('lesson_sections')
-        .insert({
-          lesson_id: lessonId,
-          title: sectionTitle,
-          content: sectionContent,
-          section_type: sectionType,
-          order_index: i,
-          created_by: request.userId
-        })
-        .select()
-        .single();
-
-      if (sectionError) {
-        console.error('Failed to create lesson section:', sectionError);
-      } else {
-        console.log(`📄 Created section: ${section.title}`);
-      }
-    });
-
-    await Promise.all(sectionPromises);
-  }
-
-  /**
-   * Generate content for all sections in a single AI call
-   */
-  private async generateAllSectionsContent(
-    lesson: any,
-    contentOutline: string[],
-    request: CourseGenerationRequest
-  ): Promise<any[]> {
-    try {
-      const prompt = `
-      Generate comprehensive educational content for ALL sections of this lesson:
-      
-      Lesson: ${lesson.title}
-      Description: ${lesson.description}
-      Academic Level: ${request.academicLevel}
-      Detail Level: ${request.lessonDetailLevel}
-      
-      Sections to create content for:
-      ${contentOutline.map((title, i) => `${i + 1}. ${title}`).join('\n')}
-      
-      ${this.getAcademicLevelGuidance(request.academicLevel)}
-      ${this.getLessonDetailGuidance(request.lessonDetailLevel)}
-      
-      Create structured content as JSON array with one object per section:
-      [
-        {
-          "sectionTitle": "Section 1 Title",
-          "introduction": "Brief section introduction (2-3 sentences)",
-          "main_content": [
-            {
-              "heading": "Key Concept or Topic",
-              "content": "Detailed explanation with examples - this should be ACTUAL TEACHING CONTENT, not placeholders",
-              "examples": ["Practical example 1 with details", "Practical example 2 with details"],
-              "key_points": ["Important point 1", "Important point 2"]
-            }
-          ],
-          "activities": [
-            {
-              "type": "reflection",
-              "instruction": "Think about how this applies to...",
-              "duration": "5 minutes"
-            }
-          ],
-          "key_takeaways": ["Main takeaway 1", "Main takeaway 2"],
-          "additional_resources": ["Resource 1", "Resource 2"]
-        }
-      ]
-      
-      CRITICAL: Create ACTUAL EDUCATIONAL CONTENT that teaches, not placeholders. Each section should have substantial teaching material appropriate for ${request.academicLevel} level with ${request.lessonDetailLevel} depth.
-      `;
-
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4.1-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 16000 // Increased for multiple sections with full content
-      });
-
-      const content = completion.choices[0]?.message?.content;
-      if (!content) return contentOutline.map(() => ({ error: 'Failed to generate content' }));
-
-      // Parse JSON with proper error handling
-      try {
-        const jsonMatch = content.match(/```(?:json)?\s*(\[[\s\S]*\])\s*```/) || [null, content];
-        const sections = JSON.parse(jsonMatch[1]);
-        
-        // Map sections by title to ensure correct order
-        return contentOutline.map(title => {
-          const section = sections.find((s: any) => 
-            s.sectionTitle?.toLowerCase().includes(title.toLowerCase()) ||
-            title.toLowerCase().includes(s.sectionTitle?.toLowerCase())
-          );
-          return section || {
-            introduction: `Introduction to ${title}`,
-            main_content: [{ heading: title, content: "Content to be added." }],
-            key_takeaways: ["Key concepts"]
-          };
-        });
-      } catch (parseError) {
-        console.error('Failed to parse sections JSON:', parseError);
-        console.log('Raw content:', content);
-        // Return fallback content for each section
-        return contentOutline.map(title => ({
-          introduction: `Introduction to ${title}`,
-          main_content: [{ heading: title, content: "Content to be added." }],
-          key_takeaways: ["Key concepts"]
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to generate section content:', error);
-      return contentOutline.map(title => ({
-        introduction: `Introduction to ${title}`,
-        main_content: [{ heading: title, content: "Content to be added." }],
-        key_takeaways: ["Key concepts"]
-      }));
-    }
-  }
-
-  /**
-   * Create lesson assessments in batch
+   * Create lesson assessments using the new AssessmentGenerationService
    */
   private async createLessonAssessmentsBatch(
     lessonId: string,
@@ -1529,506 +842,157 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
   ): Promise<void> {
     if (!request.assessmentSettings?.includeAssessments) return;
 
-    const supabase = this.getSupabaseClient();
-
     try {
-      // First, get the actual lesson content that was created
-      const { data: lessonSections, error: sectionsError } = await supabase
-        .from('lesson_sections')
-        .select('*')
-        .eq('lesson_id', lessonId)
-        .order('order_index');
+      console.log(`🎯 Generating assessment for lesson: ${lesson.title}`);
 
-      if (sectionsError || !lessonSections || lessonSections.length === 0) {
-        console.log('No lesson sections found, skipping assessment generation');
-        return;
-      }
-
-      // Create a question folder for this lesson
-      const { data: folder, error: folderError } = await supabase
-        .from('question_folders')
-        .insert({
-          name: `${lesson.title} - Questions`,
-          description: `Assessment questions for lesson: ${lesson.title}`,
-          base_class_id: request.baseClassId,
-          created_by: request.userId
-        })
-        .select()
-        .single();
-
-      if (folderError) {
-        console.error('Failed to create question folder:', folderError);
-        return;
-      }
-
-      // Generate questions based on actual lesson content
+      // Use the new assessment generation service
       const questionsPerLesson = request.assessmentSettings?.questionsPerLesson || 5;
-      const questions = await this.generateQuestionsFromLessonContent(
-        lessonSections,
-        lesson,
-        questionsPerLesson,
-        request
-      );
+      const assessmentParams = {
+        scope: 'lesson' as const,
+        scopeId: lessonId,
+        baseClassId: request.baseClassId,
+        questionCount: questionsPerLesson,
+        assessmentTitle: `${lesson.title} - Knowledge Check`,
+        assessmentDescription: `Assessment covering key concepts from: ${lesson.description}`,
+        questionTypes: this.getQuestionTypesForLevel(request.academicLevel),
+        difficulty: this.mapAcademicLevelToDifficulty(request.academicLevel),
+        timeLimit: 30, // 30 minutes for lesson assessments
+        passingScore: 70,
+        onProgress: (message: string) => console.log(`📝 Assessment Generation: ${message}`)
+      };
 
-      if (questions.length === 0) return;
+      const assessment = await this.assessmentGenerator.generateAssessment(assessmentParams);
+      console.log(`✅ Created assessment with ${questionsPerLesson} questions for lesson: ${lesson.title}`);
 
-      // Create all questions with proper folder_id
-      const questionPromises = questions.map(async (q: any, i: number) => {
-        const { data: lessonQuestion, error: questionError } = await (supabase as any)
-          .from('questions')
-          .insert({
-            folder_id: folder.id,
-            lesson_id: lessonId,
-            question_text: q.question_text,
-            question_type: q.question_type,
-            points: q.points || 10,
-            learning_objectives: q.learning_objectives || [],
-            order_index: i,
-            created_by: request.userId,
-            options: q.options || null,
-            answer_key: q.options ? { correct_answers: q.options.filter((opt: any) => opt.is_correct).map((opt: any) => opt.option_text) } : null
-          })
-          .select()
-          .single();
-
-        if (questionError) {
-          console.error('Failed to create lesson question:', questionError);
-          return;
-        }
-
-        console.log(`❓ Created lesson question: ${q.question_text.substring(0, 50)}...`);
-      });
-
-      await Promise.all(questionPromises);
     } catch (error) {
       console.error('Failed to create lesson assessments:', error);
+      // Don't throw error to prevent course generation from failing
     }
   }
 
   /**
-   * Generate questions based on actual lesson content
-   */
-  private async generateQuestionsFromLessonContent(
-    lessonSections: any[],
-    lesson: any,
-    questionsPerLesson: number,
-    request: CourseGenerationRequest
-  ): Promise<any[]> {
-    try {
-      // Collect actual content from lesson sections
-      const sectionContent = lessonSections.map(section => ({
-        title: section.title,
-        content: section.content || section.description,
-        order: section.order_index
-      }));
-
-      const prompt = `
-      Create ${questionsPerLesson} assessment questions based on this ACTUAL lesson content:
-      
-      Lesson: ${lesson.title}
-      Description: ${lesson.description}
-      Academic Level: ${request.academicLevel}
-      
-      ACTUAL LESSON CONTENT:
-      ${sectionContent.map(section => `
-      Section ${section.order + 1}: ${section.title}
-      Content: ${section.content}
-      `).join('\n')}
-      
-      ${this.getAcademicLevelGuidance(request.academicLevel)}
-      
-      Generate questions as a valid JSON array. Questions must be based on the actual content provided above:
-      [
-        {
-          "question_text": "Question directly based on the lesson content above",
-          "question_type": "multiple_choice",
-          "points": 10,
-          "learning_objectives": ["Specific objective tested"],
-          "options": [
-            { "option_text": "Option A", "is_correct": false, "explanation": "Why this is incorrect" },
-            { "option_text": "Option B", "is_correct": true, "explanation": "Why this is the correct answer" },
-            { "option_text": "Option C", "is_correct": false, "explanation": "Why this is incorrect" },
-            { "option_text": "Option D", "is_correct": false, "explanation": "Why this is incorrect" }
-          ]
-        }
-      ]
-      
-      IMPORTANT: 
-      - Questions must be directly based on the actual content provided
-      - Use a mix of multiple choice, true/false, and short answer questions
-      - Questions should test understanding of the specific content, not general knowledge
-      - Return ONLY valid JSON, no markdown formatting
-      `;
-
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.6,
-        max_tokens: 3000
-      });
-
-      const content = completion.choices[0]?.message?.content;
-      if (!content) return [];
-
-      // Better JSON parsing with error handling
-      try {
-        const jsonMatch = content.match(/```(?:json)?\s*(\[[\s\S]*\])\s*```/) || [null, content];
-        const parsedQuestions = JSON.parse(jsonMatch[1]);
-        return Array.isArray(parsedQuestions) ? parsedQuestions : [];
-      } catch (parseError) {
-        console.error('Failed to parse question JSON:', parseError);
-        console.log('Raw content:', content);
-        return [];
-      }
-    } catch (error) {
-      console.error('Failed to generate questions from lesson content:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Generate all lesson questions in a single AI call (legacy method)
-   */
-  private async generateLessonQuestions(
-    lesson: any,
-    questionsPerLesson: number,
-    request: CourseGenerationRequest
-  ): Promise<any[]> {
-    try {
-      const prompt = `
-      Create ${questionsPerLesson} assessment questions for this lesson:
-      
-      Lesson: ${lesson.title}
-      Description: ${lesson.description}
-      Learning Objectives: ${lesson.learningObjectives?.join(', ') || 'General understanding'}
-      Academic Level: ${request.academicLevel}
-      
-      ${this.getAcademicLevelGuidance(request.academicLevel)}
-      
-      Generate questions as JSON array:
-      [
-        {
-          "question_text": "Clear, specific question about the lesson content appropriate for ${request.academicLevel} level?",
-          "question_type": "multiple_choice",
-          "points": 10,
-          "difficulty_level": "medium",
-          "bloom_taxonomy": "understand",
-          "learning_objectives": ["Specific objective tested"],
-          "options": [
-            { "option_text": "Option A", "is_correct": false, "explanation": "Why this is incorrect" },
-            { "option_text": "Option B", "is_correct": true, "explanation": "Why this is the correct answer" },
-            { "option_text": "Option C", "is_correct": false, "explanation": "Why this is incorrect" },
-            { "option_text": "Option D", "is_correct": false, "explanation": "Why this is incorrect" }
-          ]
-        }
-      ]
-      
-      Include a mix of: multiple choice, true/false, and short answer questions.
-      Questions should be age-appropriate and test understanding, not just memorization.
-      Make questions progressively harder through the set.
-      `;
-
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.6,
-        max_tokens: 3000
-      });
-
-      const content = completion.choices[0]?.message?.content;
-      if (!content) return [];
-
-      const jsonMatch = content.match(/```(?:json)?\s*(\[[\s\S]*\])\s*```/) || [null, content];
-      return JSON.parse(jsonMatch[1]);
-    } catch (error) {
-      console.error('Failed to generate lesson questions:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Create path-level quiz (cumulative for entire learning path)
+   * Create path-level quizzes using the new AssessmentGenerationService
    */
   private async createPathQuiz(
     pathId: string,
-    module: any,
+    pathTitle: string,
     request: CourseGenerationRequest
   ): Promise<void> {
     if (!request.assessmentSettings?.includeQuizzes) return;
 
-    const supabase = this.getSupabaseClient();
-    const questionsPerQuiz = request.assessmentSettings?.questionsPerQuiz || 10;
-
     try {
-      const prompt = `
-      Create a comprehensive quiz for this learning path/module:
-      
-      Module: ${module.title}
-      Description: ${module.description}
-      Lessons: ${module.lessons.map((l: any) => l.title).join(', ')}
-      Question Count: ${questionsPerQuiz}
-      Academic Level: ${request.academicLevel}
-      
-      This should be a CUMULATIVE assessment covering all lessons in this path.
-      
-      Generate quiz structure as valid JSON (no markdown formatting):
-      {
-        "title": "${module.title} - Module Quiz",
-        "description": "Comprehensive assessment covering all lessons in this module",
-        "time_limit": 60,
-        "pass_threshold": 70,
-        "questions": [
-          {
-            "question_text": "Question covering multiple lessons?",
-            "question_type": "multiple_choice",
-            "points": 15,
-            "options": [
-              { "option_text": "Option A", "is_correct": false },
-              { "option_text": "Option B", "is_correct": true },
-              { "option_text": "Option C", "is_correct": false },
-              { "option_text": "Option D", "is_correct": false }
-            ]
-          }
-        ]
-      }
-      
-      IMPORTANT: Return ONLY valid JSON, no markdown code blocks.
-      `;
+      console.log(`🎯 Generating quiz for path: ${pathTitle}`);
 
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.6,
-        max_tokens: 4000
-      });
+      const questionsPerQuiz = request.assessmentSettings?.questionsPerQuiz || 10;
+      const assessmentParams = {
+        scope: 'path' as const,
+        scopeId: pathId,
+        baseClassId: request.baseClassId,
+        questionCount: questionsPerQuiz,
+        assessmentTitle: `${pathTitle} - Module Quiz`,
+        assessmentDescription: `Comprehensive quiz covering all lessons in: ${pathTitle}`,
+        questionTypes: this.getQuestionTypesForLevel(request.academicLevel),
+        difficulty: this.mapAcademicLevelToDifficulty(request.academicLevel),
+        timeLimit: 60, // 60 minutes for path quizzes
+        passingScore: 75,
+        onProgress: (message: string) => console.log(`📝 Quiz Generation: ${message}`)
+      };
 
-      const content = completion.choices[0]?.message?.content;
-      if (!content) return;
+      const assessment = await this.assessmentGenerator.generateAssessment(assessmentParams);
+      console.log(`✅ Created quiz with ${questionsPerQuiz} questions for path: ${pathTitle}`);
 
-      let quizData: any;
-      try {
-        // Try to parse JSON with better error handling
-        const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || [null, content];
-        quizData = JSON.parse(jsonMatch[1]);
-      } catch (parseError) {
-        console.error('Failed to parse quiz JSON:', parseError);
-        console.log('Raw content:', content);
-        return;
-      }
-
-      // Insert quiz
-      const { data: quiz, error: quizError } = await supabase
-        .from('quizzes')
-        .insert({
-          path_id: pathId,
-          title: quizData.title,
-          description: quizData.description,
-          assessment_type: 'quiz',
-          time_limit: quizData.time_limit,
-          pass_threshold: quizData.pass_threshold,
-          shuffle_questions: true,
-          max_attempts: 3,
-          show_feedback: true,
-          auto_grade: true,
-          created_by: request.userId
-        })
-        .select()
-        .single();
-
-      if (quizError) {
-        console.error('Failed to create path quiz:', quizError);
-        return;
-      }
-
-      // Create question folder for quiz questions
-      const { data: folder, error: folderError } = await supabase
-        .from('question_folders')
-        .insert({
-          name: `${quizData.title} - Questions`,
-          description: `Questions for quiz: ${quizData.title}`,
-          base_class_id: request.baseClassId,
-          created_by: request.userId
-        })
-        .select()
-        .single();
-
-      if (folderError) {
-        console.error('Failed to create quiz question folder:', folderError);
-        return;
-      }
-
-      // Insert quiz questions with proper folder_id
-      if (quizData.questions && Array.isArray(quizData.questions)) {
-        for (let i = 0; i < quizData.questions.length; i++) {
-          const q = quizData.questions[i];
-          
-          const { data: question, error: questionError } = await (supabase as any)
-            .from('questions')
-            .insert({
-              quiz_id: quiz.id,
-              question_text: q.question_text,
-              question_type: q.question_type,
-              points: q.points || 15,
-              order_index: i,
-              created_by: request.userId,
-              options: q.options || null,
-              answer_key: q.options ? { correct_answers: q.options.filter((opt: any) => opt.is_correct).map((opt: any) => opt.option_text) } : null
-            })
-            .select()
-            .single();
-
-          if (questionError) {
-            console.error('Failed to create quiz question:', questionError);
-            continue;
-          }
-        }
-      }
-
-      console.log(`📝 Created path quiz: ${quizData.title}`);
     } catch (error) {
       console.error('Failed to create path quiz:', error);
+      // Don't throw error to prevent course generation from failing
     }
   }
 
   /**
-   * Create comprehensive final exam for entire course
+   * Create class-level final exam using the new AssessmentGenerationService
    */
   private async createClassExam(
-    outline: CourseOutline,
+    baseClassId: string,
+    classTitle: string,
     request: CourseGenerationRequest
   ): Promise<void> {
     if (!request.assessmentSettings?.includeFinalExam) return;
 
-    const supabase = this.getSupabaseClient();
-    const questionsPerExam = request.assessmentSettings?.questionsPerExam || 25;
-
     try {
-      const prompt = `
-      Create a comprehensive final exam for this entire course:
-      
-      Course: ${outline.title}
-      Description: ${outline.description}
-      Modules: ${outline.modules.map(m => m.title).join(', ')}
-      Question Count: ${questionsPerExam}
-      Academic Level: ${request.academicLevel}
-      
-      This should be a COMPREHENSIVE final exam covering all modules and lessons.
-      
-      Generate exam structure as valid JSON (no markdown formatting):
-      {
-        "title": "Comprehensive Final Exam - ${outline.title}",
-        "description": "Comprehensive final examination covering all course material",
-        "time_limit": 120,
-        "pass_threshold": 75,
-        "questions": [
-          {
-            "question_text": "Comprehensive question covering multiple modules?",
-            "question_type": "multiple_choice",
-            "points": 20,
-            "options": [
-              { "option_text": "Option A", "is_correct": false },
-              { "option_text": "Option B", "is_correct": true },
-              { "option_text": "Option C", "is_correct": false },
-              { "option_text": "Option D", "is_correct": false }
-            ]
-          }
-        ]
-      }
-      
-      IMPORTANT: Return ONLY valid JSON, no markdown code blocks.
-      `;
+      console.log(`🎯 Generating final exam for class: ${classTitle}`);
 
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.6,
-        max_tokens: 6000
-      });
+      const questionsPerExam = request.assessmentSettings?.questionsPerExam || 25;
+      const assessmentParams = {
+        scope: 'class' as const,
+        scopeId: baseClassId,
+        baseClassId: baseClassId,
+        questionCount: questionsPerExam,
+        assessmentTitle: `${classTitle} - Final Exam`,
+        assessmentDescription: `Comprehensive final exam covering all course material from: ${classTitle}`,
+        questionTypes: this.getQuestionTypesForLevel(request.academicLevel),
+        difficulty: this.mapAcademicLevelToDifficulty(request.academicLevel),
+        timeLimit: 120, // 120 minutes for final exams
+        passingScore: 70,
+        onProgress: (message: string) => console.log(`📝 Final Exam Generation: ${message}`)
+      };
 
-      const content = completion.choices[0]?.message?.content;
-      if (!content) return;
+      const assessment = await this.assessmentGenerator.generateAssessment(assessmentParams);
+      console.log(`✅ Created final exam with ${questionsPerExam} questions for class: ${classTitle}`);
 
-      let examData: any;
-      try {
-        // Try to parse JSON with better error handling
-        const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || [null, content];
-        examData = JSON.parse(jsonMatch[1]);
-      } catch (parseError) {
-        console.error('Failed to parse exam JSON:', parseError);
-        console.log('Raw content:', content);
-        return;
-      }
-
-      // Insert exam (final exams are not tied to specific paths/lessons)
-      const { data: exam, error: examError } = await supabase
-        .from('quizzes')
-        .insert({
-          title: examData.title,
-          description: examData.description,
-          assessment_type: 'final_exam',
-          time_limit: examData.time_limit,
-          pass_threshold: examData.pass_threshold,
-          shuffle_questions: true,
-          max_attempts: 1,
-          show_feedback: false,
-          auto_grade: true,
-          created_by: request.userId
-        })
-        .select()
-        .single();
-
-      if (examError) {
-        console.error('Failed to create class exam:', examError);
-        return;
-      }
-
-      // Create question folder for exam questions
-      const { data: folder, error: folderError } = await supabase
-        .from('question_folders')
-        .insert({
-          name: `${examData.title} - Questions`,
-          description: `Questions for exam: ${examData.title}`,
-          base_class_id: request.baseClassId,
-          created_by: request.userId
-        })
-        .select()
-        .single();
-
-      if (folderError) {
-        console.error('Failed to create exam question folder:', folderError);
-        return;
-      }
-
-      // Insert exam questions with proper folder_id
-      if (examData.questions && Array.isArray(examData.questions)) {
-        for (let i = 0; i < examData.questions.length; i++) {
-          const q = examData.questions[i];
-          
-          const { data: question, error: questionError } = await (supabase as any)
-            .from('questions')
-            .insert({
-              quiz_id: exam.id,
-              question_text: q.question_text,
-              question_type: q.question_type,
-              points: q.points || 20,
-              order_index: i,
-              created_by: request.userId,
-              options: q.options || null,
-              answer_key: q.options ? { correct_answers: q.options.filter((opt: any) => opt.is_correct).map((opt: any) => opt.option_text) } : null
-            })
-            .select()
-            .single();
-
-          if (questionError) {
-            console.error('Failed to create exam question:', questionError);
-            continue;
-          }
-        }
-      }
-
-      console.log(`🎓 Created class exam: ${examData.title}`);
     } catch (error) {
       console.error('Failed to create class exam:', error);
+      // Don't throw error to prevent course generation from failing
+    }
+  }
+
+  /**
+   * Get appropriate question types based on academic level
+   */
+  private getQuestionTypesForLevel(academicLevel?: string): ('multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'matching')[] {
+    if (!academicLevel) return ['multiple_choice', 'true_false', 'short_answer'];
+    
+    const level = academicLevel.toLowerCase();
+    
+    // Elementary levels (K-5)
+    if (level.includes('kindergarten') || level.includes('1st') || level.includes('2nd') || 
+        level.includes('3rd') || level.includes('4th') || level.includes('5th')) {
+      return ['multiple_choice', 'true_false', 'matching'];
+    }
+    
+    // Middle school (6-8)
+    if (level.includes('6th') || level.includes('7th') || level.includes('8th')) {
+      return ['multiple_choice', 'true_false', 'short_answer', 'matching'];
+    }
+    
+    // High school (9-12)
+    if (level.includes('9th') || level.includes('10th') || level.includes('11th') || level.includes('12th')) {
+      return ['multiple_choice', 'true_false', 'short_answer', 'essay'];
+    }
+    
+    // College and beyond
+    return ['multiple_choice', 'short_answer', 'essay'];
+  }
+
+  // Helper method to combine lesson section content
+  private combineLessonSectionContent(lessonSections: any[], lesson: any): string {
+    const sectionContent = lessonSections.map(section => {
+      const content = section.content || section.description || '';
+      return `## ${section.title}\n${content}`;
+    }).join('\n\n');
+
+    return `# ${lesson.title}\n\n${lesson.description}\n\n${sectionContent}`;
+  }
+
+  // Helper method to map academic level to difficulty
+  private mapAcademicLevelToDifficulty(academicLevel?: string): 'easy' | 'medium' | 'hard' {
+    if (!academicLevel) return 'medium';
+    
+    const level = academicLevel.toLowerCase();
+    if (level.includes('kindergarten') || level.includes('1st') || level.includes('2nd') || level.includes('3rd')) {
+      return 'easy';
+    } else if (level.includes('college') || level.includes('graduate') || level.includes('professional') || level.includes('master')) {
+      return 'hard';
+    } else {
+      return 'medium';
     }
   }
 
@@ -2252,24 +1216,33 @@ APPROXIMATE CONTENT: 4-6 pages of substantial educational material per lesson se
             request.userId
           );
 
-          // Create assessment questions if enabled
-          if (request.assessmentSettings?.includeAssessments && lessonContent.assessmentQuestions) {
-            await this.createQuestionsFromGeneratedContent(
+          // Create lesson assessments using the new AssessmentGenerationService
+          if (request.assessmentSettings?.includeAssessments) {
+            await this.createLessonAssessmentsBatch(
               createdLesson.id,
-              lessonContent.assessmentQuestions,
-              request.userId
+              lessonOutline,
+              request
             );
           }
         }
 
-        // Create module quiz if enabled
-        if (request.assessmentSettings?.includeQuizzes && moduleContent.moduleQuiz) {
-          await this.createQuizFromGeneratedContent(
+        // Create path quiz using the new AssessmentGenerationService
+        if (request.assessmentSettings?.includeQuizzes) {
+          await this.createPathQuiz(
             path.id,
-            moduleContent.moduleQuiz,
-            request.userId
+            path.title,
+            request
           );
         }
+      }
+
+      // Create class final exam using the new AssessmentGenerationService
+      if (request.assessmentSettings?.includeFinalExam) {
+        await this.createClassExam(
+          request.baseClassId,
+          request.title,
+          request
+        );
       }
 
       console.log('✅ Optimized LMS entity creation completed!');
