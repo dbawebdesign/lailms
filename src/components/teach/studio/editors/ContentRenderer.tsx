@@ -112,7 +112,18 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
     }
 
     // Handle structured lesson content (introduction, main_content, activities, etc.)
-    if (typeof productionContent === 'object' && (productionContent.introduction || productionContent.main_content || productionContent.activities)) {
+    if (typeof productionContent === 'object' && (
+        productionContent.introduction || 
+        productionContent.main_content || 
+        productionContent.main_teaching_content ||
+        productionContent.activities ||
+        productionContent.key_concepts ||
+        productionContent.key_takeaways ||
+        productionContent.comprehension_checks ||
+        productionContent.independent_practice ||
+        productionContent.common_misconceptions ||
+        productionContent.section_summary
+      )) {
       return (
         <div className="prose dark:prose-invert max-w-none space-y-6">
           {/* Introduction */}
@@ -120,6 +131,71 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
             <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border-l-4 border-blue-500">
               <h4 className="text-lg font-semibold mb-2 text-blue-900 dark:text-blue-100">Introduction</h4>
               <p className="text-blue-800 dark:text-blue-200 leading-relaxed">{productionContent.introduction}</p>
+            </div>
+          )}
+
+          {/* Key Concepts */}
+          {productionContent.key_concepts && productionContent.key_concepts.length > 0 && (
+            <div className="bg-indigo-50 dark:bg-indigo-950/20 p-4 rounded-lg border-l-4 border-indigo-500">
+              <h4 className="text-lg font-semibold mb-3 text-indigo-900 dark:text-indigo-100">Key Concepts</h4>
+              <ul className="list-disc list-inside space-y-2">
+                {productionContent.key_concepts.map((concept: string, index: number) => (
+                  <li key={index} className="text-indigo-800 dark:text-indigo-200 leading-relaxed">
+                    {concept}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Main Teaching Content */}
+          {productionContent.main_teaching_content && productionContent.main_teaching_content.length > 0 && (
+            <div className="space-y-4">
+              {productionContent.main_teaching_content.map((section: any, index: number) => (
+                <div key={index} className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
+                  {section.concept_title && (
+                    <h4 className="text-lg font-semibold mb-3 text-foreground">{section.concept_title}</h4>
+                  )}
+                  {section.explanation && (
+                    <p className="text-foreground leading-relaxed mb-3">{section.explanation}</p>
+                  )}
+                  
+                  {/* Guided Practice */}
+                  {section.guided_practice && (
+                    <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded border-l-4 border-amber-400 mb-3">
+                      <h5 className="font-medium text-amber-900 dark:text-amber-100 mb-2">Guided Practice</h5>
+                      <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">{section.guided_practice.activity}</p>
+                      {section.guided_practice.instructions && (
+                        <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+                          <strong>Instructions:</strong> {section.guided_practice.instructions}
+                        </p>
+                      )}
+                      {section.guided_practice.expected_outcome && (
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                          <strong>Expected Outcome:</strong> {section.guided_practice.expected_outcome}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Examples */}
+                  {section.examples && section.examples.length > 0 && (
+                    <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border-l-4 border-yellow-400 mb-3">
+                      <h5 className="font-medium text-yellow-900 dark:text-yellow-100 mb-2">Examples</h5>
+                      {section.examples.map((example: any, exampleIndex: number) => (
+                        <div key={exampleIndex} className="mb-2 last:mb-0">
+                          {example.title && (
+                            <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">{example.title}</p>
+                          )}
+                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                            {example.content || example}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
 
@@ -141,7 +217,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
                       )}
                     </div>
                     <p className="text-green-800 dark:text-green-200 text-sm leading-relaxed">
-                      {activity.instruction}
+                      {activity.instruction || activity.activity}
                     </p>
                   </div>
                 ))}
@@ -149,7 +225,77 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
             </div>
           )}
 
-          {/* Main Content */}
+          {/* Independent Practice */}
+          {productionContent.independent_practice && (
+            <div className="bg-teal-50 dark:bg-teal-950/20 p-4 rounded-lg border-l-4 border-teal-500">
+              <h4 className="text-lg font-semibold mb-3 text-teal-900 dark:text-teal-100">Independent Practice</h4>
+              {productionContent.independent_practice.activity && (
+                <p className="text-teal-800 dark:text-teal-200 leading-relaxed mb-2">
+                  <strong>Activity:</strong> {productionContent.independent_practice.activity}
+                </p>
+              )}
+              {productionContent.independent_practice.extension && (
+                <p className="text-teal-800 dark:text-teal-200 leading-relaxed mb-2">
+                  <strong>Extension:</strong> {productionContent.independent_practice.extension}
+                </p>
+              )}
+              {productionContent.independent_practice.scaffolding && (
+                <p className="text-teal-800 dark:text-teal-200 leading-relaxed">
+                  <strong>Scaffolding:</strong> {productionContent.independent_practice.scaffolding}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Comprehension Checks */}
+          {productionContent.comprehension_checks && productionContent.comprehension_checks.length > 0 && (
+            <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg border-l-4 border-purple-500">
+              <h4 className="text-lg font-semibold mb-3 text-purple-900 dark:text-purple-100">Comprehension Checks</h4>
+              <div className="space-y-3">
+                {productionContent.comprehension_checks.map((check: any, index: number) => (
+                  <div key={index} className="bg-white dark:bg-purple-900/20 p-3 rounded border">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-medium text-purple-700 dark:text-purple-300 capitalize">
+                        {check.type || 'Check'}
+                      </span>
+                    </div>
+                    <p className="text-purple-800 dark:text-purple-200 text-sm leading-relaxed mb-2">
+                      {check.prompt}
+                    </p>
+                    {check.purpose && (
+                      <p className="text-xs text-purple-700 dark:text-purple-300">
+                        <strong>Purpose:</strong> {check.purpose}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Common Misconceptions */}
+          {productionContent.common_misconceptions && productionContent.common_misconceptions.length > 0 && (
+            <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border-l-4 border-red-500">
+              <h4 className="text-lg font-semibold mb-3 text-red-900 dark:text-red-100">Common Misconceptions</h4>
+              <div className="space-y-3">
+                {productionContent.common_misconceptions.map((misconception: any, index: number) => (
+                  <div key={index} className="bg-white dark:bg-red-900/20 p-3 rounded border">
+                    <p className="text-red-800 dark:text-red-200 text-sm leading-relaxed mb-2">
+                      <strong>Misconception:</strong> {misconception.misconception}
+                    </p>
+                    <p className="text-red-800 dark:text-red-200 text-sm leading-relaxed mb-2">
+                      <strong>Explanation:</strong> {misconception.explanation}
+                    </p>
+                    <p className="text-red-800 dark:text-red-200 text-sm leading-relaxed">
+                      <strong>Correction:</strong> {misconception.correction}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Main Content (legacy support) */}
           {productionContent.main_content && productionContent.main_content.length > 0 && (
             <div className="space-y-4">
               {productionContent.main_content.map((section: any, index: number) => (
@@ -198,6 +344,14 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* Section Summary */}
+          {productionContent.section_summary && (
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border-l-4 border-slate-500">
+              <h4 className="text-lg font-semibold mb-2 text-slate-900 dark:text-slate-100">Section Summary</h4>
+              <p className="text-slate-800 dark:text-slate-200 leading-relaxed">{productionContent.section_summary}</p>
             </div>
           )}
 
