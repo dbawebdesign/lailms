@@ -84,7 +84,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 0.6 }); // Start zoomed out to see all nodes
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
@@ -109,15 +109,16 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
       label: mindMapData.center.label,
       description: mindMapData.center.description,
       level: 0,
-      x: 500,
-      y: 350,
+      x: 0, // Center at origin
+      y: 0, // Center at origin
       children: [],
       isExpanded: true
     };
 
     const branchNodes: MindMapNode[] = mindMapData.branches.map((branch, branchIndex) => {
-      const angle = (branchIndex * 2 * Math.PI) / mindMapData.branches.length - Math.PI / 2;
-      const radius = 240; // Increased from 200 for better spacing
+      const totalBranches = mindMapData.branches.length;
+      const angle = (branchIndex * 2 * Math.PI) / totalBranches;
+      const radius = Math.max(350, totalBranches * 50); // Increased spacing to prevent overlap
       
       const branchNode: MindMapNode = {
         id: branch.id || generateUniqueId('branch'),
@@ -128,18 +129,26 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
         x: centerNode.x + radius * Math.cos(angle),
         y: centerNode.y + radius * Math.sin(angle),
         children: [],
-        isExpanded: false,
+        isExpanded: true,
         parentId: 'center'
       };
 
-      // Add concepts as children with unique IDs and better spacing
+      // Add concepts as children with proper spacing to prevent overlap
       if (branch.concepts) {
         branchNode.children = branch.concepts.map((concept, conceptIndex) => {
           const conceptCount = branch.concepts!.length;
-          const conceptAngle = conceptCount > 1 
-            ? angle + (conceptIndex - (conceptCount - 1) / 2) * (0.8 / conceptCount) // Dynamic angle spread
-            : angle;
-          const conceptRadius = 150; // Increased from 120
+          let conceptAngle: number;
+          
+          if (conceptCount === 1) {
+            conceptAngle = angle;
+          } else {
+            // Spread concepts in a larger arc around the branch to prevent overlap
+            const arcSpread = Math.min(Math.PI / 1.5, conceptCount * 0.5); // Increased spread
+            const startAngle = angle - arcSpread / 2;
+            conceptAngle = startAngle + (conceptIndex * arcSpread) / (conceptCount - 1);
+          }
+          
+          const conceptRadius = Math.max(220, conceptCount * 40); // Increased spacing to prevent overlap
           
           const conceptNode: MindMapNode = {
             id: concept.id || generateUniqueId(`concept-${branchNode.id}`),
@@ -150,18 +159,26 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
             x: branchNode.x + conceptRadius * Math.cos(conceptAngle),
             y: branchNode.y + conceptRadius * Math.sin(conceptAngle),
             children: [],
-            isExpanded: false,
+            isExpanded: true,
             parentId: branchNode.id
           };
 
-          // Add points as children with unique IDs and better spacing
+          // Add points as children with proper spacing
           if (concept.points) {
             conceptNode.children = concept.points.map((point, pointIndex) => {
               const pointCount = concept.points!.length;
-              const pointAngle = pointCount > 1
-                ? conceptAngle + (pointIndex - (pointCount - 1) / 2) * (0.6 / pointCount) // Dynamic angle spread
-                : conceptAngle;
-              const pointRadius = 100; // Increased from 80
+              let pointAngle: number;
+              
+              if (pointCount === 1) {
+                pointAngle = conceptAngle;
+              } else {
+                // Create a larger arc for points to prevent overlap
+                const pointArcSpread = Math.min(Math.PI / 2.5, pointCount * 0.4);
+                const pointStartAngle = conceptAngle - pointArcSpread / 2;
+                pointAngle = pointStartAngle + (pointIndex * pointArcSpread) / (pointCount - 1);
+              }
+              
+              const pointRadius = Math.max(150, pointCount * 35); // Increased spacing
               
               const pointNode: MindMapNode = {
                 id: point.id || generateUniqueId(`point-${conceptNode.id}`),
@@ -172,18 +189,25 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
                 x: conceptNode.x + pointRadius * Math.cos(pointAngle),
                 y: conceptNode.y + pointRadius * Math.sin(pointAngle),
                 children: [],
-                isExpanded: false,
+                isExpanded: true,
                 parentId: conceptNode.id
               };
 
-              // Add details as children with unique IDs and better spacing
+              // Add details as children with proper spacing
               if (point.details) {
                 pointNode.children = point.details.map((detail, detailIndex) => {
                   const detailCount = point.details!.length;
-                  const detailAngle = detailCount > 1
-                    ? pointAngle + (detailIndex - (detailCount - 1) / 2) * (0.4 / detailCount) // Dynamic angle spread
-                    : pointAngle;
-                  const detailRadius = 75; // Increased from 60
+                  let detailAngle: number;
+                  
+                  if (detailCount === 1) {
+                    detailAngle = pointAngle;
+                  } else {
+                    const detailArcSpread = Math.min(Math.PI / 3, detailCount * 0.35); // Increased spread
+                    const detailStartAngle = pointAngle - detailArcSpread / 2;
+                    detailAngle = detailStartAngle + (detailIndex * detailArcSpread) / (detailCount - 1);
+                  }
+                  
+                  const detailRadius = Math.max(100, detailCount * 30); // Increased spacing
                   
                   return {
                     id: detail.id || generateUniqueId(`detail-${pointNode.id}`),
@@ -194,7 +218,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
                     x: pointNode.x + detailRadius * Math.cos(detailAngle),
                     y: pointNode.y + detailRadius * Math.sin(detailAngle),
                     children: [],
-                    isExpanded: false,
+                    isExpanded: true,
                     parentId: pointNode.id
                   };
                 });
@@ -277,10 +301,10 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
   // Add scroll zoom functionality
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    const delta = e.deltaY > 0 ? -0.15 : 0.15;
     setTransform(prev => ({
       ...prev,
-      scale: Math.max(0.3, Math.min(3, prev.scale + delta))
+      scale: Math.max(0.1, Math.min(5, prev.scale + delta))
     }));
   }, []);
 
@@ -295,12 +319,12 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
   const handleZoom = (direction: 'in' | 'out') => {
     setTransform(prev => ({
       ...prev,
-      scale: Math.max(0.3, Math.min(3, prev.scale + (direction === 'in' ? 0.2 : -0.2)))
+      scale: Math.max(0.1, Math.min(5, prev.scale + (direction === 'in' ? 0.3 : -0.3)))
     }));
   };
 
   const handleResetView = () => {
-    setTransform({ x: 0, y: 0, scale: 1 });
+    setTransform({ x: 0, y: 0, scale: 0.6 }); // Reset to overview scale
   };
 
   const toggleNodeExpansion = (nodeId: string) => {
@@ -395,9 +419,8 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
 
     return (
       <g 
-        key={`node-${node.id}-${index}`}
         style={{
-          animation: `nodeAppear 0.3s ease-out ${index * 0.05}s both`
+          animation: `nodeAppear 0.15s ease-out ${index * 0.02}s both`
         }}
       >
         {/* Subtle selection glow */}
@@ -416,19 +439,17 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
           />
         )}
         
-        {/* Subtle loading indicator */}
+        {/* Premium loading glow */}
         {node.isLoading && (
           <circle
             cx={node.x}
             cy={node.y}
-            r={nodeRadius + 12}
+            r={nodeRadius + 4}
             fill="none"
-            stroke="#3B82F6"
+            stroke="rgba(255, 255, 255, 0.4)"
             strokeWidth="2"
-            strokeOpacity="0.6"
-            strokeDasharray="12 8"
             style={{
-              animation: 'loadingRotate 1.5s linear infinite'
+              animation: 'premiumGlow 2s ease-in-out infinite'
             }}
           />
         )}
@@ -443,8 +464,9 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
           strokeWidth={isSelected ? 2 : 1.5}
           className="cursor-pointer transition-all duration-100 ease-out"
           style={{
-            filter: isHovered ? 'brightness(1.05)' : 'none',
-            boxShadow: isSelected ? '0 0 0 2px rgba(59, 130, 246, 0.3)' : 'none'
+            filter: isHovered ? 'brightness(1.05)' : node.isLoading ? 'brightness(1.15)' : 'none',
+            boxShadow: isSelected ? '0 0 0 2px rgba(59, 130, 246, 0.3)' : 'none',
+            animation: node.isLoading ? 'premiumNodeGlow 2s ease-in-out infinite' : 'none'
           }}
           onClick={() => setSelectedNode(selectedNode === node.id ? null : node.id)}
           onMouseEnter={() => setHoveredNode(node.id)}
@@ -590,7 +612,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
         node.children.forEach((child, childIndex) => {
           connections.push(
             <line
-              key={`connection-${node.id}-${child.id}-${index}-${childIndex}`}
+              key={`connection-${node.id}-to-${child.id}-${Math.random()}`}
               x1={node.x}
               y1={node.y}
               x2={child.x}
@@ -620,7 +642,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
   return (
     <div 
       ref={containerRef}
-      className="relative w-full h-[700px] bg-white dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50 shadow-sm"
+      className="relative w-full h-[800px] bg-white dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50 shadow-sm"
     >
       {/* Minimal controls */}
       <div className="absolute top-4 right-4 flex gap-1 z-10">
@@ -667,6 +689,8 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
       <svg
         ref={svgRef}
         className="w-full h-full cursor-move"
+        viewBox="-1500 -1500 3000 3000"
+        preserveAspectRatio="xMidYMid meet"
         onMouseDown={handleMouseDown}
         style={{
           transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`
@@ -678,7 +702,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
             <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#e2e8f0" strokeWidth="0.5" opacity="0.3"/>
           </pattern>
         </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" />
+        <rect x="-1500" y="-1500" width="3000" height="3000" fill="url(#grid)" />
         
         {/* Render connections first */}
         <g className="connections">
@@ -687,7 +711,11 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
         
         {/* Render nodes */}
         <g className="nodes">
-          {visibleNodes.map((node, index) => renderNode(node, index))}
+          {visibleNodes.map((node, index) => (
+            <g key={`node-${node.id}-${index}`}>
+              {renderNode(node, index)}
+            </g>
+          ))}
         </g>
       </svg>
 
