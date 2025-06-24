@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { ToolCard } from './ToolCard';
 import { ToolFilterBar } from './ToolFilterBar';
+import { ToolWorkflow } from './ToolWorkflow';
 import { teachingTools } from '@/config/teachingTools';
 import { TeachingTool, ToolCategory } from '@/types/teachingTools';
 
@@ -13,7 +14,10 @@ export function ToolLibrary() {
 
   // Filter tools based on search query and category
   const filteredTools = useMemo(() => {
-    let filtered = teachingTools;
+    let filtered = teachingTools.filter(tool => 
+      // Exclude lesson generator and quiz generator as requested
+      tool.id !== 'lesson-generator' && tool.id !== 'quiz-generator'
+    );
 
     // Filter by search query
     if (searchQuery) {
@@ -36,10 +40,23 @@ export function ToolLibrary() {
 
   const handleToolSelect = (tool: TeachingTool) => {
     setSelectedTool(tool);
-    // In a full implementation, this would open the tool's workflow sidebar
-    console.log('Selected tool:', tool);
   };
 
+  const handleBackToLibrary = () => {
+    setSelectedTool(null);
+  };
+
+  // If a tool is selected, show the workflow
+  if (selectedTool) {
+    return (
+      <ToolWorkflow 
+        tool={selectedTool} 
+        onBack={handleBackToLibrary}
+      />
+    );
+  }
+
+  // Default view: show the tool library
   return (
     <div className="space-y-6 md:space-y-8">
       {/* Filter and Search Bar */}
@@ -79,7 +96,7 @@ export function ToolLibrary() {
       {/* Tool Count */}
       {filteredTools.length > 0 && (
          <div className="text-sm text-text-secondary text-center pt-4">
-          Showing {filteredTools.length} of {teachingTools.length} tools
+          Showing {filteredTools.length} of {teachingTools.filter(t => t.id !== 'lesson-generator' && t.id !== 'quiz-generator').length} tools
         </div>
       )}
     </div>

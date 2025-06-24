@@ -288,7 +288,7 @@ Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
       { role: 'user', content: prompt }
     ],
     temperature: 0.1,
-    max_tokens: 8000
+    max_tokens: 12000
   });
 
   let mindMapData;
@@ -505,13 +505,13 @@ IMPORTANT: Must include the "points" level between concepts and details. Extract
 Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
 
   const aiResponse = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-4.1-mini',
     messages: [
       { role: 'system', content: 'You create comprehensive educational mind maps with deep content extraction. Always return valid JSON with the complete 5-level structure including center, branches, concepts, points, and details.' },
       { role: 'user', content: prompt }
     ],
     temperature: 0.2,
-    max_tokens: 6000
+    max_tokens: 12000
   });
 
   let mindMapData;

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
+import { triggerCelebration } from '@/components/ui/confetti';
 import { 
   Loader2, 
   BookOpen, 
@@ -30,8 +32,11 @@ import {
   Calendar,
   Layers,
   Plus,
-  X
+  X,
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
+import { triggerCelebration } from '@/components/ui/confetti';
 
 interface KnowledgeBaseAnalysis {
   totalDocuments: number;
@@ -94,7 +99,10 @@ const GENERATION_MODE_DESCRIPTIONS = {
 };
 
 export default function CourseGenerationInterface({ baseClassId, baseClassInfo, onCourseGenerated }: CourseGenerationInterfaceProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [analyzing, setAnalyzing] = useState(true);
   const [kbAnalysis, setKbAnalysis] = useState<KnowledgeBaseAnalysis | null>(null);
   const [generationModes, setGenerationModes] = useState<Record<string, GenerationMode>>({});
@@ -154,6 +162,15 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
         
         if (data.job.status === 'completed') {
           if (data.courseOutline?.id) {
+            // Trigger celebration animation
+            setShowCelebration(true);
+            triggerCelebration(() => {
+              // After celebration, redirect to base class studio
+              setRedirecting(true);
+              setTimeout(() => {
+                router.push(`/teach/base-classes/${baseClassId}`);
+              }, 1000);
+            });
             onCourseGeneratedSafe?.(data.courseOutline.id);
           }
         } else if (data.job.status === 'failed') {
@@ -288,14 +305,74 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
   if (generationJob?.status === 'completed') {
     return (
       <Card className="w-full max-w-4xl">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center space-x-3 text-green-600">
-            <CheckCircle className="h-6 w-6" />
-            <span className="text-lg font-medium">Course Generated Successfully!</span>
+        <CardContent className="p-8">
+          <div className="text-center space-y-6">
+            {/* Success Icon with Animation */}
+            <div className="flex justify-center">
+              <div className="relative">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="h-10 w-10 text-green-600" />
+                </div>
+                {showCelebration && (
+                  <div className="absolute -top-2 -right-2">
+                    <Sparkles className="h-6 w-6 text-yellow-500 animate-pulse" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Success Message */}
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-green-600">
+                🎉 Course Generated Successfully!
+              </h2>
+              <p className="text-lg text-muted-foreground">
+                Your comprehensive course has been created and is ready for customization.
+              </p>
+            </div>
+
+            {/* Redirect Message */}
+            {redirecting ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-center space-x-2 text-primary">
+                  <ArrowRight className="h-5 w-5 animate-pulse" />
+                  <span className="font-medium">Redirecting to Base Class Studio...</span>
+                </div>
+                <Progress value={100} className="w-full max-w-xs mx-auto" />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  You'll be automatically redirected to the studio to customize your course.
+                </p>
+                <Button 
+                  onClick={() => router.push(`/teach/base-classes/${baseClassId}`)}
+                  className="mx-auto"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Go to Studio Now
+                </Button>
+              </div>
+            )}
+
+            {/* Course Stats */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md mx-auto">
+              <div className="text-sm text-green-800 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span>✅ Course structure created</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>✅ Learning paths generated</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>✅ Assessments configured</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>✅ Ready for customization</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <p className="text-center text-muted-foreground mt-2">
-            Your course has been created and is ready for review.
-          </p>
         </CardContent>
       </Card>
     );

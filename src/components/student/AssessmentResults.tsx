@@ -99,11 +99,12 @@ const AssessmentResults = () => {
       case 'multiple_choice':
         const options = question.answer_key?.options || [];
         const correctAnswer = question.answer_key?.correct_answer;
+        const selectedOption = answer?.selected_option;
         return (
           <div className="space-y-2">
             <div className="grid gap-2">
-              {options.map((option, index) => {
-                const isSelected = answer === option;
+              {options.map((option: string, index: number) => {
+                const isSelected = selectedOption === option;
                 const isCorrect = option === correctAnswer;
                 const label = String.fromCharCode(65 + index);
                 
@@ -136,13 +137,14 @@ const AssessmentResults = () => {
 
       case 'true_false':
         const correctBool = question.answer_key?.correct_answer;
-        const isCorrect = answer === correctBool;
+        const selectedAnswer = answer?.selected_answer;
+        const isCorrect = selectedAnswer === correctBool;
         return (
           <div className="space-y-2">
             <div className="flex items-center space-x-4">
               <span className="font-medium">Your Answer:</span>
               <Badge variant={isCorrect ? 'default' : 'destructive'}>
-                {answer ? 'True' : 'False'}
+                {selectedAnswer ? 'True' : 'False'}
               </Badge>
             </div>
             {!isCorrect && (
@@ -153,17 +155,23 @@ const AssessmentResults = () => {
                 </Badge>
               </div>
             )}
+            {question.answer_key?.explanation && (
+              <div className="mt-3 p-3 bg-blue-50 rounded-md border border-blue-200">
+                <p className="text-blue-800 text-sm">{question.answer_key.explanation}</p>
+              </div>
+            )}
           </div>
         );
 
       case 'short_answer':
       case 'essay':
+        const textAnswer = answer?.text_answer || answer?.essay_text;
         return (
           <div className="space-y-4">
             <div>
               <h4 className="font-medium mb-2">Your Answer:</h4>
               <div className="p-3 bg-muted/50 rounded-md border">
-                <p className="whitespace-pre-wrap">{answer || 'No answer provided'}</p>
+                <p className="whitespace-pre-wrap">{textAnswer || 'No answer provided'}</p>
               </div>
             </div>
             
@@ -179,11 +187,23 @@ const AssessmentResults = () => {
               </div>
             )}
 
-            {question.answer_key?.sample_response && (
+            {response.manual_feedback && (
+              <div>
+                <h4 className="font-medium mb-2">Instructor Feedback:</h4>
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="whitespace-pre-wrap">
+                    {response.manual_feedback}
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+
+            {question.sample_response && (
               <div>
                 <h4 className="font-medium mb-2">Sample Response:</h4>
                 <div className="p-3 bg-blue-50 rounded-md border border-blue-200">
-                  <p className="whitespace-pre-wrap text-blue-800">{question.answer_key.sample_response}</p>
+                  <p className="whitespace-pre-wrap text-blue-800">{question.sample_response}</p>
                 </div>
               </div>
             )}
@@ -192,7 +212,7 @@ const AssessmentResults = () => {
               <div>
                 <h4 className="font-medium mb-2">Key Points:</h4>
                 <ul className="list-disc list-inside space-y-1 text-sm">
-                  {question.answer_key.key_points.map((point, index) => (
+                  {question.answer_key.key_points.map((point: string, index: number) => (
                     <li key={index}>{point}</li>
                   ))}
                 </ul>
@@ -203,11 +223,11 @@ const AssessmentResults = () => {
 
       case 'matching':
         const pairs = question.answer_key?.pairs || [];
-        const userMatches = answer || {};
+        const userMatches = answer?.matches || {};
         return (
           <div className="space-y-3">
             <h4 className="font-medium">Your Matches:</h4>
-            {pairs.map((pair, index) => {
+            {pairs.map((pair: {left: string, right: string}, index: number) => {
               const userAnswer = userMatches[pair.left];
               const isCorrect = userAnswer === pair.right;
               
@@ -292,7 +312,7 @@ const AssessmentResults = () => {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">{assessment.title}</h1>
-        <p className="text-muted-foreground">{assessment.description}</p>
+        {assessment.description && <p className="text-muted-foreground">{assessment.description}</p>}
       </div>
 
       {/* Score Card */}
@@ -315,10 +335,10 @@ const AssessmentResults = () => {
                   {Math.round(percentageScore)}%
                 </p>
                 <Badge 
-                  variant={percentageScore >= 70 ? 'default' : 'destructive'} 
+                  variant={percentageScore >= (assessment.passing_score_percentage || 70) ? 'default' : 'destructive'} 
                   className="text-sm"
                 >
-                  {percentageScore >= 70 ? 'Passed' : 'Failed'}
+                  {percentageScore >= (assessment.passing_score_percentage || 70) ? 'Passed' : 'Failed'}
                 </Badge>
               </div>
             </div>
@@ -339,14 +359,14 @@ const AssessmentResults = () => {
                   <span className="text-muted-foreground">Correct:</span>
                   <span className="font-medium">{correctCount} / {totalQuestions}</span>
                 </div>
-                                 <div className="flex justify-between">
-                   <span className="text-muted-foreground">Points:</span>
-                   <span className="font-medium">{attempt.earned_points || 0} / {attempt.total_points || totalQuestions * 10}</span>
-                 </div>
-                 <div className="flex justify-between">
-                   <span className="text-muted-foreground">Time:</span>
-                   <span className="font-medium">{formatTime(attempt.time_spent_minutes ? attempt.time_spent_minutes * 60 : null)}</span>
-                 </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Points:</span>
+                  <span className="font-medium">{attempt.earned_points || 0} / {attempt.total_points || totalQuestions * 10}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Time:</span>
+                  <span className="font-medium">{formatTime(attempt.time_spent_minutes ? attempt.time_spent_minutes * 60 : null)}</span>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Submitted:</span>
                   <span className="font-medium">
@@ -399,10 +419,10 @@ const AssessmentResults = () => {
                     <div className="space-y-4">
                       {renderAnswer(response, response.question)}
                       
-                      {response.time_spent_seconds && (
+                      {response.created_at && (
                         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                           <Clock className="h-3 w-3" />
-                          <span>Time spent: {formatTime(response.time_spent_seconds)}</span>
+                          <span>Answered: {new Date(response.created_at).toLocaleString()}</span>
                         </div>
                       )}
                     </div>
@@ -422,7 +442,7 @@ const AssessmentResults = () => {
         >
           Back to Course
         </Button>
-        {assessment.allow_retakes && attempt.status === 'completed' && (
+        {assessment.max_attempts && attempt.attempt_number < assessment.max_attempts && attempt.status === 'completed' && (
           <Button 
             onClick={() => router.push(`/assessments/${assessment.id}/take`)}
           >

@@ -1,26 +1,53 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { Database } from '../../../../../../packages/types/db';
-import { QuestionValidationService } from '@/lib/services/question-validation-service';
+import { NextRequest, NextResponse } from 'next/server'
+import { createSupabaseServerClient } from '../../../../../lib/supabase/server'
+import { Database, Tables, TablesInsert, TablesUpdate } from '../../../../../../packages/types/db'
 
-type Assessment = Database['public']['Tables']['assessments']['Row'];
+// Types for V2 schema
+type Assessment = Tables<'assessments'>
+type AssessmentQuestion = Tables<'assessment_questions'>
+type StudentAttempt = Tables<'student_attempts'>
+type StudentResponse = Tables<'student_responses'>
 
-// POST /api/teach/assessments/attempt - Start a new assessment attempt
+interface SubmitAttemptRequest {
+  assessmentId: string
+  responses: Array<{
+    questionId: string
+    response: {
+      selected_option?: string
+      selected_answer?: boolean
+      text_answer?: string
+      selected_options?: string[]
+      pairs?: Record<string, string>
+    }
+  }>
+}
+
+interface QuestionResponse {
+  questionId: string
+  response: {
+    selected_option?: string
+    selected_answer?: boolean
+    text_answer?: string
+    selected_options?: string[]
+    pairs?: Record<string, string>
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient();
+    const supabase = createSupabaseServerClient()
     
-    // Get the authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { assessmentId } = await request.json();
-    
-    if (!assessmentId) {
-      return NextResponse.json({ error: 'Assessment ID is required' }, { status: 400 });
+    const body: SubmitAttemptRequest = await request.json()
+    const { assessmentId, responses } = body
+
+    if (!assessmentId || !responses || !Array.isArray(responses)) {
+      return NextResponse.json({ error: 'Invalid request data' }, { status: 400 })
     }
 
     // Get assessment details
@@ -28,316 +55,224 @@ export async function POST(request: NextRequest) {
       .from('assessments')
       .select('*')
       .eq('id', assessmentId)
-      .single();
+      .single() as { data: Assessment | null, error: any }
 
     if (assessmentError || !assessment) {
-      return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Assessment not found' }, { status: 404 })
     }
 
-    // Check if user is enrolled in a class instance for this base class
-    if (assessment.base_class_id) {
-      const { data: classInstances, error: instanceError } = await supabase
-        .from('class_instances')
-        .select('id')
-        .eq('base_class_id', assessment.base_class_id);
+    // Check existing attempts
+    const { data: existingAttempts, error: attemptsError } = await supabase
+      .from('student_attempts')
+      .select('attempt_number')
+      .eq('assessment_id', assessmentId)
+      .eq('student_id', user.id)
+      .order('attempt_number', { ascending: false }) as { data: Pick<StudentAttempt, 'attempt_number'>[] | null, error: any }
 
-      if (instanceError || !classInstances || classInstances.length === 0) {
-        return NextResponse.json({ error: 'No class instances found for this assessment' }, { status: 404 });
-      }
-
-      const classInstanceIds = classInstances.map(ci => ci.id);
-      
-      const { data: enrollment, error: enrollmentError } = await supabase
-        .from('rosters')
-        .select('*')
-        .in('class_instance_id', classInstanceIds)
-        .eq('profile_id', user.id)
-        .single();
-
-      if (enrollmentError || !enrollment) {
-        return NextResponse.json({ error: 'Not enrolled in this class' }, { status: 403 });
-      }
+    if (attemptsError) {
+      return NextResponse.json({ error: 'Failed to check existing attempts' }, { status: 500 })
     }
 
-    // Check if there's already an active attempt
-    const { data: existingAttempt, error: attemptError } = await supabase
-      .from('assessment_attempts')
+    // Check attempt limits
+    const currentAttemptNumber = (existingAttempts?.[0]?.attempt_number || 0) + 1
+    if (assessment.max_attempts && currentAttemptNumber > assessment.max_attempts) {
+      return NextResponse.json({ error: 'Maximum attempts exceeded' }, { status: 400 })
+    }
+
+    // Get all questions for this assessment
+    const { data: questions, error: questionsError } = await supabase
+      .from('assessment_questions')
       .select('*')
       .eq('assessment_id', assessmentId)
-      .eq('user_id', user.id)
-      .eq('status', 'in_progress')
-      .single();
+      .order('order_index') as { data: AssessmentQuestion[] | null, error: any }
 
-    if (existingAttempt && !attemptError) {
-      return NextResponse.json({ 
-        message: 'Active attempt found',
-        attemptId: existingAttempt.id 
-      });
+    if (questionsError || !questions) {
+      return NextResponse.json({ error: 'Failed to load questions' }, { status: 500 })
     }
 
-    // Create new attempt
-    const { data: newAttempt, error: createError } = await supabase
-      .from('assessment_attempts')
-      .insert({
-        assessment_id: assessmentId,
-        assessment_type: assessment.assessment_type,
-        user_id: user.id,
-        status: 'in_progress',
-        started_at: new Date().toISOString(),
-        attempt_number: 1, // TODO: Calculate actual attempt number
-        total_questions: 0, // TODO: Calculate from assessment questions
-        base_class_id: assessment.base_class_id,
-        lesson_id: assessment.lesson_id,
-        path_id: assessment.path_id
-      })
-      .select()
-      .single();
+    // Create the attempt record
+    const attemptData: TablesInsert<'student_attempts'> = {
+      assessment_id: assessmentId,
+      student_id: user.id,
+      attempt_number: currentAttemptNumber,
+      status: 'submitted',
+      started_at: new Date().toISOString(),
+      submitted_at: new Date().toISOString(),
+      ai_grading_status: 'pending'
+    }
 
-    if (createError || !newAttempt) {
-      return NextResponse.json({ error: 'Failed to create assessment attempt' }, { status: 500 });
+    const { data: newAttempt, error: attemptError } = await supabase
+      .from('student_attempts')
+      .insert(attemptData)
+      .select()
+      .single() as { data: StudentAttempt | null, error: any }
+
+    if (attemptError || !newAttempt) {
+      return NextResponse.json({ error: 'Failed to create attempt' }, { status: 500 })
+    }
+
+    // Process responses and calculate scores
+    let totalPoints = 0
+    let earnedPoints = 0
+    let hasSubjectiveQuestions = false
+
+    const responseInserts: TablesInsert<'student_responses'>[] = []
+
+    for (const questionResponse of responses) {
+      const question = questions.find((q: AssessmentQuestion) => q.id === questionResponse.questionId)
+      if (!question) continue
+
+      const questionPoints = question.points || 0
+      totalPoints += questionPoints
+
+      let isCorrect = false
+      let pointsEarned = 0
+
+      // Auto-grade objective questions
+      if (question.question_type === 'multiple_choice') {
+        const correctAnswer = (question.answer_key as any)?.correct_option
+        const userAnswer = questionResponse.response.selected_option
+        isCorrect = correctAnswer === userAnswer
+        pointsEarned = isCorrect ? questionPoints : 0
+      } else if (question.question_type === 'true_false') {
+        const correctAnswer = (question.answer_key as any)?.correct_answer
+        const userAnswer = questionResponse.response.selected_answer
+        isCorrect = correctAnswer === userAnswer
+        pointsEarned = isCorrect ? questionPoints : 0
+      } else if (question.question_type === 'matching') {
+        const correctPairs = (question.answer_key as any)?.correct_pairs || {}
+        const userPairs = questionResponse.response.pairs || {}
+        
+        let correctMatches = 0
+        const totalMatches = Object.keys(correctPairs).length
+        
+        for (const [key, value] of Object.entries(correctPairs)) {
+          if (userPairs[key] === value) {
+            correctMatches++
+          }
+        }
+        
+        isCorrect = correctMatches === totalMatches
+        pointsEarned = (correctMatches / totalMatches) * questionPoints
+      } else {
+        // Subjective questions need AI grading
+        hasSubjectiveQuestions = true
+        pointsEarned = 0 // Will be graded later
+      }
+
+      earnedPoints += pointsEarned
+
+      const responseData: TablesInsert<'student_responses'> = {
+        attempt_id: newAttempt.id,
+        question_id: question.id,
+        response_data: questionResponse.response,
+        is_correct: question.question_type in ['multiple_choice', 'true_false', 'matching'] ? isCorrect : null,
+        points_earned: pointsEarned,
+        final_score: pointsEarned
+      }
+
+      responseInserts.push(responseData)
+    }
+
+    // Insert all responses
+    const { error: responsesError } = await supabase
+      .from('student_responses')
+      .insert(responseInserts)
+
+    if (responsesError) {
+      return NextResponse.json({ error: 'Failed to save responses' }, { status: 500 })
+    }
+
+    // Calculate final scores and update attempt
+    const percentageScore = totalPoints > 0 ? (earnedPoints / totalPoints) * 100 : 0
+    const passingScore = assessment.passing_score_percentage || 70
+    const passed = percentageScore >= passingScore
+
+    const attemptUpdate: TablesUpdate<'student_attempts'> = {
+      total_points: totalPoints,
+      earned_points: earnedPoints,
+      percentage_score: percentageScore,
+      passed: hasSubjectiveQuestions ? null : passed, // Don't mark as passed/failed until AI grading is complete
+      ai_grading_status: hasSubjectiveQuestions ? 'pending' : 'completed'
+    }
+
+    const { error: updateError } = await supabase
+      .from('student_attempts')
+      .update(attemptUpdate)
+      .eq('id', newAttempt.id)
+
+    if (updateError) {
+      return NextResponse.json({ error: 'Failed to update attempt scores' }, { status: 500 })
     }
 
     return NextResponse.json({
-      message: 'Assessment attempt created successfully',
-      attemptId: newAttempt.id
-    });
+      success: true,
+      attemptId: newAttempt.id,
+      totalPoints,
+      earnedPoints,
+      percentageScore,
+      passed: hasSubjectiveQuestions ? null : passed,
+      needsAiGrading: hasSubjectiveQuestions,
+      message: hasSubjectiveQuestions 
+        ? 'Submission successful. AI grading in progress for subjective questions.'
+        : 'Assessment completed successfully!'
+    })
 
   } catch (error) {
-    console.error('Error creating assessment attempt:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error submitting assessment attempt:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// PUT /api/teach/assessments/attempt - Submit assessment responses
-export async function PUT(request: NextRequest) {
-  try {
-    const supabase = createSupabaseServerClient();
-    const body = await request.json();
-
-    // Verify user authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const {
-      attemptId,
-      responses, // Array of question responses
-      isSubmission = false // true for final submission, false for saving progress
-    } = body;
-
-    if (!attemptId || !responses || !Array.isArray(responses)) {
-      return NextResponse.json(
-        { error: 'Attempt ID and responses are required' },
-        { status: 400 }
-      );
-    }
-
-    // Verify attempt exists and belongs to user
-    const { data: attempt, error: attemptError } = await supabase
-      .from('assessment_attempts')
-      .select('id, user_id, status')
-      .eq('id', attemptId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (attemptError || !attempt) {
-      return NextResponse.json({ error: 'Assessment attempt not found' }, { status: 404 });
-    }
-
-    if (attempt.status !== 'in_progress') {
-      return NextResponse.json({ error: 'Assessment attempt is not in progress' }, { status: 400 });
-    }
-
-    // Initialize validation service
-    const validationService = new QuestionValidationService(supabase);
-
-    // Process responses
-    const processedResponses = [];
-    let totalScore = 0;
-    let maxPossibleScore = 0;
-
-    for (const response of responses) {
-      // Fetch the question details from the database to get the correct answer and other metadata
-      const { data: question, error: questionError } = await supabase
-        .from('questions')
-        .select(`
-          *,
-          options:question_options(*)
-        `)
-        .eq('id', response.questionId)
-        .single();
-
-      if (questionError || !question) {
-        console.error(`Question not found for ID: ${response.questionId}`, questionError);
-        // Optionally, add a marker to processedResponses for the client
-        processedResponses.push({
-          questionId: response.questionId,
-          validation: null,
-          error: 'Question not found',
-          saved: false
-        });
-        continue; // Skip to the next response
-      }
-      
-      try {
-        // Validate and grade the response
-        const validationResult = await validationService.validateAnswer(question, response);
-        
-        totalScore += validationResult.score;
-        maxPossibleScore += validationResult.maxScore;
-
-        // Save or update response in database
-        const { data: savedResponse, error: responseError } = await supabase
-          .from('assessment_responses')
-          .upsert({
-            attempt_id: attemptId,
-            question_id: response.questionId,
-            question_type: response.questionType,
-            student_answer: typeof response.studentAnswer === 'object' 
-              ? JSON.stringify(response.studentAnswer) 
-              : String(response.studentAnswer),
-            is_correct: validationResult.isCorrect,
-            score: validationResult.score,
-            max_score: validationResult.maxScore,
-            feedback: validationResult.feedback,
-            detailed_feedback: validationResult.detailedFeedback,
-            time_spent: response.timeSpent || 0,
-            grading_notes: validationResult.gradingNotes,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'attempt_id,question_id'
-          })
-          .select()
-          .single();
-
-        if (responseError) {
-          console.error('Error saving response:', responseError);
-        }
-
-        processedResponses.push({
-          questionId: response.questionId,
-          validation: validationResult,
-          saved: !responseError
-        });
-
-      } catch (validationError) {
-        console.error('Error validating response:', validationError);
-        processedResponses.push({
-          questionId: response.questionId,
-          validation: null,
-          error: 'Validation failed',
-          saved: false
-        });
-      }
-    }
-
-    // Calculate percentage score
-    const percentageScore = maxPossibleScore > 0 ? (totalScore / maxPossibleScore) * 100 : 0;
-
-    // Update attempt with current progress
-    const attemptUpdate: any = {
-      total_score: totalScore,
-      max_possible_score: maxPossibleScore,
-      percentage_score: percentageScore,
-      updated_at: new Date().toISOString()
-    };
-
-    // If this is a final submission, mark as completed
-    if (isSubmission) {
-      attemptUpdate.status = 'completed';
-      attemptUpdate.completed_at = new Date().toISOString();
-    }
-
-    const { data: updatedAttempt, error: updateError } = await supabase
-      .from('assessment_attempts')
-      .update(attemptUpdate)
-      .eq('id', attemptId)
-      .select()
-      .single();
-
-    if (updateError) {
-      console.error('Error updating attempt:', updateError);
-    }
-
-    const responseData = {
-      attempt: updatedAttempt || attempt,
-      responses: processedResponses,
-      summary: {
-        totalScore,
-        maxPossibleScore,
-        percentageScore: Math.round(percentageScore * 100) / 100,
-        questionsAnswered: responses.length,
-        isSubmitted: isSubmission
-      },
-      message: isSubmission ? 'Assessment submitted successfully' : 'Progress saved successfully'
-    };
-
-    return NextResponse.json(responseData);
-
-  } catch (error) {
-    console.error('Error in assessment attempt PUT:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-// GET /api/teach/assessments/attempt?attemptId=<id> - Get assessment results
+// GET /api/teach/assessments/attempt - Get attempt details
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient();
-    const { searchParams } = new URL(request.url);
-    const attemptId = searchParams.get('attemptId');
-
-    // Verify user authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const supabase = createSupabaseServerClient()
+    
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const { searchParams } = new URL(request.url)
+    const attemptId = searchParams.get('attemptId')
 
     if (!attemptId) {
-      return NextResponse.json({ error: 'Attempt ID is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Attempt ID is required' }, { status: 400 })
     }
 
-    // Fetch attempt details
+    // Fetch attempt details with assessment info
     const { data: attempt, error: attemptError } = await supabase
-      .from('assessment_attempts')
+      .from('student_attempts')
       .select('*')
       .eq('id', attemptId)
-      .eq('user_id', user.id)
-      .single();
+      .eq('student_id', user.id)
+      .single()
 
     if (attemptError || !attempt) {
-      return NextResponse.json({ error: 'Assessment attempt not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Assessment attempt not found' }, { status: 404 })
     }
 
-    // Fetch responses for the attempt, including the question details
+    // Fetch responses with question details
     const { data: responses, error: responsesError } = await supabase
-      .from('assessment_responses')
-      .select(`
-        *,
-        question:questions(*)
-      `)
-      .eq('attempt_id', attemptId);
+      .from('student_responses')
+      .select('*')
+      .eq('attempt_id', attemptId)
 
     if (responsesError) {
-      console.error('Error fetching assessment responses:', responsesError);
-      return NextResponse.json(
-        { error: 'Failed to fetch assessment responses' },
-        { status: 500 }
-      );
+      console.error('Error fetching responses:', responsesError)
+      return NextResponse.json({ error: 'Failed to fetch attempt responses' }, { status: 500 })
     }
 
-    return NextResponse.json({ attempt, responses });
+    return NextResponse.json({
+      attempt,
+      responses: responses || []
+    })
 
   } catch (error) {
-    console.error('Error in assessment attempt GET:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Error in GET /api/teach/assessments/attempt:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
  

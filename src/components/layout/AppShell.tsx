@@ -10,6 +10,7 @@ import { useUIContext } from '@/context/UIContext';
 import { cn } from '@/lib/utils'; // Assuming you have a cn utility
 import CommandPalette from './CommandPalette'; // Import CommandPalette
 import type { UserRole } from "@/config/navConfig"; // Import UserRole
+import { SkipLink } from '@/components/ui/skip-link';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -41,6 +42,11 @@ const AppShell: React.FC<AppShellProps> = ({ children, userRole }) => {
 
   return (
     <> {/* Use Fragment to include non-visual CommandPalette */}
+      {/* Skip Navigation Links */}
+      <SkipLink href="#main-content">Skip to main content</SkipLink>
+      <SkipLink href="#navigation">Skip to navigation</SkipLink>
+      {isPanelVisible && <SkipLink href="#ai-panel">Skip to AI assistant</SkipLink>}
+      
       <div className="flex h-screen bg-background text-foreground overflow-hidden relative">
         {/* Left Navigation - hide completely on mobile */}
         <div className="hidden md:block transition-all duration-300 ease-in-out z-20 flex-shrink-0">
@@ -64,7 +70,7 @@ const AppShell: React.FC<AppShellProps> = ({ children, userRole }) => {
           minWidth: !isMobile && isPanelVisible ? '320px' : undefined
         }}>
           <Header />
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 min-h-0">
             <MainContent>{children}</MainContent>
           </div>
         </div>
@@ -72,6 +78,7 @@ const AppShell: React.FC<AppShellProps> = ({ children, userRole }) => {
         {/* AI Panel for Desktop - Fixed width, never pushed off screen */}
         {!isMobile && isPanelVisible && (
           <div 
+            id="ai-panel"
             className="w-80 min-w-80 max-w-80 border-l border-[#E0E0E0] dark:border-[#333333] h-screen transition-all duration-300 ease-in-out flex-shrink-0 bg-background"
             style={{
               // Ensure panel never goes off screen
@@ -89,7 +96,9 @@ const AppShell: React.FC<AppShellProps> = ({ children, userRole }) => {
 
       {/* AI Panel for Mobile - Full screen experience */}
       {isMobile && isPanelVisible && (
-        <AiPanel userRole={userRole} />
+        <div id="ai-panel-mobile">
+          <AiPanel userRole={userRole} />
+        </div>
       )}
 
       <CommandPalette /> {/* Include CommandPalette here */}

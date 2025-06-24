@@ -29,7 +29,7 @@ const AssessmentList = ({ baseClassId }: { baseClassId: string }) => {
       try {
         // This API endpoint needs to be updated to return the AssessmentWithAttempt structure
         // It should perform a LEFT JOIN from assessments to assessment_attempts for the current user
-        const response = await fetch(`/api/teach/assessments?baseClassId=${baseClassId}&withAttempts=true`);
+        const response = await fetch(`/api/teach/assessments?base_class_id=${baseClassId}&withAttempts=true`);
         if (!response.ok) throw new Error('Failed to fetch assessments');
         const data: AssessmentWithAttempt[] = await response.json();
         setAssessments(data);

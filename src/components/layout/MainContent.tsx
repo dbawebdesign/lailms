@@ -16,13 +16,8 @@ const MainContent: React.FC<MainContentProps> = ({ children }) => {
   
   return (
     <main 
-      // Temporarily apply consistent padding for debugging
-      className='p-2 sm:p-4 md:p-6'
-      // className={`${
-      //   shouldRemoveTopPadding 
-      //     ? 'px-2 pb-2 sm:px-4 sm:pb-4 md:px-6 md:pb-6' 
-      //     : 'p-2 sm:p-4 md:p-6'
-      // }`} 
+      id="main-content"
+      className="h-full overflow-y-auto"
       role="main"
     >
       {children}

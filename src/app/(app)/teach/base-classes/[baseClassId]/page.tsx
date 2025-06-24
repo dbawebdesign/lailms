@@ -955,7 +955,7 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
       }}
       actionable={true}
     >
-      <div className="flex flex-col lg:flex-row min-h-screen bg-background">
+      <div className="flex flex-col lg:flex-row h-full bg-background">
         {/* Mobile navigation toggle - Always visible on mobile */}
         <div className="lg:hidden border-b border-border">
           <div className="p-4">
@@ -1001,7 +1001,7 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
               border-b lg:border-b-0 lg:border-r border-border 
               flex flex-col
               flex-shrink-0 
-              lg:h-screen lg:overflow-y-auto lg:sticky lg:top-0
+              lg:max-h-full lg:overflow-y-auto
             `}
           >
             {/* Navigation content with proper scrolling */}
@@ -1071,23 +1071,19 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
           }}
           actionable={true}
         >
-          <div className="flex-1 flex flex-col min-w-0 bg-background">
-            {/* Sticky Header */}
-            <div className="sticky top-0 z-20 p-4 lg:p-6 border-b border-border bg-background flex-shrink-0 shadow-sm">
+          <div className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden">
+            {/* Header */}
+            <div className="p-4 lg:p-6 border-b border-border bg-background flex-shrink-0">
               <h1 className="text-xl lg:text-2xl xl:text-3xl font-bold text-foreground truncate">Base Class Studio</h1>
               {selectedItem && selectedItem.title && (
                 <p className="text-sm lg:text-md xl:text-lg text-muted-foreground mt-1 truncate">Editing: {selectedItem.title}</p>
               )}
             </div>
             
-            {/* Editor Content - No internal scrolling */}
-            <div className="flex-1 min-w-0">
-              <div className="p-4 lg:p-6">
-                <div className="w-full max-w-none bg-background rounded-lg shadow-lg border border-border">
-                  <div className="p-4 lg:p-6 w-full min-w-0">
-                    {renderEditor()}
-                  </div>
-                </div>
+            {/* Editor Content - Scrollable */}
+            <div className="flex-1 min-w-0 overflow-y-auto">
+              <div className="p-2 sm:p-4 lg:p-6">
+                {renderEditor()}
               </div>
             </div>
           </div>

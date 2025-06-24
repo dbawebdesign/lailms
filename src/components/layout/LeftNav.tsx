@@ -59,6 +59,7 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
 
   return (
     <aside
+      id="navigation"
       className={cn(
         "h-full flex flex-col bg-background border-r border-[#E0E0E0] dark:border-[#333333]",
         isNavCollapsed ? "items-center" : "items-start"

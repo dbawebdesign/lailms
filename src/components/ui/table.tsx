@@ -4,22 +4,34 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+interface TableProps extends React.ComponentProps<"table"> {
+  'aria-label'?: string;
+  'aria-labelledby'?: string;
+  'aria-describedby'?: string;
+}
+
+function Table({ className, ...props }: TableProps) {
   return (
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
+      role="region"
+      aria-label={props['aria-label'] || "Data table"}
+      tabIndex={0}
     >
       <table
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}
+        role="table"
         {...props}
       />
     </div>
   )
 }
 
-function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
+interface TableHeaderProps extends React.ComponentProps<"thead"> {}
+
+function TableHeader({ className, ...props }: TableHeaderProps) {
   return (
     <thead
       data-slot="table-header"
@@ -29,7 +41,9 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   )
 }
 
-function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
+interface TableBodyProps extends React.ComponentProps<"tbody"> {}
+
+function TableBody({ className, ...props }: TableBodyProps) {
   return (
     <tbody
       data-slot="table-body"
@@ -39,7 +53,9 @@ function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
   )
 }
 
-function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
+interface TableFooterProps extends React.ComponentProps<"tfoot"> {}
+
+function TableFooter({ className, ...props }: TableFooterProps) {
   return (
     <tfoot
       data-slot="table-footer"
@@ -52,7 +68,9 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   )
 }
 
-function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
+interface TableRowProps extends React.ComponentProps<"tr"> {}
+
+function TableRow({ className, ...props }: TableRowProps) {
   return (
     <tr
       data-slot="table-row"
@@ -65,7 +83,12 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   )
 }
 
-function TableHead({ className, ...props }: React.ComponentProps<"th">) {
+interface TableHeadProps extends React.ComponentProps<"th"> {
+  scope?: "col" | "row" | "colgroup" | "rowgroup";
+  'aria-sort'?: "none" | "ascending" | "descending" | "other";
+}
+
+function TableHead({ className, scope = "col", ...props }: TableHeadProps) {
   return (
     <th
       data-slot="table-head"
@@ -73,12 +96,17 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
         "text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
+      scope={scope}
       {...props}
     />
   )
 }
 
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+interface TableCellProps extends React.ComponentProps<"td"> {
+  scope?: "row" | "col" | "rowgroup" | "colgroup";
+}
+
+function TableCell({ className, scope, ...props }: TableCellProps) {
   return (
     <td
       data-slot="table-cell"
@@ -86,15 +114,18 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
         "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
+      scope={scope}
       {...props}
     />
   )
 }
 
+interface TableCaptionProps extends React.ComponentProps<"caption"> {}
+
 function TableCaption({
   className,
   ...props
-}: React.ComponentProps<"caption">) {
+}: TableCaptionProps) {
   return (
     <caption
       data-slot="table-caption"
@@ -113,4 +144,7 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  type TableProps,
+  type TableHeadProps,
+  type TableCellProps,
 }

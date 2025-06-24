@@ -26,10 +26,12 @@ import {
   Loader2
 } from 'lucide-react';
 import { NewSchemaAssessment } from '@/components/assessments/v2/types/newSchemaTypes';
+import { AssessmentPreviewModal } from './AssessmentPreviewModal';
+import { AssessmentEditorModal } from './AssessmentEditorModal';
 
 interface AssessmentManagementPanelProps {
   baseClassId: string;
-  onCreateAssessment: (type: 'lesson_assessment' | 'path_quiz' | 'class_exam') => void;
+  onCreateAssessment: (type: 'lesson' | 'path' | 'class') => void;
   onEditAssessment: (assessmentId: string) => void;
 }
 
@@ -54,6 +56,9 @@ export default function AssessmentManagementPanel({
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [activeTab, setActiveTab] = useState('overview');
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedAssessment, setSelectedAssessment] = useState<AssessmentWithStats | null>(null);
 
   useEffect(() => {
     fetchAssessments();
@@ -62,13 +67,18 @@ export default function AssessmentManagementPanel({
   const fetchAssessments = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/teach/assessments?baseClassId=${baseClassId}&includeStats=true`);
+      console.log('Fetching assessments for baseClassId:', baseClassId);
+      const response = await fetch(`/api/teach/assessments?base_class_id=${baseClassId}&includeStats=true`);
+      console.log('Response status:', response.status);
       if (!response.ok) throw new Error('Failed to fetch assessments');
       
       const data = await response.json();
+      console.log('Assessment API response:', data);
+      console.log('Number of assessments:', data.assessments?.length || 0);
       setAssessments(data.assessments || []);
     } catch (error) {
       console.error('Error fetching assessments:', error);
+      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
@@ -82,6 +92,13 @@ export default function AssessmentManagementPanel({
     
     return matchesSearch && matchesType && matchesStatus;
   });
+
+  // Debug logging
+  console.log('Raw assessments:', assessments);
+  console.log('Filtered assessments:', filteredAssessments);
+  console.log('Search term:', searchTerm);
+  console.log('Type filter:', typeFilter);
+  console.log('Status filter:', statusFilter);
 
   const getAssessmentsByType = (type: string) => {
     return filteredAssessments.filter(a => a.assessment_type === type);
@@ -123,6 +140,24 @@ export default function AssessmentManagementPanel({
     }
   };
 
+  const handlePreviewAssessment = (assessment: AssessmentWithStats) => {
+    setSelectedAssessment(assessment);
+    setPreviewModalOpen(true);
+  };
+
+  const handleEditAssessment = (assessment: AssessmentWithStats) => {
+    setSelectedAssessment(assessment);
+    setEditModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setPreviewModalOpen(false);
+    setEditModalOpen(false);
+    setSelectedAssessment(null);
+    // Refresh assessments to get updated data
+    fetchAssessments();
+  };
+
   const AssessmentCard = ({ assessment }: { assessment: AssessmentWithStats }) => (
     <Card key={assessment.id} className="hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
@@ -148,7 +183,7 @@ export default function AssessmentManagementPanel({
             </div>
           </div>
           <div className="flex flex-col space-y-1">
-            <Badge variant={assessment.assessment_type === 'class_exam' ? 'default' : 'secondary'}>
+                            <Badge variant={assessment.assessment_type === 'class' ? 'default' : 'secondary'}>
               {assessment.assessment_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
             </Badge>
             {assessment.ai_grading_enabled && (
@@ -162,19 +197,19 @@ export default function AssessmentManagementPanel({
       <CardContent className="pt-0">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
           <div className="text-center">
-            <div className="font-semibold">{assessment.questionCount}</div>
+            <div className="font-semibold">{assessment.questionCount || 0}</div>
             <div className="text-muted-foreground">Questions</div>
           </div>
           <div className="text-center">
-            <div className="font-semibold">{assessment.attemptCount}</div>
+            <div className="font-semibold">{assessment.attemptCount || 0}</div>
             <div className="text-muted-foreground">Attempts</div>
           </div>
           <div className="text-center">
-            <div className="font-semibold">{assessment.averageScore.toFixed(1)}%</div>
+            <div className="font-semibold">{(assessment.averageScore || 0).toFixed(1)}%</div>
             <div className="text-muted-foreground">Avg Score</div>
           </div>
           <div className="text-center">
-            <div className="font-semibold">{assessment.completionRate.toFixed(1)}%</div>
+            <div className="font-semibold">{(assessment.completionRate || 0).toFixed(1)}%</div>
             <div className="text-muted-foreground">Completion</div>
           </div>
         </div>
@@ -184,7 +219,7 @@ export default function AssessmentManagementPanel({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onEditAssessment(assessment.id)}
+              onClick={() => handleEditAssessment(assessment)}
             >
               <Edit className="h-3 w-3 mr-1" />
               Edit
@@ -202,6 +237,7 @@ export default function AssessmentManagementPanel({
             <Button
               variant="outline"
               size="sm"
+              onClick={() => handlePreviewAssessment(assessment)}
             >
               <Eye className="h-3 w-3 mr-1" />
               Preview
@@ -242,20 +278,20 @@ export default function AssessmentManagementPanel({
         <div className="flex items-center space-x-2">
           <Button
             variant="outline"
-            onClick={() => onCreateAssessment('lesson_assessment')}
+            onClick={() => onCreateAssessment('lesson')}
           >
             <Plus className="h-4 w-4 mr-2" />
             Lesson Assessment
           </Button>
           <Button
             variant="outline"
-            onClick={() => onCreateAssessment('path_quiz')}
+            onClick={() => onCreateAssessment('path')}
           >
             <Plus className="h-4 w-4 mr-2" />
             Path Quiz
           </Button>
           <Button
-            onClick={() => onCreateAssessment('class_exam')}
+            onClick={() => onCreateAssessment('class')}
           >
             <Plus className="h-4 w-4 mr-2" />
             Class Exam
@@ -271,7 +307,7 @@ export default function AssessmentManagementPanel({
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{getAssessmentsByType('lesson_assessment').length}</div>
+            <div className="text-2xl font-bold">{getAssessmentsByType('lesson').length}</div>
             <p className="text-xs text-muted-foreground">
               Quick knowledge checks after lessons
             </p>
@@ -283,7 +319,7 @@ export default function AssessmentManagementPanel({
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{getAssessmentsByType('path_quiz').length}</div>
+            <div className="text-2xl font-bold">{getAssessmentsByType('path').length}</div>
             <p className="text-xs text-muted-foreground">
               Comprehensive path evaluations
             </p>
@@ -295,7 +331,7 @@ export default function AssessmentManagementPanel({
             <GraduationCap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{getAssessmentsByType('class_exam').length}</div>
+            <div className="text-2xl font-bold">{getAssessmentsByType('class').length}</div>
             <p className="text-xs text-muted-foreground">
               Major course evaluations
             </p>
@@ -320,9 +356,9 @@ export default function AssessmentManagementPanel({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="lesson_assessment">Lesson Assessments</SelectItem>
-            <SelectItem value="path_quiz">Path Quizzes</SelectItem>
-            <SelectItem value="class_exam">Class Exams</SelectItem>
+                          <SelectItem value="lesson">Lesson Assessments</SelectItem>
+              <SelectItem value="path">Path Quizzes</SelectItem>
+                            <SelectItem value="class">Class Exams</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -331,14 +367,14 @@ export default function AssessmentManagementPanel({
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">All ({filteredAssessments.length})</TabsTrigger>
-          <TabsTrigger value="lesson_assessment">
-            Lessons ({getAssessmentsByType('lesson_assessment').length})
+          <TabsTrigger value="lesson">
+            Lessons ({getAssessmentsByType('lesson').length})
           </TabsTrigger>
-          <TabsTrigger value="path_quiz">
-            Paths ({getAssessmentsByType('path_quiz').length})
+          <TabsTrigger value="path">
+            Paths ({getAssessmentsByType('path').length})
           </TabsTrigger>
-          <TabsTrigger value="class_exam">
-            Exams ({getAssessmentsByType('class_exam').length})
+          <TabsTrigger value="class">
+            Exams ({getAssessmentsByType('class').length})
           </TabsTrigger>
         </TabsList>
 
@@ -358,30 +394,44 @@ export default function AssessmentManagementPanel({
           )}
         </TabsContent>
 
-        <TabsContent value="lesson_assessment" className="space-y-4">
+        <TabsContent value="lesson" className="space-y-4">
           <div className="grid gap-4">
-            {getAssessmentsByType('lesson_assessment').map(assessment => (
+            {getAssessmentsByType('lesson').map(assessment => (
               <AssessmentCard key={assessment.id} assessment={assessment} />
             ))}
           </div>
         </TabsContent>
 
-        <TabsContent value="path_quiz" className="space-y-4">
+        <TabsContent value="path" className="space-y-4">
           <div className="grid gap-4">
-            {getAssessmentsByType('path_quiz').map(assessment => (
+            {getAssessmentsByType('path').map(assessment => (
               <AssessmentCard key={assessment.id} assessment={assessment} />
             ))}
           </div>
         </TabsContent>
 
-        <TabsContent value="class_exam" className="space-y-4">
+        <TabsContent value="class" className="space-y-4">
           <div className="grid gap-4">
-            {getAssessmentsByType('class_exam').map(assessment => (
+            {getAssessmentsByType('class').map(assessment => (
               <AssessmentCard key={assessment.id} assessment={assessment} />
             ))}
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Modals */}
+      <AssessmentPreviewModal
+        isOpen={previewModalOpen}
+        onClose={handleModalClose}
+        assessment={selectedAssessment}
+      />
+      
+      <AssessmentEditorModal
+        isOpen={editModalOpen}
+        onClose={handleModalClose}
+        assessment={selectedAssessment}
+        onSave={handleModalClose}
+      />
     </div>
   );
 } 

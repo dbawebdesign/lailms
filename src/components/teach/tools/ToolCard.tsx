@@ -75,9 +75,12 @@ export function ToolCard({ tool, onSelect }: ToolCardProps) {
   };
 
   return (
-    <Card className="group hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer border-0 shadow-sm bg-card relative overflow-hidden">
+    <Card 
+      className="group relative overflow-hidden cursor-pointer border-0 shadow-sm bg-card transition-all duration-300 ease-out hover:shadow-xl hover:shadow-primary/10 hover:-translate-y-1 hover:scale-[1.02]"
+      onClick={() => onSelect(tool)}
+    >
       {/* Status badges */}
-      <div className="absolute top-3 right-3 flex gap-1">
+      <div className="absolute top-3 right-3 flex gap-1 z-10">
         {tool.isNew && (
           <Badge variant="secondary" className="text-xs bg-gradient-to-r from-emerald-500 to-teal-500 text-white">
             New
@@ -92,18 +95,18 @@ export function ToolCard({ tool, onSelect }: ToolCardProps) {
 
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center group-hover:from-primary/20 group-hover:to-primary/30 transition-colors">
-            {IconComponent && <IconComponent className="w-6 h-6 text-primary" />}
+          <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center transition-all duration-300 group-hover:from-primary/20 group-hover:to-primary/30 group-hover:scale-110">
+            {IconComponent && <IconComponent className="w-6 h-6 text-primary transition-all duration-300 group-hover:text-primary" />}
           </div>
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-lg font-semibold text-slate-800 dark:text-slate-100 leading-tight">
+            <CardTitle className="text-lg font-semibold text-slate-800 dark:text-slate-100 leading-tight transition-colors duration-300 group-hover:text-primary">
               {tool.name}
             </CardTitle>
             <div className="flex items-center gap-2 mt-2">
-              <Badge className={`text-xs px-2 py-1 ${getCategoryColor(tool.category)}`}>
+              <Badge className={`text-xs px-2 py-1 transition-all duration-300 ${getCategoryColor(tool.category)}`}>
                 {tool.category.replace('-', ' ')}
               </Badge>
-              <Badge className={`text-xs px-2 py-1 ${getComplexityColor(tool.complexity)}`}>
+              <Badge className={`text-xs px-2 py-1 transition-all duration-300 ${getComplexityColor(tool.complexity)}`}>
                 {tool.complexity}
               </Badge>
             </div>
@@ -112,11 +115,11 @@ export function ToolCard({ tool, onSelect }: ToolCardProps) {
       </CardHeader>
 
       <CardContent className="pt-0 pb-4">
-        <CardDescription className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2">
+        <CardDescription className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2 transition-colors duration-300 group-hover:text-slate-700 dark:group-hover:text-slate-300">
           {tool.description}
         </CardDescription>
         
-        <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 transition-colors duration-300 group-hover:text-slate-600 dark:group-hover:text-slate-300">
           <div className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
             <span>{tool.estimatedTime}</span>
@@ -130,17 +133,16 @@ export function ToolCard({ tool, onSelect }: ToolCardProps) {
 
       <CardFooter className="pt-0">
         <Button 
-          onClick={() => onSelect(tool)}
-          className="w-full hover:bg-primary hover:text-primary-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+          className="w-full transition-all duration-300 bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground group-hover:bg-primary group-hover:text-primary-foreground"
           variant="secondary"
         >
           Use Tool
-          <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 hover:translate-x-1 transition-transform" />
+          <ArrowRight className="w-4 h-4 ml-2 transition-transform duration-300 group-hover:translate-x-1" />
         </Button>
       </CardFooter>
 
-      {/* Hover effect overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:to-transparent transition-all duration-200 pointer-events-none" />
+      {/* Subtle hover overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/0 via-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:via-primary/3 group-hover:to-primary/5 transition-all duration-300 pointer-events-none" />
     </Card>
   );
 } 

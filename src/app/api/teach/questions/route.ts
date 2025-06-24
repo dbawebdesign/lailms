@@ -12,13 +12,27 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
+    const assessmentId = searchParams.get('assessment_id');
     const baseClassId = searchParams.get('base_class_id');
+    const orderBy = searchParams.get('orderBy') || 'order_index';
 
-    if (!baseClassId) {
-      return NextResponse.json({ error: 'base_class_id is required' }, { status: 400 });
+    if (!assessmentId && !baseClassId) {
+      return NextResponse.json({ error: 'assessment_id or base_class_id is required' }, { status: 400 });
     }
 
-    let query = supabase.from('questions').select('*').eq('base_class_id', baseClassId);
+    let query = supabase.from('assessment_questions').select('*');
+
+    if (assessmentId) {
+      query = query.eq('assessment_id', assessmentId);
+    } else if (baseClassId) {
+      // Join with assessments to filter by base_class_id
+      query = supabase
+        .from('assessment_questions')
+        .select('*, assessments!inner(base_class_id)')
+        .eq('assessments.base_class_id', baseClassId);
+    }
+
+    query = query.order(orderBy);
 
     const { data, error } = await query;
 
@@ -46,15 +60,37 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { content, options, correct_answer, question_type, tags, base_class_id } = body;
+    const { 
+      assessment_id, 
+      question_text, 
+      question_type, 
+      points, 
+      order_index, 
+      answer_key, 
+      required,
+      sample_response,
+      grading_rubric,
+      ai_grading_enabled
+    } = body;
 
-    if (!content || !correct_answer || !question_type || !base_class_id) {
+    if (!assessment_id || !question_text || !question_type) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     const { data, error } = await supabase
-      .from('questions')
-      .insert({ ...body })
+      .from('assessment_questions')
+      .insert({
+        assessment_id,
+        question_text,
+        question_type,
+        points: points || 1,
+        order_index: order_index || 0,
+        answer_key: answer_key || {},
+        required: required !== undefined ? required : true,
+        sample_response,
+        grading_rubric,
+        ai_grading_enabled: ai_grading_enabled || false
+      })
       .select()
       .single();
 

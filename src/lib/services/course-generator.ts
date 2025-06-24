@@ -189,11 +189,11 @@ export class CourseGenerator {
     await this.updateJobStatus(jobId, 'processing', 55);
 
     // Step 5: Create actual LMS entities (paths, lessons, sections, assessments) (70% progress)
-    await this.createLMSEntities(courseOutlineId, outline, request);
+    await this.createLMSEntitiesOptimized(courseOutlineId, outline, request);
     await this.updateJobStatus(jobId, 'processing', 70);
 
-    // Step 6: Generate lesson content (85% progress)
-    await this.generateLessonContent(courseOutlineId, outline, generationMode, request);
+    // Step 6: Generate comprehensive lesson content (85% progress)
+    await this.generateComprehensiveLessonContent(courseOutlineId, outline, generationMode, request);
     await this.updateJobStatus(jobId, 'processing', 85);
 
     // Step 7: Assessments are now generated within createLMSEntities, so this step is removed.
@@ -240,7 +240,7 @@ export class CourseGenerator {
       await this.updateJobStatus(jobId, 'processing', 70);
 
       // Create LMS entities (paths, lessons, sections, assessments)
-      await this.createLMSEntities(outlineId, outline, request);
+      await this.createLMSEntitiesOptimized(outlineId, outline, request);
 
       await this.updateJobStatus(jobId, 'processing', 85);
 
@@ -601,6 +601,101 @@ Remember: This is an EDUCATIONAL course that must TEACH students, not just list 
     console.log('🧹 Cleared KB content cache after course generation');
   }
 
+  private async generateComprehensiveLessonContent(
+    courseOutlineId: string,
+    outline: CourseOutline,
+    generationMode: 'kb_only' | 'kb_priority' | 'kb_supplemented',
+    request: CourseGenerationRequest
+  ): Promise<void> {
+    console.log('🎓 Starting comprehensive lesson content generation...');
+    
+    // Pre-fetch and cache KB content once for the entire course
+    const cacheKey = `${outline.knowledgeBaseAnalysis.baseClassId}-${generationMode}`;
+    if (!this.kbContentCache.has(cacheKey)) {
+      console.log('🔍 Fetching KB content for comprehensive content generation...');
+      const courseKbContent = await knowledgeBaseAnalyzer.searchKnowledgeBaseForGeneration(
+        outline.knowledgeBaseAnalysis.baseClassId,
+        `${request.title} ${request.description || ''}`,
+        generationMode,
+        { courseScope: 'outline' }
+      );
+      this.kbContentCache.set(cacheKey, courseKbContent);
+      console.log(`📚 Cached ${courseKbContent.length} KB chunks for comprehensive generation`);
+    }
+
+    try {
+      const supabase = this.getSupabaseClient();
+      
+      // Get all lessons that were created for this course
+      const { data: lessons, error: lessonsError } = await supabase
+        .from('lessons')
+        .select('id, title, description, path_id')
+        .eq('base_class_id', request.baseClassId)
+        .order('order_index');
+
+      if (lessonsError || !lessons) {
+        console.error('Failed to fetch lessons for content generation:', lessonsError);
+        return;
+      }
+
+      console.log(`🔄 Generating comprehensive content for ${lessons.length} lessons...`);
+
+      // Process lessons in batches to avoid overwhelming the API
+      const batchSize = 3; // Process 3 lessons at a time
+      for (let i = 0; i < lessons.length; i += batchSize) {
+        const batch = lessons.slice(i, i + batchSize);
+        console.log(`📝 Processing lesson batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(lessons.length/batchSize)}`);
+
+        const batchPromises = batch.map(async (lesson) => {
+          try {
+            // Find the corresponding lesson outline from the course outline
+            const moduleLesson = this.findLessonInOutline(outline, lesson.title);
+            if (!moduleLesson) {
+              console.warn(`Could not find lesson outline for: ${lesson.title}`);
+              return;
+            }
+
+            console.log(`🎯 Generating content for lesson: ${lesson.title}`);
+            await this.createLessonSectionsWithComprehensiveContent(
+              lesson.id,
+              moduleLesson,
+              request,
+              outline,
+              generationMode
+            );
+            console.log(`✅ Completed content generation for: ${lesson.title}`);
+          } catch (error) {
+            console.error(`❌ Failed to generate content for lesson ${lesson.title}:`, error);
+          }
+        });
+
+        await Promise.all(batchPromises);
+        
+        // Small delay between batches to avoid rate limiting
+        if (i + batchSize < lessons.length) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+
+      console.log('✅ Comprehensive lesson content generation completed!');
+    } finally {
+      // Clear cache after course generation to prevent memory leaks
+      this.kbContentCache.clear();
+      console.log('🧹 Cleared KB content cache after comprehensive generation');
+    }
+  }
+
+  private findLessonInOutline(outline: CourseOutline, lessonTitle: string): ModuleLesson | null {
+    for (const module of outline.modules) {
+      for (const lesson of module.lessons) {
+        if (lesson.title === lessonTitle) {
+          return lesson;
+        }
+      }
+    }
+    return null;
+  }
+
   private async generateLessonContentForLesson(
     lesson: ModuleLesson,
     baseClassId: string,
@@ -718,10 +813,10 @@ Remember: Every element should contribute to TEACHING and helping students achie
           role: "system",
           content: `You are a master educator creating comprehensive lesson sections. ${modeConfig.aiInstructions} 
           
-          Create detailed educational content for ${request.academicLevel || 'college'} level learners with ${request.lessonDetailLevel || 'detailed'} depth. 
+          Create detailed educational content for ${outline.academicLevel || 'college'} level learners with ${outline.lessonDetailLevel || 'detailed'} depth. 
           Your content should actively teach and guide student learning progressively.
-          Target audience: ${request.targetAudience || 'General learners'}.
-          Prerequisites: ${request.prerequisites || 'None specified'}.`
+          Target audience: ${outline.targetAudience || 'General learners'}.
+          Prerequisites: ${outline.prerequisites || 'None specified'}.`
         },
         {
           role: "user",
@@ -1004,6 +1099,7 @@ Remember: Every element should contribute to TEACHING and helping students achie
     request: CourseGenerationRequest,
     kbContent: any[]
   ): Promise<any> {
+    console.log(`🔥 generateModuleContentBatch started for: ${module.title}`);
     try {
       const prompt = `
       Generate comprehensive educational content for an ENTIRE MODULE with multiple lessons.
@@ -1147,16 +1243,20 @@ Remember: Every element should contribute to TEACHING and helping students achie
       );
 
       // Generate content for all modules in parallel (but limit concurrency)
+      console.log(`🔄 About to generate content for ${outline.modules.length} modules...`);
       const moduleContents = await this.generateAllModulesInBatches(
         outline.modules,
         request,
         kbContent
       );
+      console.log(`✅ Successfully generated content for all ${outline.modules.length} modules`);
 
-      // Now create all entities with the pre-generated content
+      // Step 1: Create all paths and lessons first (sequential for DB constraints)
+      const createdPaths: Array<{ pathData: { id: string; title: string }, moduleIndex: number }> = [];
+      const createdLessons: Array<{ lessonData: { id: string }, pathId: string, moduleIndex: number, lessonIndex: number }> = [];
+
       for (let moduleIndex = 0; moduleIndex < outline.modules.length; moduleIndex++) {
         const courseModule = outline.modules[moduleIndex];
-        const moduleContent = moduleContents[moduleIndex];
 
         // Create path
         const { data: path, error: pathError } = await supabase
@@ -1172,25 +1272,27 @@ Remember: Every element should contribute to TEACHING and helping students achie
             created_by: request.userId,
             creator_user_id: request.userId
           })
-          .select()
+          .select('id, title')
           .single();
 
-        if (pathError) {
+        if (pathError || !path) {
           console.error('Failed to create path:', pathError);
           continue;
         }
 
-        console.log(`📁 Created path: ${path.title}`);
+        const typedPath = path as unknown as { id: string; title: string };
+        console.log(`📁 Created path: ${typedPath.title}`);
+        createdPaths.push({ pathData: typedPath, moduleIndex });
 
-        // Process lessons with pre-generated content
+        // Create lessons for this path
+        const moduleContent = moduleContents[moduleIndex];
         for (let lessonIndex = 0; lessonIndex < moduleContent.lessons.length; lessonIndex++) {
-          const lessonContent = moduleContent.lessons[lessonIndex];
           const lessonOutline = courseModule.lessons[lessonIndex];
 
           const { data: createdLesson, error: lessonError } = await supabase
             .from('lessons')
             .insert({
-              path_id: path.id,
+              path_id: typedPath.id,
               base_class_id: request.baseClassId,
               title: lessonOutline.title,
               description: lessonOutline.description,
@@ -1201,48 +1303,74 @@ Remember: Every element should contribute to TEACHING and helping students achie
               created_by: request.userId,
               creator_user_id: request.userId
             })
-            .select()
+            .select('id')
             .single();
 
-          if (lessonError) {
+          if (lessonError || !createdLesson) {
             console.error('Failed to create lesson:', lessonError);
             continue;
           }
 
-          // Create sections with pre-generated content
-          await this.createSectionsFromGeneratedContent(
-            createdLesson.id,
-            lessonContent.sections,
-            request.userId
-          );
-
-          // Create lesson assessments using the new AssessmentGenerationService
-          if (request.assessmentSettings?.includeAssessments) {
-            await this.createLessonAssessmentsBatch(
-              createdLesson.id,
-              lessonOutline,
-              request
-            );
-          }
-        }
-
-        // Create path quiz using the new AssessmentGenerationService
-        if (request.assessmentSettings?.includeQuizzes) {
-          await this.createPathQuiz(
-            path.id,
-            path.title,
-            request
-          );
+          const typedLesson = createdLesson as unknown as { id: string };
+          createdLessons.push({ 
+            lessonData: typedLesson, 
+            pathId: typedPath.id, 
+            moduleIndex, 
+            lessonIndex 
+          });
         }
       }
 
-      // Create class final exam using the new AssessmentGenerationService
-      if (request.assessmentSettings?.includeFinalExam) {
-        await this.createClassExam(
-          request.baseClassId,
-          request.title,
-          request
+      // Step 2: Create all sections in parallel
+      console.log('🔄 Creating lesson sections in parallel...');
+      const sectionPromises = createdLessons.map(({ lessonData, moduleIndex, lessonIndex }) => {
+        const moduleContent = moduleContents[moduleIndex];
+        const lessonContent = moduleContent.lessons[lessonIndex];
+        return this.createSectionsFromGeneratedContent(
+          lessonData.id,
+          lessonContent.sections,
+          request.userId
         );
+      });
+      await Promise.all(sectionPromises);
+      console.log('✅ All lesson sections created');
+
+      // Step 3: Create all assessments in parallel batches
+      if (request.assessmentSettings?.includeAssessments || 
+          request.assessmentSettings?.includeQuizzes || 
+          request.assessmentSettings?.includeFinalExam) {
+        
+        console.log('🎯 Creating assessments in parallel...');
+        const assessmentPromises: Promise<void>[] = [];
+
+        // Lesson assessments
+        if (request.assessmentSettings?.includeAssessments) {
+          const lessonAssessmentPromises = createdLessons.map(({ lessonData, moduleIndex, lessonIndex }) => {
+            const courseModule = outline.modules[moduleIndex];
+            const lessonOutline = courseModule.lessons[lessonIndex];
+            return this.createLessonAssessmentsBatch(lessonData.id, lessonOutline, request);
+          });
+          assessmentPromises.push(...lessonAssessmentPromises);
+        }
+
+        // Path quizzes
+        if (request.assessmentSettings?.includeQuizzes) {
+          const pathQuizPromises = createdPaths.map(({ pathData }) => 
+            this.createPathQuiz(pathData.id, pathData.title, request)
+          );
+          assessmentPromises.push(...pathQuizPromises);
+        }
+
+        // Class final exam
+        if (request.assessmentSettings?.includeFinalExam) {
+          assessmentPromises.push(
+            this.createClassExam(request.baseClassId, request.title, request)
+          );
+        }
+
+        // Execute all assessment creation in parallel
+        await Promise.allSettled(assessmentPromises);
+        console.log('✅ All assessments processed');
       }
 
       console.log('✅ Optimized LMS entity creation completed!');
@@ -1261,21 +1389,51 @@ Remember: Every element should contribute to TEACHING and helping students achie
     kbContent: any[]
   ): Promise<any[]> {
     const batchSize = 2; // Process 2 modules at a time to avoid overwhelming the API
-    const results = [];
+    
+    console.log(`🚀 Starting PARALLEL batch generation for ${modules.length} modules...`);
 
+    // Create all batches upfront
+    const batches = [];
     for (let i = 0; i < modules.length; i += batchSize) {
       const batch = modules.slice(i, i + batchSize);
-      const batchPromises = batch.map(module => 
-        this.generateModuleContentBatch(module, request, kbContent)
-      );
-      
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
-      
-      console.log(`📊 Generated content for modules ${i + 1}-${Math.min(i + batchSize, modules.length)} of ${modules.length}`);
+      batches.push({
+        batchNumber: Math.floor(i / batchSize) + 1,
+        startIndex: i + 1,
+        endIndex: Math.min(i + batchSize, modules.length),
+        modules: batch
+      });
     }
 
-    return results;
+    console.log(`🔥 Created ${batches.length} batches - ALL WILL RUN IN PARALLEL!`);
+
+    // Process ALL batches in parallel
+    const allBatchPromises = batches.map(async (batchInfo) => {
+      console.log(`🔄 Processing batch ${batchInfo.batchNumber}: modules ${batchInfo.startIndex}-${batchInfo.endIndex}`);
+      
+      const batchPromises = batchInfo.modules.map((module) => {
+        console.log(`📝 Starting generation for module: ${module.title}`);
+        return this.generateModuleContentBatch(module, request, kbContent)
+          .then(result => {
+            console.log(`✅ Completed generation for module: ${module.title}`);
+            return result;
+          })
+          .catch(error => {
+            console.error(`❌ Failed generation for module: ${module.title}`, error);
+            throw error;
+          });
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      console.log(`📊 Generated content for modules ${batchInfo.startIndex}-${batchInfo.endIndex} of ${modules.length}`);
+      return batchResults;
+    });
+
+    // Wait for ALL batches to complete
+    const allResults = await Promise.all(allBatchPromises);
+    const flatResults = allResults.flat();
+
+    console.log(`✅ Completed all ${modules.length} modules batch generation`);
+    return flatResults;
   }
 
   /**
@@ -1294,12 +1452,22 @@ Remember: Every element should contribute to TEACHING and helping students achie
       if (index === 0) sectionType = 'introduction';
       if (index === sections.length - 1) sectionType = 'summary';
       
+        // Sanitize the section content to prevent stack depth issues
+        const sanitizedContent = {
+          sectionTitle: section.sectionTitle || `Section ${index + 1}`,
+          content: section.content || section.sectionContent || '',
+          learningObjectives: section.learningObjectives || [],
+          keyPoints: section.keyPoints || [],
+          activities: section.activities || [],
+          examples: section.examples || []
+        };
+
         const { error } = await supabase
         .from('lesson_sections')
         .insert({
           lesson_id: lessonId,
-          title: section.sectionTitle,
-          content: section,
+          title: sanitizedContent.sectionTitle,
+          content: sanitizedContent,
           section_type: sectionType,
           order_index: index,
           created_by: userId
@@ -1665,34 +1833,67 @@ Generate the complete educational content now:`;
         }));
       }
 
-      // Create database entries for each section
+      // Update existing sections or create new ones with comprehensive content
       const sectionPromises = sectionsData.map(async (sectionData, index) => {
         try {
-          const { data: section, error: sectionError } = await supabase
+          // First, try to update existing section
+          const { data: existingSections, error: fetchError } = await supabase
             .from('lesson_sections')
-            .insert({
-              lesson_id: lessonId,
-              title: sectionData.title || lesson.contentOutline[index] || `Section ${index + 1}`,
-              content: sectionData.educational_content || sectionData,
-              section_type: sectionData.section_type || (
-                index === 0 ? 'introduction' : 
-                index === sectionsData.length - 1 ? 'summary' : 
-                'main_content'
-              ),
-              order_index: index,
-              created_by: request.userId
-            })
-            .select()
-            .single();
+            .select('id')
+            .eq('lesson_id', lessonId)
+            .eq('order_index', index);
 
-          if (sectionError) {
-            console.error(`Failed to create section ${sectionData.title}:`, sectionError);
-            throw sectionError;
-          } else {
-            console.log(`📖 Created comprehensive section: ${section.title}`);
+          if (fetchError) {
+            console.error('Error fetching existing sections:', fetchError);
+            return;
           }
 
-          return section;
+          const sectionTitle = sectionData.title || lesson.contentOutline[index] || `Section ${index + 1}`;
+          const sectionContent = sectionData.educational_content || sectionData;
+          const sectionType = sectionData.section_type || (
+            index === 0 ? 'introduction' : 
+            index === sectionsData.length - 1 ? 'summary' : 
+            'main_content'
+          );
+
+          if (existingSections && existingSections.length > 0) {
+            // Update existing section with comprehensive content
+            const { error: updateError } = await supabase
+              .from('lesson_sections')
+              .update({
+                title: sectionTitle,
+                content: sectionContent,
+                section_type: sectionType
+              })
+              .eq('id', existingSections[0].id);
+
+            if (updateError) {
+              console.error(`Failed to update section ${index} for lesson ${lessonId}:`, updateError);
+            } else {
+              console.log(`✅ Updated section: ${sectionTitle}`);
+            }
+          } else {
+            // Create new section if it doesn't exist
+            const { data: section, error: sectionError } = await supabase
+              .from('lesson_sections')
+              .insert({
+                lesson_id: lessonId,
+                title: sectionTitle,
+                content: sectionContent,
+                section_type: sectionType,
+                order_index: index,
+                created_by: request.userId
+              })
+              .select()
+              .single();
+
+            if (sectionError) {
+              console.error(`Failed to create section ${sectionTitle}:`, sectionError);
+              throw sectionError;
+            } else {
+              console.log(`📖 Created comprehensive section: ${sectionTitle}`);
+            }
+          }
         } catch (error: any) {
           console.error(`Database error creating section ${index}:`, error);
           // Try to create with minimal content as fallback
@@ -1988,6 +2189,247 @@ CRITICAL: Questions must be based ONLY on the actual lesson content provided abo
       case 'hard': return 8;
       case 'expert': return 10;
       default: return 5;
+    }
+  }
+
+  /**
+   * Update the status of a generation job
+   */
+  private async updateJobStatus(
+    jobId: string, 
+    status: 'queued' | 'processing' | 'completed' | 'failed', 
+    progress: number, 
+    error?: string | null, 
+    result?: any
+  ): Promise<void> {
+    try {
+      const supabase = this.getSupabaseClient();
+      const updateData: any = {
+        status,
+        progress_percentage: progress,
+        updated_at: new Date().toISOString()
+      };
+
+      if (error !== undefined) {
+        updateData.error_message = error;
+      }
+
+      if (result !== undefined) {
+        updateData.result_data = result;
+      }
+
+      const { error: updateError } = await supabase
+        .from('course_generation_jobs')
+        .update(updateData)
+        .eq('id', jobId);
+
+      if (updateError) {
+        console.error('Failed to update job status:', updateError);
+        throw new Error(`Failed to update job status: ${updateError.message}`);
+      }
+    } catch (error) {
+      console.error('Error updating job status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the current status of a generation job
+   */
+  async getGenerationJob(jobId: string): Promise<GenerationJob | null> {
+    try {
+      const supabase = this.getSupabaseClient();
+      const { data, error } = await supabase
+        .from('course_generation_jobs')
+        .select('*')
+        .eq('id', jobId)
+        .single();
+
+      if (error || !data) {
+        return null;
+      }
+
+      return {
+        id: data.id,
+        status: data.status,
+        progress: data.progress_percentage || 0,
+        result: data.result_data,
+        error: data.error_message
+      };
+    } catch (error) {
+      console.error('Error getting generation job:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get a course outline by ID
+   */
+  async getCourseOutline(courseOutlineId: string): Promise<CourseOutline | null> {
+    try {
+      const supabase = this.getSupabaseClient();
+      const { data, error } = await supabase
+        .from('course_outlines')
+        .select(`
+          *,
+          base_classes:base_class_id (
+            title,
+            description
+          )
+        `)
+        .eq('id', courseOutlineId)
+        .single();
+
+      if (error || !data) {
+        return null;
+      }
+
+      return {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        generationMode: data.generation_mode,
+        learningObjectives: data.learning_objectives || [],
+        estimatedDurationWeeks: data.estimated_duration_weeks || 0,
+        modules: data.modules || [],
+        knowledgeBaseAnalysis: data.knowledge_base_analysis || {},
+        status: data.status || 'draft',
+        academicLevel: data.academic_level,
+        lessonDetailLevel: data.lesson_detail_level,
+        targetAudience: data.target_audience,
+        prerequisites: data.prerequisites,
+        lessonsPerWeek: data.lessons_per_week,
+        assessmentSettings: data.assessment_settings
+      };
+    } catch (error) {
+      console.error('Error getting course outline:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get academic level guidance for prompt generation
+   */
+  private getAcademicLevelGuidance(academicLevel?: string): string {
+    switch (academicLevel) {
+      case 'kindergarten':
+      case '1st-grade':
+      case '2nd-grade':
+      case '3rd-grade':
+        return `
+ELEMENTARY GUIDANCE:
+- Use very simple language and short sentences
+- Focus on concrete concepts rather than abstract ideas
+- Include visual and hands-on learning activities
+- Questions should be basic recall and simple comprehension
+- Use familiar examples from daily life
+- Keep lessons short and engaging`;
+
+      case '4th-grade':
+      case '5th-grade':
+      case '6th-grade':
+        return `
+UPPER ELEMENTARY GUIDANCE:
+- Use clear, age-appropriate language
+- Introduce some abstract concepts with concrete examples
+- Include interactive activities and group work
+- Mix recall, comprehension, and basic application questions
+- Use relatable examples and scenarios
+- Balance individual and collaborative learning`;
+
+      case '7th-grade':
+      case '8th-grade':
+        return `
+MIDDLE SCHOOL GUIDANCE:
+- Use grade-appropriate vocabulary with explanations
+- Develop critical thinking skills
+- Include project-based learning opportunities
+- Focus on comprehension, application, and analysis questions
+- Connect to real-world applications
+- Encourage independent thinking and research`;
+
+      case '9th-grade':
+      case '10th-grade':
+      case '11th-grade':
+      case '12th-grade':
+        return `
+HIGH SCHOOL GUIDANCE:
+- Use academic vocabulary and complex concepts
+- Develop analytical and critical thinking skills
+- Include research and presentation components
+- Focus on analysis, synthesis, and evaluation questions
+- Connect to career and college preparation
+- Encourage independent learning and problem-solving`;
+
+      case 'college':
+        return `
+COLLEGE GUIDANCE:
+- Use advanced academic vocabulary and concepts
+- Develop research and analytical skills
+- Include independent study and original research
+- Focus on higher-order thinking: analysis, synthesis, evaluation, creation
+- Connect to professional applications and current research
+- Encourage critical thinking and scholarly discourse`;
+
+      case 'graduate':
+      case 'professional':
+      case 'master':
+        return `
+GRADUATE/PROFESSIONAL GUIDANCE:
+- Use professional and scholarly language
+- Focus on advanced research and theoretical concepts
+- Include original research and professional applications
+- Emphasize critical analysis, evaluation, and innovation
+- Connect to current industry practices and cutting-edge research
+- Encourage leadership and expert-level problem-solving`;
+
+      default:
+        return `
+GENERAL GUIDANCE:
+- Use clear, appropriate language for the intended audience
+- Balance theoretical concepts with practical applications
+- Include varied learning activities and assessments
+- Focus on comprehension, application, and analysis
+- Connect to real-world examples and use cases
+- Encourage active learning and engagement`;
+    }
+  }
+
+  /**
+   * Get lesson detail level guidance for prompt generation
+   */
+  private getLessonDetailGuidance(lessonDetailLevel?: string): string {
+    switch (lessonDetailLevel) {
+      case 'basic':
+        return `
+ BASIC LESSON DETAIL GUIDANCE:
+ - Focus on core concepts and essential information
+ - Keep explanations concise and straightforward
+ - Provide clear, actionable learning objectives
+ - Include simple examples and basic exercises
+ - Emphasize practical application over theory
+ - Limit lesson length to maintain engagement`;
+
+      case 'comprehensive':
+        return `
+ COMPREHENSIVE LESSON DETAIL GUIDANCE:
+ - Provide in-depth exploration of concepts
+ - Include detailed explanations and multiple examples
+ - Cover theoretical foundations and practical applications
+ - Add extended activities and complex assessments
+ - Include supplementary resources and further reading
+ - Accommodate different learning styles and paces`;
+
+      case 'detailed':
+      default:
+        return `
+ DETAILED LESSON DETAIL GUIDANCE:
+ - Balance depth with accessibility
+ - Provide clear explanations with relevant examples
+ - Include mix of theoretical and practical content
+ - Add interactive elements and varied activities
+ - Provide adequate context and background information
+ - Structure content for progressive skill building`;
     }
   }
 }

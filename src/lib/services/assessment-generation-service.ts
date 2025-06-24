@@ -342,7 +342,17 @@ Generate the questions now:`;
   private parseQuestionsResponse(response: string): GeneratedQuestion[] {
     try {
       // Remove markdown code blocks if present
-      const cleanedResponse = response.replace(/^```json\s*|```$/gm, '').trim();
+      let cleanedResponse = response.replace(/^```json\s*|```$/gm, '').trim();
+      
+      // Handle potentially truncated JSON by finding the last complete object
+      if (!cleanedResponse.endsWith(']')) {
+        console.warn('Response appears truncated, attempting to repair...');
+        const lastCompleteObjectIndex = cleanedResponse.lastIndexOf('}');
+        if (lastCompleteObjectIndex > 0) {
+          cleanedResponse = cleanedResponse.substring(0, lastCompleteObjectIndex + 1) + ']';
+        }
+      }
+      
       const parsed = JSON.parse(cleanedResponse);
 
       if (!Array.isArray(parsed)) {
@@ -363,6 +373,8 @@ Generate the questions now:`;
 
     } catch (error) {
       console.error('Failed to parse questions response:', error);
+      console.error('Response length:', response.length);
+      console.error('Response preview:', response.substring(0, 500) + '...');
       return [];
     }
   }
@@ -378,7 +390,7 @@ Generate the questions now:`;
       const assessmentData = {
         title: params.assessmentTitle,
         description: params.assessmentDescription || null,
-        assessment_type: this.mapScopeToAssessmentType(params.scope),
+        assessment_type: params.scope, // Use scope directly instead of mapping
         base_class_id: params.baseClassId,
         lesson_id: params.scope === 'lesson' ? params.scopeId : null,
         path_id: params.scope === 'path' ? params.scopeId : null,
@@ -428,13 +440,7 @@ Generate the questions now:`;
     }
   }
 
-  private mapScopeToAssessmentType(scope: 'lesson' | 'path' | 'class'): 'lesson_quiz' | 'path_exam' | 'final_exam' {
-    switch (scope) {
-      case 'lesson': return 'lesson_quiz';
-      case 'path': return 'path_exam';
-      case 'class': return 'final_exam';
-    }
-  }
+
 
   // Enhanced method to analyze content and extract key concepts with learning objectives
   async analyzeContentForConcepts(content: string, assessmentType: 'lesson' | 'path' | 'class' = 'lesson'): Promise<ContentAnalysis> {
