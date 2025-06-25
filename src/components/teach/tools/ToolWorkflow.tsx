@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { TeachingTool, ToolInputField } from '@/types/teachingTools';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,13 +29,26 @@ import {
   AlertCircle,
   Sparkles,
   Send,
-  RotateCcw
+  RotateCcw,
+  Save,
+  BookOpen,
+  Heart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUIContext } from '@/context/UIContext';
 import { RubricDisplay } from './RubricDisplay';
 import { MindMapDisplay } from './MindMapDisplay';
 import { BrainBytesDisplay } from './BrainBytesDisplay';
+import { QuizDisplay } from './QuizDisplay';
+import { teacherToolLibraryService } from '@/lib/services/teacherToolLibrary';
+import { 
+  TeacherToolCreationInput, 
+  ToolCreationContent, 
+  RubricContent, 
+  MindMapContent,
+  TeacherToolCreation 
+} from '@/types/teachingTools';
+import { useRouter } from 'next/navigation';
 
 interface ToolWorkflowProps {
   tool: TeachingTool;
@@ -62,6 +76,34 @@ interface ConversationMessage {
 }
 
 export function ToolWorkflow({ tool, onBack }: ToolWorkflowProps) {
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('edit');
+  
+  // If editId is present, redirect to the viewer instead of showing editor
+  const router = useRouter();
+  useEffect(() => {
+    if (editId) {
+      router.push(`/teach/tools/library/${editId}`);
+      return;
+    }
+  }, [editId, router]);
+  
+  // Don't render the editor if we're redirecting
+  if (editId) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="flex items-center justify-center py-12">
+            <div className="text-center space-y-3">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-purple-500" />
+              <p className="text-muted-foreground">Redirecting to viewer...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
   const [activeTab, setActiveTab] = useState<'manual' | 'ai-assisted'>('ai-assisted');
   const [formData, setFormData] = useState<FormData>({});
   const [aiPrompt, setAiPrompt] = useState('');
@@ -72,6 +114,10 @@ export function ToolWorkflow({ tool, onBack }: ToolWorkflowProps) {
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [isInConversation, setIsInConversation] = useState(false);
   const [refinementMode, setRefinementMode] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [loadedCreation, setLoadedCreation] = useState<TeacherToolCreation | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const { togglePanelVisible } = useUIContext();
   const resultRef = useRef<HTMLDivElement>(null);
   const conversationEndRef = useRef<HTMLDivElement>(null);
@@ -88,6 +134,7 @@ export function ToolWorkflow({ tool, onBack }: ToolWorkflowProps) {
         initialData[field.id] = field.min || 1;
       }
     });
+    
     setFormData(initialData);
   }, [tool]);
 
@@ -308,6 +355,208 @@ What would you like to improve or expand on?`,
     URL.revokeObjectURL(url);
   };
 
+  const saveToLibrary = async () => {
+    if (!result) return;
+
+    setIsSaving(true);
+    setSaveSuccess(false);
+
+    try {
+      // Generate title based on form data or content
+      const title = generateTitle();
+      
+      // Save the content as-is (string) instead of parsing it into complex structures
+      // The viewers expect the raw content string, not parsed objects
+      const content = result.content;
+      
+      // Extract metadata from form data and result
+      const metadata = {
+        ...result.metadata,
+        gradeLevel: formData.gradeLevel,
+        subject: formData.subject,
+        duration: formData.duration,
+        difficulty: formData.difficulty,
+        ...extractMetadataFromFormData()
+      };
+
+      // Generate tags
+      const tags = generateTags();
+
+      const creationData: TeacherToolCreationInput = {
+        tool_id: tool.id,
+        tool_name: tool.name,
+        title,
+        description: generateDescription(),
+        content, // Save the raw content string
+        metadata,
+        tags
+      };
+
+      await teacherToolLibraryService.saveCreation(creationData);
+      setSaveSuccess(true);
+      
+      // Reset success state after 3 seconds
+      setTimeout(() => setSaveSuccess(false), 3000);
+      
+    } catch (error) {
+      console.error('Failed to save to library:', error);
+      setError('Failed to save to library. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const generateTitle = (): string => {
+    // Try to generate a meaningful title based on form data and tool type
+    let title = '';
+    
+    // Handle different tool types with their specific field names
+    switch (tool.id) {
+      case 'rubric-generator':
+        const rubricSubject = formData.subject;
+        const assessmentType = formData.assessmentType;
+        const rubricGradeLevel = formData.gradeLevel;
+        
+        if (rubricSubject && assessmentType && rubricGradeLevel) {
+          title = `${rubricSubject} ${assessmentType} Rubric - Grade ${rubricGradeLevel}`;
+        } else if (rubricSubject && assessmentType) {
+          title = `${rubricSubject} ${assessmentType} Rubric`;
+        } else if (rubricSubject && rubricGradeLevel) {
+          title = `${rubricSubject} Rubric - Grade ${rubricGradeLevel}`;
+        } else if (rubricSubject) {
+          title = `${rubricSubject} Rubric`;
+        }
+        break;
+        
+      case 'quiz-generator':
+        const quizSubject = formData.subject;
+        const quizTopic = formData.topic;
+        const quizGradeLevel = formData.gradeLevel;
+        
+        if (quizTopic && quizGradeLevel) {
+          title = `${quizTopic} Quiz - Grade ${quizGradeLevel}`;
+        } else if (quizTopic) {
+          title = `${quizTopic} Quiz`;
+        } else if (quizSubject && quizGradeLevel) {
+          title = `${quizSubject} Quiz - Grade ${quizGradeLevel}`;
+        } else if (quizSubject) {
+          title = `${quizSubject} Quiz`;
+        }
+        break;
+        
+      case 'mindmap-generator':
+        const centralTopic = formData.centralTopic;
+        const mindmapGradeLevel = formData.gradeLevel;
+        
+        if (centralTopic && mindmapGradeLevel) {
+          title = `${centralTopic} Mind Map - Grade ${mindmapGradeLevel}`;
+        } else if (centralTopic) {
+          title = `${centralTopic} Mind Map`;
+        }
+        break;
+        
+      default:
+        // Generic fallback for other tools
+        const topic = formData.topic || formData.centralTopic || formData.concept || formData.subject;
+        const gradeLevel = formData.gradeLevel;
+        
+        if (topic && gradeLevel) {
+          title = `${topic} - Grade ${gradeLevel}`;
+        } else if (topic) {
+          title = topic;
+        }
+        break;
+    }
+    
+    // If no specific title was generated, use a fallback
+    if (!title) {
+      title = `${tool.name} - ${new Date().toLocaleDateString()}`;
+    }
+    
+    return title;
+  };
+
+  const generateDescription = (): string => {
+    const parts: string[] = [];
+    
+    // Add tool-specific description based on form data
+    switch (tool.id) {
+      case 'rubric-generator':
+        if (formData.subject) parts.push(`Subject: ${formData.subject}`);
+        if (formData.assessmentType) parts.push(`Assessment: ${formData.assessmentType}`);
+        if (formData.gradeLevel) parts.push(`Grade: ${formData.gradeLevel}`);
+        if (formData.performanceLevels) parts.push(`${formData.performanceLevels} performance levels`);
+        break;
+        
+      case 'quiz-generator':
+        if (formData.subject) parts.push(`Subject: ${formData.subject}`);
+        if (formData.topic) parts.push(`Topic: ${formData.topic}`);
+        if (formData.gradeLevel) parts.push(`Grade: ${formData.gradeLevel}`);
+        if (formData.questionCount) parts.push(`${formData.questionCount} questions`);
+        if (formData.difficulty) parts.push(`Difficulty: ${formData.difficulty}`);
+        break;
+        
+      case 'mindmap-generator':
+        if (formData.centralTopic) parts.push(`Topic: ${formData.centralTopic}`);
+        if (formData.gradeLevel) parts.push(`Grade: ${formData.gradeLevel}`);
+        if (formData.subject) parts.push(`Subject: ${formData.subject}`);
+        break;
+        
+      default:
+        // Generic fallback
+        if (formData.topic || formData.centralTopic) {
+          parts.push(`Topic: ${formData.topic || formData.centralTopic}`);
+        }
+        if (formData.gradeLevel) parts.push(`Grade: ${formData.gradeLevel}`);
+        if (formData.subject) parts.push(`Subject: ${formData.subject}`);
+        if (formData.duration) parts.push(`Duration: ${formData.duration}`);
+        break;
+    }
+    
+    return parts.join(' • ');
+  };
+
+  const generateTags = (): string[] => {
+    const tags: string[] = [];
+    
+    if (formData.gradeLevel) tags.push(`grade-${formData.gradeLevel}`);
+    if (formData.subject) tags.push(formData.subject.toLowerCase());
+    if (formData.category) tags.push(formData.category.toLowerCase());
+    if (formData.difficulty) tags.push(formData.difficulty.toLowerCase());
+    
+    // Add tool-specific tags
+    if (tool.keywords) {
+      tags.push(...tool.keywords.slice(0, 3));
+    }
+    
+    return [...new Set(tags)]; // Remove duplicates
+  };
+
+  const extractMetadataFromFormData = () => {
+    const metadata: any = {};
+    
+    // Save the entire form data for future loading
+    metadata.formData = formData;
+    
+    // Extract relevant fields from form data
+    const metadataFields = [
+      'gradeLevel', 'subject', 'duration', 'difficulty', 'assessmentType',
+      'questionCount', 'complexity', 'style', 'learningObjectives', 'standards'
+    ];
+    
+    metadataFields.forEach(field => {
+      if (formData[field]) {
+        metadata[field] = formData[field];
+      }
+    });
+    
+    return metadata;
+  };
+
+  const openLibrary = () => {
+    router.push(`/teach/tools/${tool.id}/library`);
+  };
+
   const renderFormField = (field: ToolInputField) => {
     const value = formData[field.id];
 
@@ -441,6 +690,38 @@ What would you like to improve or expand on?`,
     }
   };
 
+  // Show loading state when loading existing creation
+  if (isLoading) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={onBack} className="flex items-center gap-2">
+            <ArrowLeft className="w-4 h-4" />
+            Back to Tools
+          </Button>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <Wand2 className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">{tool.name}</h1>
+              <p className="text-muted-foreground">{tool.description}</p>
+            </div>
+          </div>
+        </div>
+        
+        <Card className="border-0 shadow-sm">
+          <CardContent className="flex items-center justify-center py-12">
+            <div className="text-center space-y-3">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-purple-500" />
+              <p className="text-muted-foreground">Loading your creation...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
@@ -455,7 +736,9 @@ What would you like to improve or expand on?`,
           </div>
           <div>
             <h1 className="text-2xl font-bold">{tool.name}</h1>
-            <p className="text-muted-foreground">{tool.description}</p>
+            <p className="text-muted-foreground">
+              {loadedCreation ? `Editing: ${loadedCreation.title}` : tool.description}
+            </p>
           </div>
         </div>
       </div>
@@ -492,7 +775,7 @@ What would you like to improve or expand on?`,
                     <div className="space-y-4">
                       <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 p-5 rounded-2xl border-0">
                         <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 overflow-hidden">
                             <img 
                               src="/web-app-manifest-512x512.png" 
                               alt="Luna" 
@@ -564,7 +847,7 @@ What would you like to improve or expand on?`,
                           {conversation.map((message, index) => (
                             <div key={index} className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                               {message.role === 'assistant' && (
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 overflow-hidden">
                                   <img 
                                     src="/web-app-manifest-512x512.png" 
                                     alt="Luna" 
@@ -752,6 +1035,31 @@ What would you like to improve or expand on?`,
                     <Download className="w-4 h-4" />
                     Download
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={saveToLibrary}
+                    disabled={isSaving}
+                    className="flex items-center gap-2"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : saveSuccess ? (
+                      <Check className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <Save className="w-4 h-4" />
+                    )}
+                    {isSaving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openLibrary}
+                    className="flex items-center gap-2"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Library
+                  </Button>
                 </div>
               </div>
               {result.metadata && (
@@ -787,6 +1095,14 @@ What would you like to improve or expand on?`,
                 />
               ) : tool.id === 'brain-bytes' ? (
                 <BrainBytesDisplay 
+                  content={result.content} 
+                  metadata={result.metadata}
+                  onCopy={copyToClipboard}
+                  copiedItems={copiedItems}
+                  onRefineWithLuna={handleRubricRefinement}
+                />
+              ) : tool.id === 'quiz-generator' ? (
+                <QuizDisplay 
                   content={result.content} 
                   metadata={result.metadata}
                   onCopy={copyToClipboard}

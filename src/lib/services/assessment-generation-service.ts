@@ -226,7 +226,7 @@ export class AssessmentGenerationService {
     try {
       const response = await limit(() =>
         this.openai.chat.completions.create({
-          model: 'gpt-4o-mini', // Using GPT-4.1-mini as requested
+          model: 'gpt-4.1-mini', // Using GPT-4.1-mini as requested
           messages: [
             {
               role: 'system',
@@ -400,7 +400,7 @@ Generate the questions now:`;
         show_results_immediately: true,
         allow_review: true,
         ai_grading_enabled: true,
-        ai_model: 'gpt-4o-mini'
+                  ai_model: 'gpt-4.1-mini'
       };
 
       const { data: assessment, error: assessmentError } = await supabase
@@ -450,7 +450,7 @@ Generate the questions now:`;
       
       const response = await limit(() =>
         this.openai.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4.1-mini',
           messages: [
             {
               role: 'system',

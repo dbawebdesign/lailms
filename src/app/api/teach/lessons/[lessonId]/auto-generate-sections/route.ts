@@ -530,7 +530,7 @@ export async function POST(
     try {
       console.log(`[auto-generate-sections] Calling OpenAI with enhanced knowledge base context for lessonId: ${lessonId}`);
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o', // Use the more capable model for complex knowledge integration
+        model: 'gpt-4.1-mini', // Use the more capable model for complex knowledge integration
         messages: [
           { 
             role: 'system', 

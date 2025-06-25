@@ -36,7 +36,6 @@ import {
   Sparkles,
   ArrowRight
 } from 'lucide-react';
-import { triggerCelebration } from '@/components/ui/confetti';
 
 interface KnowledgeBaseAnalysis {
   totalDocuments: number;

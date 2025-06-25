@@ -31,7 +31,7 @@ export class QuestionGenerationService {
     try {
       const response = await limit(() => 
         this.openai.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4.1-mini',
           messages: [
             { role: 'system', content: 'You are an expert educational assessment creator.' },
             { role: 'user', content: prompt }

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { TeachingTool } from '@/types/teachingTools';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,8 @@ import {
   Brain, 
   Sparkles,
   Clock,
-  ArrowRight
+  ArrowRight,
+  FolderOpen
 } from 'lucide-react';
 
 // Icon mapping for the tools
@@ -40,7 +42,13 @@ interface ToolCardProps {
 }
 
 export function ToolCard({ tool, onSelect }: ToolCardProps) {
+  const router = useRouter();
   const IconComponent = iconMap[tool.icon as keyof typeof iconMap];
+
+  const handleLibraryClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    router.push(`/teach/tools/${tool.id}/library`);
+  };
 
   const getComplexityColor = (complexity: string) => {
     switch (complexity) {
@@ -131,13 +139,22 @@ export function ToolCard({ tool, onSelect }: ToolCardProps) {
         </div>
       </CardContent>
 
-      <CardFooter className="pt-0">
+      <CardFooter className="pt-0 flex gap-2">
         <Button 
-          className="w-full transition-all duration-300 bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground group-hover:bg-primary group-hover:text-primary-foreground"
+          className="flex-1 transition-all duration-300 bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground group-hover:bg-primary group-hover:text-primary-foreground"
           variant="secondary"
         >
           Use Tool
           <ArrowRight className="w-4 h-4 ml-2 transition-transform duration-300 group-hover:translate-x-1" />
+        </Button>
+        <Button 
+          variant="outline"
+          size="sm"
+          onClick={handleLibraryClick}
+          className="px-3 transition-all duration-300 hover:bg-primary hover:text-primary-foreground"
+          title={`View ${tool.name} Library`}
+        >
+          <FolderOpen className="w-4 h-4" />
         </Button>
       </CardFooter>
 

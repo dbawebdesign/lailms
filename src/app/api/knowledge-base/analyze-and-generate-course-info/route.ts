@@ -223,7 +223,7 @@ Respond ONLY with valid JSON in this exact format:
       
       // Call OpenAI for comprehensive content analysis
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: 'gpt-4.1-mini',
         messages: [
           {
             role: 'system',
