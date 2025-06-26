@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 
 interface JoinByCodeRequest {
   enrollment_code: string;
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       .from('profiles')
       .select('user_id')
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<"profiles">>();
 
     if (profileError || !profile) {
       return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
       .from('class_instances')
       .select('id, name, base_class_id')
       .eq('enrollment_code', enrollment_code)
-      .single();
+      .single<Tables<"class_instances">>();
 
     if (classError) {
       if (classError.code === 'PGRST116') { // Not found
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
       .select('id')
       .eq('class_instance_id', classInstance.id)
       .eq('profile_id', user.id)
-      .single();
+      .single<Tables<"rosters">>();
 
     if (enrollmentCheckError && enrollmentCheckError.code !== 'PGRST116') {
       throw enrollmentCheckError;
@@ -96,7 +97,7 @@ export async function POST(request: Request) {
         role: 'student' // Default role for joining by code
       })
       .select('id')
-      .single();
+      .single<Tables<"rosters">>();
 
     if (enrollmentError) {
       throw enrollmentError;

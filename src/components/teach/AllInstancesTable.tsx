@@ -170,108 +170,163 @@ export const AllInstancesTable: React.FC<AllInstancesTableProps> = ({
 
   return (
     <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center p-1 bg-card rounded-lg shadow-sm border">
-            <Input 
-                placeholder="Search by name, base class, or code..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="max-w-xs h-9"
-            />
-            <div className="flex items-center gap-3">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[180px] h-9">
-                        <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="upcoming">Upcoming</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="archived">Archived</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
+      {/* Search and Filter Controls */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center p-4 bg-card rounded-lg shadow-sm border">
+        <Input 
+          placeholder="Search by name, base class, or code..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full sm:max-w-xs h-9"
+        />
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[180px] h-9">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="upcoming">Upcoming</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+      </div>
 
+      {/* Table Content */}
       {filteredAndSortedInstances.length === 0 ? (
         <div className="py-10 text-center">
           <h3 className="text-lg font-medium text-muted-foreground">No instances match your filters.</h3>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            {/* Implement clickable sortable headers */}
-            <TableRow>
-              <TableHead onClick={() => handleSort('name')} className="cursor-pointer hover:bg-muted/50 font-semibold">Instance Name {sortColumn === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}</TableHead>
-              <TableHead className="font-semibold">Base Class</TableHead>
-              <TableHead className="font-semibold">Enroll. Code</TableHead>
-              <TableHead onClick={() => handleSort('status')} className="cursor-pointer hover:bg-muted/50 font-semibold">Status {sortColumn === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}</TableHead>
-              <TableHead onClick={() => handleSort('start_date')} className="cursor-pointer hover:bg-muted/50 font-semibold">Start Date {sortColumn === 'start_date' && (sortOrder === 'asc' ? '↑' : '↓')}</TableHead>
-              <TableHead className="font-semibold">Period</TableHead>
-              <TableHead className="text-right font-semibold">Enrolled</TableHead>
-              <TableHead className="text-right font-semibold">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredAndSortedInstances.map((instance) => (
-              <TableRow key={instance.id} className="hover:bg-muted/50">
-                <TableCell className="font-medium text-foreground py-3">{instance.name}</TableCell>
-                <TableCell className="text-muted-foreground py-3">
-                    <Button variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary" onClick={() => onViewInstanceDetails(instance)}>
-                        {instance.base_class?.name || 'N/A'} <ExternalLink className="ml-1 h-3 w-3" />
-                    </Button>
-                </TableCell>
-                <TableCell className="text-muted-foreground py-3">
-                  <div className="flex items-center gap-1">
-                    <span>{instance.enrollment_code}</span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(instance.enrollment_code, "Enrollment Code")}>
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </TableCell>
-                <TableCell className="py-3">
-                  <Badge variant={getStatusBadgeVariant(instance.status)} className="capitalize text-xs px-2 py-0.5">
-                    {instance.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-muted-foreground py-3">
-                  {instance.start_date ? format(new Date(instance.start_date), "MMM d, yyyy") : "N/A"}
-                </TableCell>
-                <TableCell className="text-muted-foreground py-3">N/A</TableCell>
-                <TableCell className="text-right text-muted-foreground py-3">0 / ∞</TableCell>
-                <TableCell className="text-right py-3">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
+        <div className="border rounded-lg overflow-hidden bg-card">
+          <div className="overflow-x-auto max-w-full">
+            <Table className="w-full">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead 
+                    onClick={() => handleSort('name')} 
+                    className="cursor-pointer hover:bg-muted/50 font-semibold w-[25%] min-w-[180px]"
+                  >
+                    Instance Name {sortColumn === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </TableHead>
+                  <TableHead className="font-semibold w-[25%] min-w-[180px]">
+                    Base Class
+                  </TableHead>
+                  <TableHead className="font-semibold w-[12%] min-w-[110px]">
+                    Enroll. Code
+                  </TableHead>
+                  <TableHead 
+                    onClick={() => handleSort('status')} 
+                    className="cursor-pointer hover:bg-muted/50 font-semibold w-[10%] min-w-[90px]"
+                  >
+                    Status {sortColumn === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </TableHead>
+                  <TableHead 
+                    onClick={() => handleSort('start_date')} 
+                    className="cursor-pointer hover:bg-muted/50 font-semibold w-[12%] min-w-[110px]"
+                  >
+                    Start Date {sortColumn === 'start_date' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </TableHead>
+                  <TableHead className="font-semibold w-[8%] min-w-[70px]">
+                    Period
+                  </TableHead>
+                  <TableHead className="text-right font-semibold w-[8%] min-w-[80px]">
+                    Enrolled
+                  </TableHead>
+                  <TableHead className="text-right font-semibold w-[60px]">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredAndSortedInstances.map((instance) => (
+                  <TableRow key={instance.id} className="hover:bg-muted/50">
+                    <TableCell className="font-medium text-foreground py-3 max-w-0 w-[25%]">
+                      <div className="truncate pr-2" title={instance.name}>
+                        {instance.name}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground py-3 max-w-0 w-[25%]">
+                      <Button 
+                        variant="link" 
+                        className="p-0 h-auto text-muted-foreground hover:text-primary text-left justify-start w-full max-w-full" 
+                        onClick={() => onViewInstanceDetails(instance)}
+                      >
+                        <div className="truncate mr-1 flex-1" title={instance.base_class?.name || 'N/A'}>
+                          {instance.base_class?.name || 'N/A'}
+                        </div>
+                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => onViewInstanceDetails(instance)}>
-                        <ExternalLink className="mr-2 h-4 w-4" /> View Base Class
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onEditInstance(instance.id)}>
-                        <Edit2 className="mr-2 h-4 w-4" /> Manage Instance
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onViewStudents(instance.id)}>
-                        <Users className="mr-2 h-4 w-4" /> Manage Students
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      {instance.status !== "archived" && (
-                        <DropdownMenuItem onClick={() => onArchiveInstance(instance.id)} className="text-yellow-600 hover:!text-yellow-700 focus:text-yellow-700 focus:bg-yellow-50">
-                          <ArchiveIcon className="mr-2 h-4 w-4" /> Archive Instance
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground py-3 w-[12%]">
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono text-sm truncate">{instance.enrollment_code}</span>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 flex-shrink-0" 
+                          onClick={() => copyToClipboard(instance.enrollment_code, "Enrollment Code")}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3 w-[10%]">
+                      <Badge variant={getStatusBadgeVariant(instance.status)} className="capitalize text-xs px-2 py-0.5">
+                        {instance.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground py-3 w-[12%]">
+                      <div className="whitespace-nowrap">
+                        {instance.start_date ? format(new Date(instance.start_date), "MMM d, yyyy") : "N/A"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground py-3 w-[8%]">
+                      <div className="whitespace-nowrap">N/A</div>
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground py-3 w-[8%]">
+                      <div className="whitespace-nowrap">0 / ∞</div>
+                    </TableCell>
+                    <TableCell className="text-right py-3 w-[60px]">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => onViewInstanceDetails(instance)}>
+                            <ExternalLink className="mr-2 h-4 w-4" /> View Base Class
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onEditInstance(instance.id)}>
+                            <Edit2 className="mr-2 h-4 w-4" /> Manage Instance
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onViewStudents(instance.id)}>
+                            <Users className="mr-2 h-4 w-4" /> Manage Students
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {instance.status !== "archived" && (
+                            <DropdownMenuItem 
+                              onClick={() => onArchiveInstance(instance.id)} 
+                              className="text-yellow-600 hover:!text-yellow-700 focus:text-yellow-700 focus:bg-yellow-50"
+                            >
+                              <ArchiveIcon className="mr-2 h-4 w-4" /> Archive Instance
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
       )}
     </div>
   );

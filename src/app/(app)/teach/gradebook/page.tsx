@@ -21,6 +21,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tables } from 'packages/types/db';
 
 interface ClassInstance {
   id: string;
@@ -116,7 +117,7 @@ export default function GradebookPage() {
         .from('profiles')
         .select('id, user_id, role')
         .eq('user_id', user.id)
-        .single();
+        .single<Tables<"profiles">>();
 
       if (profileError || !profile) {
         throw new Error('User profile not found. Please complete your profile setup.');

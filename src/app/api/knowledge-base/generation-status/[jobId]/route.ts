@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { courseGenerator } from '@/lib/services/course-generator';
+import { Tables } from 'packages/types/db';
 
 export async function GET(
   request: NextRequest,
@@ -22,7 +23,7 @@ export async function GET(
       .select('*')
       .eq('id', jobId)
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<'course_generation_jobs'>>();
 
     if (jobError || !job) {
       return NextResponse.json(

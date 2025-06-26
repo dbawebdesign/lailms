@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       .from('assessments')
       .select('*')
       .eq('id', assessmentId)
-      .single() as { data: Assessment | null, error: any }
+      .single<Assessment>()
 
     if (assessmentError || !assessment) {
       return NextResponse.json({ error: 'Assessment not found' }, { status: 404 })
@@ -67,7 +67,8 @@ export async function POST(request: NextRequest) {
       .select('attempt_number')
       .eq('assessment_id', assessmentId)
       .eq('student_id', user.id)
-      .order('attempt_number', { ascending: false }) as { data: Pick<StudentAttempt, 'attempt_number'>[] | null, error: any }
+      .order('attempt_number', { ascending: false })
+      .returns<Pick<StudentAttempt, 'attempt_number'>[]>()
 
     if (attemptsError) {
       return NextResponse.json({ error: 'Failed to check existing attempts' }, { status: 500 })
@@ -84,7 +85,8 @@ export async function POST(request: NextRequest) {
       .from('assessment_questions')
       .select('*')
       .eq('assessment_id', assessmentId)
-      .order('order_index') as { data: AssessmentQuestion[] | null, error: any }
+      .order('order_index')
+      .returns<AssessmentQuestion[]>()
 
     if (questionsError || !questions) {
       return NextResponse.json({ error: 'Failed to load questions' }, { status: 500 })
@@ -105,7 +107,7 @@ export async function POST(request: NextRequest) {
       .from('student_attempts')
       .insert(attemptData)
       .select()
-      .single() as { data: StudentAttempt | null, error: any }
+      .single<StudentAttempt>()
 
     if (attemptError || !newAttempt) {
       return NextResponse.json({ error: 'Failed to create attempt' }, { status: 500 })
@@ -245,22 +247,31 @@ export async function GET(request: NextRequest) {
     // Fetch attempt details with assessment info
     const { data: attempt, error: attemptError } = await supabase
       .from('student_attempts')
-      .select('*')
+      .select(`
+        *,
+        assessment:assessments(*)
+      `)
       .eq('id', attemptId)
       .eq('student_id', user.id)
-      .single()
+      .single<StudentAttempt & { assessment: Assessment }>()
 
     if (attemptError || !attempt) {
-      return NextResponse.json({ error: 'Assessment attempt not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Attempt not found' }, { status: 404 })
     }
 
-    // Fetch responses with question details
+    // Fetch associated responses
     const { data: responses, error: responsesError } = await supabase
       .from('student_responses')
-      .select('*')
+      .select(`
+        *,
+        question:assessment_questions(*)
+      `)
       .eq('attempt_id', attemptId)
+      .order('created_at')
+      .returns<(StudentResponse & { question: AssessmentQuestion })[]>()
 
     if (responsesError) {
+      // It's okay if there are no responses yet, don't throw error
       console.error('Error fetching responses:', responsesError)
       return NextResponse.json({ error: 'Failed to fetch attempt responses' }, { status: 500 })
     }

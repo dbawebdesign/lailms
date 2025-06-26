@@ -2,6 +2,7 @@ import React from 'react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import KnowledgeBaseCourseCreator from '@/components/knowledge-base/KnowledgeBaseCourseCreator';
+import { Tables } from 'packages/types/db';
 
 export default async function CreateKnowledgeBaseCoursePage() {
   const supabase = createSupabaseServerClient();
@@ -17,7 +18,7 @@ export default async function CreateKnowledgeBaseCoursePage() {
     .from('profiles')
     .select('organisation_id')
     .eq('user_id', user.id)
-    .single();
+    .single<Tables<"profiles">>();
 
   if (profileError || !profile?.organisation_id) {
     redirect('/onboarding');

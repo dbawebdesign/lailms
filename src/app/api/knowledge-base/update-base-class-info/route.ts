@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 
 interface CourseInfo {
   name: string;
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
       .select('id, user_id, name, settings')
       .eq('id', baseClassId)
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (baseClassError || !baseClass) {
       return NextResponse.json(
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', baseClassId)
       .select()
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (updateError) {
       console.error('Base class update error:', updateError);

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import { z } from 'zod';
+import { Tables } from 'packages/types/db';
 
 // Enhanced request schema with optional context fields
 interface GenerateOutlineRequest {
@@ -255,176 +256,130 @@ Ensure the final output is ONLY the JSON object, with no other text before or af
 
 // Function to fetch template base class details
 async function fetchTemplateBaseClass(supabase: any, templateId: string): Promise<any | null> {
-  try {
-    const { data, error } = await supabase
-      .from('base_classes')
-      .select('*')
-      .eq('id', templateId)
-      .single();
-    
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Failed to fetch template base class:', error);
+  const { data, error } = await supabase
+    .from('base_classes')
+    .select('name, description, settings')
+    .eq('id', templateId)
+    .single();
+
+  if (error) {
+    console.error(`Error fetching template base class (${templateId}):`, error);
     return null;
   }
+  return data;
 }
 
 export async function POST(request: Request) {
-  const supabase = createSupabaseServerClient();
-  let requestBody: GenerateOutlineRequest;
-
   try {
-    requestBody = await request.json();
-  } catch (e) {
-    return NextResponse.json({ error: 'Invalid request body. JSON expected.' }, { status: 400 });
-  }
+    const supabase = createSupabaseServerClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  const { prompt, knowledgeBaseIds, templateBaseClassId, gradeLevel, lengthInWeeks } = requestBody;
-
-  if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
-    return NextResponse.json({ error: 'Prompt is required and must be a non-empty string.' }, { status: 400 });
-  }
-
-  // Check if development mode and no API key
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  const useOpenAI = openai && process.env.OPENAI_API_KEY;
-
-  // Handle case when OpenAI client is not available (more graceful error for development)
-  if (!useOpenAI && !isDevelopment) {
-    return NextResponse.json({ 
-      error: 'OpenAI API key not configured on the server.',
-      details: 'Please add OPENAI_API_KEY to your environment variables.'
-    }, { status: 500 });
-  }
-
-  try {
-    // Authenticate user (ensure they are a teacher/admin)
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+    if (authError || !user) {
+      return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
     
-    // Add role check to ensure user is teacher/admin - using profiles table instead of members
+    // Check if user has teacher role
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('role, organisation_id')
+      .select('role')
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<"profiles">>();
 
-    if (profileError || !profile) {
-      console.error('API Auth: Could not fetch user profile for generate-course-outline', profileError);
-      return NextResponse.json({ error: 'User profile not found.' }, { status: 403 });
+    if (profileError || !profile || profile.role !== 'teacher') {
+      return new NextResponse(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    if (!['admin', 'teacher'].includes(profile.role)) {
-      return NextResponse.json({ error: 'User does not have sufficient privileges (teacher or admin required).' }, { status: 403 });
-    }
-
-    // Use mock data in development with no API key
-    if (isDevelopment && !useOpenAI) {
-      console.log('DEVELOPMENT MODE: Using mock course outline data');
-      
-      // Add a slight delay to simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Return the mock response
-      const mockResponse = {...MOCK_COURSE_OUTLINE};
-      
-      // Customize the mock response based on prompt keywords
-      if (prompt.toLowerCase().includes('math')) {
-        mockResponse.baseClassName = "Mathematics Fundamentals";
-        mockResponse.subject = "Mathematics";
-      } else if (prompt.toLowerCase().includes('science')) {
-        mockResponse.baseClassName = "Introduction to Science";
-        mockResponse.subject = "Science";
-      }
-      
-      // We passed Zod validation because our mock data conforms to the schema
-      return NextResponse.json(mockResponse);
-    }
-
-    // Normal flow with OpenAI API
-    // Gather additional context if provided
-    let additionalContext = '';
-    let templateBaseClass = null;
-
-    // Fetch template base class details if provided
-    if (templateBaseClassId) {
-      templateBaseClass = await fetchTemplateBaseClass(supabase, templateBaseClassId);
-      if (templateBaseClass) {
-        additionalContext += `\nUse this existing base class as a template/inspiration: ${JSON.stringify(templateBaseClass)}`;
-      }
-    }
-
-    // TODO: If knowledgeBaseIds is provided, fetch knowledge base documents
-    // This would require additional implementation for knowledge base integration
-
-    // --- Call OpenAI API --- 
-    console.log('Generating course outline for prompt:', prompt);
-
-    // Create a complete request with all context
-    const requestWithContext: GenerateOutlineRequest = {
-      prompt,
+    const { 
+      prompt, 
       knowledgeBaseIds,
       templateBaseClassId,
       gradeLevel,
       lengthInWeeks
-    };
+    }: GenerateOutlineRequest = await request.json();
 
-    const systemPrompt = generateSystemPrompt(requestWithContext);
-    
-    // Combine the user's prompt with any additional context
-    const enhancedPrompt = `${prompt}${additionalContext ? '\n\nAdditional Context:' + additionalContext : ''}`;
-
-    const completion = await openai!.chat.completions.create({
-      model: "gpt-4.1-mini", // Use the specified model
-      response_format: { type: "json_object" }, // Request JSON mode
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: enhancedPrompt }
-      ],
-      temperature: 0.7, // Add some creativity
-      max_tokens: 4000, // Ensure we have enough tokens for detailed outlines
-    });
-
-    const jsonResponse = completion.choices[0]?.message?.content;
-
-    if (!jsonResponse) {
-      throw new Error('OpenAI response content was empty or missing.');
+    if (!prompt) {
+      return new NextResponse(JSON.stringify({ error: 'Prompt is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // Parse and validate the JSON response from OpenAI
-    let generatedOutline: GeneratedCourseOutline;
-    try {
-      // Parse JSON response
-      generatedOutline = JSON.parse(jsonResponse);
-      
-      // Validate against schema
-      const validationResult = generatedCourseOutlineSchema.safeParse(generatedOutline);
-      
-      if (!validationResult.success) {
-        console.error("JSON validation failed:", validationResult.error);
-        throw new Error('Generated course outline does not match the expected structure.');
+    let additionalContext = '';
+    // --- Add context from template ---
+    if (templateBaseClassId) {
+      const templateData = await fetchTemplateBaseClass(supabase, templateBaseClassId);
+      if (templateData) {
+        additionalContext += `\n\n# Context from Template Course: "${templateData.name}"
+## Description
+${templateData.description || 'No description provided.'}
+## Existing Outline (if available)
+${JSON.stringify(templateData.settings?.generatedOutline, null, 2) || 'No existing outline.'}`;
       }
-      
-      // Successfully validated
-      generatedOutline = validationResult.data;
-      
-    } catch (parseError) {
-      console.error("Failed to parse or validate OpenAI JSON response:", jsonResponse, parseError);
-      throw new Error('Failed to parse or validate the generated course outline from AI response.');
     }
-    
-    console.log('Successfully generated outline:', generatedOutline);
-    return NextResponse.json(generatedOutline);
+     // TODO: If knowledgeBaseIds is provided, fetch knowledge base documents
+     // This would require additional implementation for knowledge base integration
 
-  } catch (error: any) {
-    console.error('Error in /api/teach/generate-course-outline:', error);
-    // Distinguish OpenAI API errors from other errors if possible
-    if (error instanceof OpenAI.APIError) {
-        return NextResponse.json({ error: `OpenAI API Error: ${error.status} ${error.name}`, details: error.message }, { status: error.status || 500 });
+    // --- Call OpenAI API --- 
+    if (!openai) {
+      console.error("OpenAI client not initialized. Check API key.");
+      // Return mock response if in development and no API key is available
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Returning MOCK course outline due to missing OpenAI client.");
+        return new NextResponse(JSON.stringify(MOCK_COURSE_OUTLINE), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new NextResponse(JSON.stringify({ error: 'AI service not available' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
-    return NextResponse.json({ error: 'Failed to generate course outline.', details: error.message }, { status: 500 });
+    console.log("Calling OpenAI API...");
+    const systemPrompt = generateSystemPrompt({ prompt, templateBaseClassId, gradeLevel, lengthInWeeks });
+    const userPrompt = `${prompt}${additionalContext}`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4-turbo-preview',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.7,
+      max_tokens: 4000,
+    });
+    console.log("OpenAI API call successful.");
+
+    const generatedContent = response.choices[0].message.content;
+
+    if (!generatedContent) {
+      throw new Error("Received empty content from OpenAI");
+    }
+
+    // --- Validate and return response ---
+    try {
+      const parsedOutline: GeneratedCourseOutline = JSON.parse(generatedContent);
+      const validatedOutline = generatedCourseOutlineSchema.parse(parsedOutline);
+      return NextResponse.json(validatedOutline);
+    } catch (validationError) {
+      console.error("Failed to validate OpenAI response:", validationError);
+      console.error("Raw OpenAI Content:", generatedContent);
+      throw new Error("AI generated an invalid outline structure");
+    }
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('Error in generate-course-outline API:', errorMessage);
+    return new NextResponse(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 } 

@@ -6,6 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BookOpenCheck, ClipboardCheck, AlertTriangle, Info, Users, Sparkles, Activity, TrendingUp, BookOpen, CheckCircle, Target, Eye, Lightbulb, Search, Brain } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { Tables } from "packages/types/db";
 
 interface ActiveClassData {
   id: string;
@@ -157,7 +158,7 @@ export default async function TeacherDashboardPage() {
     .from('profiles')
     .select('user_id, first_name, last_name, role')
     .eq('user_id', user.id)
-    .single();
+    .single<Tables<"profiles">>();
 
   if (profileError || !profile) {
     console.error('TeacherDashboard: Profile fetch failed. ProfileError:', profileError, 'Profile:', profile, 'UserID:', user.id);

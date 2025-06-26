@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import { Tables } from 'packages/types/db'
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
       .from('password_reset_codes')
       .select('id, user_id, code, expires_at')
       .eq('code', resetCode)
-      .single()
+      .single<Tables<'password_reset_codes'>>()
 
     if (resetError || !resetData) {
       return NextResponse.json({ error: 'Invalid reset code' }, { status: 400 })

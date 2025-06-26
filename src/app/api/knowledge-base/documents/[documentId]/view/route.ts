@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { Tables } from 'packages/types/db';
 
 export async function GET(
   request: Request,
@@ -22,7 +23,7 @@ export async function GET(
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', session.user.id)
-      .maybeSingle();
+      .maybeSingle<Tables<'profiles'>>();
 
     if (profileError || !profile?.organisation_id) {
       return NextResponse.json({ error: 'Could not verify user organisation membership.' }, { status: 403 });
@@ -34,7 +35,7 @@ export async function GET(
       .select('id, file_name, storage_path, file_type, metadata, organisation_id')
       .eq('id', documentId)
       .eq('organisation_id', profile.organisation_id)
-      .single();
+      .single<Tables<'documents'>>();
 
     if (docError || !document) {
       return NextResponse.json({ error: 'Document not found or access denied' }, { status: 404 });

@@ -8,7 +8,7 @@ import { CreateBaseClassModal } from "@/components/teach/CreateBaseClassModal";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, BookOpenText, Plus, Loader2 } from "lucide-react";
 import { createBrowserClient } from '@supabase/ssr'; // Import Supabase client
-import { Database } from '@learnologyai/types'; // Import Database types
+import { Database, Tables } from '@learnologyai/types'; // Import Database types
 // import { toast } from "sonner"; // Consider adding toast notifications
 
 // --- Mock API --- (To be moved to a separate file e.g., src/lib/api/teach-mocks.ts later)
@@ -106,7 +106,7 @@ export default function TeachBaseClassesPage() {
           .from('profiles')
           .select('organisation_id')
           .eq('user_id', session.user.id) // Assuming 'user_id' is the column in profiles linking to auth.users.id
-          .single();
+          .single<Tables<'profiles'>>();
         
         if (profileError) {
           console.error('Profile fetch error:', profileError);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { QuestionGenerationService } from '@/lib/services/question-generation-service';
+import { Tables } from 'packages/types/db';
 
 // GET /api/teach/assessments/path/[pathId] - Get path assessments
 export async function GET(
@@ -50,7 +51,7 @@ export async function GET(
         ` : ''}
       `)
       .eq('id', pathId)
-      .single();
+      .single<Tables<'paths'>>();
 
     if (pathError || !path) {
       return NextResponse.json({ error: 'Path not found' }, { status: 404 });
@@ -63,7 +64,8 @@ export async function GET(
       const { data: classInstances, error: instanceError } = await supabase
         .from('class_instances')
         .select('id')
-        .eq('base_class_id', baseClass.id);
+        .eq('base_class_id', baseClass.id)
+        .returns<Tables<'class_instances'>[]>();
 
       if (instanceError || !classInstances || classInstances.length === 0) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });
@@ -76,7 +78,7 @@ export async function GET(
         .select('id, role')
         .in('class_instance_id', classInstanceIds)
         .eq('profile_id', user.id)
-        .single();
+        .maybeSingle<Tables<'rosters'>>();
 
       if (!enrollment) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });

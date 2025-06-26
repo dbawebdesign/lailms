@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { AssessmentAnalyticsService } from '@/lib/services/assessment-analytics-service';
+import { Tables } from 'packages/types/db';
 
 // GET /api/teach/analytics/assessments/[assessmentId] - Get analytics for specific assessment
 export async function GET(
@@ -26,7 +27,7 @@ export async function GET(
       .from('assessments')
       .select('id, base_class_id')
       .eq('id', assessmentId)
-      .single();
+      .single<Tables<'assessments'>>();
 
     if (assessmentError || !assessment) {
       return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
@@ -42,7 +43,7 @@ export async function GET(
       .from('base_classes')
       .select('id, user_id')
       .eq('id', assessment.base_class_id)
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (baseClassError || !baseClass) {
       return NextResponse.json({ error: 'Base class not found' }, { status: 404 });
@@ -94,7 +95,7 @@ export async function POST(
       .from('assessments')
       .select('id, base_class_id')
       .eq('id', assessmentId)
-      .single();
+      .single<Tables<'assessments'>>();
 
     if (assessmentError || !assessment) {
       return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
@@ -110,7 +111,7 @@ export async function POST(
       .from('base_classes')
       .select('id, user_id')
       .eq('id', assessment.base_class_id)
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (baseClassError || !baseClass) {
       return NextResponse.json({ error: 'Base class not found' }, { status: 404 });

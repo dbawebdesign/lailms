@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { BaseClassCreationData, BaseClass, GeneratedOutline } from '../../../../types/teach'; // Added GeneratedOutline
 import { createClient } from '@supabase/supabase-js';
+import { Tables } from 'packages/types/db';
 
 // Database representation (subset, focusing on what we insert/select)
 interface DbBaseClass {
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
       .from('profiles')
       .select('organisation_id, role')
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<"profiles">>();
 
     if (profileError || !profileData || !profileData.organisation_id) {
       console.error("API Error fetching profile/organisation:", profileError);
@@ -117,7 +118,7 @@ export async function POST(request: Request) {
       .from('profiles')
       .select('user_id, organisation_id, role')
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<"profiles">>();
 
     if (profileError) {
       console.error("API Error fetching profile:", profileError);
@@ -177,7 +178,7 @@ export async function POST(request: Request) {
       .from('base_classes')
       .insert(dbInsertData)
       .select('id, settings, organisation_id, name, description, created_at, updated_at') // Ensure all fields for DbBaseClass and what generate-lessons might need from settings
-      .single();
+      .single<Tables<"base_classes">>();
 
     if (error) {
       console.error("API Error POST base-classes:", error);

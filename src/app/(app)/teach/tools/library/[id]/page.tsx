@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { CreationViewer } from '@/components/teach/tools/CreationViewer';
+import { Tables } from 'packages/types/db';
 
 interface CreationViewPageProps {
   params: Promise<{
@@ -24,7 +25,7 @@ export default async function CreationViewPage({ params }: CreationViewPageProps
     .from('profiles')
     .select('role, organisation_id')
     .eq('user_id', user.id)
-    .single();
+    .single<Tables<"profiles">>();
 
   if (profileError || !profile || profile.role !== 'teacher') {
     redirect('/');

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { courseGenerator, CourseGenerationRequest } from '@/lib/services/course-generator';
 import { knowledgeBaseAnalyzer } from '@/lib/services/knowledge-base-analyzer';
+import { Tables } from 'packages/types/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
       .select('organisation_id')
       .eq('id', baseClassId)
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (baseClassError || !baseClass) {
       return NextResponse.json(
@@ -117,7 +118,7 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('id', baseClassId)
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (baseClassError || !baseClass) {
       return NextResponse.json(
@@ -135,7 +136,8 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('base_class_id', baseClassId)
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .returns<Tables<'course_outlines'>[]>();
 
     if (outlinesError) {
       return NextResponse.json(

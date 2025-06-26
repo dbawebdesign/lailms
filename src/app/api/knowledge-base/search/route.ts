@@ -5,16 +5,12 @@ import { Database } from '../../../../../packages/types/db'
 import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 import { NextRequest } from 'next/server';
+import { Tables } from 'packages/types/db';
 
 // Initialize OpenAI client for embeddings
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-// Define the expected structure for the user role check
-interface MemberProfile {
-  role: Database['public']['Enums']['role']
-}
 
 // Define the structure for vector search results
 interface VectorSearchResult {
@@ -139,7 +135,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', session.user.id)
-      .single()
+      .single<Tables<"profiles">>()
 
     if (memberError || !memberData?.organisation_id) {
       console.error('Error fetching member organization:', memberError)
@@ -189,6 +185,7 @@ export async function POST(request: NextRequest) {
         `)
         .eq('organisation_id', organisationId)
         .limit(limit)
+        .returns<Tables<'documents'>[]>();
       
       if (basicError) {
         console.error('Error in fallback search:', basicError)

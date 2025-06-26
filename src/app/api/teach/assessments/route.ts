@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 
 // GET /api/teach/assessments - List assessments
 export async function GET(request: NextRequest) {
@@ -23,7 +24,8 @@ export async function GET(request: NextRequest) {
     const { data: assessments, error } = await supabase
       .from('assessments')
       .select('*')
-      .eq('base_class_id', baseClassId);
+      .eq('base_class_id', baseClassId)
+      .returns<Tables<'assessments'>[]>();
 
     if (error) {
       console.error('Error fetching assessments:', error);
@@ -37,11 +39,12 @@ export async function GET(request: NextRequest) {
       }
 
       // Get question counts for all assessments
-      const assessmentIds = assessments.map((a: any) => a.id);
+      const assessmentIds = assessments.map((a) => a.id);
       const { data: questionCounts, error: questionError } = await supabase
         .from('assessment_questions')
         .select('assessment_id')
-        .in('assessment_id', assessmentIds);
+        .in('assessment_id', assessmentIds)
+        .returns<Pick<Tables<'assessment_questions'>, 'assessment_id'>[]>();
 
       if (questionError) {
         console.error('Error fetching question counts:', questionError);
@@ -50,9 +53,9 @@ export async function GET(request: NextRequest) {
       // Count questions per assessment
       const questionCountMap = new Map<string, number>();
       if (questionCounts) {
-        questionCounts.forEach((q: any) => {
-          const count = questionCountMap.get(q.assessment_id) || 0;
-          questionCountMap.set(q.assessment_id, count + 1);
+        questionCounts.forEach((q) => {
+          const count = questionCountMap.get(q.assessment_id!) || 0;
+          questionCountMap.set(q.assessment_id!, count + 1);
         });
       }
 
@@ -61,7 +64,8 @@ export async function GET(request: NextRequest) {
         .from('assessment_attempts')
         .select('assessment_id, score')
         .in('assessment_id', assessmentIds)
-        .eq('completed', true);
+        .eq('completed', true)
+        .returns<Pick<Tables<'assessment_attempts'>, 'assessment_id' | 'score'>[]>();
 
       if (attemptError) {
         console.error('Error fetching attempt stats:', attemptError);
@@ -70,19 +74,19 @@ export async function GET(request: NextRequest) {
       // Calculate attempt stats per assessment
       const attemptStatsMap = new Map<string, { count: number; totalScore: number; scores: number[] }>();
       if (attempts) {
-        attempts.forEach((attempt: any) => {
-          const assessmentId = attempt.assessment_id;
+        attempts.forEach((attempt) => {
+          const assessmentId = attempt.assessment_id!;
           const stats = attemptStatsMap.get(assessmentId) || { count: 0, totalScore: 0, scores: [] };
           stats.count++;
           if (attempt.score !== null) {
-            stats.totalScore += attempt.score;
-            stats.scores.push(attempt.score);
+            stats.totalScore += attempt.score!;
+            stats.scores.push(attempt.score!);
           }
           attemptStatsMap.set(assessmentId, stats);
         });
       }
 
-      const assessmentsWithStats = assessments.map((assessment: any) => {
+      const assessmentsWithStats = assessments.map((assessment) => {
         const questionCount = questionCountMap.get(assessment.id) || 0;
         const attemptStats = attemptStatsMap.get(assessment.id) || { count: 0, totalScore: 0, scores: [] };
         const averageScore = attemptStats.scores.length > 0 
@@ -147,7 +151,7 @@ export async function POST(request: NextRequest) {
         settings: body.settings ?? {},
       })
       .select()
-      .single();
+      .single<Tables<'assessments'>>();
 
     if (error) {
       console.error('Error creating assessment:', error);

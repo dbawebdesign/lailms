@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { TeacherToolLibrary } from "@/components/teach/tools/TeacherToolLibrary";
 import { teachingTools } from "@/config/teachingTools";
+import { Tables } from "packages/types/db";
 
 interface ToolLibraryPageProps {
   params: Promise<{
@@ -25,7 +26,7 @@ export default async function ToolLibraryPage({ params }: ToolLibraryPageProps) 
     .from('profiles')
     .select('role, organisation_id')
     .eq('user_id', user.id)
-    .single();
+    .single<Tables<"profiles">>();
 
   if (profileError || !profile || profile.role !== 'teacher') {
     redirect('/');

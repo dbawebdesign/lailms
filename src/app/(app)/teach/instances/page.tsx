@@ -90,11 +90,29 @@ export default function AllInstancesPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-10 px-4 md:px-6 lg:px-8">
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center space-y-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="text-muted-foreground">Loading class instances...</p>
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 p-4 md:p-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">My Class Instances</h1>
+              <p className="text-muted-foreground text-sm md:text-base">Manage all your active and past class instances</p>
+            </div>
+            <Button 
+              onClick={() => router.push('/teach/base-classes')}
+              className="bg-brand-gradient hover:opacity-90 transition-all duration-200 flex-shrink-0"
+            >
+              <PlusCircle className="w-4 h-4 mr-2" />
+              Create New Instance
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-hidden min-h-0">
+          <div className="h-full flex items-center justify-center p-4 md:p-6">
+            <div className="text-center space-y-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="text-muted-foreground">Loading class instances...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -102,28 +120,36 @@ export default function AllInstancesPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-8">
-      <header className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl lg:text-[36px] font-bold tracking-tight">My Class Instances</h1>
-          <p className="text-muted-foreground mt-2">Manage all your active and past class instances</p>
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 p-4 md:p-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">My Class Instances</h1>
+            <p className="text-muted-foreground text-sm md:text-base">Manage all your active and past class instances</p>
+          </div>
+          <Button 
+            onClick={() => router.push('/teach/base-classes')}
+            className="bg-brand-gradient hover:opacity-90 transition-all duration-200 flex-shrink-0"
+          >
+            <PlusCircle className="w-4 h-4 mr-2" />
+            Create New Instance
+          </Button>
         </div>
-        <Button 
-          onClick={() => router.push('/teach/base-classes')}
-          className="bg-brand-gradient hover:opacity-90 transition-airy"
-        >
-          <PlusCircle className="w-4 h-4 mr-2" />
-          Create New Instance
-        </Button>
-      </header>
+      </div>
 
-      <AllInstancesTable 
-        instances={instances}
-        onEditInstance={handleEditInstance}
-        onArchiveInstance={handleArchiveInstance}
-        onViewStudents={handleViewStudents}
-        onViewInstanceDetails={handleViewInstanceDetails}
-      />
+      <div className="flex-1 overflow-hidden min-h-0">
+        <div className="h-full p-4 md:p-6 overflow-hidden">
+          <div className="h-full max-w-full overflow-hidden">
+            <AllInstancesTable 
+              instances={instances}
+              onEditInstance={handleEditInstance}
+              onArchiveInstance={handleArchiveInstance}
+              onViewStudents={handleViewStudents}
+              onViewInstanceDetails={handleViewInstanceDetails}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 } 

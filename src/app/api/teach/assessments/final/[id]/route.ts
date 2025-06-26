@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { QuestionGenerationService } from '@/lib/services/question-generation-service';
+import { Tables } from 'packages/types/db';
 
 // GET /api/teach/assessments/final/[id] - Get final assessments
 export async function GET(
@@ -38,7 +39,7 @@ export async function GET(
         created_at
       `)
       .eq('id', id)
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (baseClassError || !baseClass) {
       return NextResponse.json({ error: 'Base class not found' }, { status: 404 });

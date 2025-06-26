@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { TeacherToolCreationInput, ToolLibraryFilters, ToolLibrarySort } from '@/types/teachingTools';
+import { Tables } from 'packages/types/db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
       .from('profiles')
       .select('role')
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || !profile || (profile as any).role !== 'teacher') {
       return NextResponse.json({ error: 'Access denied. Teacher role required.' }, { status: 403 });
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
     const to = from + limit - 1;
     query = query.range(from, to);
 
-    const { data: creations, error: queryError, count } = await query;
+    const { data: creations, error: queryError, count } = await query.returns<Tables<'teacher_tool_creations'>[]>();
 
     if (queryError) {
       console.error('Library query error:', queryError);
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .select('role')
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || !profile || (profile as any).role !== 'teacher') {
       return NextResponse.json({ error: 'Access denied. Teacher role required.' }, { status: 403 });
@@ -150,7 +151,7 @@ export async function POST(request: NextRequest) {
         tags: creationData.tags || []
       })
       .select()
-      .single();
+      .single<Tables<'teacher_tool_creations'>>();
 
     if (insertError) {
       console.error('Creation insert error:', insertError);

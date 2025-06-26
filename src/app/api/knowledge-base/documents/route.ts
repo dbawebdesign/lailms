@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { Database } from '@learnologyai/types';
+import { Tables } from 'packages/types/db';
 
 export async function GET(request: Request) {
   const supabase = createSupabaseServerClient();
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', session.user.id)
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError) {
       console.error('Error fetching profile record:', profileError);
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
 
     query = query.order('created_at', { ascending: false });
 
-    const { data: documents, error: documentsError } = await query;
+    const { data: documents, error: documentsError } = await query.returns<Tables<'documents'>[]>();
 
     if (documentsError) {
       console.error('Error fetching documents:', documentsError);
@@ -120,7 +120,7 @@ export async function DELETE(request: Request) {
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', session.user.id)
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || !profile || !profile.organisation_id) {
       // Handle errors similar to GET
@@ -134,7 +134,7 @@ export async function DELETE(request: Request) {
       .from('documents')
       .select('id, storage_path, organisation_id')
       .eq('id', docId)
-      .single();
+      .single<Tables<'documents'>>();
 
     if (docFetchError) {
         console.error('Error fetching document for delete:', docFetchError);

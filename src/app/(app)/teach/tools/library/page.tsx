@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { TeacherToolLibrary } from "@/components/teach/tools/TeacherToolLibrary";
+import { Tables } from "packages/types/db";
 
 export default async function TeacherToolLibraryPage() {
   const supabase = createSupabaseServerClient();
@@ -17,7 +18,7 @@ export default async function TeacherToolLibraryPage() {
     .from('profiles')
     .select('role, organisation_id')
     .eq('user_id', user.id)
-    .single();
+    .single<Tables<"profiles">>();
 
   if (profileError || !profile || profile.role !== 'teacher') {
     redirect('/');

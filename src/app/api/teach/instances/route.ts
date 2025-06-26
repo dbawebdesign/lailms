@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { ClassInstance, EnrichedClassInstance } from '../../../../types/teach'; // Our frontend types
+import { Tables } from 'packages/types/db';
 
 // Database representation for class_instances and base_classes (relevant fields)
 interface DbClassInstance {
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<"profiles">>();
 
     if (memberError || !memberData || !memberData.organisation_id) {
       return NextResponse.json({ error: 'User organisation not found.' }, { status: 403 });

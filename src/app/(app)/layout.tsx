@@ -5,6 +5,7 @@ import { LunaContextRegistration } from "@/components/providers/LunaContextRegis
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from 'next/navigation';
 import type { UserRole } from "@/config/navConfig";
+import { Tables } from 'packages/types/db';
 
 export default async function AppPagesLayout({
   children,
@@ -25,16 +26,14 @@ export default async function AppPagesLayout({
     .from('profiles')
     .select('role')
     .eq('user_id', user.id)
-    .single();
+    .single<Tables<'profiles'>>();
 
   if (profileError || !profile) {
     console.error("Error fetching profile for layout or profile not found:", profileError);
     redirect('/login?error=profile_critical');
   }
   
-  // Type assertion for proper access
-  const typedProfile = profile as unknown as { role: UserRole };
-  userRole = typedProfile.role;
+  userRole = profile.role;
 
   if (!userRole) {
     console.error("User role could not be determined in layout, redirecting to login.");

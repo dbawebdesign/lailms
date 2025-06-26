@@ -4,6 +4,7 @@ import { ToolLibrary } from "@/components/teach/tools/ToolLibrary";
 import { Button } from "@/components/ui/button";
 import { BookOpen } from "lucide-react";
 import Link from "next/link";
+import { Tables } from "packages/types/db";
 
 export default async function TeacherToolsPage() {
   const supabase = createSupabaseServerClient();
@@ -20,7 +21,7 @@ export default async function TeacherToolsPage() {
     .from('profiles')
     .select('role, organisation_id')
     .eq('user_id', user.id)
-    .single();
+    .single<Tables<"profiles">>();
 
   if (profileError || !profile || (profile as any).role !== 'teacher') {
     redirect('/');

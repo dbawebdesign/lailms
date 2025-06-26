@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { Tables } from "packages/types/db";
 
 interface ClassInstanceData {
   id: string;
@@ -81,7 +82,7 @@ export default async function ClassInstanceSettingsPage({
     .from('profiles')
     .select('user_id, first_name, last_name, role')
     .eq('user_id', user.id)
-    .single();
+    .single<Tables<"profiles">>();
 
   if (profileError || !profile || profile.role !== 'teacher') {
     redirect("/dashboard?error=unauthorized");

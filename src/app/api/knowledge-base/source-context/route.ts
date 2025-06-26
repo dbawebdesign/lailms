@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { Database } from '../../../../../packages/types/db'
+import { Tables } from 'packages/types/db';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -36,7 +36,7 @@ export async function GET(req: Request) {
   }
 
   // Create client for user session
-  const supabase = createServerClient<Database>(
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: supabaseCookieMethods }
@@ -77,7 +77,7 @@ export async function GET(req: Request) {
     `)
     .eq('id', chunkId)
     .eq('document_id', documentId)
-    .single();
+    .single<Tables<"document_chunks">>();
   
   if (chunkError) {
     console.error('Error fetching chunk:', chunkError);
@@ -93,7 +93,7 @@ export async function GET(req: Request) {
     .from('documents')
     .select('organisation_id')
     .eq('id', documentId)
-    .single();
+    .single<Tables<"documents">>();
     
   if (documentError || !documentData) {
     return NextResponse.json({ error: 'Document not found' }, { status: 404 });
@@ -105,7 +105,7 @@ export async function GET(req: Request) {
     .select('user_id')
     .eq('user_id', session.user.id)
     .eq('organisation_id', documentData.organisation_id)
-    .single();
+    .single<Tables<"profiles">>();
     
   if (memberError || !memberData) {
     return NextResponse.json({ error: 'Unauthorized to access this document' }, { status: 403 });
@@ -130,7 +130,8 @@ export async function GET(req: Request) {
     `)
     .eq('document_id', documentId)
     .in('chunk_index', [chunkIndex - 1, chunkIndex + 1])
-    .order('chunk_index');
+    .order('chunk_index')
+    .returns<Tables<'document_chunks'>[]>();
   
   if (contextError) {
     console.error('Error fetching context chunks:', contextError);

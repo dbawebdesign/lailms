@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
+import { Tables } from 'packages/types/db';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .select('role')
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || !profile) {
       console.error('Profile query error:', profileError);

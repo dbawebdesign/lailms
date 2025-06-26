@@ -4,6 +4,7 @@ import type { UserRole } from "@/config/navConfig";
 import WelcomeCard from "@/components/dashboard/WelcomeCard";
 import NextUpCard from "@/components/dashboard/student/NextUpCard";
 import ActiveCourseItem, { ActiveCourseItemProps } from "@/components/dashboard/student/ActiveCourseItem";
+import { Tables } from "packages/types/db";
 
 // Helper function to fetch Next Up data
 async function getNextUpData(supabase: any, userId: string) {
@@ -99,7 +100,7 @@ export default async function StudentDashboardPage() {
     .from("profiles")
     .select("role, first_name, last_name, user_id")
     .eq("user_id", user.id)
-    .single();
+    .single<Tables<"profiles">>();
 
   if (profileError || !profile) {
     console.error("Error fetching student profile:", profileError);

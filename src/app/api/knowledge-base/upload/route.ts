@@ -1,7 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { Database } from '@learnologyai/types';
+import { Database, Tables } from '@learnologyai/types';
 import { createClient } from '@supabase/supabase-js'; // Import standard client for function invocation
 
 // Define the status enum type locally for type safety
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     .from('profiles') // Use the profiles table
     .select('organisation_id')
     .eq('user_id', session.user.id) // Match using the user_id column
-    .maybeSingle();
+    .maybeSingle<Tables<'profiles'>>();
 
   if (profileError) {
     console.error('Error fetching profile record:', profileError);
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       .from('documents')
       .insert(initialDocumentData)
       .select('id') // Only select the ID we need
-      .single();
+      .single<Tables<'documents'>>();
 
     if (insertError) {
       console.error('Database Insert Error:', insertError);

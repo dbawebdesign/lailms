@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { type User } from '@supabase/supabase-js';
+import { Tables } from 'packages/types/db';
 
 // Define expected types for request/response payloads
 interface EnrollmentRequest {
@@ -18,12 +19,12 @@ interface EnrolledStudent {
 }
 
 // Authorization helper
-async function authorizeTeacher(supabase: any, instanceId: string, currentUser: User): Promise<{ organisationId: string; errorResponse?: NextResponse }> {
+async function authorizeTeacher(supabase: ReturnType<typeof createSupabaseServerClient>, instanceId: string, currentUser: User): Promise<{ organisationId: string; errorResponse?: NextResponse }> {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('organisation_id, role')
     .eq('user_id', currentUser.id)
-    .single();
+    .single<Tables<"profiles">>();
 
   if (profileError || !profile) {
     console.error('Auth error: User profile not found:', profileError);
@@ -45,7 +46,7 @@ async function authorizeTeacher(supabase: any, instanceId: string, currentUser: 
     .select('id, base_class_id, base_classes!inner(organisation_id)')
     .eq('id', instanceId)
     .eq('base_classes.organisation_id', profile.organisation_id)
-    .single();
+    .single<Tables<"class_instances">>();
 
   if (instanceError || !classInstance) {
     console.error('Auth error: Class instance not found or not in user\'s organisation:', instanceError);
@@ -144,7 +145,7 @@ export async function POST(
       .from('profiles')
       .select('user_id, organisation_id')
       .eq('user_id', profile_id)
-      .single();
+      .single<Tables<"profiles">>();
 
     if (profileError || !profileRecord) {
       console.error('Error fetching profile record:', profileError);
@@ -161,7 +162,7 @@ export async function POST(
       .select('id')
       .eq('class_instance_id', instanceId)
       .eq('profile_id', profile_id)
-      .single();
+      .single<Tables<"rosters">>();
 
     if (existingError && existingError.code !== 'PGRST116') {
       throw existingError;
@@ -182,7 +183,7 @@ export async function POST(
       .from('rosters')
       .insert(enrollmentData)
       .select()
-      .single();
+      .single<Tables<"rosters">>();
 
     if (insertError) {
       console.error('Error creating enrollment:', insertError);

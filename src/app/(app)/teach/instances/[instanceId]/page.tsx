@@ -28,6 +28,7 @@ import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ClassInstanceHeader } from "@/components/teach/ClassInstanceHeader";
+import { Tables } from "packages/types/db";
 
 interface ClassInstanceData {
   id: string;
@@ -227,7 +228,7 @@ export default async function ClassInstancePage({
     .from('profiles')
     .select('user_id, first_name, last_name, role')
     .eq('user_id', user.id)
-    .single();
+    .single<Tables<"profiles">>();
 
   if (profileError || !profile || profile.role !== 'teacher') {
     redirect("/dashboard?error=unauthorized");

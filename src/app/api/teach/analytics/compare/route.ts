@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { AssessmentAnalyticsService } from '@/lib/services/assessment-analytics-service';
+import { Tables } from 'packages/types/db';
 
 // POST /api/teach/analytics/compare - Compare user performance
 export async function POST(request: NextRequest) {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
         .from('assessments')
         .select('id, base_class_id')
         .eq('id', assessmentId)
-        .single();
+        .single<Tables<'assessments'>>();
 
       if (assessmentError || !assessment) {
         return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
         .from('base_classes')
         .select('id, user_id')
         .eq('id', assessment.base_class_id)
-        .single();
+        .single<Tables<'base_classes'>>();
 
       if (baseClassError || !baseClass) {
         return NextResponse.json({ error: 'Base class not found' }, { status: 404 });

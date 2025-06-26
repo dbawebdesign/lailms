@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { type User } from '@supabase/supabase-js';
+import { Tables } from 'packages/types/db';
 
 // Authorization helper (can be shared or adapted)
 async function authorizeTeacherForEnrollmentAction(
-    supabase: any, 
+    supabase: ReturnType<typeof createSupabaseServerClient>, 
     instanceId: string, 
     enrollmentId: string, 
     currentUser: User
@@ -13,7 +14,7 @@ async function authorizeTeacherForEnrollmentAction(
         .from('profiles')
         .select('organisation_id, role')
         .eq('user_id', currentUser.id)
-        .single();
+        .single<Tables<"profiles">>();
 
     if (profileError || !profile) {
         return { errorResponse: NextResponse.json({ error: 'User not part of an organisation or not authorized.' }, { status: 403 }) };
@@ -42,7 +43,7 @@ async function authorizeTeacherForEnrollmentAction(
         .eq('id', enrollmentId)
         .eq('class_instance_id', instanceId) // Ensure it's for the correct instance
         .eq('class_instances.organisation_id', profile.organisation_id) // Ensure it's within the teacher's org
-        .single();
+        .single<Tables<"rosters">>();
 
     if (enrollmentError || !enrollment) {
         console.error('Auth error: Enrollment not found, not in specified instance, or not in user\'s organisation:', enrollmentError);

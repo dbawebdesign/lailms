@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import { Tables } from 'packages/types/db'
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
       .from('profiles')
       .select('user_id, username, organisation_id')
       .eq('username', username)
-      .single()
+      .single<Tables<'profiles'>>()
 
     if (profileError || !profileData) {
       // Don't reveal whether the user exists or not for security reasons

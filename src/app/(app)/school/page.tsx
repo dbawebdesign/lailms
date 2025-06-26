@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { UserRole } from "@/config/navConfig";
 import WelcomeCard from "@/components/dashboard/WelcomeCard";
+import { Tables } from "packages/types/db";
 
 export default async function AdminDashboardPage() {
   const supabase = createSupabaseServerClient();
@@ -16,7 +17,7 @@ export default async function AdminDashboardPage() {
     .from("profiles")
     .select("role, first_name, last_name, user_id")
     .eq("user_id", user.id)
-    .single();
+    .single<Tables<"profiles">>();
 
   if (profileError || !profile) {
     console.error("Error fetching admin profile or profile not found:", profileError);

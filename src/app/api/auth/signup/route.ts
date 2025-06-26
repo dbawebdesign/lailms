@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { Tables } from 'packages/types/db'
 
 // Define expected type for invite code data with nested organisation
 type InviteCodeWithOrg = {
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
         organisations:organisation_id (id, name, abbr)
       `)
       .eq('code', inviteCode) // This should match the code we're sending
-      .single<InviteCodeWithOrg>()
+      .single<Tables<"invite_codes">>()
 
     console.log('Invite code lookup result:', { inviteData, inviteError });
 
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
       .select('user_id')
       .eq('username', username)
       .limit(1)
+      .returns<Tables<"profiles">[]>()
 
     if (existingUser && existingUser.length > 0) {
       return NextResponse.json({ error: 'Username is already taken' }, { status: 400 })

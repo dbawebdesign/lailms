@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
+import { Tables } from 'packages/types/db';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -25,7 +26,7 @@ interface Document {
 
 // Helper function to wait for documents to be processed
 async function waitForDocumentProcessing(
-  supabase: any, 
+  supabase: ReturnType<typeof createSupabaseServerClient>, 
   organisationId: string, 
   baseClassId: string,
   maxWaitTime: number = 120000 // 2 minutes max wait
@@ -47,7 +48,8 @@ async function waitForDocumentProcessing(
       `)
       .eq('organisation_id', organisationId)
       .eq('base_class_id', baseClassId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .returns<Tables<'documents'>[]>();
 
     if (error) {
       console.error('Error checking document status:', error);
@@ -94,7 +96,8 @@ async function waitForDocumentProcessing(
     .eq('organisation_id', organisationId)
     .eq('base_class_id', baseClassId)
     .eq('status', 'completed')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .returns<Tables<'documents'>[]>();
     
   return finalDocuments || [];
 }

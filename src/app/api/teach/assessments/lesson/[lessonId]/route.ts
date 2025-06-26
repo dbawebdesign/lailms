@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { QuestionGenerationService } from '@/lib/services/question-generation-service';
 import { QuestionValidationService } from '@/lib/services/question-validation-service';
+import { Tables } from 'packages/types/db';
 
 // GET /api/teach/assessments/lesson/[lessonId] - Get lesson assessments
 export async function GET(
@@ -53,7 +54,7 @@ export async function GET(
         )
       `)
       .eq('id', lessonId)
-      .single();
+      .single<Tables<'lessons'>>();
 
     if (lessonError || !lesson) {
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 });
@@ -66,7 +67,8 @@ export async function GET(
       const { data: classInstances, error: instanceError } = await supabase
         .from('class_instances')
         .select('id')
-        .eq('base_class_id', baseClass.id);
+        .eq('base_class_id', baseClass.id)
+        .returns<Tables<'class_instances'>[]>();
 
       if (instanceError || !classInstances || classInstances.length === 0) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });
@@ -218,7 +220,7 @@ export async function POST(
         )
       `)
       .eq('id', lessonId)
-      .single();
+      .single<Tables<'lessons'>>();
 
     if (lessonError || !lesson) {
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 });
@@ -263,21 +265,23 @@ export async function POST(
       .from('assessments')
       .insert({
         lesson_id: lessonId,
+        base_class_id: (lesson.paths as any).base_class_id,
         title,
         description,
         assessment_type: assessmentType,
-        settings: {
-          ...settings,
-          difficultyLevel,
-          timeLimit,
-          maxAttempts,
-          passingScore,
-          instructions,
-          isPublished: false
-        }
+        instructions,
+        time_limit_minutes: timeLimit,
+        max_attempts: maxAttempts,
+        passing_score_percentage: passingScore,
+        randomize_questions: settings?.randomizeQuestions || false,
+        show_results_immediately: settings?.showResultsImmediately || false,
+        allow_review: settings?.allowReview || true,
+        ai_grading_enabled: settings?.aiGradingEnabled || false,
+        ai_model: settings?.aiModel || null,
+        created_by: user.id
       })
       .select()
-      .single();
+      .single<Tables<'assessments'>>();
 
     if (createError) {
       console.error('Error creating assessment:', createError);
@@ -298,7 +302,8 @@ export async function POST(
           .from('lesson_sections')
           .select('title, content, section_type')
           .eq('lesson_id', lessonId)
-          .order('order_index');
+          .order('order_index')
+          .returns<Tables<'lesson_sections'>[]>();
 
         if (lessonSections && lessonSections.length > 0) {
           const lessonContent = lessonSections

@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { Tables } from 'packages/types/db';
 
 // POST - Create a new path
 export async function POST(request: NextRequest) {
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', session.user.id)
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || !profile) {
       return NextResponse.json({ error: 'Could not verify user organisation' }, { status: 500 });

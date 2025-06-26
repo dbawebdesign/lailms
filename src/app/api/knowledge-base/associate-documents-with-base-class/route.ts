@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || profile?.organisation_id !== organisationId) {
       return NextResponse.json(
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
       .eq('id', baseClassId)
       .eq('user_id', user.id)
       .eq('organisation_id', organisationId)
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (baseClassError || !baseClass) {
       return NextResponse.json(
@@ -62,7 +63,8 @@ export async function POST(request: NextRequest) {
       .eq('uploaded_by', user.id)
       .is('base_class_id', null) // Only unassociated documents
       .gte('created_at', cutoffTime)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .returns<Tables<'documents'>[]>();
 
     if (documentsError) {
       console.error('Error fetching recent documents:', documentsError);
@@ -88,7 +90,8 @@ export async function POST(request: NextRequest) {
       .from('documents')
       .update({ base_class_id: baseClassId })
       .in('id', documentIds)
-      .select('id, file_name');
+      .select('id, file_name')
+      .returns<Tables<'documents'>[]>();
 
     if (updateError) {
       console.error('Error associating documents with base class:', updateError);

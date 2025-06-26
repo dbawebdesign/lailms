@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', userId)
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || profile?.organisation_id !== organisationId) {
       return NextResponse.json(
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
         }
       })
       .select()
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (baseClassError) {
       console.error('Placeholder base class creation error:', baseClassError);
