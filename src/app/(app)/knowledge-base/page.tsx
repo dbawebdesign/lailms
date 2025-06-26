@@ -42,9 +42,13 @@ export default function KnowledgeBasePage() {
           .single();
         
         if (memberError) throw new Error('Could not retrieve organization membership: ' + memberError.message);
-        if (!memberData || !memberData.organisation_id) throw new Error('You are not associated with any organization');
+        if (!memberData) throw new Error('You are not associated with any organization');
         
-        setUserOrgId(memberData.organisation_id);
+        // Type assertion for proper access
+        const typedMemberData = memberData as unknown as { organisation_id: string };
+        if (!typedMemberData.organisation_id) throw new Error('You are not associated with any organization');
+        
+        setUserOrgId(typedMemberData.organisation_id);
       } catch (err) {
         console.error("Failed to fetch user organisation context:", err);
         const message = err instanceof Error ? err.message : "An unknown error occurred";

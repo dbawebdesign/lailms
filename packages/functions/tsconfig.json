@@ -6,11 +6,16 @@
     "outDir": "./dist",
     "declaration": true,
     "declarationMap": true,
-    "module": "NodeNext", // Suitable for Node.js functions
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": false,
+    "noResolve": false,
+    "lib": ["ES2022", "WebWorker"],
+    "types": ["node"],
+    "skipLibCheck": true,
     "baseUrl": ".",
-    "rootDir": "src" // Assuming source code is in src/
+    "rootDir": "src"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "deno.d.ts"],
   "exclude": ["node_modules", "dist"]
 } 

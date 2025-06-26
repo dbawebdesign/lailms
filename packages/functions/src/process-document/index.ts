@@ -101,7 +101,12 @@ async function extractTextFromUrl(url: string): Promise<string> {
   console.log(`Attempting to scrape content from URL: ${url}`);
   
   // Try multiple strategies to fetch the URL
-  const strategies = [
+  interface FetchStrategy {
+    name: string;
+    options: RequestInit;
+  }
+
+  const strategies: FetchStrategy[] = [
     // Strategy 1: Standard fetch with browser-like headers
     {
       name: 'Standard Browser Headers',
@@ -114,7 +119,7 @@ async function extractTextFromUrl(url: string): Promise<string> {
           'DNT': '1',
           'Connection': 'keep-alive',
           'Upgrade-Insecure-Requests': '1',
-        }
+        } as Record<string, string>
       }
     },
     // Strategy 2: Simplified headers
@@ -124,16 +129,16 @@ async function extractTextFromUrl(url: string): Promise<string> {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; LearnologyAI/1.0; +https://learnologyai.com)',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        }
+        } as Record<string, string>
       }
     },
     // Strategy 3: Minimal headers
     {
-      name: 'Minimal Headers',
+      name: 'Minimal headers',
       options: {
         headers: {
           'User-Agent': 'LearnologyAI-Bot/1.0',
-        }
+        } as Record<string, string>
       }
     }
   ];
@@ -173,12 +178,12 @@ async function extractTextFromUrl(url: string): Promise<string> {
       let text = html;
       
       // Remove script and style blocks
-      text = text.replace(/<script[^>]*>.*?<\/script>/gis, '');
-      text = text.replace(/<style[^>]*>.*?<\/style>/gis, '');
-      text = text.replace(/<noscript[^>]*>.*?<\/noscript>/gis, '');
+      text = text.replace(/<script[^>]*>.*?<\/script>/gi, '');
+      text = text.replace(/<style[^>]*>.*?<\/style>/gi, '');
+      text = text.replace(/<noscript[^>]*>.*?<\/noscript>/gi, '');
       
       // Remove comments
-      text = text.replace(/<!--.*?-->/gs, '');
+      text = text.replace(/<!--.*?-->/g, '');
       
       // Convert common HTML entities
       text = text.replace(/&nbsp;/g, ' ');
@@ -670,9 +675,20 @@ serve(async (req: Request) => {
     }
     console.log(`PROCESS-DOCUMENT: Received request for document ID: ${documentId}`);
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    // Safe environment variable access for both Deno and Node.js
+    const getEnvVar = (key: string): string | undefined => {
+      if (typeof globalThis.Deno !== 'undefined' && globalThis.Deno?.env) {
+        return globalThis.Deno.env.get(key);
+      }
+      if (typeof process !== 'undefined' && process.env) {
+        return process.env[key];
+      }
+      return undefined;
+    };
+
+    const supabaseUrl = getEnvVar('SUPABASE_URL');
+    const supabaseServiceRoleKey = getEnvVar('SUPABASE_SERVICE_ROLE_KEY');
+    const openaiApiKey = getEnvVar('OPENAI_API_KEY');
 
     if (!supabaseUrl || !supabaseServiceRoleKey || !openaiApiKey) {
       console.error('PROCESS-DOCUMENT: Missing one or more environment variables.');

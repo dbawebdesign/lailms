@@ -50,14 +50,7 @@ export function RubricDisplay({ content, metadata, onCopy, copiedItems, onRefine
   const [editingTitle, setEditingTitle] = useState(false);
   
   // Safely access UIContext for panel control
-  let setPanelVisible: ((visible: boolean) => void) | undefined;
-  
-  try {
-    const { setPanelVisible: setPanelVisibleFn } = useUIContext();
-    setPanelVisible = setPanelVisibleFn;
-  } catch (error) {
-    console.warn('UIContext not available - Luna integration disabled');
-  }
+  const { setPanelVisible } = useUIContext();
 
   // Enhanced parsing logic with multiple strategies
   const parseRubricContent = (content: string): ParsedRubric => {

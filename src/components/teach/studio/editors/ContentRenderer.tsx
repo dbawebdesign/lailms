@@ -10,7 +10,7 @@ import Link from '@tiptap/extension-link';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { createLowlight } from 'lowlight';
 import javascript from 'highlight.js/lib/languages/javascript';
-import { Eye } from 'lucide-react';
+import { Eye, Lightbulb, Brain, CheckCircle, ArrowRight, BookOpen, Target, AlertTriangle, Users, Zap } from 'lucide-react';
 
 interface ContentRendererProps {
   content: any;
@@ -89,29 +89,200 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
     },
   });
 
-  // Handle different content types
   const renderContent = () => {
     if (!productionContent) {
       return <p className="text-muted-foreground italic">No content available</p>;
     }
 
-    // If content is a string, display it as formatted text with better styling
-    if (typeof productionContent === 'string') {
+    // Handle AI-generated educational content with expert teaching structure
+    if (typeof productionContent === 'object' && (
+      productionContent.expertTeachingContent || 
+      productionContent.introduction || 
+      productionContent.expertSummary || 
+      productionContent.checkForUnderstanding ||
+      productionContent.bridgeToNext
+    )) {
       return (
-        <div className="prose dark:prose-invert max-w-none">
-          <div className="text-base leading-relaxed text-foreground whitespace-pre-wrap font-normal">
-            {productionContent}
-          </div>
+        <div className="max-w-none space-y-8 bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-blue-900/20 p-6 rounded-lg">
+          {/* Section Title */}
+          {productionContent.sectionTitle && (
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200 mb-2">
+                {productionContent.sectionTitle}
+              </h1>
+              <div className="w-24 h-1 bg-gradient-to-r from-blue-500 to-purple-500 mx-auto rounded-full"></div>
+            </div>
+          )}
+
+          {/* Introduction */}
+          {productionContent.introduction && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6 rounded-xl border-l-4 border-blue-500 shadow-sm">
+              <div className="flex items-start space-x-3 mb-3">
+                <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400 mt-1 flex-shrink-0" />
+                <h2 className="text-xl font-semibold text-blue-900 dark:text-blue-100">Introduction</h2>
+              </div>
+              <div className="text-blue-800 dark:text-blue-200 leading-relaxed text-lg pl-9">
+                {productionContent.introduction}
+              </div>
+            </div>
+          )}
+
+          {/* Expert Teaching Content - Main Content */}
+          {productionContent.expertTeachingContent && (
+            <div className="space-y-6">
+              {/* Concept Introduction */}
+              {productionContent.expertTeachingContent.conceptIntroduction && (
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 p-6 rounded-xl border-l-4 border-purple-500 shadow-sm">
+                  <div className="flex items-start space-x-3 mb-4">
+                    <Target className="h-6 w-6 text-purple-600 dark:text-purple-400 mt-1 flex-shrink-0" />
+                    <h2 className="text-xl font-semibold text-purple-900 dark:text-purple-100">Key Concept</h2>
+                  </div>
+                  <div className="text-purple-800 dark:text-purple-200 leading-relaxed text-lg pl-9">
+                    {productionContent.expertTeachingContent.conceptIntroduction}
+                  </div>
+                </div>
+              )}
+
+              {/* Detailed Explanation */}
+              {productionContent.expertTeachingContent.detailedExplanation && (
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                  <div className="flex items-start space-x-3 mb-4">
+                    <Brain className="h-6 w-6 text-slate-600 dark:text-slate-400 mt-1 flex-shrink-0" />
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Deep Dive</h2>
+                  </div>
+                  <div className="text-slate-800 dark:text-slate-200 leading-relaxed text-base pl-9 space-y-4">
+                    {productionContent.expertTeachingContent.detailedExplanation.split('\n\n').map((paragraph: string, index: number) => (
+                      <p key={index} className="text-justify">{paragraph}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Expert Insights */}
+              {productionContent.expertTeachingContent.expertInsights && productionContent.expertTeachingContent.expertInsights.length > 0 && (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 p-6 rounded-xl border-l-4 border-amber-500 shadow-sm">
+                  <div className="flex items-start space-x-3 mb-4">
+                    <Lightbulb className="h-6 w-6 text-amber-600 dark:text-amber-400 mt-1 flex-shrink-0" />
+                    <h2 className="text-xl font-semibold text-amber-900 dark:text-amber-100">Expert Insights</h2>
+                  </div>
+                  <div className="space-y-3 pl-9">
+                    {productionContent.expertTeachingContent.expertInsights.map((insight: string, index: number) => (
+                      <div key={index} className="flex items-start space-x-3">
+                        <Zap className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-1 flex-shrink-0" />
+                        <p className="text-amber-800 dark:text-amber-200 leading-relaxed">{insight}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Practical Examples */}
+              {productionContent.expertTeachingContent.practicalExamples && productionContent.expertTeachingContent.practicalExamples.length > 0 && (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 p-6 rounded-xl border-l-4 border-green-500 shadow-sm">
+                  <div className="flex items-start space-x-3 mb-4">
+                    <Users className="h-6 w-6 text-green-600 dark:text-green-400 mt-1 flex-shrink-0" />
+                    <h2 className="text-xl font-semibold text-green-900 dark:text-green-100">Examples & Applications</h2>
+                  </div>
+                  <div className="space-y-4 pl-9">
+                    {productionContent.expertTeachingContent.practicalExamples.map((example: string, index: number) => (
+                      <div key={index} className="bg-white dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                        <p className="text-green-800 dark:text-green-200 leading-relaxed">{example}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Common Misconceptions */}
+              {productionContent.expertTeachingContent.commonMisconceptions && productionContent.expertTeachingContent.commonMisconceptions.length > 0 && (
+                <div className="bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/30 p-6 rounded-xl border-l-4 border-red-500 shadow-sm">
+                  <div className="flex items-start space-x-3 mb-4">
+                    <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400 mt-1 flex-shrink-0" />
+                    <h2 className="text-xl font-semibold text-red-900 dark:text-red-100">Common Pitfalls to Avoid</h2>
+                  </div>
+                  <div className="space-y-3 pl-9">
+                    {productionContent.expertTeachingContent.commonMisconceptions.map((misconception: string, index: number) => (
+                      <div key={index} className="flex items-start space-x-3 bg-white dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                        <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <p className="text-red-800 dark:text-red-200 leading-relaxed">{misconception}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Real World Connections */}
+              {productionContent.expertTeachingContent.realWorldConnections && productionContent.expertTeachingContent.realWorldConnections.length > 0 && (
+                <div className="bg-gradient-to-r from-cyan-50 to-teal-50 dark:from-cyan-950/30 dark:to-teal-950/30 p-6 rounded-xl border-l-4 border-cyan-500 shadow-sm">
+                  <div className="flex items-start space-x-3 mb-4">
+                    <Target className="h-6 w-6 text-cyan-600 dark:text-cyan-400 mt-1 flex-shrink-0" />
+                    <h2 className="text-xl font-semibold text-cyan-900 dark:text-cyan-100">Real-World Applications</h2>
+                  </div>
+                  <div className="space-y-3 pl-9">
+                    {productionContent.expertTeachingContent.realWorldConnections.map((connection: string, index: number) => (
+                      <div key={index} className="flex items-start space-x-3">
+                        <ArrowRight className="h-4 w-4 text-cyan-600 dark:text-cyan-400 mt-1 flex-shrink-0" />
+                        <p className="text-cyan-800 dark:text-cyan-200 leading-relaxed">{connection}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Check for Understanding */}
+          {productionContent.checkForUnderstanding && productionContent.checkForUnderstanding.length > 0 && (
+            <div className="bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 p-6 rounded-xl border-l-4 border-violet-500 shadow-sm">
+              <div className="flex items-start space-x-3 mb-4">
+                <CheckCircle className="h-6 w-6 text-violet-600 dark:text-violet-400 mt-1 flex-shrink-0" />
+                <h2 className="text-xl font-semibold text-violet-900 dark:text-violet-100">Check Your Understanding</h2>
+              </div>
+              <div className="space-y-4 pl-9">
+                {productionContent.checkForUnderstanding.map((question: string, index: number) => (
+                  <div key={index} className="bg-white dark:bg-violet-900/20 p-4 rounded-lg border border-violet-200 dark:border-violet-800">
+                    <div className="flex items-start space-x-3">
+                      <span className="flex-shrink-0 w-6 h-6 bg-violet-100 dark:bg-violet-800 text-violet-700 dark:text-violet-300 rounded-full flex items-center justify-center text-sm font-semibold">
+                        {index + 1}
+                      </span>
+                      <p className="text-violet-800 dark:text-violet-200 leading-relaxed">{question}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Expert Summary */}
+          {productionContent.expertSummary && (
+            <div className="bg-gradient-to-r from-slate-100 to-gray-100 dark:from-slate-800 dark:to-gray-800 p-6 rounded-xl border-l-4 border-slate-500 shadow-sm">
+              <div className="flex items-start space-x-3 mb-4">
+                <Brain className="h-6 w-6 text-slate-600 dark:text-slate-400 mt-1 flex-shrink-0" />
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Key Takeaways</h2>
+              </div>
+              <div className="text-slate-800 dark:text-slate-200 leading-relaxed text-lg pl-9 font-medium bg-white dark:bg-slate-900/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                {productionContent.expertSummary}
+              </div>
+            </div>
+          )}
+
+          {/* Bridge to Next */}
+          {productionContent.bridgeToNext && (
+            <div className="bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-950/30 p-6 rounded-xl border-l-4 border-indigo-500 shadow-sm">
+              <div className="flex items-start space-x-3 mb-4">
+                <ArrowRight className="h-6 w-6 text-indigo-600 dark:text-indigo-400 mt-1 flex-shrink-0" />
+                <h2 className="text-xl font-semibold text-indigo-900 dark:text-indigo-100">What's Next?</h2>
+              </div>
+              <div className="text-indigo-800 dark:text-indigo-200 leading-relaxed text-base pl-9">
+                {productionContent.bridgeToNext}
+              </div>
+            </div>
+          )}
         </div>
       );
     }
 
-    // If content is TipTap JSON, render it with the editor
-    if (typeof productionContent === 'object' && productionContent.type === 'doc') {
-      return <EditorContent editor={editor} className={`${className} min-h-[100px]`} />;
-    }
-
-    // Handle structured lesson content (introduction, main_content, activities, etc.)
+    // Handle structured lesson content (original structure)
     if (typeof productionContent === 'object' && (
         productionContent.introduction || 
         productionContent.main_content || 
@@ -180,18 +351,15 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
 
                   {/* Examples */}
                   {section.examples && section.examples.length > 0 && (
-                    <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border-l-4 border-yellow-400 mb-3">
-                      <h5 className="font-medium text-yellow-900 dark:text-yellow-100 mb-2">Examples</h5>
-                      {section.examples.map((example: any, exampleIndex: number) => (
-                        <div key={exampleIndex} className="mb-2 last:mb-0">
-                          {example.title && (
-                            <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">{example.title}</p>
-                          )}
-                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                            {example.content || example}
+                    <div className="bg-green-50 dark:bg-green-950/20 p-3 rounded border-l-4 border-green-400 mb-3">
+                      <h5 className="font-medium text-green-900 dark:text-green-100 mb-2">Examples</h5>
+                      <div className="space-y-2">
+                        {section.examples.map((example: string, exIndex: number) => (
+                          <p key={exIndex} className="text-sm text-green-800 dark:text-green-200">
+                            {example}
                           </p>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -227,47 +395,21 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
 
           {/* Independent Practice */}
           {productionContent.independent_practice && (
-            <div className="bg-teal-50 dark:bg-teal-950/20 p-4 rounded-lg border-l-4 border-teal-500">
-              <h4 className="text-lg font-semibold mb-3 text-teal-900 dark:text-teal-100">Independent Practice</h4>
-              {productionContent.independent_practice.activity && (
-                <p className="text-teal-800 dark:text-teal-200 leading-relaxed mb-2">
-                  <strong>Activity:</strong> {productionContent.independent_practice.activity}
-                </p>
-              )}
-              {productionContent.independent_practice.extension && (
-                <p className="text-teal-800 dark:text-teal-200 leading-relaxed mb-2">
-                  <strong>Extension:</strong> {productionContent.independent_practice.extension}
-                </p>
-              )}
-              {productionContent.independent_practice.scaffolding && (
-                <p className="text-teal-800 dark:text-teal-200 leading-relaxed">
-                  <strong>Scaffolding:</strong> {productionContent.independent_practice.scaffolding}
-                </p>
-              )}
+            <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg border-l-4 border-purple-500">
+              <h4 className="text-lg font-semibold mb-3 text-purple-900 dark:text-purple-100">Independent Practice</h4>
+              <p className="text-purple-800 dark:text-purple-200 leading-relaxed">{productionContent.independent_practice}</p>
             </div>
           )}
 
           {/* Comprehension Checks */}
           {productionContent.comprehension_checks && productionContent.comprehension_checks.length > 0 && (
-            <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg border-l-4 border-purple-500">
-              <h4 className="text-lg font-semibold mb-3 text-purple-900 dark:text-purple-100">Comprehension Checks</h4>
-              <div className="space-y-3">
-                {productionContent.comprehension_checks.map((check: any, index: number) => (
-                  <div key={index} className="bg-white dark:bg-purple-900/20 p-3 rounded border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-medium text-purple-700 dark:text-purple-300 capitalize">
-                        {check.type || 'Check'}
-                      </span>
-                    </div>
-                    <p className="text-purple-800 dark:text-purple-200 text-sm leading-relaxed mb-2">
-                      {check.prompt}
-                    </p>
-                    {check.purpose && (
-                      <p className="text-xs text-purple-700 dark:text-purple-300">
-                        <strong>Purpose:</strong> {check.purpose}
-                      </p>
-                    )}
-                  </div>
+            <div className="bg-orange-50 dark:bg-orange-950/20 p-4 rounded-lg border-l-4 border-orange-500">
+              <h4 className="text-lg font-semibold mb-3 text-orange-900 dark:text-orange-100">Check Your Understanding</h4>
+              <div className="space-y-2">
+                {productionContent.comprehension_checks.map((check: string, index: number) => (
+                  <p key={index} className="text-orange-800 dark:text-orange-200 leading-relaxed">
+                    <strong>{index + 1}.</strong> {check}
+                  </p>
                 ))}
               </div>
             </div>
@@ -277,69 +419,23 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
           {productionContent.common_misconceptions && productionContent.common_misconceptions.length > 0 && (
             <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border-l-4 border-red-500">
               <h4 className="text-lg font-semibold mb-3 text-red-900 dark:text-red-100">Common Misconceptions</h4>
-              <div className="space-y-3">
-                {productionContent.common_misconceptions.map((misconception: any, index: number) => (
-                  <div key={index} className="bg-white dark:bg-red-900/20 p-3 rounded border">
-                    <p className="text-red-800 dark:text-red-200 text-sm leading-relaxed mb-2">
-                      <strong>Misconception:</strong> {misconception.misconception}
-                    </p>
-                    <p className="text-red-800 dark:text-red-200 text-sm leading-relaxed mb-2">
-                      <strong>Explanation:</strong> {misconception.explanation}
-                    </p>
-                    <p className="text-red-800 dark:text-red-200 text-sm leading-relaxed">
-                      <strong>Correction:</strong> {misconception.correction}
-                    </p>
-                  </div>
+              <div className="space-y-2">
+                {productionContent.common_misconceptions.map((misconception: string, index: number) => (
+                  <p key={index} className="text-red-800 dark:text-red-200 leading-relaxed">
+                    • {misconception}
+                  </p>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Main Content (legacy support) */}
-          {productionContent.main_content && productionContent.main_content.length > 0 && (
-            <div className="space-y-4">
-              {productionContent.main_content.map((section: any, index: number) => (
-                <div key={index} className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                  {section.heading && (
-                    <h4 className="text-lg font-semibold mb-3 text-foreground">{section.heading}</h4>
-                  )}
-                  {section.content && (
-                    <p className="text-foreground leading-relaxed mb-3">{section.content}</p>
-                  )}
-                  {section.key_points && section.key_points.length > 0 && (
-                    <div className="mb-3">
-                      <h5 className="font-medium text-foreground mb-2">Key Points:</h5>
-                      <ul className="list-disc list-inside space-y-1 text-foreground">
-                        {section.key_points.map((point: string, pointIndex: number) => (
-                          <li key={pointIndex} className="text-sm">{point}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {section.examples && section.examples.length > 0 && (
-                    <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border-l-4 border-yellow-400">
-                      <h5 className="font-medium text-yellow-900 dark:text-yellow-100 mb-2">Examples:</h5>
-                      <ul className="space-y-1">
-                        {section.examples.map((example: string, exampleIndex: number) => (
-                          <li key={exampleIndex} className="text-sm text-yellow-800 dark:text-yellow-200">
-                            • {example}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Key Takeaways */}
           {productionContent.key_takeaways && productionContent.key_takeaways.length > 0 && (
-            <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg border-l-4 border-purple-500">
-              <h4 className="text-lg font-semibold mb-3 text-purple-900 dark:text-purple-100">Key Takeaways</h4>
+            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border-l-4 border-gray-500">
+              <h4 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">Key Takeaways</h4>
               <ul className="list-disc list-inside space-y-2">
                 {productionContent.key_takeaways.map((takeaway: string, index: number) => (
-                  <li key={index} className="text-purple-800 dark:text-purple-200 leading-relaxed">
+                  <li key={index} className="text-gray-800 dark:text-gray-200 leading-relaxed">
                     {takeaway}
                   </li>
                 ))}
@@ -349,30 +445,9 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
 
           {/* Section Summary */}
           {productionContent.section_summary && (
-            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border-l-4 border-slate-500">
-              <h4 className="text-lg font-semibold mb-2 text-slate-900 dark:text-slate-100">Section Summary</h4>
-              <p className="text-slate-800 dark:text-slate-200 leading-relaxed">{productionContent.section_summary}</p>
-            </div>
-          )}
-
-          {/* Additional Resources */}
-          {productionContent.additional_resources && productionContent.additional_resources.length > 0 && (
-            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-              <h4 className="text-lg font-semibold mb-3 text-foreground">Additional Resources</h4>
-              <ul className="space-y-1">
-                {productionContent.additional_resources.map((resource: string, index: number) => (
-                  <li key={index} className="text-sm">
-                    {resource.startsWith('http') ? (
-                      <a href={resource} target="_blank" rel="noopener noreferrer" 
-                         className="text-blue-600 dark:text-blue-400 hover:underline">
-                        {resource}
-                      </a>
-                    ) : (
-                      <span className="text-foreground">{resource}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
+            <div className="bg-teal-50 dark:bg-teal-950/20 p-4 rounded-lg border-l-4 border-teal-500">
+              <h4 className="text-lg font-semibold mb-2 text-teal-900 dark:text-teal-100">Summary</h4>
+              <p className="text-teal-800 dark:text-teal-200 leading-relaxed">{productionContent.section_summary}</p>
             </div>
           )}
         </div>
@@ -402,6 +477,20 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
               </div>
             ))}
           </div>
+        </div>
+      );
+    }
+
+    // Handle TipTap editor content
+    if (editor && (typeof productionContent === 'string' || (typeof productionContent === 'object' && productionContent.type === 'doc'))) {
+      return <EditorContent editor={editor} />;
+    }
+
+    // Handle simple string content
+    if (typeof productionContent === 'string') {
+      return (
+        <div className="prose dark:prose-invert max-w-none">
+          <p className="leading-relaxed whitespace-pre-wrap">{productionContent}</p>
         </div>
       );
     }

@@ -31,7 +31,10 @@ export default async function AppPagesLayout({
     console.error("Error fetching profile for layout or profile not found:", profileError);
     redirect('/login?error=profile_critical');
   }
-  userRole = profile.role as UserRole;
+  
+  // Type assertion for proper access
+  const typedProfile = profile as unknown as { role: UserRole };
+  userRole = typedProfile.role;
 
   if (!userRole) {
     console.error("User role could not be determined in layout, redirecting to login.");

@@ -77,33 +77,10 @@ interface ConversationMessage {
 
 export function ToolWorkflow({ tool, onBack }: ToolWorkflowProps) {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const editId = searchParams.get('edit');
   
-  // If editId is present, redirect to the viewer instead of showing editor
-  const router = useRouter();
-  useEffect(() => {
-    if (editId) {
-      router.push(`/teach/tools/library/${editId}`);
-      return;
-    }
-  }, [editId, router]);
-  
-  // Don't render the editor if we're redirecting
-  if (editId) {
-    return (
-      <div className="max-w-6xl mx-auto space-y-6">
-        <Card className="border-0 shadow-sm">
-          <CardContent className="flex items-center justify-center py-12">
-            <div className="text-center space-y-3">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-purple-500" />
-              <p className="text-muted-foreground">Redirecting to viewer...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-  
+  // All hooks must be called before any conditional returns
   const [activeTab, setActiveTab] = useState<'manual' | 'ai-assisted'>('ai-assisted');
   const [formData, setFormData] = useState<FormData>({});
   const [aiPrompt, setAiPrompt] = useState('');
@@ -144,6 +121,30 @@ export function ToolWorkflow({ tool, onBack }: ToolWorkflowProps) {
       conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [conversation, isInConversation]);
+
+  // If editId is present, redirect to the viewer instead of showing editor
+  useEffect(() => {
+    if (editId) {
+      router.push(`/teach/tools/library/${editId}`);
+      return;
+    }
+  }, [editId, router]);
+  
+  // Don't render the editor if we're redirecting
+  if (editId) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="flex items-center justify-center py-12">
+            <div className="text-center space-y-3">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-purple-500" />
+              <p className="text-muted-foreground">Redirecting to viewer...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const handleInputChange = (fieldId: string, value: any) => {
     setFormData(prev => ({

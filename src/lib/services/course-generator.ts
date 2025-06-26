@@ -4,6 +4,7 @@ import { knowledgeBaseAnalyzer, KnowledgeBaseAnalysis, COURSE_GENERATION_MODES }
 import { knowledgeExtractor, ConceptMap, CourseStructureSuggestion } from './knowledge-extractor';
 import type { Database } from '@learnologyai/types';
 import { AssessmentGenerationService } from './assessment-generation-service';
+import { courseGenerationOrchestrator } from './course-generation-orchestrator';
 
 export interface CourseGenerationRequest {
   baseClassId: string;
@@ -188,21 +189,21 @@ export class CourseGenerator {
     const courseOutlineId = await this.saveCourseOutline(outline, request);
     await this.updateJobStatus(jobId, 'processing', 55);
 
-    // Step 5: Create actual LMS entities (paths, lessons, sections, assessments) (70% progress)
-    await this.createLMSEntitiesOptimized(courseOutlineId, outline, request);
+    // Step 5: Create basic LMS entities (paths, lessons) (70% progress)
+    await this.createBasicLMSEntities(courseOutlineId, outline, request);
     await this.updateJobStatus(jobId, 'processing', 70);
 
-    // Step 6: Generate comprehensive lesson content (85% progress)
-    await this.generateComprehensiveLessonContent(courseOutlineId, outline, generationMode, request);
-    await this.updateJobStatus(jobId, 'processing', 85);
+    // Step 6: Start orchestrated content generation with staggered workflow (85% progress)
+    await this.updateJobStatus(jobId, 'processing', 85, null, { 
+      message: 'Starting orchestrated content generation...',
+      courseOutlineId 
+    });
 
-    // Step 7: Assessments are now generated within createLMSEntities, so this step is removed.
-    // await this.generateAssessments(courseOutlineId, outline, request);
+    // Use the new orchestrator for staggered generation
+    await courseGenerationOrchestrator.startOrchestration(jobId, outline, request);
     
-    await this.updateJobStatus(jobId, 'processing', 95);
-
-    // Step 8: Complete (100% progress)
-    await this.updateJobStatus(jobId, 'completed', 100, null, { courseOutlineId });
+    // Note: The orchestrator will handle its own completion status updates
+    // including sections, assessments, quizzes, and final exam generation
   }
 
   private async processFullAnalysisGeneration(jobId: string, request: CourseGenerationRequest): Promise<void> {
@@ -638,13 +639,21 @@ Remember: This is an EDUCATIONAL course that must TEACH students, not just list 
         return;
       }
 
-      console.log(`🔄 Generating comprehensive content for ${lessons.length} lessons...`);
+      // Type assertion for proper TypeScript handling
+      const typedLessons = lessons as Array<{
+        id: string;
+        title: string;
+        description: string;
+        path_id: string;
+      }>;
+
+      console.log(`🔄 Generating comprehensive content for ${typedLessons.length} lessons...`);
 
       // Process lessons in batches to avoid overwhelming the API
       const batchSize = 3; // Process 3 lessons at a time
-      for (let i = 0; i < lessons.length; i += batchSize) {
-        const batch = lessons.slice(i, i + batchSize);
-        console.log(`📝 Processing lesson batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(lessons.length/batchSize)}`);
+      for (let i = 0; i < typedLessons.length; i += batchSize) {
+        const batch = typedLessons.slice(i, i + batchSize);
+        console.log(`📝 Processing lesson batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(typedLessons.length/batchSize)}`);
 
         const batchPromises = batch.map(async (lesson) => {
           try {
@@ -686,8 +695,8 @@ Remember: This is an EDUCATIONAL course that must TEACH students, not just list 
   }
 
   private findLessonInOutline(outline: CourseOutline, lessonTitle: string): ModuleLesson | null {
-    for (const module of outline.modules) {
-      for (const lesson of module.lessons) {
+    for (const courseModule of outline.modules) {
+      for (const lesson of courseModule.lessons) {
         if (lesson.title === lessonTitle) {
           return lesson;
         }
@@ -1217,6 +1226,84 @@ Remember: Every element should contribute to TEACHING and helping students achie
       return JSON.parse(jsonMatch[1]);
     } catch (error) {
       console.error('Failed to generate module content:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create basic LMS entities (paths and lessons only) without content generation
+   */
+  private async createBasicLMSEntities(
+    courseOutlineId: string,
+    outline: CourseOutline,
+    request: CourseGenerationRequest
+  ): Promise<void> {
+    console.log('🚀 Creating basic LMS entities (paths and lessons)...');
+    
+    try {
+      const supabase = this.getSupabaseClient();
+
+      // Create all paths and lessons sequentially for proper DB constraints
+      for (let moduleIndex = 0; moduleIndex < outline.modules.length; moduleIndex++) {
+        const courseModule = outline.modules[moduleIndex];
+
+        // Create path
+        const { data: path, error: pathError } = await supabase
+          .from('paths')
+          .insert({
+            organisation_id: request.organisationId,
+            base_class_id: request.baseClassId,
+            title: courseModule.title,
+            description: courseModule.description,
+            level: request.academicLevel,
+            order_index: moduleIndex,
+            published: false,
+            created_by: request.userId,
+            creator_user_id: request.userId
+          })
+          .select('id, title')
+          .single();
+
+        if (pathError || !path) {
+          console.error('Failed to create path:', pathError);
+          continue;
+        }
+
+        console.log(`📁 Created path: ${courseModule.title}`);
+
+        // Create lessons for this path
+        for (let lessonIndex = 0; lessonIndex < courseModule.lessons.length; lessonIndex++) {
+          const lessonOutline = courseModule.lessons[lessonIndex];
+
+          const { data: createdLesson, error: lessonError } = await supabase
+            .from('lessons')
+            .insert({
+              path_id: path.id,
+              base_class_id: request.baseClassId,
+              title: lessonOutline.title,
+              description: lessonOutline.description,
+              level: request.academicLevel,
+              order_index: lessonIndex,
+              estimated_time: lessonOutline.estimatedDurationHours ? lessonOutline.estimatedDurationHours * 60 : 45,
+              published: false,
+              created_by: request.userId,
+              creator_user_id: request.userId
+            })
+            .select('id')
+            .single();
+
+          if (lessonError || !createdLesson) {
+            console.error('Failed to create lesson:', lessonError);
+            continue;
+          }
+
+          console.log(`📖 Created lesson: ${lessonOutline.title}`);
+        }
+      }
+
+      console.log('✅ Basic LMS entity creation completed!');
+    } catch (error) {
+      console.error('❌ Failed to create basic LMS entities:', error);
       throw error;
     }
   }
