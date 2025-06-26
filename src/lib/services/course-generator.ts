@@ -1664,7 +1664,7 @@ Remember: Every element should contribute to TEACHING and helping students achie
   /**
    * Sanitize content to prevent deep nesting and stack depth issues
    */
-  private sanitizeContentForDatabase(content: any, maxDepth: number = 3, currentDepth: number = 0): any {
+  private sanitizeContentForDatabase(content: any, maxDepth: number = 6, currentDepth: number = 0): any {
     // Prevent infinite recursion and stack depth issues
     if (currentDepth >= maxDepth) {
       return typeof content === 'object' ? '[Content too deep - truncated]' : content;
@@ -1684,6 +1684,16 @@ Remember: Every element should contribute to TEACHING and helping students achie
     }
     
     if (Array.isArray(content)) {
+      // Handle arrays of strings specially - don't increment depth for string arrays
+      const isStringArray = content.every(item => typeof item === 'string');
+      if (isStringArray) {
+        return content.slice(0, 50).map(item => 
+          typeof item === 'string' && item.length > 10000 
+            ? item.substring(0, 10000) + '...[truncated]' 
+            : item
+        );
+      }
+      
       // Limit array size and recursively sanitize elements
       return content.slice(0, 20).map((item, index) => {
         if (index < 15) { // Only process first 15 items to prevent excessive processing
@@ -1698,7 +1708,7 @@ Remember: Every element should contribute to TEACHING and helping students achie
       let processedKeys = 0;
       
       for (const [key, value] of Object.entries(content)) {
-        if (processedKeys >= 50) { // Limit number of object properties
+        if (processedKeys >= 100) { // Increased limit for educational content
           sanitized['__truncated__'] = `${Object.keys(content).length - processedKeys} more properties truncated`;
           break;
         }
