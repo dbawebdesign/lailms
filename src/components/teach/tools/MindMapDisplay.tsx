@@ -84,7 +84,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 0.6 }); // Start zoomed out to see all nodes
+  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 0.6 }); // Start zoomed out, will be auto-adjusted
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
@@ -101,6 +101,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
     currentLabel: '',
     currentDescription: ''
   });
+  const viewInitialized = useRef(false);
 
   // Convert mind map data to node structure with unique IDs
   useEffect(() => {
@@ -239,6 +240,15 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
     setNodes([centerNode, ...getAllNodes(branchNodes)]);
   }, [mindMapData]);
 
+  // Auto-zoom to fit the whole map on initial load
+  useEffect(() => {
+    if (viewInitialized.current || nodes.length <= 1) {
+      return;
+    }
+    handleResetView(); // Use the reset function for initial zoom
+    viewInitialized.current = true;
+  }, [nodes]);
+
   const getAllNodes = (nodes: MindMapNode[]): MindMapNode[] => {
     let allNodes: MindMapNode[] = [];
     nodes.forEach(node => {
@@ -324,7 +334,33 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
   };
 
   const handleResetView = () => {
-    setTransform({ x: 0, y: 0, scale: 0.6 }); // Reset to overview scale
+    if (nodes.length <= 1 || !containerRef.current) {
+      setTransform({ x: 0, y: 0, scale: 0.6 });
+      return;
+    }
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    nodes.forEach(node => {
+        const nodeRadius = node.level === 0 ? 50 : node.level === 1 ? 40 : node.level === 2 ? 32 : node.level === 3 ? 24 : 18;
+        minX = Math.min(minX, node.x - nodeRadius);
+        minY = Math.min(minY, node.y - nodeRadius);
+        maxX = Math.max(maxX, node.x + nodeRadius);
+        maxY = Math.max(maxY, node.y + nodeRadius);
+    });
+
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    
+    if (contentWidth > 0 && contentHeight > 0) {
+      // Use the viewBox dimensions (3000x3000) for an accurate scale calculation
+      const scaleX = 3000 / contentWidth;
+      const scaleY = 3000 / contentHeight;
+      const newScale = Math.min(scaleX, scaleY) * 0.9;
+      setTransform({ x: 0, y: 0, scale: newScale });
+    } else {
+      setTransform({ x: 0, y: 0, scale: 0.6 });
+    }
   };
 
   const toggleNodeExpansion = (nodeId: string) => {
@@ -444,12 +480,12 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
           <circle
             cx={node.x}
             cy={node.y}
-            r={nodeRadius + 4}
+            r={nodeRadius + 8}
             fill="none"
-            stroke="rgba(255, 255, 255, 0.4)"
-            strokeWidth="2"
+            stroke="url(#brand-gradient-pulse)"
+            strokeWidth="3"
             style={{
-              animation: 'premiumGlow 2s ease-in-out infinite'
+              animation: 'premiumGlow 1.8s ease-in-out infinite'
             }}
           />
         )}
@@ -459,14 +495,13 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
           cx={node.x}
           cy={node.y}
           r={nodeRadius}
-          fill={node.color || '#3B82F6'}
+          fill={node.isLoading ? 'url(#brand-gradient-pulse)' : (node.color || '#3B82F6')}
           stroke={isSelected ? '#1F2937' : 'white'}
           strokeWidth={isSelected ? 2 : 1.5}
           className="cursor-pointer transition-all duration-100 ease-out"
           style={{
-            filter: isHovered ? 'brightness(1.05)' : node.isLoading ? 'brightness(1.15)' : 'none',
+            filter: isHovered ? 'brightness(1.05)' : 'none',
             boxShadow: isSelected ? '0 0 0 2px rgba(59, 130, 246, 0.3)' : 'none',
-            animation: node.isLoading ? 'premiumNodeGlow 2s ease-in-out infinite' : 'none'
           }}
           onClick={() => setSelectedNode(selectedNode === node.id ? null : node.id)}
           onMouseEnter={() => setHoveredNode(node.id)}
@@ -493,7 +528,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
             <circle
               cx={node.x + nodeRadius - 2}
               cy={node.y - nodeRadius + 2}
-              r="8"
+              r="10"
               fill="rgba(59, 130, 246, 0.9)"
               className="cursor-pointer transition-all duration-100 hover:fill-blue-600"
               onClick={(e) => {
@@ -503,12 +538,12 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
             />
             <text
               x={node.x + nodeRadius - 2}
-              y={node.y - nodeRadius + 2}
+              y={node.y - nodeRadius + 3}
               textAnchor="middle"
               dominantBaseline="middle"
               className="pointer-events-none"
               fill="white"
-              fontSize="6"
+              fontSize="8"
             >
               ✎
             </text>
@@ -519,9 +554,9 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
                 <circle
                   cx={node.x - nodeRadius + 2}
                   cy={node.y - nodeRadius + 2}
-                  r="8"
-                  fill="rgba(16, 185, 129, 0.9)"
-                  className="cursor-pointer transition-all duration-100 hover:fill-green-600"
+                  r="10"
+                  fill="rgba(5, 150, 105, 0.9)"
+                  className="cursor-pointer transition-all duration-100 hover:fill-green-700"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleExpandNode(node.id);
@@ -529,12 +564,12 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
                 />
                 <text
                   x={node.x - nodeRadius + 2}
-                  y={node.y - nodeRadius + 2}
+                  y={node.y - nodeRadius + 3}
                   textAnchor="middle"
                   dominantBaseline="middle"
                   className="pointer-events-none"
                   fill="white"
-                  fontSize="5"
+                  fontSize="7"
                   fontWeight="bold"
                 >
                   ✨
@@ -547,8 +582,8 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
               <>
                 <circle
                   cx={node.x}
-                  cy={node.y + nodeRadius + 10}
-                  r="6"
+                  cy={node.y + nodeRadius + 12}
+                  r="8"
                   fill={node.isExpanded ? 'rgba(107, 114, 128, 0.9)' : 'rgba(59, 130, 246, 0.9)'}
                   className="cursor-pointer transition-all duration-100 hover:opacity-80"
                   onClick={(e) => {
@@ -558,12 +593,12 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
                 />
                 <text
                   x={node.x}
-                  y={node.y + nodeRadius + 10}
+                  y={node.y + nodeRadius + 12}
                   textAnchor="middle"
                   dominantBaseline="middle"
                   className="pointer-events-none"
                   fill="white"
-                  fontSize="4"
+                  fontSize="6"
                   fontWeight="bold"
                 >
                   {node.isExpanded ? '▼' : '▶'}
@@ -577,7 +612,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
                 <circle
                   cx={node.x + nodeRadius - 2}
                   cy={node.y + nodeRadius - 2}
-                  r="6"
+                  r="8"
                   fill="rgba(239, 68, 68, 0.9)"
                   className="cursor-pointer transition-all duration-100 hover:fill-red-600"
                   onClick={(e) => {
@@ -587,12 +622,12 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
                 />
                 <text
                   x={node.x + nodeRadius - 2}
-                  y={node.y + nodeRadius - 2}
+                  y={node.y + nodeRadius - 1}
                   textAnchor="middle"
                   dominantBaseline="middle"
                   className="pointer-events-none"
                   fill="white"
-                  fontSize="6"
+                  fontSize="8"
                 >
                   ×
                 </text>
@@ -693,9 +728,17 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
         preserveAspectRatio="xMidYMid meet"
         onMouseDown={handleMouseDown}
         style={{
-          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`
+          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
+          transformOrigin: 'center'
         }}
       >
+        <defs>
+          <linearGradient id="brand-gradient-pulse" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style={{ stopColor: 'var(--gradient-start)' }} />
+            <stop offset="50%" style={{ stopColor: 'var(--gradient-mid)' }} />
+            <stop offset="100%" style={{ stopColor: 'var(--gradient-end)' }} />
+          </linearGradient>
+        </defs>
         {/* Subtle grid pattern */}
         <defs>
           <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">

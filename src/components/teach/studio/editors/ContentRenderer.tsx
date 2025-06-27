@@ -184,9 +184,39 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
                     <h2 className="text-xl font-semibold text-green-900 dark:text-green-100">Examples & Applications</h2>
                   </div>
                   <div className="space-y-4 pl-9">
-                    {productionContent.expertTeachingContent.practicalExamples.map((example: string, index: number) => (
+                    {productionContent.expertTeachingContent.practicalExamples.map((example: any, index: number) => (
                       <div key={index} className="bg-white dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
-                        <p className="text-green-800 dark:text-green-200 leading-relaxed">{example}</p>
+                        {/* Handle structured example object */}
+                        {typeof example === 'object' && example.title ? (
+                          <div className="space-y-3">
+                            <h3 className="font-semibold text-green-900 dark:text-green-100">{example.title}</h3>
+                            {example.context && (
+                              <div className="text-green-800 dark:text-green-200 text-sm">
+                                <strong>Context:</strong> {example.context}
+                              </div>
+                            )}
+                            {example.walkthrough && (
+                              <div className="text-green-800 dark:text-green-200">
+                                <strong>Walkthrough:</strong> {example.walkthrough}
+                              </div>
+                            )}
+                            {example.keyTakeaways && Array.isArray(example.keyTakeaways) && example.keyTakeaways.length > 0 && (
+                              <div className="text-green-800 dark:text-green-200">
+                                <strong>Key Takeaways:</strong>
+                                <ul className="list-disc list-inside mt-1 ml-4 space-y-1">
+                                  {example.keyTakeaways.map((takeaway: string, takeawayIndex: number) => (
+                                    <li key={takeawayIndex}>{takeaway}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* Handle simple string examples */
+                          <p className="text-green-800 dark:text-green-200 leading-relaxed">
+                            {typeof example === 'string' ? example : JSON.stringify(example)}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -201,10 +231,39 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
                     <h2 className="text-xl font-semibold text-red-900 dark:text-red-100">Common Pitfalls to Avoid</h2>
                   </div>
                   <div className="space-y-3 pl-9">
-                    {productionContent.expertTeachingContent.commonMisconceptions.map((misconception: string, index: number) => (
-                      <div key={index} className="flex items-start space-x-3 bg-white dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
-                        <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
-                        <p className="text-red-800 dark:text-red-200 leading-relaxed">{misconception}</p>
+                    {productionContent.expertTeachingContent.commonMisconceptions.map((misconception: any, index: number) => (
+                      <div key={index} className="bg-white dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800 space-y-2">
+                        {/* Handle structured misconception object */}
+                        {typeof misconception === 'object' && misconception.misconception ? (
+                          <div className="space-y-2">
+                            <div className="flex items-start space-x-3">
+                              <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                              <div>
+                                <p className="text-red-800 dark:text-red-200 leading-relaxed font-medium">
+                                  <strong>Misconception:</strong> {misconception.misconception}
+                                </p>
+                              </div>
+                            </div>
+                            {misconception.correction && (
+                              <div className="ml-5 text-red-700 dark:text-red-300">
+                                <strong>Correction:</strong> {misconception.correction}
+                              </div>
+                            )}
+                            {misconception.prevention && (
+                              <div className="ml-5 text-red-600 dark:text-red-400 text-sm">
+                                <strong>How to avoid:</strong> {misconception.prevention}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* Handle simple string misconceptions */
+                          <div className="flex items-start space-x-3">
+                            <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <p className="text-red-800 dark:text-red-200 leading-relaxed">
+                              {typeof misconception === 'string' ? misconception : JSON.stringify(misconception)}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

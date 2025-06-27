@@ -240,7 +240,11 @@ REQUIREMENTS:
 4. Level 3: Detailed points and examples (2-4 per concept)
 5. Level 4: Specific details and applications (1-3 per point)
 6. Use ACTUAL content from lesson sections
-7. Rich descriptions for each node
+7. **Progressively Detailed Descriptions:**
+    - Level 1 descriptions: A concise, one-sentence overview of the section.
+    - Level 2 descriptions: A 2-3 sentence explanation of the concept.
+    - Level 3 descriptions: A 3-4 sentence detailed explanation with examples.
+    - Level 4 descriptions: An in-depth, 4-5 sentence analysis of the specific detail.
 8. Logical hierarchy progression
 
 OUTPUT FORMAT (valid JSON only):
@@ -338,7 +342,7 @@ Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
     .insert({
       lesson_id: lessonId,
       asset_type: 'mind_map',
-      title: `${lessonContent.title} Mind Map`,
+      title: lessonContent.title,
       content: mindMapData,
       svg_content: svgHtml,
       status: 'completed',
@@ -463,20 +467,20 @@ OUTPUT FORMAT (valid JSON only):
     {
       "id": "module1", 
       "label": "1. Module Name",
-      "description": "Module overview and objectives",
+      "description": "Module overview and objectives. This should be a concise, one-sentence summary.",
       "color": "#DC2626",
       "concepts": [
         {
           "label": "Lesson/Topic Name",
-          "description": "What students will learn in this topic",
+          "description": "What students will learn in this topic. This should be a 2-3 sentence explanation.",
           "points": [
             {
               "label": "Key Learning Point",
-              "description": "Detailed explanation of the concept",
+              "description": "Detailed explanation of the concept, including examples. This should be 3-4 sentences.",
               "details": [
                 {
                   "label": "Specific Detail",
-                  "description": "Example, fact, or sub-concept"
+                  "description": "In-depth analysis or application of the detail. This should be 4-5 sentences."
                 },
                 {
                   "label": "Related Point", 
@@ -502,6 +506,7 @@ OUTPUT FORMAT (valid JSON only):
 }
 
 IMPORTANT: Must include the "points" level between concepts and details. Extract real content, not just structural titles.
+**Descriptions must become progressively more detailed at each level as specified.**
 
 Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
 
@@ -597,7 +602,7 @@ Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
     .insert({
       base_class_id: baseClassId,
       asset_type: 'mind_map',
-      title: `${baseClass.name} Mind Map`,
+      title: baseClass.name,
       content: mindMapData,
       svg_content: svgHtml,
       status: 'completed',
