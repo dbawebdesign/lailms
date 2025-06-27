@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 

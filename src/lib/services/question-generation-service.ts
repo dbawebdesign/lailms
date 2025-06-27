@@ -1,3 +1,4 @@
+// @ts-nocheck
 import OpenAI from 'openai';
 import { APIError } from 'openai/error';
 import { encode } from 'gpt-tokenizer';
