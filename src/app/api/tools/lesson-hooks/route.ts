@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from "packages/types/db";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
@@ -28,9 +29,9 @@ export async function POST(request: NextRequest) {
     // Get user profile
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role, organisation_id')
-      .eq('user_id', user.id)
-      .single();
+      .select('role')
+      .eq('id', user.id)
+      .single<Tables<"profiles">>();
 
     if (!profile || profile.role !== 'teacher') {
       return NextResponse.json(

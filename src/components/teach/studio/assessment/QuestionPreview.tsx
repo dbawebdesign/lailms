@@ -317,7 +317,7 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
             )}
             <div>
               <Badge variant="outline" className="text-xs">
-                {question.question_type?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                {question.question_type?.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
               </Badge>
               {question.ai_generated && (
                 <Badge variant="secondary" className="text-xs ml-2">

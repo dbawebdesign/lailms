@@ -169,15 +169,15 @@ export function NewSchemaAssessmentTaker({
   // Render question based on type
   const renderQuestion = (question: NewSchemaQuestion) => {
     const response = responses.find(r => r.question_id === question.id);
-    const currentAnswer = response?.response_data;
+    const responseData = response?.response_data;
 
     switch (question.question_type) {
       case 'multiple_choice':
         return (
           <NewSchemaQuestionMultipleChoice
             question={question}
-            value={currentAnswer}
-            onChange={(value) => handleAnswerChange(question.id, value)}
+            value={responseData?.selected_option}
+            onChange={(value) => handleAnswerChange(question.id, { selected_option: value })}
           />
         );
       
@@ -185,8 +185,8 @@ export function NewSchemaAssessmentTaker({
         return (
           <NewSchemaQuestionTrueFalse
             question={question}
-            value={currentAnswer}
-            onChange={(value) => handleAnswerChange(question.id, value)}
+            value={responseData?.selected_answer}
+            onChange={(value) => handleAnswerChange(question.id, { selected_answer: value })}
           />
         );
       
@@ -194,8 +194,8 @@ export function NewSchemaAssessmentTaker({
         return (
           <NewSchemaQuestionShortAnswer
             question={question}
-            value={currentAnswer}
-            onChange={(value) => handleAnswerChange(question.id, value)}
+            value={responseData?.text_answer}
+            onChange={(value) => handleAnswerChange(question.id, { text_answer: value })}
           />
         );
       
@@ -203,8 +203,8 @@ export function NewSchemaAssessmentTaker({
         return (
           <NewSchemaQuestionEssay
             question={question}
-            value={currentAnswer}
-            onChange={(value) => handleAnswerChange(question.id, value)}
+            value={responseData?.essay_text}
+            onChange={(value) => handleAnswerChange(question.id, { essay_text: value, word_count: value?.length || 0 })}
           />
         );
       
@@ -212,8 +212,8 @@ export function NewSchemaAssessmentTaker({
         return (
           <NewSchemaQuestionMatching
             question={question}
-            value={currentAnswer}
-            onChange={(value) => handleAnswerChange(question.id, value)}
+            value={responseData?.matches}
+            onChange={(value) => handleAnswerChange(question.id, { matches: value })}
           />
         );
       
