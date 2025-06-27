@@ -179,31 +179,80 @@ export class CourseGenerationOrchestrator {
     // Create path workflows and quiz tasks
     for (const path of paths) {
       const pathLessons = lessons.filter(l => l.path_id === path.id);
-      const lessonAssessmentTasks = pathLessons.map(l => `assessment-${l.id}`);
       
-      // Create path quiz task (depends on all lesson assessments)
+      // Only include lesson assessments that actually exist in the database
+      const { data: existingAssessments } = await supabase
+        .from('assessments')
+        .select('lesson_id')
+        .in('lesson_id', pathLessons.map(l => l.id));
+      
+      const existingAssessmentLessonIds = new Set(
+        (existingAssessments as any[])?.map((a: any) => a.lesson_id) || []
+      );
+      const lessonAssessmentTasks = pathLessons
+        .filter(l => existingAssessmentLessonIds.has(l.id))
+        .map(l => `assessment-${l.id}`);
+      
+      console.log(`🛤️ Path ${path.title}:`, {
+        totalLessons: pathLessons.length,
+        lessonsWithAssessments: lessonAssessmentTasks.length,
+        dependencies: lessonAssessmentTasks
+      });
+      
+      // Create path quiz task (depends only on existing lesson assessments)
       const quizTaskId = `quiz-${path.id}`;
-      tasks.set(quizTaskId, {
-        id: quizTaskId,
-        type: 'path_quiz',
-        status: 'pending',
-        pathId: path.id,
-        dependencies: lessonAssessmentTasks,
-        data: { pathTitle: path.title, request }
-      });
+      
+      // Only create quiz task if there are lesson assessments to depend on
+      if (lessonAssessmentTasks.length > 0) {
+        tasks.set(quizTaskId, {
+          id: quizTaskId,
+          type: 'path_quiz',
+          status: 'pending',
+          pathId: path.id,
+          dependencies: lessonAssessmentTasks,
+          data: { pathTitle: path.title, request }
+        });
 
-      pathWorkflows.push({
-        pathId: path.id,
-        title: path.title,
-        lessons: pathLessons.map(l => l.id),
-        quizTask: quizTaskId,
-        allLessonsComplete: false
-      });
+        pathWorkflows.push({
+          pathId: path.id,
+          title: path.title,
+          lessons: pathLessons.map(l => l.id),
+          quizTask: quizTaskId,
+          allLessonsComplete: false
+        });
+        
+        console.log(`✅ Created quiz task for path: ${path.title} with ${lessonAssessmentTasks.length} dependencies`);
+      } else {
+        // Path has no lesson assessments, so no quiz task needed
+        pathWorkflows.push({
+          pathId: path.id,
+          title: path.title,
+          lessons: pathLessons.map(l => l.id),
+          quizTask: undefined, // No quiz task for this path
+          allLessonsComplete: true // Mark as complete since no assessments to wait for
+        });
+        
+        console.log(`⚠️ No lesson assessments found for path: ${path.title}, skipping quiz task`);
+      }
     }
 
     // Create class workflow and exam task
-    const allQuizTasks = pathWorkflows.map(p => p.quizTask!);
+    const allQuizTasks = pathWorkflows
+      .map(p => p.quizTask)
+      .filter((task): task is string => task !== undefined);
+    
     const examTaskId = `exam-${request.baseClassId}`;
+    
+    console.log(`🎓 Creating class exam task:`, {
+      examTaskId,
+      baseClassId: request.baseClassId,
+      dependencies: allQuizTasks,
+      totalPaths: pathWorkflows.length,
+      pathsWithQuizzes: allQuizTasks.length,
+      includeFinalExam: request.assessmentSettings?.includeFinalExam,
+      classTitle: request.title
+    });
+    
     tasks.set(examTaskId, {
       id: examTaskId,
       type: 'class_exam',
@@ -219,6 +268,16 @@ export class CourseGenerationOrchestrator {
       examTask: examTaskId,
       allPathsComplete: false
     };
+
+    console.log(`📊 Orchestration state initialized:`, {
+      totalTasks: tasks.size,
+      lessonWorkflows: lessonWorkflows.length,
+      pathWorkflows: pathWorkflows.length,
+      classWorkflow: {
+        examTask: classWorkflow.examTask,
+        pathsCount: classWorkflow.paths.length
+      }
+    });
 
     return {
       jobId,
@@ -613,11 +672,25 @@ What makes this particularly important for ${request.academicLevel || 'college'}
    * Generate class exam after all path quizzes are complete
    */
   private async generateClassExam(task: GenerationTask): Promise<void> {
-    if (!task.baseClassId) return;
+    console.log(`🎯 generateClassExam called for task: ${task.id}`);
+    
+    if (!task.baseClassId) {
+      console.error(`❌ No baseClassId in class exam task: ${task.id}`);
+      return;
+    }
 
     const { classTitle, request } = task.data;
+    console.log(`📋 Class exam generation details:`, {
+      classTitle,
+      baseClassId: task.baseClassId,
+      includeFinalExam: request.assessmentSettings?.includeFinalExam,
+      assessmentSettings: request.assessmentSettings
+    });
     
-    if (!request.assessmentSettings?.includeFinalExam) return;
+    if (!request.assessmentSettings?.includeFinalExam) {
+      console.log(`⏭️ Skipping final exam generation - includeFinalExam is false`);
+      return;
+    }
 
     console.log(`🎯 Generating final exam for class: ${classTitle}`);
 
@@ -636,14 +709,24 @@ What makes this particularly important for ${request.academicLevel || 'college'}
       onProgress: (message: string) => console.log(`📝 Final Exam Generation: ${message}`)
     };
 
-    await this.assessmentGenerator.generateAssessment(assessmentParams);
-    console.log(`✅ Created final exam for class: ${classTitle}`);
+    console.log(`📝 Starting assessment generation with params:`, assessmentParams);
+
+    try {
+      await this.assessmentGenerator.generateAssessment(assessmentParams);
+      console.log(`✅ Created final exam for class: ${classTitle}`);
+    } catch (error) {
+      console.error(`❌ Failed to generate class exam:`, error);
+      throw error;
+    }
   }
 
   /**
    * Check for completed dependencies and trigger downstream tasks
    */
   private async checkAndTriggerDependentTasks(state: OrchestrationState, completedTask: GenerationTask): Promise<void> {
+    // Update progress based on completed tasks
+    await this.updateProgressBasedOnCompletedTasks(state);
+
     // Check lesson completion
     if (completedTask.type === 'lesson_section') {
       const lessonWorkflow = state.lessons.find(l => l.lessonId === completedTask.lessonId);
@@ -654,11 +737,13 @@ What makes this particularly important for ${request.academicLevel || 'college'}
         
         if (allSectionsComplete && !lessonWorkflow.allSectionsComplete) {
           lessonWorkflow.allSectionsComplete = true;
+          console.log(`📖 All sections complete for lesson: ${lessonWorkflow.title}`);
           
           // Trigger lesson assessment
           if (lessonWorkflow.assessmentTask) {
             const assessmentTask = state.tasks.get(lessonWorkflow.assessmentTask);
             if (assessmentTask && assessmentTask.status === 'pending') {
+              console.log(`🎯 Triggering assessment for lesson: ${lessonWorkflow.title}`);
               setTimeout(() => this.executeTask(state, assessmentTask), 1000); // 1 second delay
             }
           }
@@ -680,11 +765,13 @@ What makes this particularly important for ${request.academicLevel || 'college'}
         
         if (allLessonsComplete && !pathWorkflow.allLessonsComplete) {
           pathWorkflow.allLessonsComplete = true;
+          console.log(`🛤️ All lessons complete for path: ${pathWorkflow.title}`);
           
           // Trigger path quiz
           if (pathWorkflow.quizTask) {
             const quizTask = state.tasks.get(pathWorkflow.quizTask);
             if (quizTask && quizTask.status === 'pending') {
+              console.log(`📝 Triggering quiz for path: ${pathWorkflow.title}`);
               setTimeout(() => this.executeTask(state, quizTask), 1000); // 1 second delay
             }
           }
@@ -692,23 +779,37 @@ What makes this particularly important for ${request.academicLevel || 'college'}
       }
     }
 
-    // Check class completion
+    // Check if all path quizzes are complete
     if (completedTask.type === 'path_quiz') {
-      const allPathsComplete = state.classWorkflow.paths.every(pathId => {
-        const path = state.paths.find(p => p.pathId === pathId);
-        return path?.quizTask && state.completedTasks.has(path.quizTask);
-      });
+      console.log(`🎯 Path quiz completed: ${completedTask.id}`);
       
-      if (allPathsComplete && !state.classWorkflow.allPathsComplete) {
-        state.classWorkflow.allPathsComplete = true;
-        
-        // Trigger class exam
-        if (state.classWorkflow.examTask) {
-          const examTask = state.tasks.get(state.classWorkflow.examTask);
-          if (examTask && examTask.status === 'pending') {
-            setTimeout(() => this.executeTask(state, examTask), 1000); // 1 second delay
-          }
+      // Check if all existing quiz tasks are complete (only check tasks that were actually created)
+      const existingQuizTasks = Array.from(state.tasks.values())
+        .filter(task => task.type === 'path_quiz')
+        .map(task => task.id);
+      
+      console.log(`📊 Existing quiz tasks: ${existingQuizTasks.length}`, existingQuizTasks);
+      
+      const allExistingQuizzesComplete = existingQuizTasks.every(taskId => 
+        state.completedTasks.has(taskId)
+      );
+      
+      console.log(`✅ All existing quizzes complete: ${allExistingQuizzesComplete}`);
+      
+      if (allExistingQuizzesComplete) {
+        const examTask = Array.from(state.tasks.values()).find(task => task.type === 'class_exam');
+        if (examTask && examTask.status === 'pending') {
+          console.log(`🎓 Triggering class exam: ${examTask.id}`);
+          await this.executeTask(state, examTask);
+        } else {
+          console.log(`⚠️ Class exam task not found or not pending:`, {
+            found: !!examTask,
+            status: examTask?.status,
+            id: examTask?.id
+          });
         }
+      } else {
+        console.log(`⏳ Waiting for more quizzes to complete. Completed: ${state.completedTasks.size}, Total quiz tasks: ${existingQuizTasks.length}`);
       }
     }
 
@@ -716,6 +817,75 @@ What makes this particularly important for ${request.academicLevel || 'college'}
     if (completedTask.type === 'class_exam') {
       console.log('🎉 Course generation completed successfully!');
       await this.updateJobStatus(state.jobId, 'completed', 100);
+    }
+  }
+
+  /**
+   * Update progress based on completed tasks with more granular tracking
+   */
+  private async updateProgressBasedOnCompletedTasks(state: OrchestrationState): Promise<void> {
+    const totalTasks = state.tasks.size;
+    const completedTasks = state.completedTasks.size;
+    
+    if (totalTasks === 0) return;
+    
+    // Calculate base progress
+    let progress = Math.floor((completedTasks / totalTasks) * 100);
+    
+    // Add weight for different task types
+    const taskWeights = {
+      'lesson_section': 0.4,    // 40% of total weight
+      'lesson_assessment': 0.2, // 20% of total weight  
+      'path_quiz': 0.2,        // 20% of total weight
+      'class_exam': 0.2        // 20% of total weight
+    };
+    
+    let weightedProgress = 0;
+    let totalWeight = 0;
+    
+    for (const [taskType, weight] of Object.entries(taskWeights)) {
+      const tasksOfType = Array.from(state.tasks.values()).filter(t => t.type === taskType);
+      const completedOfType = tasksOfType.filter(t => state.completedTasks.has(t.id));
+      
+      if (tasksOfType.length > 0) {
+        const typeProgress = (completedOfType.length / tasksOfType.length) * weight;
+        weightedProgress += typeProgress;
+        totalWeight += weight;
+      }
+    }
+    
+    if (totalWeight > 0) {
+      progress = Math.floor((weightedProgress / totalWeight) * 100);
+    }
+    
+    // Ensure progress never goes backwards and caps at 99% until truly complete
+    progress = Math.min(99, Math.max(progress, 0));
+    
+    // Only update if progress has changed significantly (at least 1%)
+    const currentProgress = await this.getCurrentJobProgress(state.jobId);
+    if (Math.abs(progress - currentProgress) >= 1) {
+      console.log(`📊 Progress update: ${progress}% (${completedTasks}/${totalTasks} tasks completed)`);
+      await this.updateJobStatus(state.jobId, 'processing', progress);
+    }
+  }
+
+  /**
+   * Get current job progress from database
+   */
+  private async getCurrentJobProgress(jobId: string): Promise<number> {
+    try {
+      const supabase = this.getSupabaseClient();
+      const { data, error } = await supabase
+        .from('course_generation_jobs')
+        .select('progress_percentage')
+        .eq('id', jobId)
+        .single();
+      
+      if (error || !data) return 0;
+      return (data as any).progress_percentage || 0;
+    } catch (error) {
+      console.error('Error getting current progress:', error);
+      return 0;
     }
   }
 
