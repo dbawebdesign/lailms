@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 import { RubricService, GradeResponse } from '@/lib/services/rubric-service';
 
 export async function GET(
@@ -127,7 +128,7 @@ export async function POST(
       .select('*')
       .eq('id', sessionId)
       .eq('grader_id', user.id)
-      .single();
+      .single<Tables<'grading_sessions'>>();
 
     if (sessionError || !session) {
       return NextResponse.json({ error: 'Grading session not found or unauthorized' }, { status: 404 });
@@ -245,7 +246,7 @@ export async function PUT(
       .eq('id', sessionId)
       .eq('grader_id', user.id)
       .select()
-      .single();
+      .single<Tables<'grading_sessions'>>();
 
     if (updateError) {
       console.error('Error updating grading session:', updateError);

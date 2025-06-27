@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 import { ClassInstanceCreationData, ClassInstance } from '../../../../../../types/teach';
 
 // DB Representation (subset for what we insert/select)
@@ -71,7 +72,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || !profileData || !profileData.organisation_id) {
       return NextResponse.json({ error: 'User organisation not found.' }, { status: 403 });
@@ -83,7 +84,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       .select('id')
       .eq('id', base_class_id_from_param)
       .eq('organisation_id', organisationId)
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (baseClassError || !parentBaseClass) {
       return NextResponse.json({ error: 'Parent Base Class not found or not accessible.' }, { status: 404 });
@@ -111,7 +112,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       .from('class_instances')
       .insert(dbInsertData)
       .select('*')
-      .single();
+      .single<Tables<'class_instances'>>();
 
     if (insertError) throw insertError;
     if (!data) {

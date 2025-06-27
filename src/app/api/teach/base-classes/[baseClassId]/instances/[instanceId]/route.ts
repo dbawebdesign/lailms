@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 import { type ClassInstance, type ClassInstanceCreationData } from '../../../../../../../types/teach'; // Assuming types
 import { cookies } from 'next/headers';
 
@@ -58,7 +59,7 @@ export async function GET(
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || !profile) {
       console.error('Error fetching profile organisation:', profileError);
@@ -75,7 +76,7 @@ export async function GET(
       .from('base_classes')
       .select('organisation_id')
       .eq('id', baseClassId)
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (baseClassOrgError || !baseClassOrg) {
       console.error('Error fetching base class for auth:', baseClassOrgError);
@@ -92,7 +93,7 @@ export async function GET(
       .eq('id', instanceId)
       .eq('base_class_id', baseClassId) // Ensure it belongs to the specified base class
       .eq('organisation_id', organisationId) // Ensure it belongs to the user's organisation
-      .single();
+      .single<Tables<'class_instances'>>();
 
     if (instanceError) {
       console.error('Error fetching class instance:', instanceError);
@@ -139,7 +140,7 @@ export async function PUT(
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || !profile) {
       console.error('Error fetching profile organisation:', profileError);
@@ -157,7 +158,7 @@ export async function PUT(
       .select('id, organisation_id')
       .eq('id', baseClassId)
       .eq('organisation_id', organisationId)
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (baseClassError || !baseClass) {
       console.error('Error verifying base class for update:', baseClassError);
@@ -171,7 +172,7 @@ export async function PUT(
       .eq('id', instanceId)
       .eq('base_class_id', baseClassId)
       .eq('organisation_id', organisationId)
-      .single();
+      .single<Tables<'class_instances'>>();
 
     if (existingInstanceError || !existingInstance) {
       console.error('Error finding instance to update:', existingInstanceError);
@@ -193,7 +194,7 @@ export async function PUT(
       .eq('base_class_id', baseClassId) // Redundant but safe
       .eq('organisation_id', organisationId) // Redundant but safe
       .select()
-      .single();
+      .single<Tables<'class_instances'>>();
 
     if (updateError) {
       console.error('Error updating class instance:', updateError);
@@ -231,7 +232,7 @@ export async function DELETE(
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', user.id)
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || !profile) {
       console.error('Error fetching profile organisation:', profileError);
@@ -249,7 +250,7 @@ export async function DELETE(
       .select('id, organisation_id')
       .eq('id', baseClassId)
       .eq('organisation_id', organisationId)
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (baseClassError || !baseClass) {
       console.error('Error verifying base class for delete op:', baseClassError);

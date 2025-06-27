@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest, { params }: BaseClassPathsParam
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', session.user.id)
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || !profile) {
       return NextResponse.json({ error: 'Could not verify user organisation' }, { status: 500 });
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest, { params }: BaseClassPathsParam
       .from('paths')
       .insert(pathData)
       .select('*')
-      .single();
+      .single<Tables<'paths'>>();
 
     if (pathError) {
       console.error('Error creating path:', pathError);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 
 interface MediaAsset {
   id: string;
@@ -53,7 +54,7 @@ export async function GET(
     }
 
     // Transform the data to match the frontend interface
-    const transformedAssets = (assets as MediaAsset[]).map((asset: MediaAsset) => ({
+    const transformedAssets = (assets as any)?.map((asset: any) => ({
       id: asset.id,
       type: asset.asset_type,
       title: asset.title,
@@ -61,7 +62,7 @@ export async function GET(
       url: asset.file_url,
       duration: asset.duration,
       createdAt: asset.created_at
-    }));
+    })) || [];
 
     return NextResponse.json({
       success: true,

@@ -256,12 +256,12 @@ Ensure the final output is ONLY the JSON object, with no other text before or af
 
 // Function to fetch template base class details
 async function fetchTemplateBaseClass(supabase: any, templateId: string): Promise<any | null> {
-  const { data, error } = await supabase
-    .from('base_classes')
+    const { data, error } = await supabase
+      .from('base_classes')
     .select('name, description, settings')
-    .eq('id', templateId)
-    .single();
-
+      .eq('id', templateId)
+      .single();
+    
   if (error) {
     console.error(`Error fetching template base class (${templateId}):`, error);
     return null;
@@ -271,7 +271,7 @@ async function fetchTemplateBaseClass(supabase: any, templateId: string): Promis
 
 export async function POST(request: Request) {
   try {
-    const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServerClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
@@ -322,8 +322,8 @@ ${templateData.description || 'No description provided.'}
 ${JSON.stringify(templateData.settings?.generatedOutline, null, 2) || 'No existing outline.'}`;
       }
     }
-     // TODO: If knowledgeBaseIds is provided, fetch knowledge base documents
-     // This would require additional implementation for knowledge base integration
+    // TODO: If knowledgeBaseIds is provided, fetch knowledge base documents
+    // This would require additional implementation for knowledge base integration
 
     // --- Call OpenAI API --- 
     if (!openai) {

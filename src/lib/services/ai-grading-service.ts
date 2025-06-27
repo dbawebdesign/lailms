@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 import OpenAI from 'openai';
 import pLimit from 'p-limit';
 
@@ -349,8 +350,8 @@ OUTPUT FORMAT (JSON):
 
       if (responsesError) throw responsesError;
 
-      const totalPossible = responses?.reduce((sum, r) => sum + (r.assessment_questions.points || 0), 0) || 0;
-      const totalEarned = responses?.reduce((sum, r) => sum + (r.final_score || 0), 0) || 0;
+      const totalPossible = responses?.reduce((sum, r) => sum + ((r as any).assessment_questions.points || 0), 0) || 0;
+      const totalEarned = responses?.reduce((sum, r) => sum + ((r as any).final_score || 0), 0) || 0;
       const percentage = totalPossible > 0 ? (totalEarned / totalPossible) * 100 : 0;
 
       // Update attempt with calculated scores
@@ -423,7 +424,7 @@ OUTPUT FORMAT (JSON):
         .from('student_responses')
         .select('attempt_id')
         .eq('id', responseId)
-        .single();
+        .single<Tables<'student_responses'>>();
 
       if (response) {
         await this.updateAttemptGradingStatus(response.attempt_id);

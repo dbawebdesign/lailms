@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -36,7 +37,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', session.user.id) // Use user_id instead of id
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || !profile || !profile.organisation_id) {
       console.error('Error fetching profile or organisation_id for delete:', profileError);
@@ -49,7 +50,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       .from('documents')
       .select('id, storage_path, organisation_id, base_class_id')
       .eq('id', documentId)
-      .single();
+      .single<Tables<'documents'>>();
 
     if (docFetchError) {
       console.error('Error fetching document for delete:', docFetchError);

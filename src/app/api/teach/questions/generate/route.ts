@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from "packages/types/db";
 import { QuestionGenerationService } from '@/lib/services/question-generation-service';
 import { ContentExtractionService } from '@/lib/services/content-extraction-service';
 
@@ -34,13 +35,13 @@ export async function POST(request: NextRequest) {
     // Extract content based on source type
     if (sourceType === 'lesson') {
       content = await contentExtractionService.extractLessonContent(sourceId);
-      const { data: lessonData } = await supabase.from('lessons').select('base_class_id').eq('id', sourceId).single();
+      const { data: lessonData } = await supabase.from('lessons').select('base_class_id').eq('id', sourceId).single<Tables<"lessons">>();
       if (lessonData && lessonData.base_class_id) {
         baseClassId = lessonData.base_class_id;
       }
     } else if (sourceType === 'path') {
       content = await contentExtractionService.extractPathContent(sourceId);
-      const { data: pathData } = await supabase.from('paths').select('base_class_id').eq('id', sourceId).single();
+      const { data: pathData } = await supabase.from('paths').select('base_class_id').eq('id', sourceId).single<Tables<"paths">>();
       if (pathData && pathData.base_class_id) {
         baseClassId = pathData.base_class_id;
       }

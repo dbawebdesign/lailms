@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from "packages/types/db";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -131,10 +132,10 @@ export async function POST(request: NextRequest) {
     if (regenerate && existingAssets && existingAssets.length > 0) {
       // Delete old audio files from storage
       for (const asset of existingAssets) {
-        if (asset.file_path) {
+        if ((asset as any).file_path) {
           const { error: storageError } = await supabase.storage
             .from('lesson-media')
-            .remove([asset.file_path]);
+            .remove([(asset as any).file_path]);
           
           if (storageError) {
             console.warn('Failed to delete old audio file:', storageError);
@@ -163,7 +164,7 @@ export async function POST(request: NextRequest) {
       .from('lessons')
       .select('title, description')
       .eq('id', lessonId)
-      .single();
+      .single<Tables<"lessons">>();
 
     if (lessonError) {
       console.error('Failed to fetch lesson:', lessonError);
@@ -192,10 +193,10 @@ export async function POST(request: NextRequest) {
     let comprehensiveContent = '';
 
     // Add lesson title and description
-    if (lesson.title) {
+    if (lesson && lesson.title) {
       comprehensiveContent += `Lesson Title: ${lesson.title}\n\n`;
     }
-    if (lesson.description) {
+    if (lesson && lesson.description) {
       comprehensiveContent += `Lesson Description: ${lesson.description}\n\n`;
     }
 
@@ -204,10 +205,10 @@ export async function POST(request: NextRequest) {
       comprehensiveContent += 'Lesson Content:\n\n';
       
       sections.forEach((section, index) => {
-        comprehensiveContent += `Section ${index + 1}: ${section.title}\n`;
+        comprehensiveContent += `Section ${index + 1}: ${(section as any).title}\n`;
         
         // Extract text content from JSONB
-        const sectionText = extractTextFromContent(section.content);
+        const sectionText = extractTextFromContent((section as any).content);
         if (sectionText.trim()) {
           comprehensiveContent += `${sectionText}\n\n`;
         }
@@ -381,7 +382,7 @@ You are Luna, an AI educational podcast host who creates engaging, grade-appropr
         created_by: user.id
       })
       .select()
-      .single();
+      .single<Tables<"lesson_media_assets">>();
 
     if (assetError) {
       console.error('Database error:', assetError);
@@ -391,13 +392,13 @@ You are Luna, an AI educational podcast host who creates engaging, grade-appropr
     return NextResponse.json({
       success: true,
       asset: {
-        id: assetData.id,
+        id: assetData!.id,
         type: 'podcast',
-        title: assetData.title,
+        title: assetData!.title,
         url: publicUrl,
         duration: estimatedDuration,
         status: 'completed',
-        createdAt: assetData.created_at
+        createdAt: assetData!.created_at
       }
     });
 

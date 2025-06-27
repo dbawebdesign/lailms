@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 import { cookies } from 'next/headers';
 
 interface RouteParams {
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .from('profiles')
       .select('organisation_id')
       .eq('user_id', user.id) // Use user_id instead of id
-      .single();
+      .single<Tables<'profiles'>>();
 
     if (profileError || !profile || !profile.organisation_id) {
       console.error('Error fetching profile or organisation_id:', profileError);
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         .from('profiles') // Or 'members' if that's the table name
         .select('organisation_id')
         .eq('user_id', user.id) // Use user_id instead of id
-        .single();
+        .single<Tables<'profiles'>>();
 
     if (profileError || !profile || !profile.organisation_id) {
         console.error('Error fetching profile or organisation_id:', profileError);
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         status: 'queued' // Set initial status to 'queued' for the processing function
       })
       .select('id') // Only select ID, as we'll return the initial record
-      .single();
+      .single<Tables<'documents'>>();
 
     if (insertError) {
       console.error('Error inserting document record:', insertError);

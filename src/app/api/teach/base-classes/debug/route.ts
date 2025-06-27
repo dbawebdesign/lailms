@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: Request) {
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
       .from('profiles')
       .select('user_id, organisation_id, role, created_at')
       .eq('user_id', userId)
-      .single();
+      .single<Tables<'profiles'>>();
     
     // 3. Check organisation from profiles
     let orgId = null;
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
         .from('organisations')
         .select('*')
         .eq('id', orgId)
-        .single();
+        .single<Tables<'organisations'>>();
       
       organization = orgResult.data;
       orgError = orgResult.error;
@@ -134,7 +135,7 @@ export async function GET(request: Request) {
             .from('base_classes')
             .insert(testData)
             .select()
-            .single();
+            .single<Tables<'base_classes'>>();
             
           testInsertResult = directResult.data ? 'Success' : null;
           testInsertError = directResult.error;

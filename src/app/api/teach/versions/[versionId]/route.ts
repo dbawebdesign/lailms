@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from "packages/types/db";
 
 interface VersionParams {
   params: Promise<{
@@ -20,7 +21,7 @@ export async function GET(request: Request, { params }: VersionParams) {
       .from('lesson_section_versions')
       .select('*')
       .eq('id', versionId)
-      .single();
+      .single<Tables<"lesson_section_versions">>();
 
     if (error) {
       if (error.code === 'PGRST116') { 
@@ -58,7 +59,7 @@ export async function POST(request: Request, { params }: VersionParams) {
       .from('lesson_section_versions')
       .select('lesson_section_id, content')
       .eq('id', versionId)
-      .single();
+      .single<Tables<"lesson_section_versions">>();
 
     if (fetchTargetError || !targetVersion) {
       console.error('Error fetching target version for revert:', fetchTargetError);
@@ -72,7 +73,7 @@ export async function POST(request: Request, { params }: VersionParams) {
       .from('lesson_sections')
       .select('content')
       .eq('id', sectionId)
-      .single();
+      .single<Tables<"lesson_sections">>();
 
     if (fetchCurrentError || !currentSection) {
       console.error('Error fetching current section content for backup:', fetchCurrentError);
@@ -88,7 +89,7 @@ export async function POST(request: Request, { params }: VersionParams) {
           .eq('lesson_section_id', sectionId)
           .order('version_number', { ascending: false })
           .limit(1)
-          .maybeSingle();
+          .maybeSingle<Tables<"lesson_section_versions">>();
 
         const nextVersionNumber = maxVersionData ? maxVersionData.version_number + 1 : 1;
 
@@ -115,7 +116,7 @@ export async function POST(request: Request, { params }: VersionParams) {
       })
       .eq('id', sectionId)
       .select('id, content, updated_at')
-      .single();
+      .single<Tables<"lesson_sections">>();
 
     if (updateError) {
       console.error('Error reverting section content:', updateError);

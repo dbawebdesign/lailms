@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 import { BaseClass } from '../../../../../../types/teach';
 
 // TODO: Generate Supabase types and uncomment Database import above. 
@@ -43,7 +44,7 @@ export async function POST(
       .from('base_classes')
       .select('id, organisation_id, settings')
       .eq('id', baseClassId)
-      .single();
+      .single<Tables<'base_classes'>>();
 
     if (baseClassError) {
       console.error(`[generate-lessons] Error fetching base class ${baseClassId}:`, baseClassError);
@@ -84,7 +85,7 @@ export async function POST(
         .from('paths')
         .insert(pathInsertData)
         .select('id, title') 
-        .single();
+        .single<Tables<'paths'>>();
 
       if (pathError) {
         console.error(`[generate-lessons] Error creating path for module "${module.title}" (baseClassId: ${baseClassId}):`, pathError);
@@ -110,7 +111,7 @@ export async function POST(
             .from('lessons')
             .insert(lessonInsertData)
             .select('id, title')
-            .single();
+            .single<Tables<'lessons'>>();
           
           if (lessonError) {
             console.error(`[generate-lessons] Error creating lesson "${lesson.title}" for path ID ${newPath.id} (baseClassId: ${baseClassId}):`, lessonError);

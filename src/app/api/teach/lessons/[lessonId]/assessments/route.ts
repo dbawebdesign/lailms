@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 
 export async function GET(
   request: NextRequest,
@@ -102,7 +103,7 @@ export async function POST(
     }
 
     // Check if user owns the base class
-    if (lesson.base_classes?.user_id !== user.id) {
+    if ((lesson as any).base_classes?.user_id !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

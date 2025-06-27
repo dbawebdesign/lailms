@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from "packages/types/db";
 
 export async function GET(
   request: NextRequest,
@@ -35,7 +36,7 @@ export async function GET(
       .select('*')
       .eq('id', id)
       .eq('asset_type', 'mind_map')
-      .single();
+      .single<Tables<"lesson_media_assets">>();
 
     if (lessonAsset && !lessonError) {
       asset = lessonAsset;
@@ -47,7 +48,7 @@ export async function GET(
         .eq('id', id)
         .eq('asset_type', 'mind_map')
         .eq('status', 'completed')
-        .single();
+        .single<Tables<"base_class_media_assets">>();
 
       if (baseClassAsset && !baseClassError) {
         asset = baseClassAsset;

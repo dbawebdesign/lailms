@@ -269,7 +269,7 @@ export async function POST(
         title,
         description,
         assessment_type: assessmentType,
-        instructions,
+          instructions,
         time_limit_minutes: timeLimit,
         max_attempts: maxAttempts,
         passing_score_percentage: passingScore,

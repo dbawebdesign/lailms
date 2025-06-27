@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 import { QuestionGenerationService } from '@/lib/services/question-generation-service';
-import { Database } from '@learnologyai/types';
 
-type QuestionType = Database['public']['Enums']['question_type'];
+type QuestionType = 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'matching' | 'fill_in_blank';
 
 export async function GET(
   request: NextRequest,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -124,8 +125,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           exists: true,
           asset: {
-            ...assets[0],
-            url: `/api/teach/media/mind-map/${assets[0].id}`
+            ...(assets[0] as any),
+            url: `/api/teach/media/mind-map/${(assets[0] as any).id}`
           }
         });
       }
@@ -148,8 +149,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           exists: true,
           asset: {
-            ...assets[0],
-            url: `/api/teach/media/mind-map/${assets[0].id}`
+            ...(assets[0] as any),
+            url: `/api/teach/media/mind-map/${(assets[0] as any).id}`
           }
         });
       }

@@ -1,4 +1,4 @@
-import { Database } from '../../../packages/types/db';
+import { Database, Tables } from '../../../packages/types/db';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -343,7 +343,7 @@ export class AssessmentAnalyticsService {
         .from('assessment_analytics')
         .select('*')
         .eq('assessment_id', assessmentId)
-        .single();
+        .single<Tables<'assessment_analytics'>>();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
         throw new Error(`Failed to fetch cached analytics: ${error.message}`);
@@ -395,7 +395,7 @@ export class AssessmentAnalyticsService {
         .from('question_analytics')
         .select('*')
         .eq('question_id', questionId)
-        .single();
+        .single<Tables<'question_analytics'>>();
 
       if (error && error.code !== 'PGRST116') {
         throw new Error(`Failed to fetch cached question analytics: ${error.message}`);

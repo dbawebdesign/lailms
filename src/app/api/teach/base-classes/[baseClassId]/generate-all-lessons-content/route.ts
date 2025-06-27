@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from 'packages/types/db';
 
 // Helper to send JSON chunks in the stream
 // function streamJson(writableStream: WritableStreamDefaultWriter, data: object) { // Not used with controller.enqueue
@@ -40,7 +41,7 @@ export async function POST(
     const lessonsToProcess: { id: string; title: string }[] = [];
     let skippedCount = 0;
     if (pathsData) {
-      for (const path of pathsData) {
+      for (const path of pathsData as any[]) {
         if (path.lessons) {
           for (const lesson of path.lessons as any[]) {
             if (lesson.lesson_sections && lesson.lesson_sections[0] && lesson.lesson_sections[0].count > 0) {
@@ -262,7 +263,7 @@ export async function GET(
     let totalLessons = 0;
 
     if (pathsData) {
-      for (const path of pathsData) {
+      for (const path of pathsData as any[]) {
         if (path.lessons) {
           for (const lesson of path.lessons as any[]) {
             totalLessons++;
