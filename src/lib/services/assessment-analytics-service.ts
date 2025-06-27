@@ -7,20 +7,16 @@ const supabase = createClient(
 );
 
 // Type definitions based on actual database schema
-type AssessmentAttempt = Database['public']['Tables']['assessment_attempts']['Row'];
-type AssessmentResponse = Database['public']['Tables']['assessment_responses']['Row'];
+type StudentAttempt = Database['public']['Tables']['student_attempts']['Row'];
+type StudentResponse = Database['public']['Tables']['student_responses']['Row'];
 type Assessment = Database['public']['Tables']['assessments']['Row'];
-type Question = Database['public']['Tables']['questions']['Row'];
-// Note: These analytics tables will be available after the migration is applied
-// type AssessmentAnalytics = Database['public']['Tables']['assessment_analytics']['Row'];
-// type QuestionAnalytics = Database['public']['Tables']['question_analytics']['Row'];
-// type UserAnalytics = Database['public']['Tables']['user_analytics']['Row'];
+type AssessmentQuestion = Database['public']['Tables']['assessment_questions']['Row'];
 
 // Response interfaces for analytics results
 export interface StudentResultsResponse {
   id: string;
   assessment_id: string;
-  assessment_type: Database['public']['Enums']['assessment_type'];
+  assessment_type: string; // Using string instead of enum since it's stored as string in assessments table
   started_at: string;
   completed_at: string | null;
   score: number | null;
@@ -73,33 +69,28 @@ export class AssessmentAnalyticsService {
   async getStudentResults(
     userId: string, 
     assessmentId?: string,
-    assessmentType?: Database['public']['Enums']['assessment_type']
+    assessmentType?: string
   ): Promise<StudentResultsResponse[]> {
     try {
       let query = supabase
-        .from('assessment_attempts')
+        .from('student_attempts')
         .select(`
           id,
           assessment_id,
-          assessment_type,
           started_at,
-          completed_at,
-          score,
+          submitted_at,
+          percentage_score,
           status,
-          time_spent,
+          time_spent_minutes,
           passed,
           attempt_number,
-          assessments!inner(title)
+          assessments!inner(title, assessment_type)
         `)
-        .eq('user_id', userId)
+        .eq('student_id', userId)
         .order('started_at', { ascending: false });
 
       if (assessmentId) {
         query = query.eq('assessment_id', assessmentId);
-      }
-
-      if (assessmentType) {
-        query = query.eq('assessment_type', assessmentType);
       }
 
       const { data, error } = await query;
@@ -111,16 +102,16 @@ export class AssessmentAnalyticsService {
       return (data || []).map(attempt => ({
         id: attempt.id,
         assessment_id: attempt.assessment_id,
-        assessment_type: attempt.assessment_type,
-        started_at: attempt.started_at,
-        completed_at: attempt.completed_at,
-        score: attempt.score,
+        assessment_type: (attempt.assessments as any)?.assessment_type || '',
+        started_at: attempt.started_at || '',
+        completed_at: attempt.submitted_at,
+        score: attempt.percentage_score,
         status: attempt.status,
-        time_spent: attempt.time_spent,
+        time_spent: attempt.time_spent_minutes,
         passed: attempt.passed,
         attempt_number: attempt.attempt_number,
         assessment_title: (attempt.assessments as any)?.title
-      }));
+      })).filter(result => !assessmentType || result.assessment_type === assessmentType);
       
     } catch (error) {
       console.error('Error fetching student results:', error);
@@ -135,15 +126,15 @@ export class AssessmentAnalyticsService {
     try {
       // Fetch all completed attempts for this assessment
       const { data: attempts, error: attemptsError } = await supabase
-        .from('assessment_attempts')
+        .from('student_attempts')
         .select(`
           id,
-          user_id,
-          score,
+          student_id,
+          percentage_score,
           started_at,
-          completed_at,
+          submitted_at,
           status,
-          time_spent,
+          time_spent_minutes,
           passed
         `)
         .eq('assessment_id', assessmentId)
@@ -168,13 +159,13 @@ export class AssessmentAnalyticsService {
       }
 
       // Calculate basic statistics
-      const scores = attempts.map(a => a.score || 0).filter(s => s > 0);
+      const scores = attempts.map(a => a.percentage_score || 0).filter(s => s > 0);
       const completionTimes = attempts
-        .filter(a => a.completed_at && a.started_at && a.time_spent)
-        .map(a => a.time_spent!);
+        .filter(a => a.submitted_at && a.started_at && a.time_spent_minutes)
+        .map(a => a.time_spent_minutes!);
       
       const passedAttempts = attempts.filter(a => a.passed === true);
-      const uniqueUsers = new Set(attempts.map(a => a.user_id)).size;
+      const uniqueUsers = new Set(attempts.map(a => a.student_id)).size;
 
       // Get question-level statistics
       const questionStats = await this.calculateQuestionStats(assessmentId);
@@ -205,16 +196,16 @@ export class AssessmentAnalyticsService {
     try {
       // Get all responses for this assessment through attempts
       const { data: responses, error } = await supabase
-        .from('assessment_responses')
+        .from('student_responses')
         .select(`
           question_id,
           is_correct,
-          time_spent,
+          time_spent_minutes,
           attempt_id,
-          assessment_attempts!inner(assessment_id),
-          questions!inner(question_text)
+          student_attempts!inner(assessment_id),
+          assessment_questions!inner(question_text)
         `)
-        .eq('assessment_attempts.assessment_id', assessmentId);
+        .eq('student_attempts.assessment_id', assessmentId);
 
       if (error) {
         throw new Error(`Failed to fetch assessment responses: ${error.message}`);
@@ -230,7 +221,7 @@ export class AssessmentAnalyticsService {
         if (!acc[questionId]) {
           acc[questionId] = {
             question_id: questionId,
-            question_text: (response.questions as any)?.question_text || '',
+            question_text: (response.assessment_questions as any)?.question_text || '',
             responses: []
           };
         }
@@ -243,8 +234,8 @@ export class AssessmentAnalyticsService {
         const totalResponses = group.responses.length;
         const correctResponses = group.responses.filter(r => r.is_correct === true).length;
         const timesSpent = group.responses
-          .filter(r => r.time_spent && r.time_spent > 0)
-          .map(r => r.time_spent);
+          .filter(r => r.time_spent_minutes && r.time_spent_minutes > 0)
+          .map(r => r.time_spent_minutes);
         
         return {
           question_id: group.question_id,
@@ -272,9 +263,9 @@ export class AssessmentAnalyticsService {
     try {
       // Get all attempts for this user and assessment
       const { data: attempts, error } = await supabase
-        .from('assessment_attempts')
-        .select('score, completed_at, started_at')
-        .eq('user_id', userId)
+        .from('student_attempts')
+        .select('percentage_score, submitted_at, started_at')
+        .eq('student_id', userId)
         .eq('assessment_id', assessmentId)
         .eq('status', 'completed')
         .order('started_at', { ascending: true });
@@ -287,7 +278,7 @@ export class AssessmentAnalyticsService {
         return null;
       }
 
-      const scores = attempts.map(a => a.score || 0).filter(s => s > 0);
+      const scores = attempts.map(a => a.percentage_score || 0).filter(s => s > 0);
       const bestScore = scores.length > 0 ? Math.max(...scores) : null;
       const latestScore = scores.length > 0 ? scores[scores.length - 1] : null;
       
@@ -305,14 +296,14 @@ export class AssessmentAnalyticsService {
       const highScoreThreshold = 80; // 80% or above considered mastery level
       const recentAttempts = attempts.slice(-3); // Last 3 attempts
       const masteryLevel = recentAttempts.length > 0 ? 
-        recentAttempts.filter(a => (a.score || 0) >= highScoreThreshold).length / recentAttempts.length : 0;
+        recentAttempts.filter(a => (a.percentage_score || 0) >= highScoreThreshold).length / recentAttempts.length : 0;
 
       // Calculate time to mastery (time from first attempt to first high score)
       let timeToMastery = null;
-      const firstHighScoreAttempt = attempts.find(a => (a.score || 0) >= highScoreThreshold);
+      const firstHighScoreAttempt = attempts.find(a => (a.percentage_score || 0) >= highScoreThreshold);
       if (firstHighScoreAttempt && attempts[0]) {
         const firstAttemptTime = new Date(attempts[0].started_at).getTime();
-        const masteryTime = new Date(firstHighScoreAttempt.completed_at || firstHighScoreAttempt.started_at).getTime();
+        const masteryTime = new Date(firstHighScoreAttempt.submitted_at || firstHighScoreAttempt.started_at).getTime();
         timeToMastery = Math.round((masteryTime - firstAttemptTime) / (1000 * 60)); // minutes
       }
 
@@ -325,7 +316,7 @@ export class AssessmentAnalyticsService {
         avg_improvement: avgImprovement,
         mastery_level: masteryLevel,
         time_to_mastery: timeToMastery,
-        last_activity_at: attempts[attempts.length - 1]?.completed_at || null
+        last_activity_at: attempts[attempts.length - 1]?.submitted_at || null
       };
 
     } catch (error) {
@@ -428,7 +419,7 @@ export class AssessmentAnalyticsService {
    */
   async getUserPerformanceTrends(
     userId: string, 
-    assessmentType?: Database['public']['Enums']['assessment_type'],
+    assessmentType?: string,
     daysPeriod: number = 30
   ): Promise<{
     trends: Array<{
@@ -445,21 +436,21 @@ export class AssessmentAnalyticsService {
       cutoffDate.setDate(cutoffDate.getDate() - daysPeriod);
 
       let query = supabase
-        .from('assessment_attempts')
+        .from('student_attempts')
         .select(`
-          score,
-          completed_at,
+          percentage_score,
+          submitted_at,
           assessment_id,
-          assessments!inner(title)
+          assessments!inner(title, assessment_type)
         `)
-        .eq('user_id', userId)
+        .eq('student_id', userId)
         .eq('status', 'completed')
-        .gte('completed_at', cutoffDate.toISOString())
-        .not('score', 'is', null)
-        .order('completed_at', { ascending: true });
+        .gte('submitted_at', cutoffDate.toISOString())
+        .not('percentage_score', 'is', null)
+        .order('submitted_at', { ascending: true });
 
       if (assessmentType) {
-        query = query.eq('assessment_type', assessmentType);
+        query = query.eq('assessments.assessment_type', assessmentType);
       }
 
       const { data, error } = await query;
@@ -477,8 +468,8 @@ export class AssessmentAnalyticsService {
       }
 
       const trends = data.map(attempt => ({
-        date: attempt.completed_at!.split('T')[0], // Extract date part
-        score: attempt.score!,
+        date: attempt.submitted_at!.split('T')[0], // Extract date part
+        score: attempt.percentage_score!,
         assessment_id: attempt.assessment_id,
         assessment_title: (attempt.assessments as any)?.title
       }));
@@ -529,11 +520,11 @@ export class AssessmentAnalyticsService {
   }> {
     try {
       const { data, error } = await supabase
-        .from('assessment_attempts')
-        .select('user_id, score, time_spent')
+        .from('student_attempts')
+        .select('student_id, percentage_score, time_spent_minutes')
         .eq('assessment_id', assessmentId)
         .eq('status', 'completed')
-        .in('user_id', userIds);
+        .in('student_id', userIds);
 
       if (error) {
         throw new Error(`Failed to fetch user comparison data: ${error.message}`);
@@ -555,9 +546,9 @@ export class AssessmentAnalyticsService {
 
       // Group by user
       const userStats = userIds.map(userId => {
-        const userAttempts = data.filter(attempt => attempt.user_id === userId);
-        const scores = userAttempts.map(a => a.score || 0).filter(s => s > 0);
-        const times = userAttempts.map(a => a.time_spent || 0).filter(t => t > 0);
+        const userAttempts = data.filter(attempt => attempt.student_id === userId);
+        const scores = userAttempts.map(a => a.percentage_score || 0).filter(s => s > 0);
+        const times = userAttempts.map(a => a.time_spent_minutes || 0).filter(t => t > 0);
 
         return {
           user_id: userId,
@@ -577,7 +568,7 @@ export class AssessmentAnalyticsService {
       });
 
       // Calculate assessment average
-      const allScores = data.map(a => a.score || 0).filter(s => s > 0);
+      const allScores = data.map(a => a.percentage_score || 0).filter(s => s > 0);
       const assessmentAverage = allScores.length > 0 ? 
         allScores.reduce((sum, score) => sum + score, 0) / allScores.length : 0;
 
@@ -614,17 +605,17 @@ export class AssessmentAnalyticsService {
   }> {
     try {
       let query = supabase
-        .from('assessment_responses')
+        .from('student_responses')
         .select(`
           is_correct,
-          time_spent,
-          assessment_attempts!inner(user_id, assessment_id),
-          questions!inner(tags, cognitive_level)
+          time_spent_minutes,
+          student_attempts!inner(student_id, assessment_id),
+          assessment_questions!inner(tags, cognitive_level)
         `)
-        .eq('assessment_attempts.user_id', userId);
+        .eq('student_attempts.student_id', userId);
 
       if (assessmentIds && assessmentIds.length > 0) {
-        query = query.in('assessment_attempts.assessment_id', assessmentIds);
+        query = query.in('student_attempts.assessment_id', assessmentIds);
       }
 
       const { data, error } = await query;
@@ -646,7 +637,7 @@ export class AssessmentAnalyticsService {
       }> = {};
 
       data.forEach(response => {
-        const question = response.questions as any;
+        const question = response.assessment_questions as any;
         const topics = [
           ...(question?.tags || []),
           question?.cognitive_level
@@ -661,8 +652,8 @@ export class AssessmentAnalyticsService {
           if (response.is_correct) {
             topicStats[topic].correct++;
           }
-          if (response.time_spent) {
-            topicStats[topic].total_time += response.time_spent;
+          if (response.time_spent_minutes) {
+            topicStats[topic].total_time += response.time_spent_minutes;
             topicStats[topic].time_count++;
           }
         });

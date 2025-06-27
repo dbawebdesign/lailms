@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Tables } from '../../../packages/types/db';
 import OpenAI from 'openai';
 import { encode } from 'gpt-tokenizer';
 import pLimit from 'p-limit';
@@ -147,11 +148,11 @@ export class AssessmentGenerationService {
             .from('lesson_sections')
             .select('title, content, section_type')
             .eq('lesson_id', scopeId)
-            .order('order_index');
+            .order('order_index') as any; // Complex query with joins, using any cast
 
           if (sectionsError) throw sectionsError;
           
-          content = sections?.map(section => 
+          content = sections?.map((section: any) => 
             `${section.title}\n${section.content}`
           ).join('\n\n') || '';
           break;
@@ -165,11 +166,11 @@ export class AssessmentGenerationService {
               lesson_sections(title, content, section_type)
             `)
             .eq('path_id', scopeId)
-            .order('order_index');
+            .order('order_index') as any; // Complex query with joins, using any cast
 
           if (pathError) throw pathError;
 
-          content = pathLessons?.map(lesson => {
+          content = pathLessons?.map((lesson: any) => {
             const sectionContent = lesson.lesson_sections?.map((section: any) => 
               `${section.title}\n${section.content}`
             ).join('\n\n') || '';
@@ -189,11 +190,11 @@ export class AssessmentGenerationService {
               )
             `)
             .eq('base_class_id', scopeId)
-            .order('order_index');
+            .order('order_index') as any; // Complex query with joins, using any cast
 
           if (classError) throw classError;
 
-          content = classPaths?.map(path => {
+          content = classPaths?.map((path: any) => {
             const pathContent = path.lessons?.map((lesson: any) => {
               const sectionContent = lesson.lesson_sections?.map((section: any) => 
                 `${section.title}\n${section.content}`
@@ -407,7 +408,7 @@ Generate the questions now:`;
         .from('assessments')
         .insert(assessmentData)
         .select()
-        .single();
+        .single() as any;
 
       if (assessmentError) throw assessmentError;
 
@@ -687,25 +688,25 @@ Focus on extracting concepts that can be assessed through questions.`;
 
     try {
       // Get summary statistics
-      const { data: attempts, error: attemptsError } = await supabase
+      const { data: attempts, error: attemptsError } = (await supabase
         .from('student_attempts')
         .select('percentage_score, status, time_spent_minutes')
         .eq('assessment_id', assessmentId)
-        .eq('status', 'graded');
+        .eq('status', 'graded')) as any;
 
       if (attemptsError) throw attemptsError;
 
       // Calculate analytics
       const totalAttempts = attempts?.length || 0;
-      const scores = attempts?.map(a => a.percentage_score || 0) || [];
-      const averageScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+      const scores = attempts?.map((a: any) => a.percentage_score || 0) || [];
+      const averageScore = scores.length > 0 ? scores.reduce((sum: number, score: number) => sum + score, 0) / scores.length : 0;
       const highestScore = scores.length > 0 ? Math.max(...scores) : 0;
       const lowestScore = scores.length > 0 ? Math.min(...scores) : 0;
-      const passedCount = scores.filter(score => score >= 70).length; // Assuming 70% pass rate
+      const passedCount = scores.filter((score: number) => score >= 70).length; // Assuming 70% pass rate
       const passRate = totalAttempts > 0 ? (passedCount / totalAttempts) * 100 : 0;
 
       // Get question-level analytics
-      const { data: responses, error: responsesError } = await supabase
+      const { data: responses, error: responsesError } = (await supabase
         .from('student_responses')
         .select(`
           question_id,
@@ -717,7 +718,7 @@ Focus on extracting concepts that can be assessed through questions.`;
             points
           )
         `)
-        .in('attempt_id', attempts?.map(a => a.id) || []);
+        .in('attempt_id', attempts?.map((a: any) => a.id) || [])) as any;
 
       if (responsesError) throw responsesError;
 
