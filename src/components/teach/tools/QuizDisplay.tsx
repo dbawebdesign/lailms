@@ -338,7 +338,7 @@ export function QuizDisplay({ content, metadata, onCopy, copiedItems, onRefineWi
                     const isCorrect = showAnswers && (
                       question.correctAnswer === option || 
                       question.correctAnswer === letter ||
-                      question.correctAnswer.toLowerCase() === letter
+                      (typeof question.correctAnswer === 'string' && question.correctAnswer.toLowerCase() === letter)
                     );
                     
                     return (
