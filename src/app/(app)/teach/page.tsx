@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import WelcomeCard from "@/components/dashboard/WelcomeCard";
 import { ActiveClassItem } from "@/components/dashboard/teacher/ActiveClassItem";
+import CourseGenerationProgressWidget from "@/components/dashboard/CourseGenerationProgressWidget";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BookOpenCheck, ClipboardCheck, AlertTriangle, Info, Users, Sparkles, Activity, TrendingUp, BookOpen, CheckCircle, Target, Eye, Lightbulb, Search, Brain } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -184,6 +185,9 @@ export default async function TeacherDashboardPage() {
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6 md:space-y-8">
       <WelcomeCard userName={userName} userRole={profile.role} />
+
+      {/* Course Generation Progress Widget */}
+      <CourseGenerationProgressWidget userId={user.id} />
 
       {/* Bento Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">

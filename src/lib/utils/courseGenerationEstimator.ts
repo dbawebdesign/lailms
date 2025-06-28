@@ -40,32 +40,32 @@ export function estimateCourseGenerationTime(params: CourseGenerationParams): Co
   const totalLessons = estimatedWeeks * lessonsPerWeek;
   const estimatedPaths = Math.max(3, Math.ceil(estimatedWeeks / 3)); // Roughly 3-4 weeks per path
 
-  // Base time estimates (in minutes)
+  // Base time estimates (in minutes) - optimized based on actual performance
   const baseTimeEstimates = {
     kbAnalysis: {
-      kb_only: Math.min(2, 0.5 + (documentCount * 0.1)),
-      kb_priority: Math.min(3, 1 + (documentCount * 0.15)),
-      kb_supplemented: Math.min(2.5, 0.8 + (documentCount * 0.12))
+      kb_only: Math.min(1.6, 0.4 + (documentCount * 0.08)), // Reduced from 2, 0.5, 0.1
+      kb_priority: Math.min(2.4, 0.8 + (documentCount * 0.12)), // Reduced from 3, 1, 0.15
+      kb_supplemented: Math.min(2, 0.64 + (documentCount * 0.096)) // Reduced from 2.5, 0.8, 0.12
     },
     outlineGeneration: {
-      basic: 1.5,
-      detailed: 2.5,
-      comprehensive: 4
+      basic: 1.2, // Reduced from 1.5
+      detailed: 2, // Reduced from 2.5
+      comprehensive: 3.2 // Reduced from 4
     },
     perPath: {
-      basic: 1,
-      detailed: 1.5,
-      comprehensive: 2.5
+      basic: 0.8, // Reduced from 1
+      detailed: 1.2, // Reduced from 1.5
+      comprehensive: 2 // Reduced from 2.5
     },
     perLesson: {
-      basic: 0.8,
-      detailed: 1.2,
-      comprehensive: 2
+      basic: 0.64, // Reduced from 0.8
+      detailed: 0.96, // Reduced from 1.2
+      comprehensive: 1.6 // Reduced from 2
     },
     perAssessment: {
-      lesson: 0.5,
-      quiz: 1,
-      exam: 1.5
+      lesson: 0.4, // Reduced from 0.5
+      quiz: 0.8, // Reduced from 1
+      exam: 1.2 // Reduced from 1.5
     }
   };
 
@@ -103,9 +103,9 @@ export function estimateCourseGenerationTime(params: CourseGenerationParams): Co
     assessmentCreation
   };
 
-  const estimatedMinutes = Math.ceil(
-    kbAnalysis + outlineGeneration + pathCreation + lessonGeneration + assessmentCreation
-  );
+  // Calculate total time and apply 30-minute cap
+  const rawEstimatedMinutes = kbAnalysis + outlineGeneration + pathCreation + lessonGeneration + assessmentCreation;
+  const estimatedMinutes = Math.min(30, Math.ceil(rawEstimatedMinutes)); // Cap at 30 minutes
 
   return {
     estimatedMinutes,
@@ -140,11 +140,11 @@ export function formatEstimatedTime(minutes: number): string {
 export function getTimeEstimateExplanation(params: CourseGenerationParams): string {
   const factors: string[] = [];
   
-  if (params.estimatedWeeks > 16) {
-    factors.push('long course duration');
+  if (params.estimatedWeeks > 20) {
+    factors.push('extensive course duration');
   }
   
-  if (params.lessonsPerWeek > 3) {
+  if (params.lessonsPerWeek > 4) {
     factors.push('high lesson frequency');
   }
   
@@ -153,19 +153,19 @@ export function getTimeEstimateExplanation(params: CourseGenerationParams): stri
   }
   
   if (params.includeAssessments && params.includeQuizzes && params.includeFinalExam) {
-    factors.push('full assessment suite');
+    factors.push('complete assessment suite');
   }
   
-  if (params.generationMode === 'kb_only' && (params.documentCount || 0) > 10) {
-    factors.push('extensive knowledge base');
+  if (params.generationMode === 'kb_only' && (params.documentCount || 0) > 15) {
+    factors.push('large knowledge base');
   }
 
   if (factors.length === 0) {
-    return 'This is a typical course generation that should complete quickly.';
+    return 'This course will generate quickly! Feel free to continue with other tasks.';
   } else if (factors.length === 1) {
-    return `Generation time is increased due to ${factors[0]}.`;
+    return `Generation may take a bit longer due to ${factors[0]}, but will still complete efficiently.`;
   } else {
     const lastFactor = factors.pop();
-    return `Generation time is increased due to ${factors.join(', ')} and ${lastFactor}.`;
+    return `Generation time may be extended due to ${factors.join(', ')} and ${lastFactor}, but will complete within 30 minutes.`;
   }
 } 

@@ -269,48 +269,80 @@ async function performCourseOutlineGeneration(prompt: string, gradeLevel?: strin
   }
 }
 
-// Collect knowledge base sources for enhanced course generation
-async function performCollectKnowledgeBaseSources(baseClassId: string, forwardedCookies?: string | null, request?: Request): Promise<any> {
-  console.log(`---> COLLECTING KB SOURCES for base class ${baseClassId}`);
+// Create a base class, process sources, and redirect to KB course generator
+async function performCollectKnowledgeBaseSources(courseTitle: string, courseDescription: string, forwardedCookies?: string | null, request?: Request): Promise<any> {
+  console.log(`---> CREATING BASE CLASS AND PROCESSING SOURCES FOR KB COURSE: ${courseTitle}`);
   
   try {
     const baseURL = getBaseURL(request);
     
-    // Check current KB status for this base class
-    const kbStatusURL = `${baseURL}/api/teach/course-generation?baseClassId=${baseClassId}`;
+    // First, create the base class
+    const createBaseClassURL = `${baseURL}/api/knowledge-base/create-base-class`;
     
     const headers: HeadersInit = { 'Content-Type': 'application/json' };
     if (forwardedCookies) headers['Cookie'] = forwardedCookies;
 
-    const response = await fetch(kbStatusURL, {
+    // Get user info from auth
+    const authResponse = await fetch(`${baseURL}/api/auth/user`, {
       method: 'GET',
+      headers: { Cookie: forwardedCookies || '' },
+    });
+    
+    if (!authResponse.ok) {
+      throw new Error('Authentication required');
+    }
+    
+    const { user } = await authResponse.json();
+    
+    // Get user's organization
+    const profileResponse = await fetch(`${baseURL}/api/auth/profile`, {
+      method: 'GET',
+      headers: { Cookie: forwardedCookies || '' },
+    });
+    
+    if (!profileResponse.ok) {
+      throw new Error('Profile not found');
+    }
+    
+    const { profile } = await profileResponse.json();
+
+    const response = await fetch(createBaseClassURL, {
+      method: 'POST',
       headers,
+      body: JSON.stringify({
+        name: courseTitle,
+        description: courseDescription,
+        organisationId: profile.organisation_id,
+        userId: user.id
+      }),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to check knowledge base status');
+      throw new Error('Failed to create base class for KB course');
     }
 
-    const kbData = await response.json();
+    const result = await response.json();
+    const baseClassId = result.baseClassId;
     
+    if (!baseClassId) {
+      throw new Error('No base class ID returned from creation');
+    }
+
     return {
       success: true,
-      message: "I can help you enhance your course with knowledge base sources. You can upload documents or provide URLs that contain relevant content for your course.",
-      kbAnalysis: kbData.knowledgeBaseAnalysis,
-      availableModes: kbData.availableModes,
-      recommendedMode: kbData.recommendedMode,
+      message: `Perfect! I've created your "${courseTitle}" course foundation. I'm now redirecting you to the Knowledge Base Course Generator where you can upload your documents and I'll analyze them to generate comprehensive course content, learning objectives, and structure.`,
+      baseClassId,
+      redirectUrl: `/teach/knowledge-base/create?baseClassId=${baseClassId}`,
       actions: [
-        { type: 'uploadDocument', label: 'Upload Document' },
-        { type: 'addURL', label: 'Add URL' },
-        { type: 'proceedWithoutKB', label: 'Continue Without KB' }
+        { type: 'redirectToKB', label: 'Open KB Course Generator', url: `/teach/knowledge-base/create?baseClassId=${baseClassId}` }
       ]
     };
 
   } catch (error) {
-    console.error('Error collecting KB sources:', error);
+    console.error('Error creating base class for KB course:', error);
     return {
       success: false,
-      message: "I encountered an issue while checking your knowledge base. You can still proceed with general course generation."
+      message: `I encountered an issue while setting up your course: ${error instanceof Error ? error.message : 'Unknown error'}. You can try again or create a course manually from the Knowledge Base section.`
     };
   }
 }
@@ -1351,10 +1383,11 @@ ${chatHistory.slice(-6).map((msg, index) => {
 # Instructions
 
 ## Context-Aware Response Guidelines
-1. **Always acknowledge what you can see**: Start by confirming what page/content the user is currently viewing
-2. **Be specific about the current context**: Reference the actual class name, lesson title, or content they're working with
-3. **Provide relevant suggestions**: Offer help that's directly applicable to their current task
-4. **Use the actual data**: When discussing their content, use the real titles, descriptions, and data you can see
+1. **Keep it conversational and brief**: 2-3 sentences max unless user asks for detailed explanation
+2. **Always acknowledge what you can see**: Quickly confirm what they're viewing
+3. **Be specific about context**: Reference actual content they're working with
+4. **Focus on immediate help**: What can you do right now to help them?
+5. **Use natural language**: Avoid formal structure, bullet points, and lengthy explanations
 
 ## Response Approach Based on Context
 - **Base Class Studio**: Help with course design, curriculum structure, lesson planning, content organization
@@ -1415,20 +1448,80 @@ Analyze the current UI context to determine the appropriate level of educational
 - **Resource Planning**: Suggest supporting materials and tools
 - **Scope**: Address broad curriculum design and organizational elements
 
-### 4. Creation Requests (When user explicitly requests new content)
-**Trigger**: User explicitly asks to "create," "design," "build," or "generate" new courses/classes
-**Response Approach**:
-- **ALWAYS start with collectKnowledgeBaseSources tool** for any course creation request
-- **Follow up with enhancedCourseGeneration tool** for comprehensive course creation
-- **Use generateCourseOutline tool** ONLY for simple outlines when user explicitly requests basic generation
-- **When user mentions documents, PDFs, or materials**: Use collectKnowledgeBaseSources
-- **When user asks about uploading content**: Use collectKnowledgeBaseSources
-- **For all course creation**: Prefer enhanced KB workflow over simple generation
+### 4. Course Creation Workflow (When user requests new course/class creation)
+**Trigger**: User asks to "create," "design," "build," or "generate" new courses/classes using ANY terminology (course, class, curriculum, program, etc.)
+**Primary Directive**: ALWAYS guide users through the enhanced KB course generation workflow for the best results.
 
-**IMPORTANT**: 
-- ALWAYS offer KB enhancement for course creation requests unless user explicitly wants simple outline
-- Do NOT use generateCourseOutline for improving existing content
-- Use collectKnowledgeBaseSources first, then enhancedCourseGeneration for best results
+#### 4.1 Course Creation Detection
+**Trigger Phrases** (be liberal in detection):
+- "create a course/class"
+- "build a curriculum" 
+- "design a program"
+- "generate content for [subject]"
+- "help me make a [grade level] [subject] course"
+- "I need a course about..."
+- "Can you create a [subject] class?"
+- ANY request that implies creating new educational content
+
+#### 4.2 Streamlined KB Enhancement Workflow
+**Step 1 - ALWAYS Start with KB Source Collection**:
+- **Use collectKnowledgeBaseSources tool immediately** for ANY course creation request
+- **Extract course title and description** from user's request (e.g., "6th grade world history" → title: "6th Grade World History", description: "Comprehensive world history course for 6th grade students")
+- **Create base class foundation** and redirect to KB Course Generator page
+- **Example Response**: "Perfect! I've created your [subject] course foundation. I'm redirecting you to our Knowledge Base Course Generator where you can upload your documents and I'll analyze them to create comprehensive course content."
+
+**Step 2 - KB Course Generator Page**:
+- **User uploads documents** on the dedicated KB page with better UI and functionality
+- **AI analyzes content** and generates course title, description, learning objectives, and subject classification
+- **User reviews and approves** the AI-generated course information on the review page (as shown in screenshots)
+- **Full course generation** proceeds with "Approve & Generate Full Course" button
+
+**Step 3 - Studio Integration**:
+- **Redirect to Base Class Studio** for full lesson content creation
+- **"Create All Lesson Content" button** completes the comprehensive course build
+- **Professional workflow** leverages the proven KB course generation system
+
+#### 4.3 User Experience Principles
+**Seamless Integration**:
+- Make file/URL upload feel natural and optional
+- Keep explanations brief and action-focused
+- Use casual language: "Want to add your own materials?"
+
+**Progressive Disclosure**:
+- Start simple, add complexity only when needed
+- Keep responses short and conversational
+- Focus on immediate next steps
+
+**Value Communication**:
+- Briefly mention benefits without over-explaining
+- Let users experience the value rather than describing it extensively
+
+#### 4.4 Fallback Options
+**If User Explicitly Refuses KB Enhancement**:
+- Respect user choice but gently suggest benefits
+- Use enhancedCourseGeneration with general knowledge mode
+- Still provide comprehensive course configuration options
+
+**Simple Outline Requests**:
+- Use generateCourseOutline ONLY when user explicitly asks for "just an outline" or "basic structure"
+- Even then, offer to enhance with KB sources for better results
+
+#### 4.5 Workflow Integration
+**Luna's Role**:
+- **Immediate Response**: Create base class foundation and redirect to KB Course Generator
+- **Clear Handoff**: Smooth transition from Luna chat to dedicated KB workflow
+- **Value Communication**: Briefly explain benefits of the enhanced approach
+
+**KB Course Generator Role**:
+- **Document Upload & Analysis**: Professional interface for file management and AI analysis
+- **Course Information Review**: User can review and adjust AI-generated course details
+- **Full Generation Trigger**: "Approve & Generate Full Course" starts comprehensive build
+
+**CRITICAL SUCCESS FACTORS**:
+1. **Immediate Action**: ALWAYS create base class and redirect for course creation requests
+2. **Seamless Handoff**: Make transition from Luna to KB page feel natural
+3. **Proven Workflow**: Leverage the established KB course generation system
+4. **Professional Experience**: Use dedicated pages for complex workflows rather than chat constraints
 
 ### 5. Multi-Step Content Creation Workflow Rules
 **CRITICAL WORKFLOW PRINCIPLE**: When creating hierarchical content (paths with lessons, lessons with sections, etc.), always follow a step-by-step approach to ensure proper ID availability and prevent content from being added to wrong parents.
@@ -1545,8 +1638,9 @@ Analyze the current UI context to determine the appropriate level of educational
 - **Assessment Alignment**: Ensure activities support stated learning objectives
 
 ### Communication Style:
-- **Professional Educator Tone**: Knowledgeable yet approachable
-- **Structured Presentation**: Use clear headings and bullet points
+- **Conversational & Concise**: Keep responses short, friendly, and to-the-point
+- **Natural Language**: Avoid bullet points and formal structure unless specifically needed
+- **Direct Action**: Get straight to helping rather than explaining extensively
 - **Practical Focus**: Emphasize implementable strategies over theory
 - **Encouraging Language**: Support teacher confidence and creativity
 - **Concise Delivery**: Respect teacher time with focused, relevant advice
@@ -2392,13 +2486,14 @@ export async function POST(request: Request) {
         type: "function",
         function: {
           name: "collectKnowledgeBaseSources",
-          description: "Check the knowledge base status for a base class and guide the user through enhancing their course with documents or URLs. Use this when users want to enhance course generation with their own content.",
+          description: "Create a base class for knowledge base course generation and redirect to the KB course generator. Use this when users want to create courses with their own documents/content.",
           parameters: {
             type: "object",
             properties: {
-              baseClassId: { type: "string", description: "The ID of the base class to check KB status for. Extract from UI context." }
+              courseTitle: { type: "string", description: "The title/name of the course to create" },
+              courseDescription: { type: "string", description: "A brief description of the course content and objectives" }
             },
-            required: ["baseClassId"]
+            required: ["courseTitle", "courseDescription"]
           }
         }
       },
@@ -2511,7 +2606,7 @@ export async function POST(request: Request) {
               } else if (functionName === 'uiAction') {
                 result = await performUIAction(functionArgs.componentId, functionArgs.actionType, functionArgs.additionalParams);
               } else if (functionName === 'collectKnowledgeBaseSources') {
-                result = await performCollectKnowledgeBaseSources(functionArgs.baseClassId, forwardedCookies, request);
+                result = await performCollectKnowledgeBaseSources(functionArgs.courseTitle, functionArgs.courseDescription, forwardedCookies, request);
               } else if (functionName === 'enhancedCourseGeneration') {
                 result = await performEnhancedCourseGeneration(functionArgs.baseClassId, functionArgs.title, functionArgs.description, functionArgs.generationMode, functionArgs.additionalParams, forwardedCookies, request);
               } else if (functionName === 'checkJobStatus') {

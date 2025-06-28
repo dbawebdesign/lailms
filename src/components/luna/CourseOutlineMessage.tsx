@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Accordion,
   AccordionContent,
@@ -8,6 +8,9 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { BookOpen, Save, ExternalLink, CheckCircle } from "lucide-react";
 
 // Re-define or import the type for the outline data
 interface CourseOutlineModule {
@@ -28,13 +31,51 @@ interface GeneratedCourseOutline {
 
 interface CourseOutlineMessageProps {
   outline: GeneratedCourseOutline;
+  onSaveAndContinue?: (outline: GeneratedCourseOutline) => void;
+  onSaveAsDraft?: (outline: GeneratedCourseOutline) => void;
 }
 
-export function CourseOutlineMessage({ outline }: CourseOutlineMessageProps) {
+export function CourseOutlineMessage({ outline, onSaveAndContinue, onSaveAsDraft }: CourseOutlineMessageProps) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
   if (!outline) return null;
 
+  const handleSaveAndContinue = async () => {
+    if (!onSaveAndContinue) return;
+    
+    setIsSaving(true);
+    try {
+      await onSaveAndContinue(outline);
+      setSaved(true);
+      // Optionally redirect to studio after a brief delay
+      setTimeout(() => {
+        // This would be handled by the parent component
+      }, 1500);
+    } catch (error) {
+      console.error('Error saving course outline:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveAsDraft = async () => {
+    if (!onSaveAsDraft) return;
+    
+    setIsSaving(true);
+    try {
+      await onSaveAsDraft(outline);
+      setSaved(true);
+    } catch (error) {
+      console.error('Error saving course draft:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
-    <div className="space-y-2 text-sm w-full max-w-full overflow-hidden min-w-0">
+    <Card className="w-full max-w-full overflow-hidden min-w-0">
+      <CardContent className="space-y-2 text-sm w-full max-w-full overflow-hidden min-w-0 p-4">
       {/* Display basic course info if available */}
       {outline.baseClassName && (
         <div className="break-words text-wrap overflow-hidden">
@@ -122,6 +163,65 @@ export function CourseOutlineMessage({ outline }: CourseOutlineMessageProps) {
           </Accordion>
         </div>
       )}
-    </div>
+      </CardContent>
+      
+      {/* Action buttons for saving and continuing */}
+      <CardFooter className="flex flex-col gap-3 p-4 pt-0">
+        <div className="flex flex-col sm:flex-row gap-2 w-full">
+          <Button 
+            onClick={handleSaveAndContinue}
+            disabled={isSaving || saved}
+            className="flex-1 flex items-center gap-2"
+            size="sm"
+          >
+            {saved ? (
+              <>
+                <CheckCircle className="h-4 w-4" />
+                Saved!
+              </>
+            ) : isSaving ? (
+              <>
+                <Save className="h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <BookOpen className="h-4 w-4" />
+                Save & Continue in Studio
+              </>
+            )}
+          </Button>
+          
+          <Button 
+            onClick={handleSaveAsDraft}
+            disabled={isSaving || saved}
+            variant="outline"
+            className="flex-1 flex items-center gap-2"
+            size="sm"
+          >
+            {saved ? (
+              <>
+                <CheckCircle className="h-4 w-4" />
+                Saved as Draft
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Save as Draft
+              </>
+            )}
+          </Button>
+        </div>
+        
+        <div className="text-xs text-muted-foreground text-center">
+          <p className="mb-1">
+            <strong>Save & Continue in Studio:</strong> Create the base class and open the studio to generate all lesson content
+          </p>
+          <p>
+            <strong>Save as Draft:</strong> Save this outline to review and modify later
+          </p>
+        </div>
+      </CardFooter>
+    </Card>
   );
 } 

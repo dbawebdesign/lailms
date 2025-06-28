@@ -143,34 +143,31 @@ export default function EnhancedCourseGenerationMessage({
   };
 
   return (
-    <Card className="w-full max-w-4xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5" />
+    <Card className="w-full">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <BookOpen className="h-4 w-4" />
           Enhanced Course Generation
         </CardTitle>
-        <CardDescription>
-          Configure your course parameters for AI-powered generation with detailed customization options.
+        <CardDescription className="text-xs">
+          Configure your course parameters for AI-powered generation.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Generation Mode Selection */}
+      <CardContent className="space-y-4 pt-0">
+        {/* Generation Mode Selection - Compact */}
         {Object.keys(generationModes).length > 0 && (
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Generation Mode</Label>
+          <div className="space-y-2">
+            <Label className="text-xs font-medium">Generation Mode</Label>
             <Select value={selectedMode} onValueChange={setSelectedMode}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select generation mode" />
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Select mode" />
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(generationModes).map(([key, mode]) => (
                   <SelectItem key={key} value={key}>
-                    <div className="flex items-center space-x-2">
-                      <div className={`w-2 h-2 rounded-full ${mode.suitable ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                      <div>
-                        <div className="font-medium">{mode.title}</div>
-                        <div className="text-xs text-muted-foreground">{mode.description}</div>
-                      </div>
+                    <div className="flex items-center space-x-1">
+                      <div className={`w-1.5 h-1.5 rounded-full ${mode.suitable ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                      <span className="text-xs">{mode.title}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -179,39 +176,32 @@ export default function EnhancedCourseGenerationMessage({
           </div>
         )}
 
-        <Separator />
-
-        {/* Basic Course Information */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            Course Information
+        {/* Essential Course Information - Compact */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium flex items-center gap-1">
+            <Target className="h-3 w-3" />
+            Course Info
           </h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Course Title *</Label>
+          <div className="space-y-2">
+            <div>
+              <Label htmlFor="title" className="text-xs">Course Title *</Label>
               <Input
                 id="title"
-                placeholder="e.g., Introduction to Machine Learning"
+                placeholder="e.g., 6th Grade World History"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                className="h-8 text-xs"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="academic-level">Academic Level</Label>
+            <div>
+              <Label htmlFor="academic-level" className="text-xs">Academic Level</Label>
               <Select value={academicLevel} onValueChange={setAcademicLevel}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select academic level" />
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Select level" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="kindergarten">Kindergarten</SelectItem>
-                  <SelectItem value="1st-grade">1st Grade</SelectItem>
-                  <SelectItem value="2nd-grade">2nd Grade</SelectItem>
-                  <SelectItem value="3rd-grade">3rd Grade</SelectItem>
-                  <SelectItem value="4th-grade">4th Grade</SelectItem>
-                  <SelectItem value="5th-grade">5th Grade</SelectItem>
                   <SelectItem value="6th-grade">6th Grade</SelectItem>
                   <SelectItem value="7th-grade">7th Grade</SelectItem>
                   <SelectItem value="8th-grade">8th Grade</SelectItem>
@@ -220,59 +210,34 @@ export default function EnhancedCourseGenerationMessage({
                   <SelectItem value="11th-grade">11th Grade</SelectItem>
                   <SelectItem value="12th-grade">12th Grade</SelectItem>
                   <SelectItem value="college">College</SelectItem>
-                  <SelectItem value="graduate">Graduate</SelectItem>
-                  <SelectItem value="professional">Professional</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Course Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Describe what this course will cover..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="target-audience">Target Audience</Label>
-              <Input
-                id="target-audience"
-                placeholder="e.g., Software developers, Medical professionals"
-                value={targetAudience}
-                onChange={(e) => setTargetAudience(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="prerequisites">Prerequisites</Label>
-              <Input
-                id="prerequisites"
-                placeholder="e.g., Basic programming knowledge"
-                value={prerequisites}
-                onChange={(e) => setPrerequisites(e.target.value)}
+            <div>
+              <Label htmlFor="description" className="text-xs">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Brief course description..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                className="text-xs"
               />
             </div>
           </div>
         </div>
 
-        <Separator />
-
-        {/* Course Structure */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Course Structure
+        {/* Course Structure - Compact */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            Structure
           </h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label>Course Duration: {estimatedWeeks[0]} weeks</Label>
+          <div className="space-y-2">
+            <div>
+              <Label className="text-xs">Duration: {estimatedWeeks[0]} weeks</Label>
               <Slider
                 value={estimatedWeeks}
                 onValueChange={setEstimatedWeeks}
@@ -281,14 +246,10 @@ export default function EnhancedCourseGenerationMessage({
                 step={1}
                 className="w-full"
               />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>1 week</span>
-                <span>52 weeks</span>
-              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Lessons per Week: {lessonsPerWeek[0]}</Label>
+            <div>
+              <Label className="text-xs">Lessons/Week: {lessonsPerWeek[0]}</Label>
               <Slider
                 value={lessonsPerWeek}
                 onValueChange={setLessonsPerWeek}
@@ -297,257 +258,90 @@ export default function EnhancedCourseGenerationMessage({
                 step={1}
                 className="w-full"
               />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>1 lesson</span>
-                <span>7 lessons</span>
-              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="detail-level" className="text-xs">Detail Level</Label>
+              <Select value={lessonDetailLevel} onValueChange={setLessonDetailLevel}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Select detail" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="basic">Basic</SelectItem>
+                  <SelectItem value="detailed">Detailed</SelectItem>
+                  <SelectItem value="comprehensive">Comprehensive</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="detail-level">Lesson Detail Level</Label>
-            <Select value={lessonDetailLevel} onValueChange={setLessonDetailLevel}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select detail level" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="basic">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span>Basic - Key concepts and activities</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="detailed">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span>Detailed - Comprehensive content and examples</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="comprehensive">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                    <span>Comprehensive - In-depth coverage with resources</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </div>
 
-        <Separator />
-
-        {/* Learning Objectives */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            Learning Objectives
+        {/* Assessment Settings - Compact */}
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium flex items-center gap-1">
+            <CheckCircle className="h-3 w-3" />
+            Assessments
           </h3>
           
-          <div className="space-y-2">
-            {learningObjectives.map((objective, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <Input
-                  placeholder={`Learning objective ${index + 1}`}
-                  value={objective}
-                  onChange={(e) => updateLearningObjective(index, e.target.value)}
-                />
-                {learningObjectives.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeLearningObjective(index)}
-                    className="h-10 w-10 p-0"
-                  >
-                    ×
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-          
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={addLearningObjective}
-            className="w-full"
-          >
-            Add Learning Objective
-          </Button>
-        </div>
-
-        <Separator />
-
-        {/* Assessment Settings */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium flex items-center gap-2">
-            <CheckCircle className="h-4 w-4" />
-            Assessment Configuration
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap gap-2 text-xs">
+            <div className="flex items-center space-x-1">
               <Switch
                 checked={includeAssessments}
                 onCheckedChange={setIncludeAssessments}
               />
-              <Label>Lesson Assessments</Label>
+              <Label className="text-xs">Lessons</Label>
             </div>
             
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1">
               <Switch
                 checked={includeQuizzes}
                 onCheckedChange={setIncludeQuizzes}
               />
-              <Label>Module Quizzes</Label>
+              <Label className="text-xs">Quizzes</Label>
             </div>
             
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1">
               <Switch
                 checked={includeFinalExam}
                 onCheckedChange={setIncludeFinalExam}
               />
-              <Label>Final Exam</Label>
+              <Label className="text-xs">Final Exam</Label>
             </div>
-          </div>
-
-          {(includeAssessments || includeQuizzes || includeFinalExam) && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="assessment-difficulty">Assessment Difficulty</Label>
-                <Select value={assessmentDifficulty} onValueChange={setAssessmentDifficulty}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select difficulty level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="easy">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span>Easy - Basic recall and understanding</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="medium">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <span>Medium - Application and analysis</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="hard">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                        <span>Hard - Synthesis and evaluation</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {includeAssessments && (
-                  <div className="space-y-2">
-                    <Label>Questions per Lesson: {questionsPerLesson[0]}</Label>
-                    <Slider
-                      value={questionsPerLesson}
-                      onValueChange={setQuestionsPerLesson}
-                      max={10}
-                      min={1}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                )}
-
-                {includeQuizzes && (
-                  <div className="space-y-2">
-                    <Label>Questions per Quiz: {questionsPerQuiz[0]}</Label>
-                    <Slider
-                      value={questionsPerQuiz}
-                      onValueChange={setQuestionsPerQuiz}
-                      max={25}
-                      min={5}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                )}
-
-                {includeFinalExam && (
-                  <div className="space-y-2">
-                    <Label>Questions per Exam: {questionsPerExam[0]}</Label>
-                    <Slider
-                      value={questionsPerExam}
-                      onValueChange={setQuestionsPerExam}
-                      max={50}
-                      min={10}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
-        <Separator />
-
-        {/* Additional Guidance */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Additional Guidance
-          </h3>
-          
-          <div className="space-y-2">
-            <Label htmlFor="user-guidance">Special Instructions (Optional)</Label>
-            <Textarea
-              id="user-guidance"
-              placeholder="Any specific requirements, teaching approaches, or focus areas..."
-              value={userGuidance}
-              onChange={(e) => setUserGuidance(e.target.value)}
-              rows={3}
-            />
           </div>
         </div>
 
         {/* Error Display */}
         {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+          <Alert variant="destructive" className="py-2">
+            <AlertCircle className="h-3 w-3" />
+            <AlertDescription className="text-xs">{error}</AlertDescription>
           </Alert>
         )}
 
-        {/* Info Alert */}
-        <Alert>
-          <Info className="h-4 w-4" />
-          <AlertDescription>
-            This enhanced generation will create a comprehensive course structure with detailed lessons, 
-            assessments, and customized content based on your specifications.
-          </AlertDescription>
-        </Alert>
-
-        {/* Generate Button */}
-        <div className="flex justify-end">
-          <Button 
-            onClick={handleGenerate} 
-            disabled={isLoading || !title.trim()}
-            className="px-8"
-          >
-            {isLoading ? (
-              <>
-                <Sparkles className="mr-2 h-4 w-4 animate-pulse" />
-                Generating Course...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Generate Enhanced Course
-              </>
-            )}
-          </Button>
+        {/* Compact Info */}
+        <div className="text-[10px] text-muted-foreground bg-muted/50 rounded p-2">
+          🚀 Enhanced generation creates comprehensive course with detailed lessons and assessments.
         </div>
+
+        {/* Generate Button - Compact */}
+        <Button 
+          onClick={handleGenerate} 
+          disabled={isLoading || !title.trim()}
+          className="w-full h-8 text-xs"
+          size="sm"
+        >
+          {isLoading ? (
+            <>
+              <Sparkles className="mr-1 h-3 w-3 animate-pulse" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <Sparkles className="mr-1 h-3 w-3" />
+              Generate Course
+            </>
+          )}
+        </Button>
       </CardContent>
     </Card>
   );

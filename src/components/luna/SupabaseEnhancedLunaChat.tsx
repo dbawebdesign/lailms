@@ -18,7 +18,8 @@ import { createClient } from '@/lib/supabase/client';
 import { 
   Menu, Send, Search, Plus, Bot, User, Star, Trash2, Loader2, ArrowLeft,
   MessageSquare, ClipboardCheck, Wand2, Brain, Wrench, BarChart3, Users,
-  SlidersHorizontal, CreditCard, ShieldCheck, MoreHorizontal, ExternalLink
+  SlidersHorizontal, CreditCard, ShieldCheck, MoreHorizontal, ExternalLink,
+  Paperclip, X, FileText, Link2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
@@ -68,6 +69,17 @@ interface SupabaseEnhancedLunaChatProps {
 // Define view modes
 type ViewMode = 'sidebar' | 'chat';
 
+// File attachment types
+interface AttachedFile {
+  file: File;
+  id: string;
+}
+
+interface AttachedUrl {
+  url: string;
+  id: string;
+}
+
 export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> = ({
   userRole,
   userId,
@@ -89,6 +101,12 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
   const [editTitle, setEditTitle] = useState('');
   const [isCreatingCourse, setIsCreatingCourse] = useState(false);
   
+  // File attachment state
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [attachedUrls, setAttachedUrls] = useState<AttachedUrl[]>([]);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  
   // Persona state
   const defaultPersona = (() => {
     switch (userRole) {
@@ -104,6 +122,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageHistory = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Hooks
   const { context, isReady } = useLunaContext();
@@ -719,6 +738,13 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
   const handleActionButtonClick = async (button: any) => {
     console.log('🔘 Action button clicked:', button);
     
+    // Handle redirect actions
+    if (button.type === 'redirectToKB' && button.url) {
+      console.log('🔗 Redirecting to KB Course Generator:', button.url);
+      window.open(button.url, '_blank');
+      return;
+    }
+    
     // Determine response text based on button
     let responseText = '';
     if (button.action === 'confirm' || button.label === 'Yes') {
@@ -1092,11 +1118,79 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!message.trim() || isLoading) return;
+  // File attachment helper functions
+  const detectUrls = (text: string): string[] => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.match(urlRegex) || [];
+  };
 
-    const messageToSend = message.trim();
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach(file => {
+      const id = Math.random().toString(36).substr(2, 9);
+      setAttachedFiles(prev => [...prev, { file, id }]);
+    });
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeFile = (id: string) => {
+    setAttachedFiles(prev => prev.filter(f => f.id !== id));
+  };
+
+  const removeUrl = (id: string) => {
+    setAttachedUrls(prev => prev.filter(u => u.id !== id));
+  };
+
+  const addUrl = () => {
+    if (!urlInput.trim()) return;
+    
+    const id = Math.random().toString(36).substr(2, 9);
+    setAttachedUrls(prev => [...prev, { url: urlInput.trim(), id }]);
+    setUrlInput('');
+    setShowUrlInput(false);
+  };
+
+  const handleUrlKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addUrl();
+    } else if (e.key === 'Escape') {
+      setShowUrlInput(false);
+      setUrlInput('');
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if ((!message.trim() && attachedFiles.length === 0 && attachedUrls.length === 0) || isLoading) return;
+
+    // Detect URLs in the message and add them to attachedUrls
+    const detectedUrls = detectUrls(message);
+    const newUrls = detectedUrls.map(url => ({
+      url,
+      id: Math.random().toString(36).substr(2, 9)
+    }));
+    
+    // Combine message with attachment info
+    let messageToSend = message.trim();
+    
+    if (attachedFiles.length > 0) {
+      messageToSend += '\n\n[Files attached: ' + attachedFiles.map(f => f.file.name).join(', ') + ']';
+    }
+    
+    if (attachedUrls.length > 0 || newUrls.length > 0) {
+      const allUrls = [...attachedUrls, ...newUrls];
+      messageToSend += '\n\n[URLs: ' + allUrls.map(u => u.url).join(', ') + ']';
+    }
+
     setMessage('');
+    setAttachedFiles([]);
+    setAttachedUrls([]);
     setError(null);
     setIsLoading(true);
 
@@ -1771,7 +1865,115 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
                           />
                         </div>
                       ) : msg.isOutline && msg.outlineData ? (
-                        <CourseOutlineMessage outline={msg.outlineData} />
+                        <CourseOutlineMessage 
+                          outline={msg.outlineData}
+                          onSaveAndContinue={async (outline) => {
+                            try {
+                              console.log('💾 Saving course outline and continuing to studio...', outline);
+                              
+                              // Create base class from outline
+                              const response = await fetch('/api/teach/base-classes/create-from-outline', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                  outline,
+                                  title: outline.baseClassName || 'New Course',
+                                  description: outline.description || '',
+                                  subject: outline.subject || '',
+                                  gradeLevel: outline.gradeLevel || '',
+                                  lengthInWeeks: outline.lengthInWeeks || 12
+                                })
+                              });
+                              
+                              if (!response.ok) {
+                                throw new Error('Failed to create base class');
+                              }
+                              
+                              const result = await response.json();
+                              console.log('✅ Base class created:', result);
+                              
+                              // Redirect to studio
+                              const studioUrl = `/teach/base-classes/${result.baseClassId}/studio`;
+                              window.open(studioUrl, '_blank');
+                              
+                              // Add success message to chat
+                              const successMsg: ExtendedChatMessage = {
+                                id: uuidv4(),
+                                role: 'assistant',
+                                content: `✅ Course "${outline.baseClassName}" has been created successfully! I've opened the Base Class Studio in a new tab where you can use the "Create All Lesson Content" button to generate the full course content including lessons, assessments, quizzes, and exams.`,
+                                timestamp: new Date(),
+                                persona: currentPersona
+                              };
+                              
+                              setMessages(prev => [...prev, successMsg]);
+                              
+                            } catch (error) {
+                              console.error('❌ Error saving course outline:', error);
+                              // Add error message to chat
+                              const errorMsg: ExtendedChatMessage = {
+                                id: uuidv4(),
+                                role: 'assistant',
+                                content: `❌ Sorry, there was an error creating the course. Please try again or contact support if the issue persists.`,
+                                timestamp: new Date(),
+                                persona: currentPersona
+                              };
+                              
+                              setMessages(prev => [...prev, errorMsg]);
+                            }
+                          }}
+                          onSaveAsDraft={async (outline) => {
+                            try {
+                              console.log('💾 Saving course outline as draft...', outline);
+                              
+                              // Save as draft (you might want to implement a drafts API)
+                              const response = await fetch('/api/teach/base-classes/save-draft', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                  outline,
+                                  title: outline.baseClassName || 'Draft Course',
+                                  description: outline.description || '',
+                                  isDraft: true
+                                })
+                              });
+                              
+                              if (!response.ok) {
+                                throw new Error('Failed to save draft');
+                              }
+                              
+                              const result = await response.json();
+                              console.log('✅ Draft saved:', result);
+                              
+                              // Add success message to chat
+                              const successMsg: ExtendedChatMessage = {
+                                id: uuidv4(),
+                                role: 'assistant',
+                                content: `✅ Course outline "${outline.baseClassName}" has been saved as a draft. You can find it in your base classes list and continue working on it later.`,
+                                timestamp: new Date(),
+                                persona: currentPersona
+                              };
+                              
+                              setMessages(prev => [...prev, successMsg]);
+                              
+                            } catch (error) {
+                              console.error('❌ Error saving draft:', error);
+                              // Add error message to chat
+                              const errorMsg: ExtendedChatMessage = {
+                                id: uuidv4(),
+                                role: 'assistant',
+                                content: `❌ Sorry, there was an error saving the draft. Please try again or contact support if the issue persists.`,
+                                timestamp: new Date(),
+                                persona: currentPersona
+                              };
+                              
+                              setMessages(prev => [...prev, errorMsg]);
+                            }
+                          }}
+                        />
                       ) : (
                         <div className="whitespace-pre-wrap break-words overflow-wrap-anywhere">{msg.content}</div>
                       )}
@@ -1876,7 +2078,89 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
           </div>
         )}
         
+        {/* File and URL attachments display */}
+        {(attachedFiles.length > 0 || attachedUrls.length > 0) && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {attachedFiles.map((file) => (
+              <Badge key={file.id} variant="secondary" className="flex items-center gap-1">
+                <FileText size={12} />
+                <span className="max-w-[100px] truncate">{file.file.name}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={() => removeFile(file.id)}
+                >
+                  <X size={10} />
+                </Button>
+              </Badge>
+            ))}
+            {attachedUrls.map((urlItem) => (
+              <Badge key={urlItem.id} variant="secondary" className="flex items-center gap-1">
+                <Link2 size={12} />
+                <span className="max-w-[120px] truncate">{urlItem.url}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={() => removeUrl(urlItem.id)}
+                >
+                  <X size={10} />
+                </Button>
+              </Badge>
+            ))}
+          </div>
+        )}
+        
+        {/* URL input field */}
+        {showUrlInput && (
+          <div className="mb-3">
+            <Input
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              onKeyDown={handleUrlKeyPress}
+              placeholder="Enter URL and press Enter..."
+              className="text-sm"
+              autoFocus
+            />
+          </div>
+        )}
+        
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.txt,.md"
+          multiple
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+        
         <div className="flex gap-2 w-full min-w-0">
+          {/* File upload button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+            className="flex-shrink-0"
+            title="Attach files"
+          >
+            <Paperclip size={16} />
+          </Button>
+          
+          {/* URL button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowUrlInput(!showUrlInput)}
+            disabled={isLoading}
+            className="flex-shrink-0"
+            title="Add URL"
+          >
+            <Link2 size={16} />
+          </Button>
+          
           <Input
             value={message}
             onChange={(e) => setMessage(e.target.value)}
@@ -1886,17 +2170,17 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
                 handleSendMessage();
               }
             }}
-            placeholder={`Ask ${availablePersonas.find(p => p.id === currentPersona)?.name}...`}
+            placeholder={`Ask ${availablePersonas.find(p => p.id === currentPersona)?.name}... (attach files or paste URLs)`}
             disabled={isLoading}
             className="flex-1 min-w-0"
           />
           <Button 
             onClick={handleSendMessage} 
-            disabled={!message.trim() || isLoading}
+            disabled={(!message.trim() && attachedFiles.length === 0 && attachedUrls.length === 0) || isLoading}
             size="icon"
             className="flex-shrink-0"
           >
-            <Send size={16} />
+            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           </Button>
         </div>
       </div>

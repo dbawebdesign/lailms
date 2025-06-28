@@ -173,24 +173,24 @@ export default function KBSourceCollectionMessage({
   const hasAnySources = uploadedFiles.length > 0 || urls.some(url => url.trim());
 
   return (
-    <Card className="w-full max-w-2xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Upload className="h-5 w-5" />
+    <Card className="w-full">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <Upload className="h-4 w-4" />
           Knowledge Base Sources
         </CardTitle>
-        <CardDescription>
-          Add documents or URLs to enhance your course with specific content, or skip to use general knowledge.
+        <CardDescription className="text-xs">
+          Add documents or URLs to enhance your course, or skip to use general knowledge.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* File Upload Section */}
-        <div className="space-y-3">
-          <Label className="text-sm font-medium">Upload Documents</Label>
-          <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-muted-foreground/50 transition-colors min-h-[120px] flex flex-col items-center justify-center">
-            <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-            <Label htmlFor="file-upload" className="text-sm text-muted-foreground mb-2 cursor-pointer">
-              Drop files here or click to upload
+      <CardContent className="space-y-4 pt-0">
+        {/* File Upload Section - Compact */}
+        <div className="space-y-2">
+          <Label className="text-xs font-medium">Upload Documents</Label>
+          <div className="border border-dashed border-muted-foreground/25 rounded p-3 text-center hover:border-muted-foreground/50 transition-colors">
+            <Label htmlFor="file-upload" className="text-xs text-muted-foreground cursor-pointer flex flex-col items-center gap-1">
+              <Upload className="h-4 w-4" />
+              Click to upload files
             </Label>
             <Input
               id="file-upload"
@@ -200,31 +200,27 @@ export default function KBSourceCollectionMessage({
               onChange={handleFileInputChange}
               className="hidden"
             />
-            <p className="text-xs text-muted-foreground">
-              Supports: PDF, TXT, DOCX, MD (Max 10 files)
+            <p className="text-[10px] text-muted-foreground mt-1">
+              PDF, TXT, DOCX, MD
             </p>
           </div>
           
           {uploadedFiles.length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Uploaded Files:</Label>
+            <div className="space-y-1">
               {uploadedFiles.map((file, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    <span className="text-sm truncate">{file.name}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {(file.size / 1024).toFixed(1)} KB
-                    </Badge>
+                <div key={index} className="flex items-center justify-between p-1.5 bg-muted rounded text-xs">
+                  <div className="flex items-center gap-1 min-w-0 flex-1">
+                    <FileText className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{file.name}</span>
                   </div>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => removeFile(index)}
-                    className="h-6 w-6 p-0"
+                    className="h-4 w-4 p-0 ml-1"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-2 w-2" />
                   </Button>
                 </div>
               ))}
@@ -232,21 +228,19 @@ export default function KBSourceCollectionMessage({
           )}
         </div>
 
-        <Separator />
-
-        {/* URL Section */}
-        <div className="space-y-3">
-          <Label className="text-sm font-medium">Add URLs</Label>
-          <div className="space-y-2">
+        {/* URL Section - Compact */}
+        <div className="space-y-2">
+          <Label className="text-xs font-medium">Add URLs</Label>
+          <div className="space-y-1">
             {urls.map((url, index) => (
-              <div key={index} className="flex items-center gap-2">
+              <div key={index} className="flex items-center gap-1">
                 <div className="flex-1 relative">
-                  <LinkIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <LinkIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-muted-foreground" />
                   <Input
-                    placeholder="https://example.com/article"
+                    placeholder="https://example.com"
                     value={url}
                     onChange={(e) => updateUrl(index, e.target.value)}
-                    className="pl-10"
+                    className="pl-7 h-8 text-xs"
                   />
                 </div>
                 {urls.length > 1 && (
@@ -255,9 +249,9 @@ export default function KBSourceCollectionMessage({
                     variant="outline"
                     size="sm"
                     onClick={() => removeUrl(index)}
-                    className="h-10 w-10 p-0"
+                    className="h-8 w-8 p-0"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3 w-3" />
                   </Button>
                 )}
               </div>
@@ -269,48 +263,45 @@ export default function KBSourceCollectionMessage({
             variant="outline"
             size="sm"
             onClick={addUrlField}
-            className="w-full"
+            className="w-full h-7 text-xs"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Another URL
+            <Plus className="h-3 w-3 mr-1" />
+            Add URL
           </Button>
         </div>
 
         {/* Error Display */}
         {(uploadError || urlError) && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
+          <Alert variant="destructive" className="py-2">
+            <AlertCircle className="h-3 w-3" />
+            <AlertDescription className="text-xs">
               {uploadError || urlError}
             </AlertDescription>
           </Alert>
         )}
 
-        {/* Info Alert */}
-        <Alert>
-          <Info className="h-4 w-4" />
-          <AlertDescription>
-            Adding knowledge base sources will make your course more specific and tailored to your content. 
-            You can skip this step to create a general course using AI knowledge.
-          </AlertDescription>
-        </Alert>
+        {/* Compact Info */}
+        <div className="text-[10px] text-muted-foreground bg-muted/50 rounded p-2">
+          💡 Knowledge base sources make courses more specific. Skip to use general AI knowledge.
+        </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col gap-3">
+        {/* Action Buttons - Compact */}
+        <div className="flex gap-2">
           <Button
             onClick={handleSubmitSources}
             disabled={isLoading || uploading || !hasAnySources}
-            className="w-full"
+            className="flex-1 h-8 text-xs"
+            size="sm"
           >
             {uploading ? (
               <>
-                <Upload className="h-4 w-4 mr-2 animate-pulse" />
-                Processing Sources...
+                <Upload className="h-3 w-3 mr-1 animate-pulse" />
+                Processing...
               </>
             ) : (
               <>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Use These Sources
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Use Sources
               </>
             )}
           </Button>
@@ -319,10 +310,11 @@ export default function KBSourceCollectionMessage({
             variant="outline"
             onClick={handleSkip}
             disabled={isLoading || uploading}
-            className="w-full"
+            className="flex-1 h-8 text-xs"
+            size="sm"
           >
-            <ArrowRight className="h-4 w-4 mr-2" />
-            Skip & Use General Knowledge
+            <ArrowRight className="h-3 w-3 mr-1" />
+            Skip
           </Button>
         </div>
       </CardContent>

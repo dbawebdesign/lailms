@@ -27,6 +27,7 @@ import {
 interface KnowledgeBaseCourseCreatorProps {
   userId: string;
   organisationId: string;
+  existingBaseClassId?: string;
 }
 
 type CreationStep = 'upload' | 'analyzing' | 'review' | 'generation' | 'complete';
@@ -48,7 +49,7 @@ interface CreationProgress {
   error?: string;
 }
 
-export default function KnowledgeBaseCourseCreator({ userId, organisationId }: KnowledgeBaseCourseCreatorProps) {
+export default function KnowledgeBaseCourseCreator({ userId, organisationId, existingBaseClassId }: KnowledgeBaseCourseCreatorProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<CreationStep>('upload');
   const [creationProgress, setCreationProgress] = useState<CreationProgress>({
@@ -62,6 +63,19 @@ export default function KnowledgeBaseCourseCreator({ userId, organisationId }: K
   const [analysisResult, setAnalysisResult] = useState<GeneratedCourseInfo | null>(null);
   const [analysisMetrics, setAnalysisMetrics] = useState<any | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Handle existing base class from Luna
+  React.useEffect(() => {
+    if (existingBaseClassId) {
+      setCreatedBaseClassId(existingBaseClassId);
+      setCreationProgress({
+        step: 'upload',
+        progress: 0,
+        message: 'Luna has created your course foundation. Upload your documents to continue.',
+        baseClassId: existingBaseClassId
+      });
+    }
+  }, [existingBaseClassId]);
 
   const steps = [
     {
@@ -104,29 +118,35 @@ export default function KnowledgeBaseCourseCreator({ userId, organisationId }: K
     setCurrentStep('analyzing');
 
     try {
-      // Step 1: Create a placeholder base class
-      const baseClassResponse = await fetch('/api/knowledge-base/create-placeholder-base-class', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          organisationId,
-          userId
-        }),
-      });
+      let targetBaseClassId = createdBaseClassId;
 
-      const baseClassData = await baseClassResponse.json();
-      if (!baseClassData.success) {
-        throw new Error(baseClassData.error || 'Failed to create course structure');
+      // Step 1: Create a placeholder base class (only if we don't have one from Luna)
+      if (!targetBaseClassId) {
+        const baseClassResponse = await fetch('/api/knowledge-base/create-placeholder-base-class', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            organisationId,
+            userId
+          }),
+        });
+
+        const baseClassData = await baseClassResponse.json();
+        if (!baseClassData.success) {
+          throw new Error(baseClassData.error || 'Failed to create course structure');
+        }
+
+        targetBaseClassId = baseClassData.baseClassId;
+        setCreatedBaseClassId(targetBaseClassId);
       }
 
-      setCreatedBaseClassId(baseClassData.baseClassId);
       setCreationProgress(prev => ({
         ...prev,
         progress: 40,
         message: 'Associating uploaded documents with your course...',
-        baseClassId: baseClassData.baseClassId
+        baseClassId: targetBaseClassId || undefined
       }));
 
       // Step 2: Associate recent uploads with the base class for proper isolation
@@ -136,7 +156,7 @@ export default function KnowledgeBaseCourseCreator({ userId, organisationId }: K
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          baseClassId: baseClassData.baseClassId,
+          baseClassId: targetBaseClassId,
           organisationId,
           timeWindowMinutes: 15 // Look for uploads in the last 15 minutes
         }),
@@ -152,11 +172,13 @@ export default function KnowledgeBaseCourseCreator({ userId, organisationId }: K
         ...prev,
         progress: 60,
         message: `Analyzing ${associateData.documentsAssociated || 0} document(s) to generate course information...`,
-        baseClassId: baseClassData.baseClassId
+        baseClassId: targetBaseClassId || undefined
       }));
 
       // Step 3: Analyze content and generate course info
-      await handleAnalyzeUploads(baseClassData.baseClassId);
+      if (targetBaseClassId) {
+        await handleAnalyzeUploads(targetBaseClassId);
+      }
 
     } catch (error) {
       setCreationProgress(prev => ({
@@ -479,8 +501,7 @@ export default function KnowledgeBaseCourseCreator({ userId, organisationId }: K
                   className="px-8"
                 >
                   {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Approve & Generate Full Course
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  Proceed to course options
                 </Button>
               </div>
             </CardContent>

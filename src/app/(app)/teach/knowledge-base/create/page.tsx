@@ -4,7 +4,11 @@ import { redirect } from 'next/navigation';
 import KnowledgeBaseCourseCreator from '@/components/knowledge-base/KnowledgeBaseCourseCreator';
 import { Tables } from 'packages/types/db';
 
-export default async function CreateKnowledgeBaseCoursePage() {
+interface PageProps {
+  searchParams: { [key: string]: string | string[] | undefined };
+}
+
+export default async function CreateKnowledgeBaseCoursePage({ searchParams }: PageProps) {
   const supabase = createSupabaseServerClient();
   
   // Check authentication
@@ -23,6 +27,9 @@ export default async function CreateKnowledgeBaseCoursePage() {
   if (profileError || !profile?.organisation_id) {
     redirect('/onboarding');
   }
+
+  // Extract baseClassId from search params if provided
+  const baseClassId = typeof searchParams.baseClassId === 'string' ? searchParams.baseClassId : undefined;
 
   return (
     <div className="min-h-screen bg-background">
@@ -43,6 +50,7 @@ export default async function CreateKnowledgeBaseCoursePage() {
         <KnowledgeBaseCourseCreator 
           userId={user.id}
           organisationId={profile.organisation_id}
+          existingBaseClassId={baseClassId}
         />
       </div>
     </div>

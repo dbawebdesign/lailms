@@ -306,125 +306,58 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
 
   if (analyzing) {
     return (
-      <Card className="w-full max-w-4xl">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center space-x-3">
-            <Loader2 className="h-6 w-6 animate-spin" />
-            <span>Analyzing knowledge base...</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+        <p className="mt-4 text-lg text-gray-600">Analyzing Knowledge Base...</p>
+        <p className="text-sm text-gray-500">This may take a moment.</p>
+      </div>
     );
   }
 
   if (generationJob && (generationJob.status === 'processing' || generationJob.status === 'queued')) {
     return (
-      <Card className="w-full max-w-4xl">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Clock className="h-5 w-5" />
-            <span>Generating Course</span>
-          </CardTitle>
-          <CardDescription>
-            Creating your course based on the knowledge base content...
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Progress value={generationJob.progress || 0} className="w-full" />
-          <div className="text-sm text-muted-foreground">
-            {generationJob.progress || 0}% complete
-          </div>
-          <div className="text-sm">
-            {generationJob.status === 'queued' && 'Waiting to start...'}
-            {generationJob.status === 'processing' && generationJob.progress < 20 && 'Analyzing knowledge base...'}
-            {generationJob.status === 'processing' && generationJob.progress >= 20 && generationJob.progress < 50 && 'Generating course outline...'}
-            {generationJob.status === 'processing' && generationJob.progress >= 50 && generationJob.progress < 70 && 'Creating learning paths and lessons...'}
-            {generationJob.status === 'processing' && generationJob.progress >= 70 && generationJob.progress < 90 && 'Generating lesson content...'}
-            {generationJob.status === 'processing' && generationJob.progress >= 90 && 'Creating assessments and quizzes...'}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center justify-center p-6">
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-center text-2xl font-bold">
+              <Sparkles className="h-6 w-6 mr-2 text-purple-500" />
+              <span>Generating Course</span>
+            </CardTitle>
+            <CardDescription>
+              Creating your course based on the knowledge base content...
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Progress value={generationJob.progress || 0} className="w-full" />
+            <div className="text-sm text-muted-foreground">
+              {generationJob.progress || 0}% complete
+            </div>
+            <div className="text-sm">
+              {generationJob.status === 'queued' && 'Waiting to start...'}
+              {generationJob.status === 'processing' && generationJob.progress < 20 && 'Analyzing knowledge base...'}
+              {generationJob.status === 'processing' && generationJob.progress >= 20 && generationJob.progress < 50 && 'Generating course outline...'}
+              {generationJob.status === 'processing' && generationJob.progress >= 50 && generationJob.progress < 70 && 'Creating learning paths and lessons...'}
+              {generationJob.status === 'processing' && generationJob.progress >= 70 && generationJob.progress < 90 && 'Generating lesson content...'}
+              {generationJob.status === 'processing' && generationJob.progress >= 90 && 'Creating assessments and quizzes...'}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   if (generationJob?.status === 'completed') {
     return (
-      <Card className="w-full max-w-4xl">
-        <CardContent className="p-8">
-          <div className="text-center space-y-6">
-            {/* Success Icon with Animation */}
-            <div className="flex justify-center">
-              <div className="relative">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="h-10 w-10 text-green-600" />
-                </div>
-                {showCelebration && (
-                  <div className="absolute -top-2 -right-2">
-                    <Sparkles className="h-6 w-6 text-yellow-500 animate-pulse" />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Success Message */}
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-green-600">
-                🎉 Course Generated Successfully!
-              </h2>
-              <p className="text-lg text-muted-foreground">
-                Your comprehensive course has been created and is ready for customization.
-              </p>
-            </div>
-
-            {/* Redirect Message */}
-            {redirecting ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-center space-x-2 text-primary">
-                  <ArrowRight className="h-5 w-5 animate-pulse" />
-                  <span className="font-medium">Redirecting to Base Class Studio...</span>
-                </div>
-                <Progress value={100} className="w-full max-w-xs mx-auto" />
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  You'll be automatically redirected to the studio to customize your course.
-                </p>
-                <Button 
-                  onClick={() => router.push(`/teach/base-classes/${baseClassId}`)}
-                  className="mx-auto"
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  Go to Studio Now
-                </Button>
-              </div>
-            )}
-
-            {/* Course Stats */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md mx-auto">
-              <div className="text-sm text-green-800 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span>✅ Course structure created</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>✅ Learning paths generated</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>✅ Assessments configured</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>✅ Ready for customization</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center justify-center h-64">
+        <CheckCircle className="h-12 w-12 text-green-500" />
+        <p className="mt-4 text-xl font-semibold">Course Generated Successfully!</p>
+        <p className="text-gray-600">Redirecting to your new course...</p>
+      </div>
     );
   }
 
   return (
-    <div className="w-full max-w-4xl space-y-6">
+    <div className="w-full space-y-6">
       {/* Knowledge Base Analysis Summary */}
       {kbAnalysis && (
         <Card>
