@@ -3,9 +3,9 @@ import { courseGenerationOrchestrator } from '@/lib/services/course-generation-o
 
 export async function POST(
   request: Request,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
-  const { jobId } = params;
+  const { jobId } = await params;
   const { taskId } = await request.json();
 
   if (!jobId || !taskId) {
