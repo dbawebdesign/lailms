@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { courseGenerator } from '@/lib/services/course-generator';
+import { courseGenerationOrchestrator } from '@/lib/services/course-generation-orchestrator';
 import { Tables } from 'packages/types/db';
+
+interface GenerationTask {
+  id: string;
+  type: 'lesson_section' | 'lesson_assessment' | 'path_quiz' | 'class_exam';
+  status: 'pending' | 'running' | 'completed' | 'failed';
+}
+
+function areAllTasksFinished(tasks: GenerationTask[]): boolean {
+  return tasks.every(task => task.status === 'completed' || task.status === 'failed');
+}
 
 export async function GET(
   request: NextRequest,
@@ -32,34 +42,41 @@ export async function GET(
       );
     }
 
-    // Get current job status
-    const jobStatus = await courseGenerator.getGenerationJob(jobId);
+    // Try to get live, detailed state from the orchestrator
+    const liveState = courseGenerationOrchestrator.getJobState(jobId);
 
-    if (!jobStatus) {
-      return NextResponse.json(
-        { error: 'Job status not available' }, 
-        { status: 404 }
-      );
+    if (liveState) {
+      // Serialize Map to Array for JSON response
+      const tasks = Array.from(liveState.tasks.values());
+      return NextResponse.json({
+        success: true,
+        isLive: true,
+        job: {
+          id: liveState.jobId,
+          status: areAllTasksFinished(tasks as GenerationTask[]) ? 'completed' : job.status,
+          progress: liveState.progress,
+          error: job.error_message,
+          tasks: tasks,
+        },
+        createdAt: job.created_at,
+        updatedAt: job.updated_at
+      });
+    } else {
+      // Fallback to database record if not live in memory
+      return NextResponse.json({
+        success: true,
+        isLive: false,
+        job: {
+          id: job.id,
+          status: job.status,
+          progress: job.progress_percentage,
+          error: job.error_message,
+          result: job.result_data
+        },
+        createdAt: job.created_at,
+        updatedAt: job.updated_at
+      });
     }
-
-    let courseOutline = null;
-    if (jobStatus.status === 'completed' && jobStatus.result?.courseOutlineId) {
-      courseOutline = await courseGenerator.getCourseOutline(jobStatus.result.courseOutlineId);
-    }
-
-    return NextResponse.json({
-      success: true,
-      job: {
-        id: jobStatus.id,
-        status: jobStatus.status,
-        progress: jobStatus.progress,
-        error: jobStatus.error,
-        result: jobStatus.result
-      },
-      courseOutline,
-      createdAt: job.created_at,
-      updatedAt: job.updated_at
-    });
 
   } catch (error) {
     console.error('Job status check error:', error);

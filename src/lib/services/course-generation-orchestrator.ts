@@ -18,6 +18,7 @@ export interface GenerationTask {
   completeTime?: Date;
   error?: string;
   data?: any;
+  retryCount: number;
 }
 
 export interface OrchestrationState {
@@ -28,6 +29,7 @@ export interface OrchestrationState {
   lessons: LessonWorkflow[];
   paths: PathWorkflow[];
   classWorkflow: ClassWorkflow;
+  progress: number;
 }
 
 export interface LessonWorkflow {
@@ -96,6 +98,51 @@ export class CourseGenerationOrchestrator {
   }
 
   /**
+   * Regenerate a specific failed task
+   */
+  public async regenerateTask(jobId: string, taskId: string): Promise<boolean> {
+    const state = this.orchestrationStates.get(jobId);
+    if (!state) {
+      console.error(`Regenerate failed: No orchestration state found for job ${jobId}`);
+      return false;
+    }
+
+    const task = state.tasks.get(taskId);
+    if (!task) {
+      console.error(`Regenerate failed: Task ${taskId} not found in job ${jobId}`);
+      return false;
+    }
+
+    if (task.status !== 'failed') {
+      console.warn(`Regenerate failed: Task ${taskId} is not in 'failed' state. Current state: ${task.status}`);
+      return false;
+    }
+
+    console.log(`🔄 Regenerating task: ${taskId} for job: ${jobId}`);
+
+    // Reset task state
+    task.status = 'pending';
+    task.error = undefined;
+    task.startTime = undefined;
+    task.completeTime = undefined;
+
+    // Re-execute the task
+    // Using a timeout to ensure it runs in the next event loop cycle
+    setTimeout(() => {
+      this.executeTask(state, task);
+    }, 100);
+
+    return true;
+  }
+
+  /**
+   * Get the current state of a generation job
+   */
+  public getJobState(jobId: string): OrchestrationState | undefined {
+    return this.orchestrationStates.get(jobId);
+  }
+
+  /**
    * Initialize the orchestration state with all tasks and dependencies
    */
   private async initializeOrchestrationState(
@@ -147,7 +194,8 @@ export class CourseGenerationOrchestrator {
           sectionIndex: i,
           sectionTitle,
           dependencies: [],
-          data: { moduleLesson, sectionTitle, outline, request }
+          data: { moduleLesson, sectionTitle, outline, request },
+          retryCount: 0
         });
         
         sectionTasks.push(taskId);
@@ -162,7 +210,8 @@ export class CourseGenerationOrchestrator {
         lessonId: lesson.id,
         pathId: lesson.path_id,
         dependencies: sectionTasks,
-        data: { moduleLesson, outline, request }
+        data: { moduleLesson, outline, request },
+        retryCount: 0
       });
 
       lessonWorkflows.push({
@@ -200,7 +249,8 @@ export class CourseGenerationOrchestrator {
           status: 'pending',
           pathId: path.id,
           dependencies: lessonAssessmentTasks,
-          data: { pathTitle: path.title, request }
+          data: { pathTitle: path.title, request },
+          retryCount: 0
         });
 
         pathWorkflows.push({
@@ -258,7 +308,8 @@ export class CourseGenerationOrchestrator {
         status: 'pending',
         baseClassId: request.baseClassId,
         dependencies: examDependencies,
-        data: { classTitle: request.title, request }
+        data: { classTitle: request.title, request },
+        retryCount: 0
       });
     }
 
@@ -279,15 +330,18 @@ export class CourseGenerationOrchestrator {
       }
     });
 
-    return {
+    const state: OrchestrationState = {
       jobId,
       tasks,
       completedTasks: new Set(),
       runningTasks: new Set(),
       lessons: lessonWorkflows,
       paths: pathWorkflows,
-      classWorkflow
+      classWorkflow,
+      progress: 0
     };
+
+    return state;
   }
 
   /**
@@ -333,43 +387,50 @@ export class CourseGenerationOrchestrator {
    * Execute a specific generation task
    */
   private async executeTask(state: OrchestrationState, task: GenerationTask): Promise<void> {
-    try {
-      console.log(`🔄 Starting task: ${task.id} (${task.type})`);
-      
-      task.status = 'running';
-      task.startTime = new Date();
-      state.runningTasks.add(task.id);
+    task.status = 'running';
+    task.startTime = new Date();
+    state.runningTasks.add(task.id);
+    await this.updateProgressBasedOnCompletedTasks(state);
 
-      switch (task.type) {
-        case 'lesson_section':
-          await this.generateLessonSection(task);
-          break;
-        case 'lesson_assessment':
-          await this.generateLessonAssessment(task);
-          break;
-        case 'path_quiz':
-          await this.generatePathQuiz(task);
-          break;
-        case 'class_exam':
-          await this.generateClassExam(task);
-          break;
+    while (task.retryCount <= 1) {
+      try {
+        switch (task.type) {
+          case 'lesson_section':
+            await this.generateLessonSection(task);
+            break;
+          case 'lesson_assessment':
+            await this.generateLessonAssessment(task);
+            break;
+          case 'path_quiz':
+            await this.generatePathQuiz(task);
+            break;
+          case 'class_exam':
+            await this.generateClassExam(task);
+            break;
+        }
+        
+        task.status = 'completed';
+        task.completeTime = new Date();
+        state.completedTasks.add(task.id);
+        state.runningTasks.delete(task.id);
+        console.log(`✅ Completed task: ${task.type} - ${task.sectionTitle || task.id}`);
+        this.checkAndTriggerDependentTasks(state, task);
+        return;
+
+      } catch (error) {
+        task.retryCount += 1;
+        if (task.retryCount > 1) {
+          console.error(`❌ Failed task after retry: ${task.id} (${task.type}):`, error);
+          task.status = 'failed';
+          task.completeTime = new Date();
+          task.error = error instanceof Error ? error.message : 'An unknown error occurred';
+          state.runningTasks.delete(task.id);
+          this.checkAndTriggerDependentTasks(state, task);
+          return;
+        } else {
+          console.warn(`⚠️ Task failed, retrying: ${task.id} (${task.type}). Attempt: ${task.retryCount}`);
+        }
       }
-
-      task.status = 'completed';
-      task.completeTime = new Date();
-      state.completedTasks.add(task.id);
-      state.runningTasks.delete(task.id);
-
-      console.log(`✅ Completed task: ${task.id} (${task.type})`);
-
-      // Check for cascading triggers
-      await this.checkAndTriggerDependentTasks(state, task);
-
-    } catch (error) {
-      console.error(`❌ Failed task: ${task.id} (${task.type}):`, error);
-      task.status = 'failed';
-      task.error = error instanceof Error ? error.message : String(error);
-      state.runningTasks.delete(task.id);
     }
   }
 
@@ -381,42 +442,52 @@ export class CourseGenerationOrchestrator {
       throw new Error('Invalid lesson section task data');
     }
 
-    const { moduleLesson, sectionTitle, outline, request } = task.data;
-    const supabase = this.getSupabaseClient();
+    try {
+      const { moduleLesson, sectionTitle, outline, request } = task.data;
+      const supabase = this.getSupabaseClient();
 
-    // Get cached KB content
-    const cacheKey = `${outline.knowledgeBaseAnalysis.baseClassId}-${request.generationMode || 'kb_supplemented'}`;
-    const kbContent = this.kbContentCache.get(cacheKey) || [];
+      // Get cached KB content
+      const cacheKey = `${outline.knowledgeBaseAnalysis.baseClassId}-${request.generationMode || 'kb_supplemented'}`;
+      const kbContent = this.kbContentCache.get(cacheKey) || [];
 
-    // Generate expert-level educational content
-    const sectionContent = await this.generateExpertLevelSectionContent(
-      moduleLesson,
-      sectionTitle,
-      task.sectionIndex!,
-      outline,
-      request,
-      kbContent
-    );
+      // Generate expert-level educational content
+      const sectionContent = await this.generateExpertLevelSectionContent(
+        moduleLesson,
+        sectionTitle,
+        task.sectionIndex!,
+        outline,
+        request,
+        kbContent
+      );
+      
+      if (!sectionContent) {
+        throw new Error('AI failed to generate section content.');
+      }
 
-    // Save to database immediately
-    const { error } = await supabase
-      .from('lesson_sections')
-      .insert({
-        lesson_id: task.lessonId,
-        title: sectionTitle,
-        content: sectionContent,
-        section_type: task.sectionIndex === 0 ? 'introduction' : 
-                     task.sectionIndex === moduleLesson.contentOutline.length - 1 ? 'summary' : 
-                     'main_content',
-        order_index: task.sectionIndex,
-        created_by: request.userId
-      });
+      // Save to database immediately
+      const { error } = await supabase
+        .from('lesson_sections')
+        .insert({
+          lesson_id: task.lessonId,
+          title: sectionTitle,
+          content: sectionContent,
+          section_type: task.sectionIndex === 0 ? 'introduction' : 
+                      task.sectionIndex === moduleLesson.contentOutline.length - 1 ? 'summary' : 
+                      'main_content',
+          order_index: task.sectionIndex,
+          created_by: request.userId
+        });
 
-    if (error) {
-      throw new Error(`Failed to save lesson section: ${error.message}`);
+      if (error) {
+        throw new Error(`Failed to save lesson section: ${error.message}`);
+      }
+
+      console.log(`📖 Saved lesson section: ${sectionTitle} for lesson ${task.lessonId}`);
+    } catch (error) {
+      console.error(`Error in generateLessonSection for task ${task.id}:`, error);
+      // Re-throw the error to be caught by executeTask
+      throw error;
     }
-
-    console.log(`📖 Saved lesson section: ${sectionTitle} for lesson ${task.lessonId}`);
   }
 
   /**
@@ -731,13 +802,26 @@ What makes this particularly important for ${request.academicLevel || 'college'}
     if (completedTask.type === 'lesson_section') {
       const lessonWorkflow = state.lessons.find(l => l.lessonId === completedTask.lessonId);
       if (lessonWorkflow) {
-        const allSectionsComplete = lessonWorkflow.sectionTasks.every(taskId => 
-          state.completedTasks.has(taskId)
+        const sectionStatuses = lessonWorkflow.sectionTasks.map(taskId => ({
+          taskId,
+          isFinished: this.isTaskFinished(state, taskId),
+          status: state.tasks.get(taskId)?.status
+        }));
+        
+        const allSectionsFinished = lessonWorkflow.sectionTasks.every(taskId => 
+          this.isTaskFinished(state, taskId)
         );
         
-        if (allSectionsComplete && !lessonWorkflow.allSectionsComplete) {
+        console.log(`📝 Lesson section completion check for "${lessonWorkflow.title}":`, {
+          completedTaskId: completedTask.id,
+          sectionStatuses,
+          allSectionsFinished,
+          assessmentTask: lessonWorkflow.assessmentTask
+        });
+        
+        if (allSectionsFinished && !lessonWorkflow.allSectionsComplete) {
           lessonWorkflow.allSectionsComplete = true;
-          console.log(`📖 All sections complete for lesson: ${lessonWorkflow.title}`);
+          console.log(`📖 All sections finished for lesson: ${lessonWorkflow.title}`);
           
           // Trigger lesson assessment
           if (lessonWorkflow.assessmentTask) {
@@ -745,6 +829,12 @@ What makes this particularly important for ${request.academicLevel || 'college'}
             if (assessmentTask && assessmentTask.status === 'pending') {
               console.log(`🎯 Triggering assessment for lesson: ${lessonWorkflow.title}`);
               setTimeout(() => this.executeTask(state, assessmentTask), 1000); // 1 second delay
+            } else {
+              console.log(`⚠️ Assessment task not available or not pending:`, {
+                exists: !!assessmentTask,
+                status: assessmentTask?.status,
+                taskId: lessonWorkflow.assessmentTask
+              });
             }
           }
         }
@@ -758,14 +848,31 @@ What makes this particularly important for ${request.academicLevel || 'college'}
       );
       
       if (pathWorkflow) {
-        const allLessonsComplete = pathWorkflow.lessons.every(lessonId => {
+        const lessonStatuses = pathWorkflow.lessons.map(lessonId => {
           const lesson = state.lessons.find(l => l.lessonId === lessonId);
-          return lesson?.assessmentTask && state.completedTasks.has(lesson.assessmentTask);
+          return {
+            lessonId,
+            title: lesson?.title,
+            assessmentTask: lesson?.assessmentTask,
+            isFinished: lesson?.assessmentTask ? this.isTaskFinished(state, lesson.assessmentTask) : false
+          };
         });
         
-        if (allLessonsComplete && !pathWorkflow.allLessonsComplete) {
+        const allLessonsFinished = pathWorkflow.lessons.every(lessonId => {
+          const lesson = state.lessons.find(l => l.lessonId === lessonId);
+          return lesson?.assessmentTask && this.isTaskFinished(state, lesson.assessmentTask);
+        });
+        
+        console.log(`🛤️ Path lesson completion check for "${pathWorkflow.title}":`, {
+          completedTaskId: completedTask.id,
+          lessonStatuses,
+          allLessonsFinished,
+          quizTask: pathWorkflow.quizTask
+        });
+        
+        if (allLessonsFinished && !pathWorkflow.allLessonsComplete) {
           pathWorkflow.allLessonsComplete = true;
-          console.log(`🛤️ All lessons complete for path: ${pathWorkflow.title}`);
+          console.log(`🛤️ All lessons finished for path: ${pathWorkflow.title}`);
           
           // Trigger path quiz
           if (pathWorkflow.quizTask) {
@@ -773,6 +880,12 @@ What makes this particularly important for ${request.academicLevel || 'college'}
             if (quizTask && quizTask.status === 'pending') {
               console.log(`📝 Triggering quiz for path: ${pathWorkflow.title}`);
               setTimeout(() => this.executeTask(state, quizTask), 1000); // 1 second delay
+            } else {
+              console.log(`⚠️ Quiz task not available or not pending:`, {
+                exists: !!quizTask,
+                status: quizTask?.status,
+                taskId: pathWorkflow.quizTask
+              });
             }
           }
         }
@@ -803,18 +916,18 @@ What makes this particularly important for ${request.academicLevel || 'college'}
       .filter(task => task.type === 'path_quiz')
       .map(task => task.id);
     
-    const allExistingQuizzesComplete = existingQuizTasks.length === 0 || existingQuizTasks.every(taskId => 
-      state.completedTasks.has(taskId)
+    const allExistingQuizzesFinished = existingQuizTasks.length === 0 || existingQuizTasks.every(taskId => 
+      this.isTaskFinished(state, taskId)
     );
     
     // If no quiz tasks exist, check if all lesson assessments are complete
-    const allLessonAssessmentsComplete = state.lessons.every(lesson => 
-      !lesson.assessmentTask || state.completedTasks.has(lesson.assessmentTask)
+    const allLessonAssessmentsFinished = state.lessons.every(lesson => 
+      !lesson.assessmentTask || this.isTaskFinished(state, lesson.assessmentTask)
     );
     
     const shouldTriggerExam = existingQuizTasks.length > 0 
-      ? allExistingQuizzesComplete 
-      : allLessonAssessmentsComplete;
+      ? allExistingQuizzesFinished 
+      : allLessonAssessmentsFinished;
     
     if (completedTask.type === 'path_quiz') {
       console.log(`🎯 Path quiz completed: ${completedTask.id}`);
@@ -822,8 +935,8 @@ What makes this particularly important for ${request.academicLevel || 'college'}
     
     console.log(`📊 Exam trigger check:`, {
       quizTasks: existingQuizTasks.length,
-      allQuizzesComplete: allExistingQuizzesComplete,
-      allAssessmentsComplete: allLessonAssessmentsComplete,
+      allQuizzesComplete: allExistingQuizzesFinished,
+      allAssessmentsComplete: allLessonAssessmentsFinished,
       shouldTriggerExam,
       completedTaskType: completedTask.type,
       completedTaskId: completedTask.id,
@@ -833,7 +946,7 @@ What makes this particularly important for ${request.academicLevel || 'college'}
         lessonId: l.lessonId,
         title: l.title,
         assessmentTask: l.assessmentTask,
-        isComplete: l.assessmentTask ? state.completedTasks.has(l.assessmentTask) : false
+        isComplete: l.assessmentTask ? this.isTaskFinished(state, l.assessmentTask) : false
       }))
     });
     
@@ -858,71 +971,41 @@ What makes this particularly important for ${request.academicLevel || 'college'}
   }
 
   /**
-   * Update progress based on completed tasks with more granular tracking
+   * Helper to check if a task is finished (completed or failed)
    */
-  private async updateProgressBasedOnCompletedTasks(state: OrchestrationState): Promise<void> {
-    const totalTasks = state.tasks.size;
-    const completedTasks = state.completedTasks.size;
-    
-    if (totalTasks === 0) return;
-    
-    // Calculate base progress
-    let progress = Math.floor((completedTasks / totalTasks) * 100);
-    
-    // Add weight for different task types
-    const taskWeights = {
-      'lesson_section': 0.4,    // 40% of total weight
-      'lesson_assessment': 0.2, // 20% of total weight  
-      'path_quiz': 0.2,        // 20% of total weight
-      'class_exam': 0.2        // 20% of total weight
-    };
-    
-    let weightedProgress = 0;
-    let totalWeight = 0;
-    
-    for (const [taskType, weight] of Object.entries(taskWeights)) {
-      const tasksOfType = Array.from(state.tasks.values()).filter(t => t.type === taskType);
-      const completedOfType = tasksOfType.filter(t => state.completedTasks.has(t.id));
-      
-      if (tasksOfType.length > 0) {
-        const typeProgress = (completedOfType.length / tasksOfType.length) * weight;
-        weightedProgress += typeProgress;
-        totalWeight += weight;
-      }
+  private isTaskFinished(state: OrchestrationState, taskId: string): boolean {
+    if (state.completedTasks.has(taskId)) {
+      return true;
     }
-    
-    if (totalWeight > 0) {
-      progress = Math.floor((weightedProgress / totalWeight) * 100);
-    }
-    
-    // Ensure progress never goes backwards and caps at 99% until truly complete
-    progress = Math.min(99, Math.max(progress, 0));
-    
-    // Only update if progress has changed significantly (at least 1%)
-    const currentProgress = await this.getCurrentJobProgress(state.jobId);
-    if (Math.abs(progress - currentProgress) >= 1) {
-      console.log(`📊 Progress update: ${progress}% (${completedTasks}/${totalTasks} tasks completed)`);
-      await this.updateJobStatus(state.jobId, 'processing', progress);
-    }
+    const task = state.tasks.get(taskId);
+    return task?.status === 'failed';
   }
 
   /**
-   * Get current job progress from database
+   * Update progress based on completed tasks with more granular tracking
    */
-  private async getCurrentJobProgress(jobId: string): Promise<number> {
+  private async updateProgressBasedOnCompletedTasks(state: OrchestrationState): Promise<void> {
+    const completedCount = Array.from(state.tasks.values()).filter(t => t.status === 'completed' || t.status === 'failed').length;
+    const totalCount = state.tasks.size;
+    const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+    
+    state.progress = progress; // Update in-memory state
+
     try {
       const supabase = this.getSupabaseClient();
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('course_generation_jobs')
-        .select('progress_percentage')
-        .eq('id', jobId)
-        .single();
+        .update({
+          progress_percentage: progress,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', state.jobId);
       
-      if (error || !data) return 0;
-      return (data as any).progress_percentage || 0;
+      if (error) {
+        console.error('Error updating job progress:', error);
+      }
     } catch (error) {
       console.error('Error getting current progress:', error);
-      return 0;
     }
   }
 
