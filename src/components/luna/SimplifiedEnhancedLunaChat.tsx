@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useLunaContext } from '@/hooks/useLunaContext';
 import { useRealTimeUpdates } from '@/hooks/useRealTimeUpdates';
 import { PersonaType, ChatMessage } from '@/components/LunaAIChat';
@@ -29,6 +30,11 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
+import { 
+  generateConversationTitle, 
+  shouldGenerateTitle, 
+  generateFallbackTitle 
+} from '@/lib/utils/conversationTitleGenerator';
 
 interface StoredConversation {
   id: string;
@@ -87,6 +93,17 @@ export const SimplifiedEnhancedLunaChat: React.FC<SimplifiedEnhancedLunaChatProp
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Handle component unmount (user navigating away) - trigger title generation
+  useEffect(() => {
+    return () => {
+      // On component unmount, generate title for current conversation if needed
+      if (currentConversation && messages.length > 0) {
+        // Use a fire-and-forget approach since the component is unmounting
+        handleConversationExit(currentConversation, messages).catch(console.error);
+      }
+    };
+  }, []); // Empty dependency array means this effect runs only on mount/unmount
+
   // Load conversations from localStorage
   useEffect(() => {
     const loadConversations = () => {
@@ -128,10 +145,121 @@ export const SimplifiedEnhancedLunaChat: React.FC<SimplifiedEnhancedLunaChatProp
     }
   };
 
+  // Track if a conversation has had its title generated
+  const [titleGeneratedConversations, setTitleGeneratedConversations] = useState<Set<string>>(new Set());
+
   // Generate conversation title from first message
   const generateTitle = (firstMessage: string): string => {
-    const words = firstMessage.split(' ').slice(0, 5);
-    return words.join(' ') + (firstMessage.split(' ').length > 5 ? '...' : '');
+    const words = firstMessage.split(' ').slice(0, 4);
+    return words.join(' ') + (firstMessage.split(' ').length > 4 ? '...' : '');
+  };
+
+  // Generate AI-powered conversation title when a user exits a conversation
+  const generateAITitle = async (conversation: StoredConversation, currentMessages: ChatMessage[]) => {
+    // Don't generate if we already have for this conversation or if it already has a custom title
+    if (titleGeneratedConversations.has(conversation.id) || 
+        (conversation.title !== 'New Conversation' && !conversation.title.endsWith('...'))) {
+      return;
+    }
+
+    // Only generate if conversation has meaningful content
+    if (!shouldGenerateTitle(currentMessages)) {
+      return;
+    }
+
+    try {
+      console.log('🤖 Generating AI title for conversation:', conversation.id);
+      
+      // Mark as being processed to avoid duplicate requests
+      setTitleGeneratedConversations(prev => new Set(prev).add(conversation.id));
+      
+      const result = await generateConversationTitle(currentMessages, conversation.id);
+      
+      if (result.wasGenerated && result.title !== conversation.title) {
+        // Update conversation title in localStorage
+        const updatedConversation = {
+          ...conversation,
+          title: result.title,
+          updatedAt: new Date().toISOString(),
+        };
+
+        const updatedConversations = conversations.map(conv =>
+          conv.id === conversation.id ? updatedConversation : conv
+        );
+
+        saveConversations(updatedConversations);
+        
+        // Update current conversation if it's the one we just updated
+        if (currentConversation?.id === conversation.id) {
+          setCurrentConversation(updatedConversation);
+        }
+        
+        console.log('✅ AI title generated and saved:', result.title);
+      }
+    } catch (error) {
+      console.error('❌ Error generating AI title:', error);
+      // Remove from processed set so we can try again later
+      setTitleGeneratedConversations(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(conversation.id);
+        return newSet;
+      });
+    }
+  };
+
+  // Handle conversation exit logic (when user switches away from a conversation)
+  const handleConversationExit = async (exitingConversation: StoredConversation | null, currentMessages: ChatMessage[]) => {
+    if (!exitingConversation || currentMessages.length === 0) {
+      return;
+    }
+
+    // Generate AI title for the conversation being exited
+    await generateAITitle(exitingConversation, currentMessages);
+  };
+
+  // Helper component for title with tooltip
+  const TitleWithTooltip = ({ 
+    title, 
+    className = "", 
+    maxLength = 50,
+    onClick 
+  }: { 
+    title: string; 
+    className?: string; 
+    maxLength?: number;
+    onClick?: () => void;
+  }) => {
+    const shouldShowTooltip = title.length > maxLength;
+    
+    const titleElement = (
+      <div 
+        className={cn("truncate min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap", className)}
+        onClick={onClick}
+        style={{
+          maxWidth: '100%',
+          wordBreak: 'break-all'
+        }}
+      >
+        {title}
+      </div>
+    );
+
+    if (shouldShowTooltip) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {titleElement}
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="max-w-xs break-words">{title}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    return titleElement;
   };
 
   // Create new conversation
@@ -157,7 +285,12 @@ export const SimplifiedEnhancedLunaChat: React.FC<SimplifiedEnhancedLunaChatProp
   };
 
   // Switch conversation
-  const switchConversation = (conversation: StoredConversation) => {
+  const switchConversation = async (conversation: StoredConversation) => {
+    // Handle exit of current conversation (generate AI title if needed)
+    if (currentConversation && currentConversation.id !== conversation.id) {
+      await handleConversationExit(currentConversation, messages);
+    }
+    
     setCurrentConversation(conversation);
     setMessages(conversation.messages);
     setCurrentPersona(conversation.persona);
@@ -345,22 +478,26 @@ export const SimplifiedEnhancedLunaChat: React.FC<SimplifiedEnhancedLunaChatProp
             <Card
               key={conversation.id}
               className={cn(
-                "cursor-pointer transition-colors hover:bg-muted/50",
+                "cursor-pointer transition-colors hover:bg-muted/50 w-full max-w-full",
                 currentConversation?.id === conversation.id && "bg-muted border-primary"
               )}
               onClick={() => switchConversation(conversation)}
             >
               <CardContent className="p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-sm truncate">{conversation.title}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">
+                <div className="flex items-start gap-2 w-full max-w-full">
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <TitleWithTooltip 
+                      title={conversation.title} 
+                      maxLength={20}
+                      className="font-medium text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1 truncate">
                       {conversation.messages.length} messages
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    {conversation.isPinned && <Star size={12} className="text-yellow-500" />}
-                    <Badge variant="outline" className="text-xs">
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0 w-[70px]">
+                    {conversation.isPinned && <Star size={12} className="text-yellow-500 flex-shrink-0" />}
+                    <Badge variant="outline" className="text-xs flex-shrink-0 truncate max-w-full">
                       {conversation.persona}
                     </Badge>
                   </div>
@@ -412,10 +549,12 @@ export const SimplifiedEnhancedLunaChat: React.FC<SimplifiedEnhancedLunaChatProp
             
             <div className="flex items-center gap-2">
               <Bot size={20} className="text-primary" />
-              <div>
-                <h1 className="font-semibold">
-                  {currentConversation?.title || 'Luna Assistant'}
-                </h1>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <TitleWithTooltip 
+                  title={currentConversation?.title || 'Luna Assistant'}
+                  maxLength={40}
+                  className="font-semibold"
+                />
                 <p className="text-xs text-muted-foreground">
                   {currentPersona} • {messages.length} messages
                 </p>

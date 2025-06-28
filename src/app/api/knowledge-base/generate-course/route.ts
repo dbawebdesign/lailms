@@ -156,14 +156,14 @@ export async function GET(request: NextRequest) {
           title: 'Knowledge Base Only',
           description: 'Generate content exclusively from uploaded sources',
           suitable: kbAnalysis.contentDepth === 'comprehensive' && 
-                   kbAnalysis.totalDocuments >= 5 &&
+                   kbAnalysis.totalDocuments >= 3 &&
                    kbAnalysis.analysisDetails.contentQuality === 'high'
         },
         kb_priority: {
           title: 'Knowledge Base Priority', 
           description: 'Prioritize knowledge base content, fill minor gaps with general knowledge',
           suitable: kbAnalysis.contentDepth !== 'minimal' && 
-                   kbAnalysis.totalDocuments >= 2
+                   kbAnalysis.totalDocuments >= 1
         },
         kb_supplemented: {
           title: 'Knowledge Base Supplemented',

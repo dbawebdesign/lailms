@@ -208,13 +208,13 @@ async function performLessonUpdate(sectionId: string, instruction: string): Prom
   };
 }
 
-// Generate course outline when explicitly requested
+// Enhanced course generation with KB integration
 async function performCourseOutlineGeneration(prompt: string, gradeLevel?: string, lengthInWeeks?: number, forwardedCookies?: string | null, request?: Request): Promise<any> {
-  console.log(`---> EXECUTING COURSE OUTLINE GENERATION for prompt: ${prompt}`);
+  console.log(`---> EXECUTING ENHANCED COURSE OUTLINE GENERATION for prompt: ${prompt}`);
   console.log(`[performCourseOutlineGeneration] Request object available:`, !!request);
   
   const baseURL = getBaseURL(request);
-  const generateURL = `${baseURL}/api/teach/generate-course-outline`;
+  const generateURL = `${baseURL}/api/teach/course-generation`;
   
   console.log(`[performCourseOutlineGeneration] Making fetch request to:`, generateURL);
 
@@ -233,7 +233,8 @@ async function performCourseOutlineGeneration(prompt: string, gradeLevel?: strin
       body: JSON.stringify({ 
         prompt, 
         gradeLevel, 
-        lengthInWeeks 
+        lengthInWeeks,
+        generationMode: 'general' // Default to general mode for Luna requests
       }),
     });
 
@@ -250,12 +251,12 @@ async function performCourseOutlineGeneration(prompt: string, gradeLevel?: strin
     
     return {
       success: true,
-      message: `I've generated a course outline for "${outlineData.baseClassName || 'your course'}". You can save this as a base class or open it in the designer for detailed editing.`,
+      message: `I've generated a course outline for "${outlineData.title || 'your course'}". You can save this as a base class or continue editing it.`,
       outlineData: outlineData,
       isOutline: true, // Flag to indicate this should be displayed as an outline
       actions: [
         { type: 'saveOutline', label: 'Save as Base Class' },
-        { type: 'openInDesigner', label: 'Open in Designer' }
+        { type: 'enhanceWithKB', label: 'Enhance with Knowledge Base' }
       ]
     };
 
@@ -264,6 +265,191 @@ async function performCourseOutlineGeneration(prompt: string, gradeLevel?: strin
     return {
       success: false,
       message: "I encountered an unexpected issue while trying to generate the course outline. Please try again later."
+    };
+  }
+}
+
+// Collect knowledge base sources for enhanced course generation
+async function performCollectKnowledgeBaseSources(baseClassId: string, forwardedCookies?: string | null, request?: Request): Promise<any> {
+  console.log(`---> COLLECTING KB SOURCES for base class ${baseClassId}`);
+  
+  try {
+    const baseURL = getBaseURL(request);
+    
+    // Check current KB status for this base class
+    const kbStatusURL = `${baseURL}/api/teach/course-generation?baseClassId=${baseClassId}`;
+    
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    if (forwardedCookies) headers['Cookie'] = forwardedCookies;
+
+    const response = await fetch(kbStatusURL, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to check knowledge base status');
+    }
+
+    const kbData = await response.json();
+    
+    return {
+      success: true,
+      message: "I can help you enhance your course with knowledge base sources. You can upload documents or provide URLs that contain relevant content for your course.",
+      kbAnalysis: kbData.knowledgeBaseAnalysis,
+      availableModes: kbData.availableModes,
+      recommendedMode: kbData.recommendedMode,
+      actions: [
+        { type: 'uploadDocument', label: 'Upload Document' },
+        { type: 'addURL', label: 'Add URL' },
+        { type: 'proceedWithoutKB', label: 'Continue Without KB' }
+      ]
+    };
+
+  } catch (error) {
+    console.error('Error collecting KB sources:', error);
+    return {
+      success: false,
+      message: "I encountered an issue while checking your knowledge base. You can still proceed with general course generation."
+    };
+  }
+}
+
+// Generate enhanced course with KB integration
+async function performEnhancedCourseGeneration(baseClassId: string, title: string, description: string, generationMode: string, additionalParams?: any, forwardedCookies?: string | null, request?: Request): Promise<any> {
+  console.log(`---> GENERATING ENHANCED COURSE with KB for ${baseClassId}`);
+  
+  const baseURL = getBaseURL(request);
+  const generateURL = `${baseURL}/api/teach/course-generation`;
+
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (forwardedCookies) headers['Cookie'] = forwardedCookies;
+
+  try {
+    const requestBody = {
+      baseClassId,
+      title,
+      description,
+      generationMode,
+      ...additionalParams
+    };
+
+    const response = await fetch(generateURL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Failed to generate enhanced course." }));
+      throw new Error(errorData.error || response.statusText);
+    }
+
+    const result = await response.json();
+    
+    if (result.jobId) {
+      // Advanced KB-based generation started
+      return {
+        success: true,
+        message: `I've started generating your course using the ${generationMode.replace('_', ' ')} approach. This advanced generation process analyzes your knowledge base content and creates a comprehensive course structure. I'll also provide a basic outline below while the detailed generation completes.`,
+        jobId: result.jobId,
+        basicOutline: result.basicOutline,
+        generationMode: result.generationMode,
+        isOutline: true,
+        actions: [
+          { type: 'checkJobStatus', label: 'Check Generation Status' },
+          { type: 'saveBasicOutline', label: 'Save Basic Outline Now' }
+        ]
+      };
+    } else {
+      // Simple generation completed immediately
+      return {
+        success: true,
+        message: `I've generated your course outline using ${generationMode === 'general' ? 'general knowledge' : 'your knowledge base content'}. You can save this as a base class or request further enhancements.`,
+        outlineData: result,
+        generationMode: result.generationMode,
+        isOutline: true,
+        actions: [
+          { type: 'saveOutline', label: 'Save as Base Class' },
+          { type: 'enhanceWithKB', label: 'Enhance with Knowledge Base' }
+        ]
+      };
+    }
+
+  } catch (error) {
+    console.error('Error generating enhanced course:', error);
+    return {
+      success: false,
+      message: `I encountered an error while generating your enhanced course: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again or use the general course generation mode.`
+    };
+  }
+}
+
+// Check KB course generation job status
+async function performCheckJobStatus(jobId: string, forwardedCookies?: string | null, request?: Request): Promise<any> {
+  console.log(`---> CHECKING JOB STATUS for ${jobId}`);
+  
+  try {
+    const baseURL = getBaseURL(request);
+    const statusURL = `${baseURL}/api/knowledge-base/generation-status/${jobId}`;
+    
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    if (forwardedCookies) headers['Cookie'] = forwardedCookies;
+
+    const response = await fetch(statusURL, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to check job status');
+    }
+
+    const statusData = await response.json();
+    
+    let message = '';
+    let actions: any[] = [];
+    
+    switch (statusData.status) {
+      case 'completed':
+        message = `✅ Your enhanced course generation is complete! The course has been fully generated with detailed content based on your knowledge base.`;
+        actions = [
+          { type: 'viewGeneratedCourse', label: 'View Generated Course' },
+          { type: 'openInDesigner', label: 'Open in Designer' }
+        ];
+        break;
+      case 'processing':
+        message = `⏳ Your course is still being generated (${statusData.progress || 0}% complete). The AI is analyzing your knowledge base and creating detailed lesson content.`;
+        actions = [
+          { type: 'checkJobStatus', label: 'Check Again' }
+        ];
+        break;
+      case 'failed':
+        message = `❌ Course generation failed: ${statusData.error || 'Unknown error'}. You can try again or use the basic outline that was generated.`;
+        actions = [
+          { type: 'retryGeneration', label: 'Retry Generation' },
+          { type: 'useBasicOutline', label: 'Use Basic Outline' }
+        ];
+        break;
+      default:
+        message = `📋 Job status: ${statusData.status}. Please check again in a moment.`;
+        actions = [
+          { type: 'checkJobStatus', label: 'Check Again' }
+        ];
+    }
+    
+    return {
+      success: true,
+      message,
+      jobStatus: statusData,
+      actions
+    };
+
+  } catch (error) {
+    console.error('Error checking job status:', error);
+    return {
+      success: false,
+      message: "I couldn't check the generation status right now. Please try again or contact support if the issue persists."
     };
   }
 }
@@ -1232,15 +1418,17 @@ Analyze the current UI context to determine the appropriate level of educational
 ### 4. Creation Requests (When user explicitly requests new content)
 **Trigger**: User explicitly asks to "create," "design," "build," or "generate" new courses/classes
 **Response Approach**:
-- **Use generateCourseOutline tool**: ONLY when user explicitly requests course/class creation
-- **Needs Assessment**: Clarify learning objectives, audience, and constraints
-- **Structural Framework**: Propose logical course organization and module breakdown
-- **Content Scaffolding**: Suggest detailed lesson sequences and learning activities
-- **Assessment Planning**: Design comprehensive evaluation strategies
-- **Implementation Roadmap**: Provide step-by-step development guidance
-- **Scope**: Full course creation from concept to implementation
+- **ALWAYS start with collectKnowledgeBaseSources tool** for any course creation request
+- **Follow up with enhancedCourseGeneration tool** for comprehensive course creation
+- **Use generateCourseOutline tool** ONLY for simple outlines when user explicitly requests basic generation
+- **When user mentions documents, PDFs, or materials**: Use collectKnowledgeBaseSources
+- **When user asks about uploading content**: Use collectKnowledgeBaseSources
+- **For all course creation**: Prefer enhanced KB workflow over simple generation
 
-**IMPORTANT**: Do NOT use the generateCourseOutline tool for improving existing content. Only use it when the user explicitly wants to create something new.
+**IMPORTANT**: 
+- ALWAYS offer KB enhancement for course creation requests unless user explicitly wants simple outline
+- Do NOT use generateCourseOutline for improving existing content
+- Use collectKnowledgeBaseSources first, then enhancedCourseGeneration for best results
 
 ### 5. Multi-Step Content Creation Workflow Rules
 **CRITICAL WORKFLOW PRINCIPLE**: When creating hierarchical content (paths with lessons, lessons with sections, etc.), always follow a step-by-step approach to ensure proper ID availability and prevent content from being added to wrong parents.
@@ -2199,6 +2387,52 @@ export async function POST(request: Request) {
             required: ["componentId", "actionType"]
           }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "collectKnowledgeBaseSources",
+          description: "Check the knowledge base status for a base class and guide the user through enhancing their course with documents or URLs. Use this when users want to enhance course generation with their own content.",
+          parameters: {
+            type: "object",
+            properties: {
+              baseClassId: { type: "string", description: "The ID of the base class to check KB status for. Extract from UI context." }
+            },
+            required: ["baseClassId"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "enhancedCourseGeneration",
+          description: "Generate a course using knowledge base integration with different modes (kb_only, kb_priority, kb_supplemented, or general). Use this for advanced course generation with KB content.",
+          parameters: {
+            type: "object",
+            properties: {
+              baseClassId: { type: "string", description: "The ID of the base class to generate content for" },
+              title: { type: "string", description: "The course title" },
+              description: { type: "string", description: "Course description" },
+              generationMode: { type: "string", enum: ["kb_only", "kb_priority", "kb_supplemented", "general"], description: "The generation mode to use" },
+              additionalParams: { type: "object", description: "Additional parameters like duration, grade level, etc." }
+            },
+            required: ["baseClassId", "title", "description", "generationMode"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "checkJobStatus",
+          description: "Check the status of a knowledge base course generation job. Use this to follow up on advanced course generation processes.",
+          parameters: {
+            type: "object",
+            properties: {
+              jobId: { type: "string", description: "The job ID returned from enhanced course generation" }
+            },
+            required: ["jobId"]
+          }
+        }
       }
     ];
 
@@ -2276,6 +2510,12 @@ export async function POST(request: Request) {
                 result = await performReorderContent(functionArgs.itemType, functionArgs.parentId, functionArgs.orderedIds, forwardedCookies, request);
               } else if (functionName === 'uiAction') {
                 result = await performUIAction(functionArgs.componentId, functionArgs.actionType, functionArgs.additionalParams);
+              } else if (functionName === 'collectKnowledgeBaseSources') {
+                result = await performCollectKnowledgeBaseSources(functionArgs.baseClassId, forwardedCookies, request);
+              } else if (functionName === 'enhancedCourseGeneration') {
+                result = await performEnhancedCourseGeneration(functionArgs.baseClassId, functionArgs.title, functionArgs.description, functionArgs.generationMode, functionArgs.additionalParams, forwardedCookies, request);
+              } else if (functionName === 'checkJobStatus') {
+                result = await performCheckJobStatus(functionArgs.jobId, forwardedCookies, request);
               } else {
                 console.warn(`[Luna Chat API] Unknown tool called: ${functionName}`);
                 result = { error: `Unknown tool: ${functionName}` };

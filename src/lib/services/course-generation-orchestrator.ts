@@ -180,30 +180,20 @@ export class CourseGenerationOrchestrator {
     for (const path of paths) {
       const pathLessons = lessons.filter(l => l.path_id === path.id);
       
-      // Only include lesson assessments that actually exist in the database
-      const { data: existingAssessments } = await supabase
-        .from('assessments')
-        .select('lesson_id')
-        .in('lesson_id', pathLessons.map(l => l.id));
-      
-      const existingAssessmentLessonIds = new Set(
-        (existingAssessments as any[])?.map((a: any) => a.lesson_id) || []
-      );
-      const lessonAssessmentTasks = pathLessons
-        .filter(l => existingAssessmentLessonIds.has(l.id))
-        .map(l => `assessment-${l.id}`);
+      // Use planned lesson assessment tasks instead of checking database
+      const lessonAssessmentTasks = pathLessons.map(l => `assessment-${l.id}`);
       
       console.log(`🛤️ Path ${path.title}:`, {
         totalLessons: pathLessons.length,
-        lessonsWithAssessments: lessonAssessmentTasks.length,
+        plannedAssessments: lessonAssessmentTasks.length,
         dependencies: lessonAssessmentTasks
       });
       
-      // Create path quiz task (depends only on existing lesson assessments)
+      // Create path quiz task if assessments are enabled and there are lessons
       const quizTaskId = `quiz-${path.id}`;
       
-      // Only create quiz task if there are lesson assessments to depend on
-      if (lessonAssessmentTasks.length > 0) {
+      // Create quiz task if there are lessons with planned assessments and path quizzes are enabled
+      if (lessonAssessmentTasks.length > 0 && request.assessmentSettings?.includeQuizzes !== false) {
         tasks.set(quizTaskId, {
           id: quizTaskId,
           type: 'path_quiz',
@@ -221,18 +211,19 @@ export class CourseGenerationOrchestrator {
           allLessonsComplete: false
         });
         
-        console.log(`✅ Created quiz task for path: ${path.title} with ${lessonAssessmentTasks.length} dependencies`);
+        console.log(`✅ Created quiz task for path: ${path.title} with ${lessonAssessmentTasks.length} planned assessment dependencies`);
       } else {
-        // Path has no lesson assessments, so no quiz task needed
+        // Path has no lessons or path quizzes are disabled
         pathWorkflows.push({
           pathId: path.id,
           title: path.title,
           lessons: pathLessons.map(l => l.id),
           quizTask: undefined, // No quiz task for this path
-          allLessonsComplete: true // Mark as complete since no assessments to wait for
+          allLessonsComplete: lessonAssessmentTasks.length === 0 // Mark as complete if no assessments planned
         });
         
-        console.log(`⚠️ No lesson assessments found for path: ${path.title}, skipping quiz task`);
+        const reason = lessonAssessmentTasks.length === 0 ? 'no lessons' : 'path quizzes disabled';
+        console.log(`⚠️ No quiz task created for path: ${path.title} (${reason})`);
       }
     }
 
@@ -243,29 +234,38 @@ export class CourseGenerationOrchestrator {
     
     const examTaskId = `exam-${request.baseClassId}`;
     
+    // If there are no quiz tasks, depend on all lesson assessment tasks instead
+    const examDependencies = allQuizTasks.length > 0 
+      ? allQuizTasks 
+      : lessonWorkflows.map(l => l.assessmentTask).filter((task): task is string => task !== undefined);
+    
     console.log(`🎓 Creating class exam task:`, {
       examTaskId,
       baseClassId: request.baseClassId,
-      dependencies: allQuizTasks,
+      dependencies: examDependencies,
       totalPaths: pathWorkflows.length,
       pathsWithQuizzes: allQuizTasks.length,
       includeFinalExam: request.assessmentSettings?.includeFinalExam,
-      classTitle: request.title
+      classTitle: request.title,
+      dependencyType: allQuizTasks.length > 0 ? 'quiz_tasks' : 'lesson_assessments'
     });
     
-    tasks.set(examTaskId, {
-      id: examTaskId,
-      type: 'class_exam',
-      status: 'pending',
-      baseClassId: request.baseClassId,
-      dependencies: allQuizTasks,
-      data: { classTitle: request.title, request }
-    });
+    // Only create exam task if final exam is enabled
+    if (request.assessmentSettings?.includeFinalExam !== false) {
+      tasks.set(examTaskId, {
+        id: examTaskId,
+        type: 'class_exam',
+        status: 'pending',
+        baseClassId: request.baseClassId,
+        dependencies: examDependencies,
+        data: { classTitle: request.title, request }
+      });
+    }
 
     const classWorkflow: ClassWorkflow = {
       baseClassId: request.baseClassId,
       paths: paths.map(p => p.id),
-      examTask: examTaskId,
+      examTask: request.assessmentSettings?.includeFinalExam !== false ? examTaskId : undefined,
       allPathsComplete: false
     };
 
@@ -779,44 +779,81 @@ What makes this particularly important for ${request.academicLevel || 'college'}
       }
     }
 
-    // Check if all path quizzes are complete
-    if (completedTask.type === 'path_quiz') {
-      console.log(`🎯 Path quiz completed: ${completedTask.id}`);
-      
-      // Check if all existing quiz tasks are complete (only check tasks that were actually created)
-      const existingQuizTasks = Array.from(state.tasks.values())
-        .filter(task => task.type === 'path_quiz')
-        .map(task => task.id);
-      
-      console.log(`📊 Existing quiz tasks: ${existingQuizTasks.length}`, existingQuizTasks);
-      
-      const allExistingQuizzesComplete = existingQuizTasks.every(taskId => 
-        state.completedTasks.has(taskId)
-      );
-      
-      console.log(`✅ All existing quizzes complete: ${allExistingQuizzesComplete}`);
-      
-      if (allExistingQuizzesComplete) {
-        const examTask = Array.from(state.tasks.values()).find(task => task.type === 'class_exam');
-        if (examTask && examTask.status === 'pending') {
-          console.log(`🎓 Triggering class exam: ${examTask.id}`);
-          await this.executeTask(state, examTask);
-        } else {
-          console.log(`⚠️ Class exam task not found or not pending:`, {
-            found: !!examTask,
-            status: examTask?.status,
-            id: examTask?.id
-          });
-        }
-      } else {
-        console.log(`⏳ Waiting for more quizzes to complete. Completed: ${state.completedTasks.size}, Total quiz tasks: ${existingQuizTasks.length}`);
-      }
-    }
+    // Check exam trigger conditions
+    await this.checkExamTriggerConditions(state, completedTask);
 
     // Check overall completion
     if (completedTask.type === 'class_exam') {
       console.log('🎉 Course generation completed successfully!');
       await this.updateJobStatus(state.jobId, 'completed', 100);
+    }
+  }
+
+  /**
+   * Check if exam should be triggered based on completed tasks
+   */
+  private async checkExamTriggerConditions(state: OrchestrationState, completedTask: GenerationTask): Promise<void> {
+    // Only check for exam trigger on quiz or assessment completion
+    if (completedTask.type !== 'path_quiz' && completedTask.type !== 'lesson_assessment') {
+      return;
+    }
+
+    // Check if all existing quiz tasks are complete (only check tasks that were actually created)
+    const existingQuizTasks = Array.from(state.tasks.values())
+      .filter(task => task.type === 'path_quiz')
+      .map(task => task.id);
+    
+    const allExistingQuizzesComplete = existingQuizTasks.length === 0 || existingQuizTasks.every(taskId => 
+      state.completedTasks.has(taskId)
+    );
+    
+    // If no quiz tasks exist, check if all lesson assessments are complete
+    const allLessonAssessmentsComplete = state.lessons.every(lesson => 
+      !lesson.assessmentTask || state.completedTasks.has(lesson.assessmentTask)
+    );
+    
+    const shouldTriggerExam = existingQuizTasks.length > 0 
+      ? allExistingQuizzesComplete 
+      : allLessonAssessmentsComplete;
+    
+    if (completedTask.type === 'path_quiz') {
+      console.log(`🎯 Path quiz completed: ${completedTask.id}`);
+    }
+    
+    console.log(`📊 Exam trigger check:`, {
+      quizTasks: existingQuizTasks.length,
+      allQuizzesComplete: allExistingQuizzesComplete,
+      allAssessmentsComplete: allLessonAssessmentsComplete,
+      shouldTriggerExam,
+      completedTaskType: completedTask.type,
+      completedTaskId: completedTask.id,
+      totalCompletedTasks: state.completedTasks.size,
+      totalTasks: state.tasks.size,
+      lessonAssessmentDetails: state.lessons.map(l => ({
+        lessonId: l.lessonId,
+        title: l.title,
+        assessmentTask: l.assessmentTask,
+        isComplete: l.assessmentTask ? state.completedTasks.has(l.assessmentTask) : false
+      }))
+    });
+    
+    if (shouldTriggerExam) {
+      const examTask = Array.from(state.tasks.values()).find(task => task.type === 'class_exam');
+      if (examTask && examTask.status === 'pending') {
+        console.log(`🎓 Triggering class exam: ${examTask.id}`);
+        await this.executeTask(state, examTask);
+      } else if (!examTask) {
+        console.log(`✅ No final exam configured - course generation complete`);
+        await this.updateJobStatus(state.jobId, 'completed', 100);
+      } else {
+        console.log(`⚠️ Class exam task not pending:`, {
+          status: examTask?.status,
+          id: examTask?.id
+        });
+      }
+    } else {
+      const waitingFor = existingQuizTasks.length > 0 ? 'quizzes' : 'assessments';
+      console.log(`⏳ Waiting for more ${waitingFor} to complete.`);
     }
   }
 

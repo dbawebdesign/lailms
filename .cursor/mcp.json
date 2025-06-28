@@ -21,11 +21,11 @@
                 "npx",
                 "-y",
                 "@supabase/mcp-server-supabase@latest",
-                "--access-token",
-                "sbp_741659638d12c7c1480a25fc6bbdb8937cab3019",
-                "--project-ref",
-                "zylyphqfzalidclffugh"
-            ]
+                "--project-ref=zylyphqfzalidclffugh"
+            ],
+            "env": {
+                "SUPABASE_ACCESS_TOKEN": "sbp_741659638d12c7c1480a25fc6bbdb8937cab3019"
+            }
         }
     }
 }

@@ -17,6 +17,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { triggerCelebration } from '@/components/ui/confetti';
 import { 
+  estimateCourseGenerationTime, 
+  formatEstimatedTime, 
+  getTimeEstimateExplanation,
+  type CourseGenerationParams 
+} from '@/lib/utils/courseGenerationEstimator';
+import { 
   Loader2, 
   BookOpen, 
   Brain, 
@@ -34,7 +40,9 @@ import {
   Plus,
   X,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Home,
+  Info
 } from 'lucide-react';
 
 interface KnowledgeBaseAnalysis {
@@ -127,6 +135,7 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
   const [userGuidance, setUserGuidance] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [generationJob, setGenerationJob] = useState<any>(null);
+  const [showTimeEstimate, setShowTimeEstimate] = useState(false);
 
   const loadKnowledgeBaseAnalysis = useCallback(async () => {
     try {
@@ -147,6 +156,39 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
       setAnalyzing(false);
     }
   }, [baseClassId]);
+
+  // Calculate time estimate based on current settings
+  const getTimeEstimate = useCallback(() => {
+    if (!selectedMode || !kbAnalysis) return null;
+
+    const params: CourseGenerationParams = {
+      estimatedWeeks,
+      lessonsPerWeek: lessonsPerWeek[0],
+      includeAssessments,
+      includeQuizzes,
+      includeFinalExam,
+      lessonDetailLevel,
+      generationMode: selectedMode as any,
+      documentCount: kbAnalysis.totalDocuments
+    };
+
+    return estimateCourseGenerationTime(params);
+  }, [
+    selectedMode, 
+    estimatedWeeks, 
+    lessonsPerWeek, 
+    includeAssessments, 
+    includeQuizzes, 
+    includeFinalExam, 
+    lessonDetailLevel, 
+    kbAnalysis
+  ]);
+
+  const timeEstimate = getTimeEstimate();
+
+  const returnToDashboard = () => {
+    router.push('/teach');
+  };
 
   const onCourseGeneratedSafe = onCourseGenerated;
   const checkJobStatus = useCallback(async () => {
@@ -210,34 +252,37 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
       setLoading(true);
       setError(null);
 
+      const requestData = {
+        baseClassId,
+        title: title.trim(),
+        description: description.trim(),
+        generationMode: selectedMode,
+        estimatedDurationWeeks: estimatedWeeks,
+        academicLevel,
+        lessonDetailLevel,
+        targetAudience: targetAudience.trim(),
+        prerequisites: prerequisites.trim(),
+        lessonsPerWeek: lessonsPerWeek[0],
+        learningObjectives: learningObjectives.filter(obj => obj.trim().length > 0),
+        assessmentSettings: {
+          includeAssessments,
+          includeQuizzes,
+          includeFinalExam,
+          assessmentDifficulty,
+          questionsPerLesson: questionsPerLesson[0],
+          questionsPerQuiz: questionsPerQuiz[0],
+          questionsPerExam: questionsPerExam[0]
+        },
+        userGuidance: userGuidance.trim(),
+        estimatedMinutes: timeEstimate?.estimatedMinutes
+      };
+
       const response = await fetch('/api/knowledge-base/generate-course', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          baseClassId,
-          title: title.trim(),
-          description: description.trim(),
-          generationMode: selectedMode,
-          estimatedDurationWeeks: estimatedWeeks,
-          academicLevel,
-          lessonDetailLevel,
-          targetAudience: targetAudience.trim(),
-          prerequisites: prerequisites.trim(),
-          lessonsPerWeek: lessonsPerWeek[0],
-          learningObjectives: learningObjectives.filter(obj => obj.trim().length > 0),
-          assessmentSettings: {
-            includeAssessments,
-            includeQuizzes,
-            includeFinalExam,
-            assessmentDifficulty,
-            questionsPerLesson: questionsPerLesson[0],
-            questionsPerQuiz: questionsPerQuiz[0],
-            questionsPerExam: questionsPerExam[0]
-          },
-          userGuidance: userGuidance.trim()
-        }),
+        body: JSON.stringify(requestData),
       });
 
       const data = await response.json();
@@ -246,7 +291,8 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
         setGenerationJob({
           id: data.jobId,
           status: data.status,
-          progress: 0
+          progress: 0,
+          estimatedMinutes: timeEstimate?.estimatedMinutes
         });
       } else {
         setError(data.error || 'Failed to start course generation');
@@ -940,6 +986,64 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
         </CardContent>
       </Card>
 
+      {/* Time Estimate */}
+      {timeEstimate && selectedMode && (
+        <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-5 w-5 text-blue-600" />
+                <div>
+                  <h4 className="font-medium text-sm">Estimated Generation Time</h4>
+                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                    {formatEstimatedTime(timeEstimate.estimatedMinutes)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {getTimeEstimateExplanation({
+                      estimatedWeeks,
+                      lessonsPerWeek: lessonsPerWeek[0],
+                      includeAssessments,
+                      includeQuizzes,
+                      includeFinalExam,
+                      lessonDetailLevel,
+                      generationMode: selectedMode as any,
+                      documentCount: kbAnalysis?.totalDocuments
+                    })}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTimeEstimate(!showTimeEstimate)}
+                className="text-xs"
+              >
+                <Info className="h-3 w-3 mr-1" />
+                {showTimeEstimate ? 'Hide' : 'Show'} Details
+              </Button>
+            </div>
+            
+            {showTimeEstimate && (
+              <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-800">
+                <h5 className="font-medium text-sm mb-2">Time Breakdown:</h5>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>Knowledge Base Analysis: {formatEstimatedTime(timeEstimate.taskBreakdown.kbAnalysis)}</div>
+                  <div>Outline Generation: {formatEstimatedTime(timeEstimate.taskBreakdown.outlineGeneration)}</div>
+                  <div>Path Creation: {formatEstimatedTime(timeEstimate.taskBreakdown.pathCreation)}</div>
+                  <div>Lesson Generation: {formatEstimatedTime(timeEstimate.taskBreakdown.lessonGeneration)}</div>
+                  {timeEstimate.taskBreakdown.assessmentCreation > 0 && (
+                    <div className="col-span-2">Assessment Creation: {formatEstimatedTime(timeEstimate.taskBreakdown.assessmentCreation)}</div>
+                  )}
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Total tasks to complete: {timeEstimate.totalTasks}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Error Display */}
       {error && (
         <Alert variant="destructive">
@@ -949,7 +1053,11 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
       )}
 
       {/* Generate Button */}
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+          <Sparkles className="h-4 w-4" />
+          <span>Course will be generated in the background</span>
+        </div>
         <Button 
           onClick={generateCourse} 
           disabled={loading || !title.trim() || !selectedMode}

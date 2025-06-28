@@ -7,10 +7,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useLunaContext } from '@/hooks/useLunaContext';
 import { PersonaType, ChatMessage } from '@/components/LunaAIChat';
 import { UserRole } from '@/config/navConfig';
 import { CourseOutlineMessage } from '@/components/luna/CourseOutlineMessage';
+import KBSourceCollectionMessage from '@/components/luna/KBSourceCollectionMessage';
+import EnhancedCourseGenerationMessage from '@/components/luna/EnhancedCourseGenerationMessage';
 import { createClient } from '@/lib/supabase/client';
 import { 
   Menu, Send, Search, Plus, Bot, User, Star, Trash2, Loader2, ArrowLeft,
@@ -21,6 +24,11 @@ import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import Image from 'next/image';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { 
+  generateConversationTitle, 
+  shouldGenerateTitle, 
+  generateFallbackTitle 
+} from '@/lib/utils/conversationTitleGenerator';
 
 interface LunaConversation {
   id: string;
@@ -31,6 +39,23 @@ interface LunaConversation {
   updated_at: string;
   is_pinned: boolean;
   message_count: number;
+}
+
+// Extended ChatMessage interface to support new interactive message types
+interface ExtendedChatMessage extends ChatMessage {
+  // KB Source Collection properties
+  isKBSourceCollection?: boolean;
+  kbAnalysis?: any;
+  availableModes?: string[];
+  recommendedMode?: string;
+  
+  // Enhanced Course Generation properties
+  isEnhancedCourseGeneration?: boolean;
+  baseClassId?: string;
+  generationConfig?: any;
+  
+  // Tool execution results
+  toolResults?: any[];
 }
 
 interface SupabaseEnhancedLunaChatProps {
@@ -55,7 +80,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
   // Data state
   const [conversations, setConversations] = useState<LunaConversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<LunaConversation | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ExtendedChatMessage[]>([]);
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -148,6 +173,17 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Handle component unmount (user navigating away) - trigger title generation
+  useEffect(() => {
+    return () => {
+      // On component unmount, generate title for current conversation if needed
+      if (currentConversation && messages.length > 0) {
+        // Use a fire-and-forget approach since the component is unmounting
+        handleConversationExit(currentConversation, messages).catch(console.error);
+      }
+    };
+  }, []); // Empty dependency array means this effect runs only on mount/unmount
 
   const loadConversations = useCallback(async () => {
     try {
@@ -285,9 +321,120 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     }
   };
 
+  // Track if a conversation has had its title generated
+  const [titleGeneratedConversations, setTitleGeneratedConversations] = useState<Set<string>>(new Set());
+
   const generateTitle = (firstMessage: string): string => {
-    const words = firstMessage.split(' ').slice(0, 5);
-    return words.join(' ') + (firstMessage.split(' ').length > 5 ? '...' : '');
+    const words = firstMessage.split(' ').slice(0, 4);
+    return words.join(' ') + (firstMessage.split(' ').length > 4 ? '...' : '');
+  };
+
+  // Generate AI-powered conversation title when a user exits a conversation
+  const generateAITitle = async (conversation: LunaConversation, currentMessages: ExtendedChatMessage[]) => {
+    // Don't generate if we already have for this conversation or if it already has a custom title
+    if (titleGeneratedConversations.has(conversation.id) || 
+        (conversation.title !== 'New Conversation' && !conversation.title.endsWith('...'))) {
+      return;
+    }
+
+    // Only generate if conversation has meaningful content
+    if (!shouldGenerateTitle(currentMessages)) {
+      return;
+    }
+
+    try {
+      console.log('🤖 Generating AI title for conversation:', conversation.id);
+      
+      // Mark as being processed to avoid duplicate requests
+      setTitleGeneratedConversations(prev => new Set(prev).add(conversation.id));
+      
+      const result = await generateConversationTitle(currentMessages, conversation.id);
+      
+      if (result.wasGenerated && result.title !== conversation.title) {
+        // Update conversation title in database
+        const { error } = await supabase
+          .from('luna_conversations')
+          .update({ title: result.title })
+          .eq('id', conversation.id);
+        
+        if (!error) {
+          console.log('✅ AI title generated and saved:', result.title);
+          // Refresh conversations to show new title
+          await loadConversations();
+        } else {
+          console.error('❌ Failed to save AI-generated title:', error);
+          // Remove from processed set so we can try again later
+          setTitleGeneratedConversations(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(conversation.id);
+            return newSet;
+          });
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error generating AI title:', error);
+      // Remove from processed set so we can try again later
+      setTitleGeneratedConversations(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(conversation.id);
+        return newSet;
+      });
+    }
+  };
+
+  // Handle conversation exit logic (when user switches away from a conversation)
+  const handleConversationExit = async (exitingConversation: LunaConversation | null, currentMessages: ExtendedChatMessage[]) => {
+    if (!exitingConversation || currentMessages.length === 0) {
+      return;
+    }
+
+    // Generate AI title for the conversation being exited
+    await generateAITitle(exitingConversation, currentMessages);
+  };
+
+  // Helper component for title with tooltip
+  const TitleWithTooltip = ({ 
+    title, 
+    className = "", 
+    maxLength = 50,
+    onClick 
+  }: { 
+    title: string; 
+    className?: string; 
+    maxLength?: number;
+    onClick?: () => void;
+  }) => {
+    const shouldShowTooltip = title.length > maxLength;
+    
+    const titleElement = (
+      <div 
+        className={cn("truncate min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap", className)}
+        onClick={onClick}
+        style={{
+          maxWidth: '100%',
+          wordBreak: 'break-all'
+        }}
+      >
+        {title}
+      </div>
+    );
+
+    if (shouldShowTooltip) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {titleElement}
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="max-w-xs break-words">{title}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    return titleElement;
   };
 
   const createNewConversation = async (persona: PersonaType = currentPersona) => {
@@ -360,6 +507,11 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
   };
 
   const switchConversation = async (conversation: LunaConversation) => {
+    // Handle exit of current conversation (generate AI title if needed)
+    if (currentConversation && currentConversation.id !== conversation.id) {
+      await handleConversationExit(currentConversation, messages);
+    }
+    
     setCurrentConversation(conversation);
     setCurrentPersona(conversation.persona);
     await loadMessages(conversation.id);
@@ -397,7 +549,12 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     }
   };
 
-  const handleBackToSidebar = () => {
+  const handleBackToSidebar = async () => {
+    // Handle exit of current conversation (generate AI title if needed)
+    if (currentConversation) {
+      await handleConversationExit(currentConversation, messages);
+    }
+    
     setViewMode('sidebar');
   };
 
@@ -1070,8 +1227,16 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
 
       // Check if this is an outline response
       const isOutlineResponse = result.isOutline || (result.outlineData && Object.keys(result.outlineData).length > 0);
+      
+      // Check for KB source collection response
+      const isKBSourceCollectionResponse = result.toolsUsed?.includes('collectKnowledgeBaseSources') || 
+                                         (result.kbAnalysis || result.availableModes || result.recommendedMode);
+      
+      // Check for enhanced course generation response  
+      const isEnhancedCourseGenerationResponse = result.toolsUsed?.includes('enhancedCourseGeneration') ||
+                                               (result.generationConfig || result.baseClassId);
 
-      const assistantMsg: ChatMessage = {
+      const assistantMsg: ExtendedChatMessage = {
         id: uuidv4(),
         role: 'assistant',
         content: result.response || 'Sorry, I encountered an error.',
@@ -1081,6 +1246,15 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
         actionButtons: result.actionButtons,
         isOutline: isOutlineResponse,
         outlineData: result.outlineData,
+        // New properties for interactive message types
+        isKBSourceCollection: isKBSourceCollectionResponse,
+        kbAnalysis: result.kbAnalysis,
+        availableModes: result.availableModes,
+        recommendedMode: result.recommendedMode,
+        isEnhancedCourseGeneration: isEnhancedCourseGenerationResponse,
+        baseClassId: result.baseClassId,
+        generationConfig: result.generationConfig,
+        toolResults: result.toolResults,
         actions: isOutlineResponse ? [
           { 
             label: 'Save Outline', 
@@ -1275,17 +1449,17 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
 
   // Sidebar View
   const renderSidebar = () => (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b">
-        <div className="flex items-center gap-2 mb-3">
+    <div className="flex flex-col h-full w-full max-w-full overflow-hidden">
+      <div className="p-4 border-b flex-shrink-0">
+        <div className="flex items-center gap-2 mb-3 min-w-0">
           <Image 
             src="/web-app-manifest-512x512.png" 
             alt="Luna" 
             width={20} 
             height={20} 
-            className="rounded-full"
+            className="rounded-full flex-shrink-0"
           />
-          <h2 className="font-semibold">Luna Conversations</h2>
+          <h2 className="font-semibold truncate">Luna Conversations</h2>
         </div>
         
         <Button 
@@ -1308,26 +1482,69 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="p-2 space-y-1">
+      <ScrollArea className="flex-1 w-full max-w-full overflow-hidden">
+        <div className="p-2 space-y-1" style={{ width: '320px', maxWidth: '320px', overflow: 'hidden' }}>
           {filteredConversations.map((conversation) => (
             <div
               key={conversation.id}
               className="cursor-pointer transition-colors hover:bg-muted/50 rounded-lg px-3 py-2 group"
               onClick={() => switchConversation(conversation)}
+              style={{ 
+                width: '296px', // 320px - 16px (p-2) - 8px (margin)
+                maxWidth: '296px',
+                minWidth: '296px',
+                overflow: 'hidden',
+                boxSizing: 'border-box'
+              }}
             >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm truncate leading-tight">{conversation.title}</h3>
+              <div 
+                className="flex items-center gap-2"
+                style={{ 
+                  width: '272px', // 296px - 24px (px-3 padding)
+                  maxWidth: '272px',
+                  minWidth: 0,
+                  overflow: 'hidden'
+                }}
+              >
+                <div 
+                  className="flex-1 overflow-hidden"
+                  style={{ 
+                    minWidth: 0,
+                    maxWidth: '220px', // 272px - 50px (actions) - 2px (gap)
+                    overflow: 'hidden'
+                  }}
+                >
+                  <div 
+                    className="font-medium text-sm leading-tight"
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '220px',
+                      width: '220px'
+                    }}
+                    title={conversation.title}
+                  >
+                    {conversation.title}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {conversation.is_pinned && <Star size={12} className="text-yellow-500" />}
+                <div 
+                  className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                  style={{ 
+                    width: '50px', 
+                    maxWidth: '50px',
+                    minWidth: '50px',
+                    justifyContent: 'flex-end',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {conversation.is_pinned && <Star size={12} className="text-yellow-500 flex-shrink-0" />}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 w-6 p-0 hover:bg-muted-foreground/20"
+                        className="h-6 w-6 p-0 hover:bg-muted-foreground/20 flex-shrink-0"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <MoreHorizontal size={12} />
@@ -1420,15 +1637,16 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
                     autoFocus
                   />
                 ) : (
-                  <h1 
-                    className="text-sm font-medium truncate cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5"
-                    onClick={() => {
-                      setEditingTitle(true);
-                      setEditTitle(currentConversation?.title || '');
-                    }}
-                  >
-                    {currentConversation?.title || 'New Conversation'}
-                  </h1>
+                  <div className="text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 min-w-0 flex-1">
+                    <TitleWithTooltip 
+                      title={currentConversation?.title || 'New Conversation'}
+                      maxLength={40}
+                      onClick={() => {
+                        setEditingTitle(true);
+                        setEditTitle(currentConversation?.title || '');
+                      }}
+                    />
+                  </div>
                 )}
                 <p className="text-xs text-muted-foreground truncate">
                   {availablePersonas.find(p => p.id === currentPersona)?.name}
@@ -1524,7 +1742,35 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
                     </div>
                   ) : (
                     <div className="break-words">
-                      {msg.isOutline && msg.outlineData ? (
+                      {msg.isKBSourceCollection ? (
+                        <div>
+                          <div className="whitespace-pre-wrap break-words overflow-wrap-anywhere mb-4">{msg.content}</div>
+                          <KBSourceCollectionMessage
+                            baseClassId={msg.baseClassId || 'unknown'}
+                            onSourcesCollected={(sources: any) => {
+                              console.log('KB sources collected:', sources);
+                              sendDirectResponseToLuna(`I've collected ${sources.documents?.length || 0} documents and ${sources.urls?.length || 0} URLs. Please proceed with enhanced course generation.`);
+                            }}
+                            onSkipSources={() => {
+                              console.log('KB source collection skipped');
+                              sendDirectResponseToLuna('I\'ve chosen to skip knowledge base sources and proceed with general course generation.');
+                            }}
+                          />
+                        </div>
+                      ) : msg.isEnhancedCourseGeneration ? (
+                        <div>
+                          <div className="whitespace-pre-wrap break-words overflow-wrap-anywhere mb-4">{msg.content}</div>
+                          <EnhancedCourseGenerationMessage
+                            baseClassId={msg.baseClassId || 'unknown'}
+                            generationModes={msg.generationConfig?.modes}
+                            recommendedMode={msg.recommendedMode}
+                            onGenerateCourse={(params: any) => {
+                              console.log('Enhanced course generation params:', params);
+                              sendDirectResponseToLuna(`I've configured the enhanced course generation with title: "${params.title}", mode: ${params.generationMode}, duration: ${params.estimatedDurationWeeks} weeks.`);
+                            }}
+                          />
+                        </div>
+                      ) : msg.isOutline && msg.outlineData ? (
                         <CourseOutlineMessage outline={msg.outlineData} />
                       ) : (
                         <div className="whitespace-pre-wrap break-words overflow-wrap-anywhere">{msg.content}</div>

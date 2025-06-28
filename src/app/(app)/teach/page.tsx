@@ -239,12 +239,6 @@ export default async function TeacherDashboardPage() {
               </Link>
             </Button>
             <Button asChild className="w-full justify-start" variant="outline">
-              <Link href="/teach/designer">
-                <Lightbulb className="mr-2 h-4 w-4" />
-                Create Content
-              </Link>
-            </Button>
-            <Button asChild className="w-full justify-start" variant="outline">
               <Link href="/teach/knowledge-base/create">
                 <Brain className="mr-2 h-4 w-4" />
                 Create KB Course

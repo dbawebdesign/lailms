@@ -128,12 +128,6 @@ const navConfig: NavItem[] = [
     roles: ["teacher"],
   },
   {
-    title: "Designer", // Consolidating Course Designer, Lesson Studio, Assessment Builder under one umbrella
-    href: "/teach/designer", // Generic route for designer tools
-    icon: PenTool,
-    roles: ["teacher"],
-  },
-  {
     title: "Gradebook",
     href: "/teach/gradebook", // PRD: /teach/gradebook/:classId
     icon: ClipboardList,

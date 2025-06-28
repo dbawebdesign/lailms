@@ -8,7 +8,7 @@ import { CreateBaseClassModal } from "@/components/teach/CreateBaseClassModal";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, BookOpenText, Plus, Loader2 } from "lucide-react";
 import { createBrowserClient } from '@supabase/ssr'; // Import Supabase client
-import { Database, Tables } from '@learnologyai/types'; // Import Database types
+import { Database, Tables } from '../../../../../packages/types/db'; // Import Database types
 // import { toast } from "sonner"; // Consider adding toast notifications
 
 // --- Mock API --- (To be moved to a separate file e.g., src/lib/api/teach-mocks.ts later)
@@ -209,19 +209,44 @@ export default function TeachBaseClassesPage() {
       newBaseClassId = createdBaseClass.id;
 
       setCurrentProcessStatus("Step 2/4: Generating course outline...");
-      const prompt = `Design a comprehensive course outline for a ${formDataFromModal.lengthInWeeks}-week course titled "${formDataFromModal.name}". Subject: ${createdBaseClass.subject || 'General'}. Grade Level: ${createdBaseClass.gradeLevel || 'Not specified'}. Course Description: ${formDataFromModal.description || 'No additional description provided.'}. Ensure the outline includes distinct modules, and for each module, suggest specific lesson titles.`;
       
-      const outlineResponse = await fetch("/api/teach/generate-course-outline", {
+      // Use the new unified course generation API
+      const outlineResponse = await fetch("/api/teach/course-generation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({
+          baseClassId: newBaseClassId,
+          title: formDataFromModal.name,
+          description: formDataFromModal.description,
+          estimatedDurationWeeks: formDataFromModal.lengthInWeeks,
+          generationMode: 'kb_supplemented', // Default mode that works with or without KB content
+          academicLevel: 'college', // Default academic level
+          lessonDetailLevel: 'detailed', // Default detail level
+          assessmentSettings: {
+            includeAssessments: true,
+            includeQuizzes: true,
+            includeFinalExam: true,
+            assessmentDifficulty: 'medium',
+            questionsPerLesson: 3,
+            questionsPerQuiz: 10,
+            questionsPerExam: 20
+          }
+        }),
       });
 
       if (!outlineResponse.ok) {
         const errorData = await outlineResponse.json().catch(() => ({error: "Failed to generate outline and parse server error"}));
         throw new Error(errorData.error || "Failed to generate course outline");
       }
-      const generatedOutline: GeneratedOutline = await outlineResponse.json(); 
+      
+      const outlineResult = await outlineResponse.json();
+      
+      // Extract the generated outline from the response
+      const generatedOutline: GeneratedOutline = {
+        title: outlineResult.title,
+        description: outlineResult.description,
+        paths: outlineResult.paths
+      }; 
 
       setCurrentProcessStatus("Step 3/4: Saving outline to base class...");
       const existingSettings = createdBaseClass?.settings;
