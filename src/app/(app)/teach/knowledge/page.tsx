@@ -34,7 +34,13 @@ export default async function TeacherKnowledgePage() {
       created_at
     `)
     .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .returns<Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      created_at: string;
+    }>>();
 
   if (baseClassesError) {
     console.error('Error fetching base classes:', baseClassesError);
