@@ -5,10 +5,11 @@ import KnowledgeBaseCourseCreator from '@/components/knowledge-base/KnowledgeBas
 import { Tables } from 'packages/types/db';
 
 interface PageProps {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export default async function CreateKnowledgeBaseCoursePage({ searchParams }: PageProps) {
+  const resolvedSearchParams = await searchParams;
   const supabase = createSupabaseServerClient();
   
   // Check authentication
@@ -29,7 +30,7 @@ export default async function CreateKnowledgeBaseCoursePage({ searchParams }: Pa
   }
 
   // Extract baseClassId from search params if provided
-  const baseClassId = typeof searchParams.baseClassId === 'string' ? searchParams.baseClassId : undefined;
+  const baseClassId = typeof resolvedSearchParams.baseClassId === 'string' ? resolvedSearchParams.baseClassId : undefined;
 
   return (
     <div className="min-h-screen bg-background">
