@@ -300,6 +300,10 @@ export default function TeachBaseClassesPage() {
     }
   };
 
+  const handleCreateNewBaseClass = () => {
+    router.push('/teach/knowledge-base/create');
+  };
+
   const handleModalOpen = () => {
     if (!userOrgId) {
       setPageError(isLoadingOrg ? "Organisation context is still loading. Please wait." : "Organisation context could not be loaded. Please refresh or check your profile.");
@@ -382,15 +386,12 @@ export default function TeachBaseClassesPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">My Base Classes</h1>
         <Button 
-          onClick={handleModalOpen} 
+          onClick={handleCreateNewBaseClass} 
           variant="default" 
           size="lg" 
-          disabled={isProcessingRequest || isLoadingOrg || !userOrgId}
+          disabled={isLoadingOrg || !userOrgId}
         >
-          {/* Button text logic updated slightly to reflect isProcessingRequest and currentProcessStatus */}
-          {isProcessingRequest && currentProcessStatus ? (
-            <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> {currentProcessStatus.length > 20 ? `${currentProcessStatus.substring(0,20)}...` : currentProcessStatus}</>
-          ) : isLoadingOrg ? (
+          {isLoadingOrg ? (
             <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading Context...</>
           ) : !userOrgId ? (
             <><PlusCircle className="mr-2 h-5 w-5" /> Org ID Missing</>
@@ -431,14 +432,12 @@ export default function TeachBaseClassesPage() {
                 Get started by creating your first base class.
               </p>
               <Button 
-                onClick={handleModalOpen} 
+                onClick={handleCreateNewBaseClass} 
                 variant="outline" 
                 className="mt-6" 
-                disabled={isProcessingRequest || isLoadingOrg || !userOrgId}
+                disabled={isLoadingOrg || !userOrgId}
               >
-                {isProcessingRequest && currentProcessStatus ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {currentProcessStatus.substring(0,18)}...</>
-                ) : isLoadingOrg ? (
+                {isLoadingOrg ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Context...</>
                 ) : !userOrgId ? (
                   <><Plus className="mr-2 h-4 w-4" /> Org ID Missing</>

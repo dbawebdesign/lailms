@@ -4,7 +4,7 @@ import WelcomeCard from "@/components/dashboard/WelcomeCard";
 import { ActiveClassItem } from "@/components/dashboard/teacher/ActiveClassItem";
 import CourseGenerationProgressWidget from "@/components/dashboard/CourseGenerationProgressWidget";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BookOpenCheck, ClipboardCheck, AlertTriangle, Info, Users, Sparkles, Activity, TrendingUp, BookOpen, CheckCircle, Target, Eye, Lightbulb, Search, Brain } from 'lucide-react';
+import { BookOpenCheck, ClipboardCheck, AlertTriangle, Info, Users, Sparkles, Activity, TrendingUp, BookOpen, CheckCircle, Target, Eye, Lightbulb, Search } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Tables } from "packages/types/db";
@@ -231,7 +231,7 @@ export default async function TeacherDashboardPage() {
           </h2>
             <div className="space-y-3">
             <Button asChild className="w-full justify-start" variant="outline">
-              <Link href="/teach/base-classes">
+              <Link href="/teach/knowledge-base/create">
                 <BookOpen className="mr-2 h-4 w-4" />
                 Create New Course
               </Link>
@@ -243,13 +243,7 @@ export default async function TeacherDashboardPage() {
               </Link>
             </Button>
             <Button asChild className="w-full justify-start" variant="outline">
-              <Link href="/teach/knowledge-base/create">
-                <Brain className="mr-2 h-4 w-4" />
-                Create KB Course
-              </Link>
-            </Button>
-            <Button asChild className="w-full justify-start" variant="outline">
-              <Link href="/knowledge-base">
+              <Link href="/teach/knowledge">
                 <Search className="mr-2 h-4 w-4" />
                 Search Knowledge
               </Link>
