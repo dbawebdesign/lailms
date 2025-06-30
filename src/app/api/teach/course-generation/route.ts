@@ -113,6 +113,13 @@ export async function POST(request: NextRequest) {
     }
 
     // For KB-based modes, use the advanced course generator
+    if (!baseClass) {
+      return NextResponse.json(
+        { error: 'Base class is required for knowledge base generation modes' }, 
+        { status: 400 }
+      );
+    }
+
     const generationRequest: CourseGenerationRequest = {
       baseClassId,
       organisationId: baseClass.organisation_id,

@@ -61,11 +61,11 @@ export async function GET(request: NextRequest) {
 
       // Get attempt counts and scores
       const { data: attempts, error: attemptError } = await supabase
-        .from('assessment_attempts')
-        .select('assessment_id, score')
+        .from('student_attempts')
+        .select('assessment_id, percentage_score')
         .in('assessment_id', assessmentIds)
-        .eq('completed', true)
-        .returns<Pick<Tables<'assessment_attempts'>, 'assessment_id' | 'score'>[]>();
+        .eq('status', 'submitted')
+        .returns<Pick<Tables<'student_attempts'>, 'assessment_id' | 'percentage_score'>[]>();
 
       if (attemptError) {
         console.error('Error fetching attempt stats:', attemptError);
@@ -78,9 +78,9 @@ export async function GET(request: NextRequest) {
           const assessmentId = attempt.assessment_id!;
           const stats = attemptStatsMap.get(assessmentId) || { count: 0, totalScore: 0, scores: [] };
           stats.count++;
-          if (attempt.score !== null) {
-            stats.totalScore += attempt.score!;
-            stats.scores.push(attempt.score!);
+          if (attempt.percentage_score !== null) {
+            stats.totalScore += attempt.percentage_score!;
+            stats.scores.push(attempt.percentage_score!);
           }
           attemptStatsMap.set(assessmentId, stats);
         });

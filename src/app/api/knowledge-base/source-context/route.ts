@@ -77,7 +77,7 @@ export async function GET(req: Request) {
     `)
     .eq('id', chunkId)
     .eq('document_id', documentId)
-    .single<Tables<"document_chunks">>();
+    .single();
   
   if (chunkError) {
     console.error('Error fetching chunk:', chunkError);
@@ -144,7 +144,7 @@ export async function GET(req: Request) {
   // Extract document title and other metadata
   const documentTitle = (chunk.metadata && typeof chunk.metadata === 'object' && 'documentTitle' in chunk.metadata && typeof chunk.metadata.documentTitle === 'string') 
                         ? chunk.metadata.documentTitle 
-                        : chunk.documents?.file_name || 'Untitled Document';
+                        : chunk.documents?.[0]?.file_name || 'Untitled Document';
   
   // Special handling for YouTube timestamps if available
   let timestampInfo = null;
@@ -178,7 +178,7 @@ export async function GET(req: Request) {
     },
     documentId: documentId,
     documentTitle,
-    documentType: chunk.documents?.file_type,
+    documentType: chunk.documents?.[0]?.file_type,
     previousChunk,
     nextChunk,
     timestamp: timestampInfo
