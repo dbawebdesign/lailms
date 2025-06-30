@@ -26,7 +26,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ 
       success: true,
       profile: {
-        id: profile.id,
         user_id: profile.user_id,
         organisation_id: profile.organisation_id,
         first_name: profile.first_name,
