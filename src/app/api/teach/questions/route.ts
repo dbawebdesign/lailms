@@ -20,28 +20,49 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'assessment_id or base_class_id is required' }, { status: 400 });
     }
 
-    let query = supabase.from('assessment_questions').select('*');
+    let query;
 
     if (assessmentId) {
-      query = query.eq('assessment_id', assessmentId);
-    } else if (baseClassId) {
-      // Join with assessments to filter by base_class_id
       query = supabase
         .from('assessment_questions')
-        .select('*, assessments!inner(base_class_id)')
-        .eq('assessments.base_class_id', baseClassId);
+        .select('*')
+        .eq('assessment_id', assessmentId);
+    } else if (baseClassId) {
+      // First get assessments for the base class, then get questions for those assessments
+      const { data: assessments, error: assessmentError } = await supabase
+        .from('assessments')
+        .select('id')
+        .eq('base_class_id', baseClassId);
+
+      if (assessmentError) {
+        console.error('Error fetching assessments:', assessmentError);
+        return NextResponse.json({ error: assessmentError.message }, { status: 500 });
+      }
+
+      if (!assessments || assessments.length === 0) {
+        return NextResponse.json([]);
+      }
+
+      const assessmentIds = assessments.map(a => a.id);
+      query = supabase
+        .from('assessment_questions')
+        .select('*')
+        .in('assessment_id', assessmentIds);
     }
 
-    query = query.order(orderBy);
+    if (query) {
+      query = query.order(orderBy);
+      const { data, error } = await query;
 
-    const { data, error } = await query;
+      if (error) {
+        console.error('Error fetching questions:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
 
-    if (error) {
-      console.error('Error fetching questions:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(data);
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json([]);
 
   } catch (error) {
     console.error('Error in GET /api/teach/questions:', error);
