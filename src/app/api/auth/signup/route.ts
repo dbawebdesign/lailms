@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
         organisations:organisation_id (id, name, abbr)
       `)
       .eq('code', inviteCode) // This should match the code we're sending
-      .single<Tables<"invite_codes">>()
+      .single<InviteCodeWithOrg>()
 
     console.log('Invite code lookup result:', { inviteData, inviteError });
 
