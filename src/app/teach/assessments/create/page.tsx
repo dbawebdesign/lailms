@@ -7,7 +7,7 @@ import { AssessmentBuilder } from '@/components/teach/studio/assessment/Assessme
 import { Database } from '../../../../../packages/types/db';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 
-type Question = Database['public']['Tables']['questions']['Row'];
+type Question = Database['public']['Tables']['assessment_questions']['Row'];
 
 const CreateAssessmentContent = () => {
     const searchParams = useSearchParams();

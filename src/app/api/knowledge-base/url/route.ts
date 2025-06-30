@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { Database, Tables } from '@learnologyai/types';
+import { Database, Tables } from '../../../../../packages/types/db';
 import { createClient } from '@supabase/supabase-js';
 
 // Define the status enum type locally for type safety

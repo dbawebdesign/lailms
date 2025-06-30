@@ -20,7 +20,18 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type Question = Database['public']['Tables']['questions']['Row'];
+type Question = Database['public']['Tables']['assessment_questions']['Row'] & {
+  // Legacy fields that may not exist in current DB schema but are expected by UI
+  difficulty_score?: number;
+  cognitive_level?: string;
+  tags?: string[];
+  learning_objectives?: string[];
+  estimated_time?: number;
+  folder_id?: string;
+  ai_generated?: boolean;
+  legacy_question_text?: string;
+  rubric?: any; // Legacy field
+};
 
 // Helper type for question options
 interface QuestionOption {
@@ -208,7 +219,11 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
             {showAnswers && question.correct_answer && (
               <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <h5 className="font-medium text-blue-900 dark:text-blue-300 mb-2">Correct Answer:</h5>
-                <p className="text-blue-800 dark:text-blue-200">{question.correct_answer}</p>
+                <p className="text-blue-800 dark:text-blue-200">
+                  {typeof question.correct_answer === 'string' 
+                    ? question.correct_answer 
+                    : JSON.stringify(question.correct_answer)}
+                </p>
               </div>
             )}
           </div>
@@ -232,7 +247,11 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
             {showAnswers && question.correct_answer && (
               <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <h5 className="font-medium text-blue-900 dark:text-blue-300 mb-2">Sample Response:</h5>
-                <p className="text-blue-800 dark:text-blue-200 whitespace-pre-wrap">{question.correct_answer}</p>
+                <p className="text-blue-800 dark:text-blue-200 whitespace-pre-wrap">
+                  {typeof question.correct_answer === 'string' 
+                    ? question.correct_answer 
+                    : JSON.stringify(question.correct_answer)}
+                </p>
               </div>
             )}
             
@@ -284,7 +303,11 @@ export const QuestionPreview: React.FC<QuestionPreviewProps> = ({
             {showAnswers && question.correct_answer && (
               <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <h5 className="font-medium text-green-900 dark:text-green-300 mb-2">Correct Answer:</h5>
-                <p className="text-green-800 dark:text-green-200">{question.correct_answer}</p>
+                <p className="text-green-800 dark:text-green-200">
+                  {typeof question.correct_answer === 'string' 
+                    ? question.correct_answer 
+                    : JSON.stringify(question.correct_answer)}
+                </p>
               </div>
             )}
           </div>

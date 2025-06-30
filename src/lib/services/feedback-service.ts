@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '../../../packages/types/db';
 
-type QuizResponse = Database['public']['Tables']['quiz_responses']['Row'];
-type QuizAttempt = Database['public']['Tables']['quiz_attempts']['Row'];
+type StudentResponse = Database['public']['Tables']['student_responses']['Row'];
+type StudentAttempt = Database['public']['Tables']['student_attempts']['Row'];
 
 export interface StudentProfile {
   userId: string;
@@ -210,9 +210,9 @@ export class FeedbackService {
    */
   private async getStudentProfile(responseId: string): Promise<StudentProfile> {
     try {
-      // Get user ID from quiz response
+      // Get user ID from student response
       const { data: response } = await this.supabase
-        .from('quiz_responses')
+        .from('student_responses')
         .select('attempt_id')
         .eq('id', responseId)
         .single();
@@ -222,8 +222,8 @@ export class FeedbackService {
       }
 
       const { data: attempt } = await this.supabase
-        .from('quiz_attempts')
-        .select('member_id')
+        .from('student_attempts')
+        .select('student_id')
         .eq('id', response.attempt_id)
         .single();
 
@@ -231,16 +231,16 @@ export class FeedbackService {
         return this.createDefaultProfile('unknown');
       }
 
-      // Get performance history from quiz attempts
+      // Get performance history from student attempts
       const { data: performanceData } = await this.supabase
-        .from('quiz_attempts')
+        .from('student_attempts')
         .select(`
           id,
           score,
           created_at,
           time_spent_seconds,
-          quiz_id,
-          quizzes (
+          assessment_id,
+          assessments (
             lesson_id,
             lessons (
               path_id,
@@ -248,7 +248,7 @@ export class FeedbackService {
             )
           )
         `)
-        .eq('member_id', attempt.member_id)
+        .eq('student_id', attempt.student_id)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -269,7 +269,7 @@ export class FeedbackService {
       const preferredFeedbackType = this.determinePreferredFeedbackType(performanceHistory);
 
       return {
-        userId: attempt.member_id,
+        userId: attempt.student_id,
         learningStyle,
         performanceHistory,
         strengths,

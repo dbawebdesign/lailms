@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createSupabaseServerClient } from '@/utils/supabase/server';
-import { Database } from '@learnologyai/types';
+import { Database } from '../../../../../../../packages/types/db';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ baseClassId: string }> }) {
   const { baseClassId } = await params;

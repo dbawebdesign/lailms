@@ -42,8 +42,21 @@ import { QuestionBankManager } from './QuestionBankManager';
 import { QuestionDistributionDialog } from './QuestionDistributionDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-type Question = Database['public']['Tables']['questions']['Row'];
-type Quiz = Database['public']['Tables']['quizzes']['Row'];
+type Question = Database['public']['Tables']['assessment_questions']['Row'] & {
+  // Legacy fields that may not exist in current DB schema but are expected by UI
+  difficulty_score?: number;
+  cognitive_level?: string;
+  tags?: string[];
+  learning_objectives?: string[];
+  estimated_time?: number;
+  folder_id?: string;
+  ai_generated?: boolean;
+  legacy_question_text?: string;
+  lesson_content_refs?: any;
+  validation_status?: string;
+};
+// Quizzes table doesn't exist in current schema, use assessments instead
+type Quiz = Database['public']['Tables']['assessments']['Row'];
 
 interface QuestionManagerProps {
   lessonId?: string;

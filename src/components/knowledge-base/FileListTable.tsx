@@ -36,7 +36,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from 'sonner'
-import type { Database } from '@learnologyai/types'
+import type { Database } from '../../../packages/types/db'
 
 // Document status type - updated to match database enum
 export type DocumentStatus = 'queued' | 'processing' | 'completed' | 'error'

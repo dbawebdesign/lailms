@@ -16,6 +16,7 @@
     "test:coverage": "jest --coverage",
     "test:integration": "jest --testPathPattern=tests/integration",
     "test:e2e": "jest --testPathPattern=tests/e2e",
+    "pre-PR": "npm run lint && npm run build",
     "deploy:functions": "npx supabase functions deploy",
     "deploy:process-document": "npx supabase functions deploy process-document"
   },

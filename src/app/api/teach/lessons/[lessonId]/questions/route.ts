@@ -24,9 +24,9 @@ export async function GET(
 
     // Build query for lesson questions - use explicit typing to avoid recursion
     const baseQuery = (supabase as any)
-      .from('questions')
+      .from('assessment_questions')
       .select('*')
-      .eq('lesson_id', lessonId);
+      .eq('assessment_id', lessonId); // Note: using assessment_id since lesson_id doesn't exist
 
     // Apply filters
     let filteredQuery = baseQuery;
@@ -118,29 +118,21 @@ export async function POST(
 
         // Save generated questions to database
         const questionsToInsert = generatedQuestions.map((q, index) => ({
-          lesson_id: lessonId,
-          base_class_id: lesson.base_class_id,
+          assessment_id: lessonId, // Using lessonId as assessment_id for now
           question_text: q.question_text,
           question_type: q.question_type,
           points: points || 1,
-          difficulty_score: difficulty_score,
-          cognitive_level: cognitive_level || 'remember',
-          learning_objectives: learning_objectives || [],
-          tags: q.tags || [],
           order_index: index + 1,
+          answer_key: q.options || q.correct_answer, // Use answer_key field
           options: q.options || null,
           correct_answer: q.correct_answer,
-          ai_generated: true,
-          created_by: user.id,
-          author_id: user.id,
-          legacy_metadata: {
-            generated_at: new Date().toISOString(),
-            generation_context: 'lesson_content'
-          }
+          ai_grading_enabled: false,
+          explanation: q.explanation || null,
+          grading_rubric: null
         }));
 
         const { data: insertedQuestions, error: insertError } = await (supabase as any)
-          .from('questions')
+          .from('assessment_questions')
           .insert(questionsToInsert)
           .select();
 
@@ -172,22 +164,19 @@ export async function POST(
       }
 
       const { data: question, error: createError } = await (supabase as any)
-        .from('questions')
+        .from('assessment_questions')
         .insert({
-          lesson_id: lessonId,
-          base_class_id: lesson.base_class_id,
+          assessment_id: lessonId, // Using lessonId as assessment_id for now
           question_text,
           question_type,
           points,
-          difficulty_score,
-          cognitive_level: cognitive_level || 'remember',
-          learning_objectives,
-          tags,
+          order_index: 1, // Default order
+          answer_key: options || correct_answer, // Use answer_key field
           options: options || null,
           correct_answer,
-          ai_generated: false,
-          created_by: user.id,
-          author_id: user.id
+          ai_grading_enabled: false,
+          explanation: null,
+          grading_rubric: null
         })
         .select()
         .single();

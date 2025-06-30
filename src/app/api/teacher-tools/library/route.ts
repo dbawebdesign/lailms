@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { TeacherToolCreationInput, ToolLibraryFilters, ToolLibrarySort } from '@/types/teachingTools';
-import { Tables } from 'packages/types/db';
+import { Tables, Json } from 'packages/types/db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -146,8 +146,8 @@ export async function POST(request: NextRequest) {
         tool_name: creationData.tool_name,
         title: creationData.title,
         description: creationData.description,
-        content: creationData.content,
-        metadata: creationData.metadata || {},
+        content: creationData.content as Json, // Cast to Json type for database compatibility
+        metadata: (creationData.metadata || {}) as Json,
         tags: creationData.tags || []
       })
       .select()

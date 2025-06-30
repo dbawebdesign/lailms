@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import { knowledgeBaseAnalyzer, KnowledgeBaseAnalysis, COURSE_GENERATION_MODES } from './knowledge-base-analyzer';
 import { knowledgeExtractor, ConceptMap, CourseStructureSuggestion } from './knowledge-extractor';
-import type { Database } from '@learnologyai/types';
+import type { Database } from '../../../packages/types/db';
 import { AssessmentGenerationService } from './assessment-generation-service';
 import { courseGenerationOrchestrator } from './course-generation-orchestrator';
 

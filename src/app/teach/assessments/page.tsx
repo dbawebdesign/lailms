@@ -9,7 +9,7 @@ import AssessmentManager from '@/components/teach/studio/assessment/AssessmentMa
 import { QuestionBankManager } from '@/components/teach/studio/assessment/QuestionBankManager';
 import { Database } from '../../../../packages/types/db';
 
-type Question = Database['public']['Tables']['questions']['Row'];
+type Question = Database['public']['Tables']['assessment_questions']['Row'];
 
 const AssessmentsPage = () => {
   const [questions, setQuestions] = useState<Question[]>([]);

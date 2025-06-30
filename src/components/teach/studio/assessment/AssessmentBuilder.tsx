@@ -6,7 +6,7 @@ import { Database } from '../../../../../packages/types/db';
 import { Card, CardContent } from '@/components/ui/card';
 import { GripVertical } from 'lucide-react';
 
-type Question = Database['public']['Tables']['questions']['Row'];
+type Question = Database['public']['Tables']['assessment_questions']['Row'];
 
 interface AssessmentBuilderProps {
   questions: Question[];

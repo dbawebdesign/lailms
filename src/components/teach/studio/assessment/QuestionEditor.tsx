@@ -20,9 +20,20 @@ import { QuestionPreview } from './QuestionPreview';
 import { createClient } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 
-type Question = Database['public']['Tables']['questions']['Row'];
-type QuestionInsert = Database['public']['Tables']['questions']['Insert'];
-type Json = Database['public']['Tables']['questions']['Row']['options'];
+type Question = Database['public']['Tables']['assessment_questions']['Row'] & {
+  // Legacy fields that may not exist in current DB schema but are expected by UI
+  difficulty_score?: number;
+  cognitive_level?: string;
+  tags?: string[];
+  learning_objectives?: string[];
+  estimated_time?: number;
+  folder_id?: string;
+  ai_generated?: boolean;
+  legacy_question_text?: string;
+  lesson_id?: string;
+};
+type QuestionInsert = Database['public']['Tables']['assessment_questions']['Insert'];
+type Json = Database['public']['Tables']['assessment_questions']['Row']['answer_key'];
 
 // Define the structure for question options as stored in the JSONB field
 interface QuestionOptionData {
@@ -138,7 +149,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
 
     // Validate other question types
     if ((editedQuestion.question_type === 'short_answer' || editedQuestion.question_type === 'long_answer') 
-        && !editedQuestion.correct_answer?.trim()) {
+        && !editedQuestion.correct_answer) {
       newErrors.correct_answer = 'Answer key is required for this question type';
     }
 
@@ -155,25 +166,20 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
     setIsLoading(true);
     try {
       const questionData: QuestionInsert = {
+        assessment_id: baseClassId, // Use baseClassId as assessment_id for now
         question_text: editedQuestion.question_text?.trim() || '',
         question_type: editedQuestion.question_type || 'multiple_choice',
         points: editedQuestion.points || 1,
+        order_index: 0, // Default order
+        answer_key: editedQuestion.question_type === 'multiple_choice' ? (options as unknown as Json) : (editedQuestion.correct_answer as Json || ''),
         options: editedQuestion.question_type === 'multiple_choice' ? (options as unknown as Json) : null,
-        correct_answer: editedQuestion.correct_answer || '',
-        difficulty_score: editedQuestion.difficulty_score || 5,
-        cognitive_level: editedQuestion.cognitive_level || 'knowledge',
-        tags: editedQuestion.tags || [],
-        learning_objectives: editedQuestion.learning_objectives || [],
-        estimated_time: editedQuestion.estimated_time || 5,
-        lesson_id: lessonId || '',
-        legacy_question_text: editedQuestion.question_text?.trim() || '',
-        base_class_id: baseClassId,
+        correct_answer: editedQuestion.correct_answer as Json || null,
       };
 
       if (initialQuestion?.id) {
         // Update existing question
         const { data, error } = await supabase
-          .from('questions')
+          .from('assessment_questions')
           .update(questionData)
           .eq('id', initialQuestion.id)
           .select()
@@ -185,7 +191,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
       } else {
         // Create new question
         const { data, error } = await supabase
-          .from('questions')
+          .from('assessment_questions')
           .insert(questionData)
           .select()
           .single();
@@ -296,7 +302,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
           <div className="space-y-4">
             <Label>Correct Answer</Label>
             <Select
-              value={editedQuestion.correct_answer || 'true'}
+              value={typeof editedQuestion.correct_answer === 'string' ? editedQuestion.correct_answer : 'true'}
               onValueChange={(value) => updateQuestion({ correct_answer: value })}
             >
               <SelectTrigger>
@@ -318,7 +324,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
               <Label htmlFor="correctAnswer">Answer Key</Label>
               <Textarea
                 id="correctAnswer"
-                value={editedQuestion.correct_answer || ''}
+                value={typeof editedQuestion.correct_answer === 'string' ? editedQuestion.correct_answer : ''}
                 onChange={(e) => updateQuestion({ correct_answer: e.target.value })}
                 placeholder="Enter the correct answer or acceptable answers separated by |"
                 className={errors.correct_answer ? 'border-red-500' : ''}

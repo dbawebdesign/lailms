@@ -40,9 +40,29 @@ import { TwitterPicker } from 'react-color';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { QuestionEditor } from './QuestionEditor';
 
-// Use the proper database types
-type Question = Database['public']['Tables']['questions']['Row'];
-type QuestionFolder = Database['public']['Tables']['question_folders']['Row'];
+// Use the proper database types with legacy field support
+type Question = Database['public']['Tables']['assessment_questions']['Row'] & {
+  // Legacy fields that may not exist in current DB schema but are expected by UI
+  difficulty_score?: number;
+  cognitive_level?: string;
+  tags?: string[];
+  learning_objectives?: string[];
+  estimated_time?: number;
+  folder_id?: string;
+  ai_generated?: boolean;
+  legacy_question_text?: string;
+};
+
+// Question folders don't exist in current schema, so we'll use a simple interface
+interface QuestionFolder {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  base_class_id: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 interface QuestionBankManagerProps {
   questions: Question[];
@@ -124,7 +144,11 @@ const QuestionPreview: React.FC<QuestionPreviewProps> = ({ question }) => {
         <div className="space-y-2">
           <h5 className="font-medium text-sm">Sample Answer:</h5>
           <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
-            <p className="text-sm">{question.correct_answer}</p>
+            <p className="text-sm">
+              {typeof question.correct_answer === 'string' 
+                ? question.correct_answer 
+                : JSON.stringify(question.correct_answer)}
+            </p>
           </div>
         </div>
       );
@@ -225,10 +249,13 @@ export const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({
   const createFolder = async () => {
     if (!newFolderName.trim()) return;
     const newFolder: QuestionFolder = {
-      id: `temp-folder-${Date.now()}`, name: newFolderName.trim(),
-      description: newFolderDescription.trim() || null, color: newFolderColor,
-      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-      base_class_id: baseClassId, created_by: 'user-1', parent_id: null,
+      id: `temp-folder-${Date.now()}`, 
+      name: newFolderName.trim(),
+      description: newFolderDescription.trim() || undefined, 
+      color: newFolderColor,
+      created_at: new Date().toISOString(), 
+      updated_at: new Date().toISOString(),
+      base_class_id: baseClassId,
     };
     setFolders(prev => [...prev, newFolder]);
     setNewFolderName('');

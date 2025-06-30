@@ -327,76 +327,29 @@ export class AssessmentAnalyticsService {
 
   /**
    * Get assessment analytics from cached analytics table (if available)
+   * Note: assessment_analytics table doesn't exist yet, so this returns null
    */
   async getCachedAssessmentAnalytics(assessmentId: string): Promise<any | null> {
-    try {
-      const { data, error } = await supabase
-        .from('assessment_analytics')
-        .select('*')
-        .eq('assessment_id', assessmentId)
-        .single<Tables<'assessment_analytics'>>();
-
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        throw new Error(`Failed to fetch cached analytics: ${error.message}`);
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error fetching cached analytics:', error);
-      return null;
-    }
+    // TODO: Implement when assessment_analytics table is created
+    return null;
   }
 
   /**
    * Update or create cached analytics for an assessment
+   * Note: assessment_analytics table doesn't exist yet, so this is a no-op
    */
   async updateCachedAnalytics(assessmentId: string): Promise<void> {
-    try {
-      const analytics = await this.getAssessmentAnalytics(assessmentId);
-      
-      const { error } = await supabase
-        .from('assessment_analytics')
-        .upsert({
-          assessment_id: assessmentId,
-          assessment_type: 'lesson_quiz', // Default, should be fetched from assessment
-          total_attempts: analytics.total_attempts,
-          unique_users: analytics.unique_users,
-          avg_score: analytics.average_score,
-          avg_completion_time: analytics.average_completion_time,
-          pass_rate: analytics.pass_rate,
-          question_count: analytics.question_stats.length,
-          last_calculated_at: new Date().toISOString()
-        });
-
-      if (error) {
-        throw new Error(`Failed to update cached analytics: ${error.message}`);
-      }
-    } catch (error) {
-      console.error('Error updating cached analytics:', error);
-      throw error;
-    }
+    // TODO: Implement when assessment_analytics table is created
+    return;
   }
 
   /**
    * Get question analytics from cached table (if available)
+   * Note: question_analytics table doesn't exist yet, so this returns null
    */
   async getCachedQuestionAnalytics(questionId: string): Promise<any | null> {
-    try {
-      const { data, error } = await supabase
-        .from('question_analytics')
-        .select('*')
-        .eq('question_id', questionId)
-        .single<Tables<'question_analytics'>>();
-
-      if (error && error.code !== 'PGRST116') {
-        throw new Error(`Failed to fetch cached question analytics: ${error.message}`);
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error fetching cached question analytics:', error);
-      return null;
-    }
+    // TODO: Implement when question_analytics table is created
+    return null;
   }
 
   /**

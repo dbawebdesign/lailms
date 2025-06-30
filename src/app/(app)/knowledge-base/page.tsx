@@ -6,7 +6,7 @@ import { FileListTable } from '@/components/knowledge-base/FileListTable';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
-import { Database } from '@learnologyai/types';
+import { Database } from '../../../../packages/types/db';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';

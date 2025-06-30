@@ -3,9 +3,9 @@ import OpenAI from 'openai';
 import { APIError } from 'openai/error';
 import { encode } from 'gpt-tokenizer';
 import pLimit from 'p-limit';
-import { Database } from '@learnologyai/types';
+import { Database } from '../../../packages/types/db';
 
-type Question = Partial<Database['public']['Tables']['questions']['Row']>;
+type Question = Partial<Database['public']['Tables']['assessment_questions']['Row']>;
 type QuestionType = Database['public']['Enums']['question_type'];
 
 const limit = pLimit(5); // Allow up to 5 concurrent requests

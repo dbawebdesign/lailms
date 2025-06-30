@@ -2,7 +2,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from 'packages/types/db';
 
-type Question = Database['public']['Tables']['questions']['Row'] & {
+type Question = Database['public']['Tables']['assessment_questions']['Row'] & {
   options: Database['public']['Tables']['question_options']['Row'][];
 };
 
