@@ -39,13 +39,16 @@ export async function POST(req: NextRequest) {
 
     // First, verify the reset code
     const { data: resetData, error: resetError } = await supabase
-      .from('password_reset_codes')
-      .select('id, user_id, code, expires_at')
-      .eq('code', resetCode)
-      .single<Tables<'password_reset_codes'>>()
+      .from('password_reset_requests')
+      .select('*')
+      .eq('reset_token', resetCode)
+      .eq('email', username)
+      .gt('expires_at', new Date().toISOString())
+      .is('fulfilled_at', null) // Make sure it hasn't been used yet
+      .single();
 
     if (resetError || !resetData) {
-      return NextResponse.json({ error: 'Invalid reset code' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid or expired reset code' }, { status: 400 })
     }
 
     // Check if code is expired
@@ -53,64 +56,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Reset code has expired' }, { status: 400 })
     }
 
-    // Define the expected type for the profile data
-    type ProfileWithOrg = {
-      user_id: string;
-      username: string;
-      organisation_id: string;
-      organisations: { abbr: string } | null; // Expect single object or null
-    }
-
-    // Next, get user profile to verify username
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('user_id, username, organisation_id, organisations:organisation_id (abbr)')
-      .eq('user_id', resetData.user_id)
-      .single<ProfileWithOrg>() // Apply the type assertion
-
-    if (profileError || !profileData) {
-      // Handle profile fetch error
-      console.error('Profile fetch error for reset:', profileError);
-      return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
-    }
-
-    // Verify username matches
-    if (profileData.username !== username) {
-      return NextResponse.json({ error: 'Username does not match reset code' }, { status: 400 })
-    }
-
-    // Get organization abbreviation (Type checker should now work)
-    const orgAbbr = profileData.organisations?.abbr
-
-    if (!orgAbbr) {
-      // Handle missing org abbr
-      console.error('Organisation abbreviation not found for user:', profileData.user_id);
-      return NextResponse.json({ error: 'Organization data missing or invalid' }, { status: 500 })
-    }
-
-    // Construct pseudo-email
-    const pseudoEmail = `${username}@${orgAbbr}.internal`
-
     // Create admin client for changing password
     const adminAuthClient = supabase.auth.admin
 
+    // Find the user by email to get the user ID
+    const { data: userData, error: userError } = await supabase.auth.admin.listUsers();
+    
+    if (userError) {
+      return NextResponse.json({ error: 'Failed to find user' }, { status: 500 })
+    }
+
+    const user = userData.users.find(u => u.email === resetData.email);
+    
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
     // Update user password
     const { error: updateError } = await adminAuthClient.updateUserById(
-      profileData.user_id,
+      user.id,
       { password: newPassword }
     )
 
     if (updateError) {
-      return NextResponse.json(
-        { error: 'Error updating password', details: updateError.message },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Failed to update password' }, { status: 500 })
     }
 
     // Mark reset code as used
     await supabase
-      .from('password_reset_codes')
-      .update({ used_at: new Date().toISOString() })
+      .from('password_reset_requests')
+      .update({ fulfilled_at: new Date().toISOString() })
       .eq('id', resetData.id)
 
     // Return success
