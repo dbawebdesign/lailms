@@ -1586,6 +1586,69 @@ ${context.components?.map(comp => {
         analysis += `. Lesson ID: ${data.id || data.lessonId || data.lesson_id}`;
       }
     }
+  } else if (comp.type === 'course-navigation' && comp.content) {
+    analysis += `Student viewing course navigation`;
+    if (comp.content.courseTitle) analysis += ` for "${comp.content.courseTitle}"`;
+    if (comp.content.overallProgress !== undefined) analysis += ` (${comp.content.overallProgress}% complete)`;
+    if (comp.content.totalPaths) analysis += `. Contains ${comp.content.totalPaths} learning paths`;
+    if (comp.content.totalLessons) analysis += ` with ${comp.content.totalLessons} total lessons`;
+    if (comp.content.pathsData && comp.content.pathsData.length > 0) {
+      const pathSummary = comp.content.pathsData.map((path: any) => 
+        `"${path.title}" (${path.lessonsCount} lessons, ${path.progress}% complete)`
+      ).join(', ');
+      analysis += `. Paths: ${pathSummary}`;
+    }
+  } else if (comp.type === 'lesson-content-renderer' && comp.content) {
+    analysis += `Student viewing lesson content`;
+    if (comp.content.lessonTitle) analysis += ` for "${comp.content.lessonTitle}"`;
+    if (comp.content.currentSection) analysis += ` - currently on section "${comp.content.currentSection}"`;
+    if (comp.content.progress !== undefined) analysis += ` (${comp.content.progress}% complete)`;
+    if (comp.content.availableTabs) {
+      analysis += `. Available tabs: ${comp.content.availableTabs.join(', ')}`;
+    }
+    if (comp.content.activeTab) analysis += `. Currently viewing: ${comp.content.activeTab}`;
+    // Extract lesson ID
+    if (comp.metadata?.lessonId || comp.content.lessonId) {
+      analysis += `. Lesson ID: ${comp.metadata?.lessonId || comp.content.lessonId}`;
+    }
+  } else if (comp.type === 'course-overview' && comp.content) {
+    analysis += `Course overview card`;
+    if (comp.content.title) analysis += ` showing "${comp.content.title}"`;
+    if (comp.content.overallProgress !== undefined) analysis += ` (${comp.content.overallProgress}% complete)`;
+    if (comp.content.description) {
+      const desc = comp.content.description.substring(0, 100);
+      analysis += `. Description: ${desc}${comp.content.description.length > 100 ? '...' : ''}`;
+    }
+  } else if (comp.type === 'learning-paths-section' && comp.content) {
+    analysis += `Learning paths section`;
+    if (comp.content.pathsCount) analysis += ` with ${comp.content.pathsCount} paths`;
+    if (comp.content.paths && comp.content.paths.length > 0) {
+      const pathInfo = comp.content.paths.map((path: any) => 
+        `"${path.title}" (${path.progress}% complete)`
+      ).join(', ');
+      analysis += `. Paths: ${pathInfo}`;
+    }
+  } else if (comp.type === 'content-section' && comp.content) {
+    analysis += `Content section`;
+    if (comp.content.sectionTitle) analysis += ` "${comp.content.sectionTitle}"`;
+    if (comp.content.contentType) analysis += ` (${comp.content.contentType})`;
+    if (comp.content.hasContent !== undefined) {
+      analysis += comp.content.hasContent ? ' with content' : ' (empty)';
+    }
+  } else if (comp.type === 'audio-player' && comp.content) {
+    analysis += `Audio player`;
+    if (comp.content.title) analysis += ` for "${comp.content.title}"`;
+    if (comp.content.audioUrl) analysis += ` (audio available)`;
+    if (comp.content.isPlaying !== undefined) {
+      analysis += comp.content.isPlaying ? ' (currently playing)' : ' (paused)';
+    }
+  } else if (comp.type === 'mind-map' && comp.content) {
+    analysis += `Mind map viewer`;
+    if (comp.content.title) analysis += ` for "${comp.content.title}"`;
+    if (comp.content.mindMapUrl) analysis += ` (mind map available)`;
+    if (comp.content.isOpen !== undefined) {
+      analysis += comp.content.isOpen ? ' (currently open)' : ' (closed)';
+    }
   } else if (comp.content && typeof comp.content === 'object') {
     // Generic content analysis with ID extraction
     const contentKeys = Object.keys(comp.content);
@@ -1623,9 +1686,28 @@ ${(() => {
     if (comp.content?.baseClassId || comp.content?.base_class_id) {
       ids.push(`Base Class ID: ${comp.content.baseClassId || comp.content.base_class_id}`);
     }
-    // Extract path IDs and lesson IDs from navigation tree
+    if (comp.metadata?.baseClassId) {
+      ids.push(`Base Class ID: ${comp.metadata.baseClassId}`);
+    }
+    // Extract lesson ID from lesson content renderer
+    if (comp.type === 'lesson-content-renderer' && (comp.metadata?.lessonId || comp.content?.lessonId)) {
+      ids.push(`Current Lesson ID: ${comp.metadata?.lessonId || comp.content?.lessonId}`);
+    }
+    // Extract path IDs and lesson IDs from navigation tree (teacher interface)
     if (comp.type === 'navigation-tree' && comp.content?.paths) {
       comp.content.paths.forEach((path: any) => {
+        ids.push(`Path "${path.title}": ${path.id}`);
+        // Extract lesson IDs from each path
+        if (path.lessons && Array.isArray(path.lessons)) {
+          path.lessons.forEach((lesson: any) => {
+            ids.push(`Lesson "${lesson.title}" (in ${path.title}): ${lesson.id}`);
+          });
+        }
+      });
+    }
+    // Extract path IDs and lesson IDs from course navigation (student interface)
+    if (comp.type === 'course-navigation' && comp.content?.pathsData) {
+      comp.content.pathsData.forEach((path: any) => {
         ids.push(`Path "${path.title}": ${path.id}`);
         // Extract lesson IDs from each path
         if (path.lessons && Array.isArray(path.lessons)) {
@@ -1671,6 +1753,8 @@ ${chatHistory.slice(-6).map((msg, index) => {
 ## Response Approach Based on Context
 - **Base Class Studio**: Help with course design, curriculum structure, lesson planning, content organization
 - **Lesson/Path Editing**: Assist with educational content creation, learning objectives, assessment strategies
+- **Student Course Navigation**: Help students understand course structure, track progress, navigate to specific lessons
+- **Student Lesson Content**: Assist with understanding lesson material, explain concepts, provide additional context
 - **Knowledge Base**: Help with document management, content organization, search strategies
 - **General Navigation**: Guide users to relevant features and explain platform capabilities
 

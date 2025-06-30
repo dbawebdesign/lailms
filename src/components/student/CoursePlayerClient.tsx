@@ -113,10 +113,36 @@ const ContentPlayer = ({ selectedItemId, selectedItemType }: { selectedItemId?: 
   };
 
   return (
-    <div className="p-4 h-full">
-      {renderContent()}
-
-    </div>
+    <LunaContextElement
+      type="content-player"
+      role="display"
+      content={{
+        selectedItemId,
+        selectedItemType,
+        hasContent: !!content,
+        isLoading: loading,
+        error: error,
+        contentType: selectedItemType === 'lesson' ? 'lesson-content' : selectedItemType === 'assessment' ? 'assessment-content' : 'no-selection',
+        description: selectedItemId ? `Displaying ${selectedItemType}: ${selectedItemId}` : "Content area waiting for selection"
+      }}
+      metadata={{
+        selectedItemId,
+        selectedItemType,
+        hasError: !!error,
+        userId: user?.id
+      }}
+      state={{
+        loading,
+        hasContent: !!content,
+        hasError: !!error,
+        isUserLoggedIn: !!user
+      }}
+      actionable={true}
+    >
+      <div className="p-4 h-full">
+        {renderContent()}
+      </div>
+    </LunaContextElement>
   );
 };
 
@@ -149,13 +175,25 @@ export default function CoursePlayerClient({ courseId }: CoursePlayerClientProps
         selectedItem: selectedItemId ? {
           id: selectedItemId,
           type: selectedItemType
-        } : null
+        } : null,
+        hasSelectedItem: !!selectedItemId,
+        currentView: selectedItemId ? (selectedItemType === 'lesson' ? 'lesson-content' : 'assessment-content') : 'selection-prompt',
+        availableInteractionTypes: ['lesson', 'assessment'],
+        description: "Main course player interface with navigation tree and content viewer"
       }}
-      metadata={{ courseId }}
+      metadata={{ 
+        courseId,
+        selectedItemId,
+        selectedItemType,
+        isContentLoaded: !!selectedItemId
+      }}
       state={{
         hasSelectedItem: !!selectedItemId,
-        selectedItemType
+        selectedItemType,
+        isNavigationVisible: true,
+        isContentAreaVisible: true
       }}
+      actionable={true}
     >
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 h-full">
         <div className="md:col-span-1 h-full overflow-y-auto">

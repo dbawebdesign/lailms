@@ -63,26 +63,46 @@ const ContentSection = ({
   gradient?: string;
   delay?: number;
 }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.6, delay }}
-    className="mb-8"
+  <LunaContextElement
+    type="lesson-content-section"
+    role="display"
+    content={{
+      title,
+      sectionType: title.toLowerCase().replace(/\s+/g, '-'),
+      hasIcon: !!Icon,
+      gradient,
+      description: `Educational content section: ${title}`,
+      contentLength: typeof children === 'string' ? children.length : 'dynamic-content'
+    }}
+    metadata={{
+      delay,
+      isAnimated: true,
+      hasChildren: !!children,
+      iconName: Icon?.name || 'none'
+    }}
+    actionable={true}
   >
-    <Card className="border-0 shadow-sm bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 backdrop-blur-sm">
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center space-x-3 text-lg font-semibold">
-          {Icon && <Icon className="h-5 w-5 text-primary" />}
-          <span className="bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-            {title}
-          </span>
-        </CardTitle>
-    </CardHeader>
-      <CardContent className={`prose prose-gray max-w-none dark:prose-invert bg-gradient-to-br ${gradient} rounded-lg p-6`}>
-      {children}
-    </CardContent>
-  </Card>
-  </motion.div>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, delay }}
+      className="mb-8"
+    >
+      <Card className="border-0 shadow-sm bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 backdrop-blur-sm">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center space-x-3 text-lg font-semibold">
+            {Icon && <Icon className="h-5 w-5 text-primary" />}
+            <span className="bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+              {title}
+            </span>
+          </CardTitle>
+      </CardHeader>
+        <CardContent className={`prose prose-gray max-w-none dark:prose-invert bg-gradient-to-br ${gradient} rounded-lg p-6`}>
+        {children}
+      </CardContent>
+    </Card>
+    </motion.div>
+  </LunaContextElement>
 );
 
 // Tesla-inspired audio player component
@@ -613,21 +633,56 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
       role="display"
       content={{
         title: lesson?.title || displayContent?.sectionTitle,
+        description: lesson?.description,
         hasAudio: !!brainbytes,
         hasMindMap: !!mindMap,
         currentSection: currentSection?.title,
         totalSections: sections.length,
-        progress: progress
+        progress: progress,
+        allSections: sections.map((section, index) => ({
+          id: section.id,
+          title: section.title,
+          isCurrentSection: index === currentSectionIndex,
+          isCompleted: index < currentSectionIndex
+        })),
+        audioContent: brainbytes ? {
+          title: brainbytes.title,
+          hasAudio: !!brainbytes.audio_url,
+          url: brainbytes.audio_url
+        } : null,
+        mindMapContent: mindMap ? {
+          title: mindMap.title,
+          content: mindMap.content
+        } : null,
+        displayContent: displayContent ? {
+          introduction: displayContent.introduction,
+          conceptIntroduction: displayContent.expertTeachingContent?.conceptIntroduction,
+          detailedExplanation: displayContent.expertTeachingContent?.detailedExplanation,
+          expertSummary: displayContent.expertSummary,
+          practicalExamples: displayContent.expertTeachingContent?.practicalExamples,
+          commonMisconceptions: displayContent.expertTeachingContent?.commonMisconceptions,
+          expertInsights: displayContent.expertTeachingContent?.expertInsights,
+          checkForUnderstanding: displayContent.checkForUnderstanding,
+          realWorldConnections: displayContent.expertTeachingContent?.realWorldConnections,
+          bridgeToNext: displayContent.bridgeToNext
+        } : null
       }}
       metadata={{
         lessonId,
         hasInteractiveContent: !!(mindMap || brainbytes),
-        sectionIndex: currentSectionIndex
+        sectionIndex: currentSectionIndex,
+        currentSectionId: currentSection?.id,
+        isCompleted: progress === 100,
+        hasAllContentTypes: !!(displayContent?.introduction && displayContent?.expertTeachingContent?.conceptIntroduction && displayContent?.expertTeachingContent?.detailedExplanation)
       }}
       state={{
         isLoading: loading,
-        hasError: !!error
+        hasError: !!error,
+        currentSectionIndex,
+        canNavigatePrevious: currentSectionIndex > 0,
+        canNavigateNext: currentSectionIndex < sections.length - 1
       }}
+      actionable={true}
     >
       <div className="max-w-4xl mx-auto p-6 space-y-8">
         {/* Header with lesson title and progress */}
@@ -722,36 +777,99 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
 
         {/* Audio Player */}
         {brainbytes && brainbytes.audio_url && (
-          <AudioPlayer src={brainbytes.audio_url} title={brainbytes.title} />
+          <LunaContextElement
+            type="lesson-audio-player"
+            role="media"
+            content={{
+              title: brainbytes.title,
+              audioUrl: brainbytes.audio_url,
+              contentType: "brainbytes",
+              description: "Audio summary of lesson content for auditory learning"
+            }}
+            metadata={{
+              lessonId,
+              sectionIndex: currentSectionIndex,
+              mediaType: "audio"
+            }}
+            actionable={true}
+          >
+            <AudioPlayer src={brainbytes.audio_url} title={brainbytes.title} />
+          </LunaContextElement>
         )}
 
         {/* Mind Map Viewer */}
         {mindMap && (
-          <MindMapDisplay 
-            content={mindMap.content} 
-            metadata={{ subject: mindMap.title }}
-            onCopy={() => {}}
-            copiedItems={new Set()}
-          />
+          <LunaContextElement
+            type="lesson-mind-map"
+            role="media"
+            content={{
+              title: mindMap.title,
+              content: mindMap.content,
+              contentType: "mind_map",
+              description: "Visual mind map representation of lesson concepts and relationships"
+            }}
+            metadata={{
+              lessonId,
+              sectionIndex: currentSectionIndex,
+              mediaType: "mind_map"
+            }}
+            actionable={true}
+          >
+            <MindMapDisplay 
+              content={mindMap.content} 
+              metadata={{ subject: mindMap.title }}
+              onCopy={() => {}}
+              copiedItems={new Set()}
+            />
+          </LunaContextElement>
         )}
 
         {/* Section Content */}
         {displayContent && (
-          <Tabs defaultValue="content" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-8">
-              <TabsTrigger value="content" className="flex items-center space-x-2">
-                <BookOpen className="h-4 w-4" />
-                <span>Content</span>
-              </TabsTrigger>
-              <TabsTrigger value="examples" className="flex items-center space-x-2">
-                <Lightbulb className="h-4 w-4" />
-                <span>Examples</span>
-              </TabsTrigger>
-              <TabsTrigger value="insights" className="flex items-center space-x-2">
-                <Target className="h-4 w-4" />
-                <span>Insights</span>
-              </TabsTrigger>
-            </TabsList>
+          <LunaContextElement
+            type="lesson-content-tabs"
+            role="navigation"
+            content={{
+              availableTabs: ["content", "examples", "insights"],
+              contentTab: {
+                introduction: displayContent.introduction,
+                conceptIntroduction: displayContent.expertTeachingContent?.conceptIntroduction,
+                detailedExplanation: displayContent.expertTeachingContent?.detailedExplanation,
+                expertSummary: displayContent.expertSummary
+              },
+              examplesTab: {
+                practicalExamples: displayContent.expertTeachingContent?.practicalExamples,
+                commonMisconceptions: displayContent.expertTeachingContent?.commonMisconceptions
+              },
+              insightsTab: {
+                expertInsights: displayContent.expertTeachingContent?.expertInsights,
+                checkForUnderstanding: displayContent.checkForUnderstanding,
+                realWorldConnections: displayContent.expertTeachingContent?.realWorldConnections,
+                bridgeToNext: displayContent.bridgeToNext
+              }
+            }}
+            metadata={{
+              lessonId,
+              sectionIndex: currentSectionIndex,
+              hasAllContent: !!(displayContent.introduction && displayContent.expertTeachingContent?.conceptIntroduction && displayContent.expertTeachingContent?.detailedExplanation)
+            }}
+            actionable={true}
+          >
+            <Tabs defaultValue="content" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 mb-8">
+                <TabsTrigger value="content" className="flex items-center space-x-2">
+                  <BookOpen className="h-4 w-4" />
+                  <span>Content</span>
+                </TabsTrigger>
+                <TabsTrigger value="examples" className="flex items-center space-x-2">
+                  <Lightbulb className="h-4 w-4" />
+                  <span>Examples</span>
+                </TabsTrigger>
+                <TabsTrigger value="insights" className="flex items-center space-x-2">
+                  <Target className="h-4 w-4" />
+                  <span>Insights</span>
+                </TabsTrigger>
+              </TabsList>
 
             <TabsContent value="content" className="space-y-6">
               {displayContent.introduction && (
@@ -858,38 +976,63 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
               )}
             </TabsContent>
           </Tabs>
+          </LunaContextElement>
         )}
 
         {/* Section Navigation Footer */}
         {sections.length > 1 && (
-          <div className="flex justify-between items-center pt-8 border-t border-border">
-            <Button 
-              variant="outline" 
-              onClick={goToPrevSection}
-              disabled={currentSectionIndex === 0}
-              className="flex items-center space-x-2"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              <span>Previous Section</span>
-            </Button>
-            
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-2">
-                Section {currentSectionIndex + 1} of {sections.length}
-              </p>
-              <Progress value={progress} className="w-32" />
+          <LunaContextElement
+            type="lesson-navigation"
+            role="navigation"
+            content={{
+              currentSection: currentSectionIndex + 1,
+              totalSections: sections.length,
+              progress: progress,
+              canGoToPrevious: currentSectionIndex > 0,
+              canGoToNext: currentSectionIndex < sections.length - 1,
+              sections: sections.map((section, index) => ({
+                id: section.id,
+                title: section.title,
+                isCurrentSection: index === currentSectionIndex,
+                isCompleted: index < currentSectionIndex
+              }))
+            }}
+            metadata={{
+              lessonId,
+              currentSectionId: sections[currentSectionIndex]?.id,
+              currentSectionIndex
+            }}
+            actionable={true}
+          >
+            <div className="flex justify-between items-center pt-8 border-t border-border">
+              <Button 
+                variant="outline" 
+                onClick={goToPrevSection}
+                disabled={currentSectionIndex === 0}
+                className="flex items-center space-x-2"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span>Previous Section</span>
+              </Button>
+              
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-2">
+                  Section {currentSectionIndex + 1} of {sections.length}
+                </p>
+                <Progress value={progress} className="w-32" />
+              </div>
+              
+              <Button 
+                variant="outline" 
+                onClick={goToNextSection}
+                disabled={currentSectionIndex === sections.length - 1}
+                className="flex items-center space-x-2"
+              >
+                <span>Next Section</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
-            
-            <Button 
-              variant="outline" 
-              onClick={goToNextSection}
-              disabled={currentSectionIndex === sections.length - 1}
-              className="flex items-center space-x-2"
-            >
-              <span>Next Section</span>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+          </LunaContextElement>
         )}
       </div>
     </LunaContextElement>

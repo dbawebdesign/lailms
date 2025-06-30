@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { progressEvents } from '@/lib/utils/progressEvents';
+import LunaContextElement from '@/components/luna/LunaContextElement';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -407,59 +408,178 @@ export default function StudentCourseNavigationTree({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Course Header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-xl">{courseData.title}</CardTitle>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => fetchCourseData(true)}
-              disabled={loading || refreshing}
-              className="h-8 w-8 p-0"
-              title="Refresh progress"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading || refreshing ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-          <div className="flex items-center space-x-4 mt-2">
-            <div className="flex-1">
-              <Progress value={courseData.overallProgress} className="h-3" />
-            </div>
-            <span className="text-sm font-medium">{courseData.overallProgress}% Complete</span>
-          </div>
-        </CardHeader>
-      </Card>
+    <LunaContextElement
+      type="course-navigation"
+      role="navigation"
+      content={{
+        courseTitle: courseData.title,
+        courseDescription: courseData.description,
+        overallProgress: courseData.overallProgress,
+        totalPaths: courseData.paths.length,
+        totalLessons: courseData.paths.reduce((acc, path) => acc + path.lessons.length, 0),
+        totalAssessments: courseData.paths.reduce((acc, path) => acc + path.assessments.length + path.lessons.reduce((lessonAcc, lesson) => lessonAcc + lesson.assessments.length, 0), 0) + courseData.classAssessments.length,
+        pathsData: courseData.paths.map(path => ({
+          id: path.id,
+          title: path.title,
+          description: path.description,
+          progress: path.progress,
+          completed: path.completed,
+          lessonsCount: path.lessons.length,
+          assessmentsCount: path.assessments.length,
+          lessons: path.lessons.map(lesson => ({
+            id: lesson.id,
+            title: lesson.title,
+            description: lesson.description,
+            progress: lesson.progress,
+            completed: lesson.completed,
+            estimatedDuration: lesson.estimatedDurationHours,
+            assessmentsCount: lesson.assessments.length
+          })),
+          assessments: path.assessments.map(assessment => ({
+            id: assessment.id,
+            title: assessment.title,
+            type: assessment.assessment_type,
+            status: assessment.status,
+            score: assessment.score,
+            passingScore: assessment.passing_score_percentage,
+            timeLimit: assessment.time_limit_minutes,
+            attempts: assessment.attempts,
+            maxAttempts: assessment.maxAttempts
+          }))
+        })),
+        classAssessments: courseData.classAssessments.map(assessment => ({
+          id: assessment.id,
+          title: assessment.title,
+          type: assessment.assessment_type,
+          status: assessment.status,
+          score: assessment.score,
+          passingScore: assessment.passing_score_percentage,
+          timeLimit: assessment.time_limit_minutes,
+          attempts: assessment.attempts,
+          maxAttempts: assessment.maxAttempts
+        }))
+      }}
+      metadata={{
+        baseClassId,
+        selectedItemId,
+        selectedItemType,
+        expandedPaths: Array.from(expandedPaths),
+        expandedLessons: Array.from(expandedLessons)
+      }}
+      state={{
+        loading,
+        refreshing,
+        hasSelectedItem: !!selectedItemId
+      }}
+      actionable={true}
+    >
+      <div className="space-y-6">
+        {/* Course Header */}
+        <LunaContextElement
+          type="course-overview"
+          role="display"
+          content={{
+            title: courseData.title,
+            description: courseData.description,
+            overallProgress: courseData.overallProgress,
+            progressText: `${courseData.overallProgress}% Complete`
+          }}
+          metadata={{ courseId: courseData.id }}
+          actionable={true}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl">{courseData.title}</CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => fetchCourseData(true)}
+                  disabled={loading || refreshing}
+                  className="h-8 w-8 p-0"
+                  title="Refresh progress"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading || refreshing ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+              <div className="flex items-center space-x-4 mt-2">
+                <div className="flex-1">
+                  <Progress value={courseData.overallProgress} className="h-3" />
+                </div>
+                <span className="text-sm font-medium">{courseData.overallProgress}% Complete</span>
+              </div>
+            </CardHeader>
+          </Card>
+        </LunaContextElement>
 
-      {/* Class-level Exams */}
-      {courseData.classAssessments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center">
-              <GraduationCap className="h-5 w-5 mr-2" />
-              Class Exams
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {courseData.classAssessments.map(assessment => (
-              <AssessmentItem key={assessment.id} assessment={assessment} />
+        {/* Class-level Exams */}
+        {courseData.classAssessments.length > 0 && (
+          <LunaContextElement
+            type="class-assessments-section"
+            role="navigation"
+            content={{
+              sectionTitle: "Class Exams",
+              assessmentsCount: courseData.classAssessments.length,
+              assessments: courseData.classAssessments.map(assessment => ({
+                id: assessment.id,
+                title: assessment.title,
+                type: assessment.assessment_type,
+                status: assessment.status,
+                score: assessment.score,
+                passingScore: assessment.passing_score_percentage,
+                timeLimit: assessment.time_limit_minutes,
+                attempts: assessment.attempts,
+                maxAttempts: assessment.maxAttempts
+              }))
+            }}
+            actionable={true}
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                  <GraduationCap className="h-5 w-5 mr-2" />
+                  Class Exams
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {courseData.classAssessments.map(assessment => (
+                  <AssessmentItem key={assessment.id} assessment={assessment} />
+                ))}
+              </CardContent>
+            </Card>
+          </LunaContextElement>
+        )}
+
+        {/* Learning Paths */}
+        <LunaContextElement
+          type="learning-paths-section"
+          role="navigation"
+          content={{
+            sectionTitle: "Learning Paths",
+            pathsCount: courseData.paths.length,
+            paths: courseData.paths.map(path => ({
+              id: path.id,
+              title: path.title,
+              description: path.description,
+              progress: path.progress,
+              completed: path.completed,
+              lessonsCount: path.lessons.length,
+              assessmentsCount: path.assessments.length
+            }))
+          }}
+          actionable={true}
+        >
+          <div>
+            <h3 className="text-lg font-semibold mb-4 flex items-center">
+              <BookOpen className="h-5 w-5 mr-2" />
+              Learning Paths
+            </h3>
+            {courseData.paths.map(path => (
+              <PathItem key={path.id} path={path} />
             ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Learning Paths */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <BookOpen className="h-5 w-5 mr-2" />
-          Learning Paths
-        </h3>
-        {courseData.paths.map(path => (
-          <PathItem key={path.id} path={path} />
-        ))}
+          </div>
+        </LunaContextElement>
       </div>
-    </div>
+    </LunaContextElement>
   );
 } 
