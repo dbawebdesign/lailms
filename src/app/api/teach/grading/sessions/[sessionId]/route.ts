@@ -34,50 +34,20 @@ export async function GET(
     }
 
     // Get responses to grade based on assessment type
-    let responses = [];
-    if (result.session.assessment_type === 'lesson_quiz' || result.session.assessment_type === 'practice') {
-      const { data: assessmentResponses, error: responseError } = await supabase
-        .from('assessment_responses')
-        .select(`
-          *,
-          lesson_questions (
-            id,
-            question_text,
-            question_type,
-            correct_answer,
-            options
-          )
-        `)
-        .eq('attempt_id', result.session.assessment_id);
+    let responses: any[] = [];
+    
+    // Use student_responses table for all response types
+    const { data: studentResponses, error: responseError } = await supabase
+      .from('student_responses')
+      .select('*')
+      .eq('attempt_id', result.session.assessment_id);
 
-      if (responseError) {
-        console.error('Error fetching assessment responses:', responseError);
-        return NextResponse.json({ error: 'Failed to fetch responses' }, { status: 500 });
-      }
-
-      responses = assessmentResponses || [];
-    } else {
-      const { data: quizResponses, error: responseError } = await supabase
-        .from('quiz_responses')
-        .select(`
-          *,
-          questions (
-            id,
-            question_text,
-            question_type,
-            correct_answer,
-            options
-          )
-        `)
-        .eq('attempt_id', result.session.assessment_id);
-
-      if (responseError) {
-        console.error('Error fetching quiz responses:', responseError);
-        return NextResponse.json({ error: 'Failed to fetch responses' }, { status: 500 });
-      }
-
-      responses = quizResponses || [];
+    if (responseError) {
+      console.error('Error fetching student responses:', responseError);
+      return NextResponse.json({ error: 'Failed to fetch responses' }, { status: 500 });
     }
+
+    responses = studentResponses || [];
 
     // Get rubric details if available
     let rubric = null;
