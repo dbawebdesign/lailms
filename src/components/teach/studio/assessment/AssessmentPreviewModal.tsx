@@ -13,8 +13,11 @@ interface AssessmentQuestion {
   question_type: 'multiple_choice' | 'short_answer' | 'essay' | 'true_false';
   points: number;
   order_index: number;
-  answer_key: any;
+  options?: any; // JSONB field for question-specific options
+  correct_answer?: any; // JSONB field for the correct answer(s)
+  answer_key: any; // JSONB field (legacy/additional grading info)
   required: boolean;
+  explanation?: string; // Optional explanation
 }
 
 interface Assessment {
@@ -101,7 +104,7 @@ export function AssessmentPreviewModal({ isOpen, onClose, assessment }: Assessme
               value={answers[question.id] || ''}
               onValueChange={(value) => handleAnswerChange(question.id, value)}
             >
-              {answerKey.options?.map((option: string, optionIndex: number) => (
+              {(question.options || answerKey.options || []).map((option: string, optionIndex: number) => (
                 <div key={optionIndex} className="flex items-center space-x-2">
                   <RadioGroupItem value={option} id={`${question.id}-${optionIndex}`} />
                   <Label htmlFor={`${question.id}-${optionIndex}`} className="text-sm">

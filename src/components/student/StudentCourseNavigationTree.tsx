@@ -92,10 +92,19 @@ export default function StudentCourseNavigationTree({
   const fetchCourseData = async () => {
     setLoading(true);
     try {
+      console.log('Fetching course data for baseClassId:', baseClassId);
       const response = await fetch(`/api/learn/courses/${baseClassId}/navigation`);
-      if (!response.ok) throw new Error('Failed to fetch course data');
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', errorText);
+        throw new Error(`Failed to fetch course data: ${response.status} ${errorText}`);
+      }
       
       const data = await response.json();
+      console.log('Fetched course data:', data);
       setCourseData(data);
     } catch (error) {
       console.error('Error fetching course data:', error);

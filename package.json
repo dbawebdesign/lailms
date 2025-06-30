@@ -77,7 +77,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
-    "framer-motion": "^12.12.2",
+    "framer-motion": "^12.19.2",
     "gpt-tokenizer": "^3.0.1",
     "idb": "^8.0.3",
     "jspdf": "^3.0.1",

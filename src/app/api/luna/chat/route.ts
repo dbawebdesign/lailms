@@ -330,16 +330,295 @@ async function performCollectKnowledgeBaseSources(courseTitle: string, courseDes
 
     return {
       success: true,
-      message: `Perfect! I've created your "${courseTitle}" course foundation. I'm now redirecting you to the Knowledge Base Course Generator where you can upload your documents and I'll analyze them to generate comprehensive course content, learning objectives, and structure.`,
+      message: `🎯 **Perfect!** I've created your "${courseTitle}" course foundation and I'm ready to help you build something amazing!
+
+📋 **What I've done:**
+- ✅ Created your course foundation
+- ✅ Set up the knowledge base structure
+
+🎯 **What's next:** I'm redirecting you to the Knowledge Base Course Generator where you can:
+- Upload your course materials (PDFs, Word docs, PowerPoints, etc.)
+- Add relevant URLs and web resources
+- Let AI analyze everything to generate comprehensive course content, learning objectives, and structure
+
+Once you upload your materials, I'll work my magic to create a detailed course outline tailored to your content!`,
       baseClassId,
       redirectUrl: `/teach/knowledge-base/create?baseClassId=${baseClassId}`,
       actions: [
-        { type: 'redirectToKB', label: 'Open KB Course Generator', url: `/teach/knowledge-base/create?baseClassId=${baseClassId}` }
+        { type: 'redirectToKB', label: '🚀 Open KB Course Generator', url: `/teach/knowledge-base/create?baseClassId=${baseClassId}` }
       ]
     };
 
   } catch (error) {
     console.error('Error creating base class for KB course:', error);
+    return {
+      success: false,
+      message: `I encountered an issue while setting up your course: ${error instanceof Error ? error.message : 'Unknown error'}. You can try again or create a course manually from the Knowledge Base section.`
+    };
+  }
+}
+
+// Helper function to extract files and URLs from user messages
+function extractFilesAndUrls(message: string): { files: string[], urls: string[], fileNames: string[] } {
+  const files: string[] = [];
+  const urls: string[] = [];
+  const fileNames: string[] = [];
+  
+  // Extract uploaded file IDs from [Uploaded Files: ...] pattern
+  const uploadedFileMatch = message.match(/\[Uploaded Files:\s*([^\]]+)\]/i);
+  if (uploadedFileMatch) {
+    const fileIdList = uploadedFileMatch[1].split(',').map(f => f.trim()).filter(f => f.length > 0);
+    files.push(...fileIdList);
+  }
+  
+  // Extract original file names from [File Names: ...] pattern
+  const fileNameMatch = message.match(/\[File Names:\s*([^\]]+)\]/i);
+  if (fileNameMatch) {
+    const nameList = fileNameMatch[1].split(',').map(f => f.trim()).filter(f => f.length > 0);
+    fileNames.push(...nameList);
+  }
+  
+  // Also support legacy [Files attached: ...] pattern for backward compatibility
+  const legacyFileMatch = message.match(/\[Files attached:\s*([^\]]+)\]/i);
+  if (legacyFileMatch) {
+    const fileList = legacyFileMatch[1].split(',').map(f => f.trim()).filter(f => f.length > 0);
+    // These are just filenames, not IDs, so put them in fileNames
+    fileNames.push(...fileList);
+  }
+  
+  // Extract URLs from [URLs: ...] pattern
+  const urlMatch = message.match(/\[URLs:\s*([^\]]+)\]/i);
+  if (urlMatch) {
+    const urlList = urlMatch[1].split(',').map(u => u.trim()).filter(u => u.length > 0);
+    urls.push(...urlList);
+  }
+  
+  // Also detect standalone URLs in the message text
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const detectedUrls = message.match(urlRegex) || [];
+  urls.push(...detectedUrls.filter(url => !urls.includes(url)));
+  
+  return { files, urls, fileNames };
+}
+
+// Helper function to clean message text by removing file/URL annotations
+function cleanMessageText(message: string): string {
+  return message
+    .replace(/\[Uploaded Files:[^\]]+\]/gi, '')
+    .replace(/\[File Names:[^\]]+\]/gi, '')
+    .replace(/\[Files attached:[^\]]+\]/gi, '')
+    .replace(/\[URLs:[^\]]+\]/gi, '')
+    .trim();
+}
+
+// Create course with files - processes files and triggers the same backend flow as the KB create page
+async function performCreateCourseWithFiles(courseTitle: string, courseDescription: string, files: string[], urls: string[], forwardedCookies?: string | null, request?: Request): Promise<any> {
+  console.log(`---> CREATING COURSE WITH FILES: ${courseTitle}`);
+  console.log(`Uploaded File IDs: ${files.join(', ')}`);
+  console.log(`URLs: ${urls.join(', ')}`);
+  
+  // Return immediate response with step-by-step updates
+  const steps = [
+    `Great! I can see you've uploaded ${files.length} file${files.length !== 1 ? 's' : ''}${urls.length > 0 ? ` and ${urls.length} URL${urls.length !== 1 ? 's' : ''}` : ''}. Let me process these for your "${courseTitle}" course.`,
+    `🔄 **Step 1:** Creating your course foundation...`,
+    `🔄 **Step 2:** Associating your uploaded documents with the course...`,
+    `🔄 **Step 3:** Running AI analysis on your content to generate course information...`,
+    `✅ **Almost done!** I'm preparing your results page where you can review the AI-generated course details.`
+  ];
+  
+  try {
+    const baseURL = getBaseURL(request);
+    
+    // First, create the base class
+    const createBaseClassURL = `${baseURL}/api/knowledge-base/create-base-class`;
+    
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    if (forwardedCookies) headers['Cookie'] = forwardedCookies;
+
+    // Get user info from auth
+    const authResponse = await fetch(`${baseURL}/api/auth/user`, {
+      method: 'GET',
+      headers: { Cookie: forwardedCookies || '' },
+    });
+    
+    if (!authResponse.ok) {
+      throw new Error('Authentication required');
+    }
+    
+    const { user } = await authResponse.json();
+    
+    // Get user's organization
+    const profileResponse = await fetch(`${baseURL}/api/auth/profile`, {
+      method: 'GET',
+      headers: { Cookie: forwardedCookies || '' },
+    });
+    
+    if (!profileResponse.ok) {
+      throw new Error('Profile not found');
+    }
+    
+    const { profile } = await profileResponse.json();
+
+    const response = await fetch(createBaseClassURL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: courseTitle,
+        description: courseDescription,
+        organisationId: profile.organisation_id,
+        userId: user.id
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create base class for KB course');
+    }
+
+    const result = await response.json();
+    const baseClassId = result.baseClassId;
+    
+    if (!baseClassId) {
+      throw new Error('No base class ID returned from creation');
+    }
+
+    // Step 2: Associate uploaded documents with the base class
+    if (files.length > 0) {
+      console.log(`Associating ${files.length} documents with base class ${baseClassId}...`);
+      
+      // Add a delay and retry mechanism for document association
+      let associationSuccess = false;
+      for (let i = 0; i < 3; i++) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+
+        const associateURL = `${baseURL}/api/knowledge-base/associate-documents-with-base-class`;
+        const associateResponse = await fetch(associateURL, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            baseClassId: baseClassId,
+            organisationId: profile.organisation_id,
+            timeWindowMinutes: 2 // Use a shorter time window for this specific case
+          }),
+        });
+
+        if (associateResponse.ok) {
+          const associateData = await associateResponse.json();
+          console.log(`Attempt ${i + 1}: Documents association check`, associateData);
+          if (associateData.documentsAssociated > 0) {
+            associationSuccess = true;
+            break; // Exit loop on success
+          }
+        }
+      }
+
+      if (!associationSuccess) {
+        console.warn('Could not associate documents after multiple attempts.');
+        // Optionally, you could decide to fail here or let the user handle it manually.
+        // For now, we'll proceed but the analysis step will likely fail.
+      }
+    }
+    
+    // Step 3: Trigger content analysis (NOT full course generation)
+    if (files.length > 0) {
+      console.log(`Starting content analysis for base class ${baseClassId} with ${files.length} uploaded files...`);
+      
+      // Wait a moment for document processing to start
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      const analyzeURL = `${baseURL}/api/knowledge-base/analyze-and-generate-course-info`;
+      const analyzeResponse = await fetch(analyzeURL, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          baseClassId: baseClassId,
+          organisationId: profile.organisation_id
+        }),
+      });
+      
+      if (analyzeResponse.ok) {
+        const analyzeData = await analyzeResponse.json();
+        console.log(`Content analysis completed successfully:`, analyzeData);
+        
+        return {
+          success: true,
+          message: `🎉 **Perfect!** I've successfully processed your ${files.length} file${files.length !== 1 ? 's' : ''}${urls.length > 0 ? ` and ${urls.length} URL${urls.length !== 1 ? 's' : ''}` : ''} and generated comprehensive course information for "${courseTitle}".
+
+📋 **What I've done:**
+- ✅ Created your course foundation
+- ✅ Uploaded and processed all your documents  
+- ✅ Generated AI-powered course title, description, and learning objectives
+- ✅ Analyzed content structure and themes
+
+🎯 **What's next:** I'm redirecting you to the course review page where you can:
+- Review the AI-generated course details
+- Make any adjustments you'd like
+- Proceed to full course generation when ready
+
+Click the button below to review your course analysis!`,
+          baseClassId,
+          analysisResult: analyzeData.courseInfo,
+          redirectUrl: `/teach/knowledge-base/create?baseClassId=${baseClassId}`,
+          files: files,
+          urls: urls,
+          actions: [
+            { type: 'redirectToKB', label: '📊 Review AI Analysis & Course Info', url: `/teach/knowledge-base/create?baseClassId=${baseClassId}` }
+          ]
+        };
+      } else {
+        console.error(`Content analysis failed:`, analyzeResponse.statusText);
+        // Still return success for base class creation, user can manually continue
+        return {
+          success: true,
+          message: `🔄 **Good news!** I've successfully created your "${courseTitle}" course foundation and uploaded your ${files.length} file${files.length !== 1 ? 's' : ''}${urls.length > 0 ? ` and ${urls.length} URL${urls.length !== 1 ? 's' : ''}` : ''}.
+
+📋 **What I've completed:**
+- ✅ Created your course foundation
+- ✅ Uploaded all your documents
+- ⏳ AI analysis is still processing (this can take 1-2 minutes for comprehensive analysis)
+
+🎯 **What to do next:** I'm redirecting you to the Knowledge Base Course Generator where you can:
+- Monitor the analysis progress in real-time
+- Review results as they become available
+- Continue with course creation once analysis completes
+
+The page will automatically update when your analysis is ready!`,
+          baseClassId,
+          redirectUrl: `/teach/knowledge-base/create?baseClassId=${baseClassId}`,
+          files: files,
+          urls: urls,
+          actions: [
+            { type: 'redirectToKB', label: '⏳ Monitor Analysis Progress', url: `/teach/knowledge-base/create?baseClassId=${baseClassId}` }
+          ]
+        };
+      }
+    } else {
+      // No files to process, just redirect to upload page
+      return {
+        success: true,
+        message: `🎯 **Great start!** I've created your "${courseTitle}" course foundation${urls.length > 0 ? ` and noted your ${urls.length} URL${urls.length !== 1 ? 's' : ''}` : ''}.
+
+📋 **What I've done:**
+- ✅ Created your course foundation
+${urls.length > 0 ? `- ✅ Saved your ${urls.length} URL${urls.length !== 1 ? 's' : ''} for processing` : ''}
+
+🎯 **What's next:** I'm redirecting you to the Knowledge Base Course Generator where you can:
+- Upload your course documents (PDFs, Word docs, etc.)
+- Add any additional URLs if needed
+- Let AI analyze everything to generate comprehensive course content
+
+Once you upload your materials, I'll process them just like I did with the files you had ready!`,
+        baseClassId,
+        redirectUrl: `/teach/knowledge-base/create?baseClassId=${baseClassId}`,
+        files: files,
+        urls: urls,
+        actions: [
+          { type: 'redirectToKB', label: '📁 Upload Files & Generate Course', url: `/teach/knowledge-base/create?baseClassId=${baseClassId}` }
+        ]
+      };
+    }
+
+  } catch (error) {
+    console.error('Error creating course with files:', error);
     return {
       success: false,
       message: `I encountered an issue while setting up your course: ${error instanceof Error ? error.message : 'Unknown error'}. You can try again or create a course manually from the Knowledge Base section.`
@@ -1463,17 +1742,36 @@ Analyze the current UI context to determine the appropriate level of educational
 - "Can you create a [subject] class?"
 - ANY request that implies creating new educational content
 
-#### 4.2 Streamlined KB Enhancement Workflow
-**Step 1 - ALWAYS Start with KB Source Collection**:
-- **Use collectKnowledgeBaseSources tool immediately** for ANY course creation request
-- **Extract course title and description** from user's request (e.g., "6th grade world history" → title: "6th Grade World History", description: "Comprehensive world history course for 6th grade students")
-- **Create base class foundation** and redirect to KB Course Generator page
+#### 4.2 Smart Course Creation Workflow
+**CRITICAL: Detect Files and URLs First**:
+- **Check for attached files** in the user's message (look for [Files attached: ...] patterns)
+- **Check for mentioned URLs** in the user's message (look for [URLs: ...] patterns or detect URLs in the text)
+- **Extract file names and URLs** from the message content
+- **Use createCourseWithFiles tool** when BOTH course creation is requested AND files/URLs are detected
+- **Use collectKnowledgeBaseSources tool** when course creation is requested but NO files/URLs are detected
+
+**Step 1A - Course Creation WITH Files/URLs**:
+- **Use createCourseWithFiles tool** when users request course creation AND have attached files or mentioned URLs
+- **Extract course title and description** from user's request
+- **Extract uploaded file IDs** from [Uploaded Files: ...] pattern in the message
+- **Extract URLs** from [URLs: ...] pattern in the message
+- **Pass the detected file IDs and URLs** to the tool (these are already uploaded to the server)
+- **This replicates the exact "Process All Sources & Create Course" button workflow**
+- **IMPORTANT**: This tool only does source processing and analysis, NOT full course generation
+- **Result**: User gets redirected to the analysis results page where they can review and manually proceed
+- **Communication Style**: Be conversational and informative! Explain what you're doing step-by-step rather than just saying "thinking"
+- **Example Response**: Use the detailed, step-by-step messaging provided by the tool result to explain the process and what's happening
+
+**Step 1B - Course Creation WITHOUT Files/URLs**:
+- **Use collectKnowledgeBaseSources tool** when users want to create courses but don't have files attached
+- **Extract course title and description** from user's request
+- **Create base class foundation** and redirect to KB Course Generator page for manual upload
 - **Example Response**: "Perfect! I've created your [subject] course foundation. I'm redirecting you to our Knowledge Base Course Generator where you can upload your documents and I'll analyze them to create comprehensive course content."
 
 **Step 2 - KB Course Generator Page**:
-- **User uploads documents** on the dedicated KB page with better UI and functionality
+- **User uploads documents** (if not already processed) on the dedicated KB page
 - **AI analyzes content** and generates course title, description, learning objectives, and subject classification
-- **User reviews and approves** the AI-generated course information on the review page (as shown in screenshots)
+- **User reviews and approves** the AI-generated course information
 - **Full course generation** proceeds with "Approve & Generate Full Course" button
 
 **Step 3 - Studio Integration**:
@@ -1482,19 +1780,31 @@ Analyze the current UI context to determine the appropriate level of educational
 - **Professional workflow** leverages the proven KB course generation system
 
 #### 4.3 User Experience Principles
+**Smart File Detection**:
+- Automatically detect when users have attached files or mentioned URLs
+- Seamlessly route to the appropriate workflow (with files vs without files)
+- Acknowledge the files/URLs in the response to show understanding
+
+**Conversational Progress Updates**:
+- **NEVER just say "thinking" or show loading without explanation**
+- **Always explain what you're doing** while processing (e.g., "I'm creating your course foundation...", "Now analyzing your documents...")
+- **Use step-by-step communication** to keep users informed and engaged
+- **Set clear expectations** about what will happen next and how long things might take
+
 **Seamless Integration**:
-- Make file/URL upload feel natural and optional
-- Keep explanations brief and action-focused
-- Use casual language: "Want to add your own materials?"
+- Make the transition from Luna chat to KB Course Generator feel natural
+- Keep explanations brief but informative
+- Use casual, friendly language: "I can see you have some materials ready!"
 
 **Progressive Disclosure**:
 - Start simple, add complexity only when needed
-- Keep responses short and conversational
-- Focus on immediate next steps
+- Keep responses conversational but detailed enough to be helpful
+- Focus on immediate next steps with clear guidance
 
 **Value Communication**:
 - Briefly mention benefits without over-explaining
 - Let users experience the value rather than describing it extensively
+- Use emojis and formatting to make responses more engaging and scannable
 
 #### 4.4 Fallback Options
 **If User Explicitly Refuses KB Enhancement**:
@@ -1505,6 +1815,11 @@ Analyze the current UI context to determine the appropriate level of educational
 **Simple Outline Requests**:
 - Use generateCourseOutline ONLY when user explicitly asks for "just an outline" or "basic structure"
 - Even then, offer to enhance with KB sources for better results
+
+**File Processing Limitations**:
+- If actual file processing fails, still create the base class and redirect to manual upload
+- Acknowledge the limitation and guide user to the KB Course Generator
+- Ensure the workflow continues smoothly despite technical constraints
 
 #### 4.5 Workflow Integration
 **Luna's Role**:
@@ -2486,7 +2801,7 @@ export async function POST(request: Request) {
         type: "function",
         function: {
           name: "collectKnowledgeBaseSources",
-          description: "Create a base class for knowledge base course generation and redirect to the KB course generator. Use this when users want to create courses with their own documents/content.",
+          description: "Create a base class for knowledge base course generation and redirect to the KB course generator. Use this when users want to create courses but don't have files attached.",
           parameters: {
             type: "object",
             properties: {
@@ -2494,6 +2809,23 @@ export async function POST(request: Request) {
               courseDescription: { type: "string", description: "A brief description of the course content and objectives" }
             },
             required: ["courseTitle", "courseDescription"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "createCourseWithFiles",
+          description: "Create a course with uploaded files or URLs. Use this when users request course creation AND have attached files or mentioned specific URLs in their message. This replicates the exact same process as the 'Process All Sources & Create Course' button on the knowledge base create page.",
+          parameters: {
+            type: "object",
+            properties: {
+              courseTitle: { type: "string", description: "The title/name of the course to create" },
+              courseDescription: { type: "string", description: "A brief description of the course content and objectives" },
+              files: { type: "array", items: { type: "string" }, description: "Array of file names that the user has attached" },
+              urls: { type: "array", items: { type: "string" }, description: "Array of URLs that the user has mentioned or attached" }
+            },
+            required: ["courseTitle", "courseDescription", "files", "urls"]
           }
         }
       },
@@ -2607,6 +2939,8 @@ export async function POST(request: Request) {
                 result = await performUIAction(functionArgs.componentId, functionArgs.actionType, functionArgs.additionalParams);
               } else if (functionName === 'collectKnowledgeBaseSources') {
                 result = await performCollectKnowledgeBaseSources(functionArgs.courseTitle, functionArgs.courseDescription, forwardedCookies, request);
+              } else if (functionName === 'createCourseWithFiles') {
+                result = await performCreateCourseWithFiles(functionArgs.courseTitle, functionArgs.courseDescription, functionArgs.files || [], functionArgs.urls || [], forwardedCookies, request);
               } else if (functionName === 'enhancedCourseGeneration') {
                 result = await performEnhancedCourseGeneration(functionArgs.baseClassId, functionArgs.title, functionArgs.description, functionArgs.generationMode, functionArgs.additionalParams, forwardedCookies, request);
               } else if (functionName === 'checkJobStatus') {

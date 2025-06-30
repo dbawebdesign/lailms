@@ -103,26 +103,48 @@ export interface Question {
   updated_at: string;
 }
 
+export interface AssessmentQuestion {
+  id: string;
+  assessment_id: string;
+  question_text: string;
+  question_type: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'matching';
+  options?: any; // JSONB field for question-specific options
+  correct_answer?: any; // JSONB field for the correct answer(s)
+  answer_key: any; // JSONB field (legacy/additional grading info)
+  points: number;
+  order_index: number;
+  explanation?: string;
+  sample_response?: string;
+  grading_rubric?: any;
+  ai_grading_enabled?: boolean;
+  required?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // Assessment types
 export type AssessmentType = 'lesson_assessment' | 'path_quiz' | 'class_exam';
 
 export interface Assessment {
   id: string;
   title: string;
-  type: AssessmentType;
+  description?: string;
+  assessment_type: 'quiz' | 'exam' | 'practice';
   base_class_id: string;
   lesson_id?: string;
   path_id?: string;
-  is_enabled: boolean;
-  settings: {
-    time_limit?: number; // in minutes
-    attempts_allowed?: number;
-    passing_score?: number;
-    show_correct_answers?: boolean;
-    randomize_questions?: boolean;
-  };
-  created_at: string;
-  updated_at: string;
+  time_limit_minutes?: number; // in minutes
+  max_attempts?: number;
+  passing_score_percentage?: number;
+  randomize_questions?: boolean;
+  show_results_immediately?: boolean;
+  allow_review?: boolean;
+  ai_grading_enabled?: boolean;
+  ai_model?: string;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+  assessment_questions?: AssessmentQuestion[];
 }
 
 // Assessment configuration

@@ -151,7 +151,7 @@ const AssessmentTaker = () => {
           const currentQuestion = attemptData.questions[currentQuestionIndex];
           if (currentQuestion.question_type === 'multiple_choice') {
             const optionIndex = parseInt(event.key) - 1;
-            const options = currentQuestion.answer_key?.options || [];
+            const options = currentQuestion.options || [];
             if (optionIndex < options.length) {
               event.preventDefault();
               handleAnswerChange(currentQuestion.id, options[optionIndex]);
@@ -296,8 +296,6 @@ const AssessmentTaker = () => {
     setQuestionStartTime(Date.now());
   };
 
-
-
   const handleQuestionNavigation = useCallback((direction: 'prev' | 'next') => {
     // Save time spent on current question before navigation
     if (attemptData) {
@@ -335,7 +333,7 @@ const AssessmentTaker = () => {
 
     switch (question.question_type as NewSchemaQuestionType) {
       case 'multiple_choice':
-        const mcOptions = question.answer_key?.options || [];
+        const mcOptions = question.options || [];
         return (
           <div className="space-y-4">
             <div id={`question-${question.id}-instructions`} className="sr-only">
@@ -399,19 +397,28 @@ const AssessmentTaker = () => {
 
       case 'short_answer':
         return (
-          <div className="space-y-2">
+          <div className="space-y-4">
             <Textarea
               value={studentAnswer || ''}
               onChange={(e) => handleAnswerChange(question.id, e.target.value)}
               placeholder="Enter your answer here..."
               className="min-h-[120px] focus:ring-2 focus:ring-primary focus:border-primary"
-              maxLength={500}
-              aria-describedby={`question-${question.id}-char-count`}
+              aria-describedby={`question-${question.id}-word-count`}
               aria-label="Short answer response"
             />
-            <p id={`question-${question.id}-char-count`} className="text-sm text-muted-foreground">
-              {(studentAnswer || '').length}/500 characters
-            </p>
+            <div id={`question-${question.id}-word-count`} className="flex justify-between text-sm text-muted-foreground">
+              <span>{(studentAnswer || '').split(/\s+/).filter((word: string) => word.length > 0).length} words</span>
+              <span>{(studentAnswer || '').length} characters</span>
+            </div>
+            {/* Show sample response hint if available */}
+            {question.answer_key?.grading_notes && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Hint:</strong> {question.answer_key.grading_notes}
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
         );
 
@@ -447,59 +454,52 @@ const AssessmentTaker = () => {
         );
 
       case 'matching':
-        const matchingPairs = question.answer_key?.pairs || [];
-        const leftItems = matchingPairs.map((pair: any) => pair.left);
-        const rightItems = matchingPairs.map((pair: any) => pair.right);
-        const currentMatches = studentAnswer || {};
-
+        // Handle matching questions with the new schema
+        const matchingOptions = question.options || { left_items: [], right_items: [] };
         return (
           <div className="space-y-4">
-            <div id={`question-${question.id}-instructions`} className="text-sm text-muted-foreground">
-              Match each item on the left with the correct item on the right. Use the dropdown menus to make your selections. Tab through the dropdowns and use arrow keys to navigate options.
-            </div>
-            <div role="group" aria-labelledby={`question-${question.id}-instructions`}>
-              {leftItems.map((leftItem: string, index: number) => (
-                <div key={index} className="flex items-center space-x-4 mb-3">
-                  <div className="flex-1 p-3 bg-muted rounded-md">
-                    {leftItem}
-                  </div>
-                  <div className="text-muted-foreground" aria-hidden="true">→</div>
-                  <div className="flex-1">
-                    <Select
-                      value={currentMatches[leftItem] || ''}
-                      onValueChange={(value) => {
-                        const newMatches = { ...currentMatches };
-                        if (value) {
-                          newMatches[leftItem] = value;
-                        } else {
-                          delete newMatches[leftItem];
-                        }
-                        handleAnswerChange(question.id, newMatches);
-                      }}
-                    >
-                      <SelectTrigger 
-                        aria-label={`Match for: ${leftItem}`}
-                        className="focus:ring-2 focus:ring-primary focus:border-primary"
-                      >
-                        <SelectValue placeholder="Select a match..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {rightItems.map((rightItem: string, rightIndex: number) => (
-                          <SelectItem key={rightIndex} value={rightItem}>
-                            {rightItem}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-medium mb-3">Items</h4>
+                <div className="space-y-2">
+                  {matchingOptions.left_items?.map((item: string, index: number) => (
+                    <div key={index} className="p-3 border rounded-lg bg-muted/50">
+                      <span className="font-medium text-sm mr-2">{index + 1}.</span>
+                      {item}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+              <div>
+                <h4 className="font-medium mb-3">Matches</h4>
+                <div className="space-y-2">
+                  {matchingOptions.right_items?.map((item: string, index: number) => (
+                    <div key={index} className="p-3 border rounded-lg bg-muted/50">
+                      <span className="font-medium text-sm mr-2">{String.fromCharCode(65 + index)}.</span>
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Drag and drop or use selection controls to match items. (Interactive matching interface coming soon)
+              </AlertDescription>
+            </Alert>
           </div>
         );
 
       default:
-        return <div className="text-red-500">Unsupported question type: {question.question_type}</div>;
+        return (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Question type "{question.question_type}" is not yet supported.
+            </AlertDescription>
+          </Alert>
+        );
     }
   };
 

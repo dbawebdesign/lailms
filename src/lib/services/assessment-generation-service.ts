@@ -57,7 +57,9 @@ interface AssessmentGenerationParams {
 interface GeneratedQuestion {
   question_text: string;
   question_type: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'matching';
-  answer_key: any;
+  options?: any; // JSONB - for questions that need options (multiple choice, matching, etc.)
+  correct_answer?: any; // JSONB - the correct answer(s)
+  answer_key: any; // JSONB - enhanced answer key with explanations and grading criteria
   sample_response?: string;
   grading_rubric?: any;
   points: number;
@@ -281,36 +283,47 @@ REQUIREMENTS:
 3. Questions should be ${difficulty} difficulty
 4. Output MUST be valid JSON array
 5. Questions must be directly based on the provided content
-6. Include proper answer keys and explanations
+6. Include proper options, correct_answer, and answer_key fields
 
 QUESTION TYPE SPECIFICATIONS:
 
 multiple_choice:
-- answer_key: {"options": ["A", "B", "C", "D"], "correct_option": "A", "explanations": {"A": "Why correct", "B": "Why wrong", ...}}
-- 4 plausible options
+- options: ["Option A text", "Option B text", "Option C text", "Option D text"]
+- correct_answer: "Option A text" (the exact text of the correct option)
+- answer_key: {"explanation": "Why this is correct", "distractors": {"Option B text": "Why wrong", "Option C text": "Why wrong", "Option D text": "Why wrong"}}
 
 true_false:
-- answer_key: {"correct_answer": true/false, "explanation": "Why this is true/false"}
+- options: null (no options needed)
+- correct_answer: true or false
+- answer_key: {"explanation": "Detailed explanation of why this is true/false"}
 
 short_answer:
-- answer_key: {"acceptable_answers": ["answer1", "answer2"], "keywords": ["key1", "key2"], "min_score_threshold": 0.7}
+- options: null (no options needed)
+- correct_answer: ["primary answer", "alternative answer"]
+- answer_key: {"keywords": ["keyword1", "keyword2"], "min_score_threshold": 0.7, "grading_notes": "What to look for"}
 - sample_response: "Model correct answer"
 
 essay:
-- answer_key: {"grading_criteria": "What to look for", "key_points": ["point1", "point2"], "rubric": {"content": 40, "organization": 30, "analysis": 30}}
+- options: null (no options needed)
+- correct_answer: null (no single correct answer)
+- answer_key: {"key_points": ["point1", "point2", "point3"], "grading_criteria": "What to evaluate", "rubric": {"content": 40, "organization": 30, "analysis": 30}}
 - sample_response: "Model essay response"
 
 matching:
-- answer_key: {"pairs": [{"left": "item1", "right": "match1"}, {"left": "item2", "right": "match2"}]}
+- options: {"left_items": ["Item 1", "Item 2", "Item 3"], "right_items": ["Match A", "Match B", "Match C"]}
+- correct_answer: {"Item 1": "Match A", "Item 2": "Match B", "Item 3": "Match C"}
+- answer_key: {"explanation": "Brief explanation of the matching logic"}
 
 OUTPUT FORMAT (JSON array):
 [
   {
     "question_text": "Question text here?",
     "question_type": "multiple_choice",
+    "options": [...] or null,
+    "correct_answer": "..." or [...] or {...} or null,
     "answer_key": {...},
     "sample_response": "For short_answer and essay only",
-    "grading_rubric": {...},
+    "grading_rubric": null,
     "points": 1,
     "explanation": "Brief explanation of what this tests"
   }
@@ -366,10 +379,15 @@ Generate the questions now:`;
         q.question_type && 
         q.answer_key
       ).map((q, index) => ({
-        ...q,
-        points: q.points || 1,
+        question_text: q.question_text,
         question_type: q.question_type,
-        answer_key: q.answer_key
+        options: q.options || null, // Include options field
+        correct_answer: q.correct_answer || null, // Include correct_answer field
+        answer_key: q.answer_key,
+        sample_response: q.sample_response || null,
+        grading_rubric: q.grading_rubric || null,
+        points: q.points || 1,
+        explanation: q.explanation || null
       }));
 
     } catch (error) {
@@ -401,7 +419,7 @@ Generate the questions now:`;
         show_results_immediately: true,
         allow_review: true,
         ai_grading_enabled: true,
-                  ai_model: 'gpt-4.1-mini'
+        ai_model: 'gpt-4.1-mini'
       };
 
       const { data: assessment, error: assessmentError } = await supabase
@@ -412,17 +430,19 @@ Generate the questions now:`;
 
       if (assessmentError) throw assessmentError;
 
-      // 2. Create the questions
+      // 2. Create the questions with options and correct_answer fields
       const questionsData = questions.map((q, index) => ({
         assessment_id: assessment.id,
         question_text: q.question_text,
         question_type: q.question_type,
-        points: q.points,
-        order_index: index + 1,
-        required: true,
+        options: q.options || null, // Include options for questions that need them
+        correct_answer: q.correct_answer || null, // Include correct answer
         answer_key: q.answer_key,
         sample_response: q.sample_response,
         grading_rubric: q.grading_rubric,
+        points: q.points,
+        order_index: index + 1,
+        required: true,
         ai_grading_enabled: ['short_answer', 'essay'].includes(q.question_type)
       }));
 
@@ -440,8 +460,6 @@ Generate the questions now:`;
       throw new Error('Failed to save assessment to database');
     }
   }
-
-
 
   // Enhanced method to analyze content and extract key concepts with learning objectives
   async analyzeContentForConcepts(content: string, assessmentType: 'lesson' | 'path' | 'class' = 'lesson'): Promise<ContentAnalysis> {

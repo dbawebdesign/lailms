@@ -13,7 +13,7 @@ export interface Assessment {
     time_limit_minutes?: number;
     shuffle_questions?: boolean;
     shuffle_options?: boolean;
-    passing_score?: number;
+    passing_score_percentage?: number;
     max_attempts?: number;
     show_correct_answers?: 'immediately' | 'after_deadline' | 'never';
     availability_start?: string;

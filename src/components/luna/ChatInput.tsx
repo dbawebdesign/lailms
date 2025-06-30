@@ -112,6 +112,38 @@ const ChatInput: React.FC<ChatInputProps> = ({ persona }) => {
     if ((!message.trim() && attachedFiles.length === 0 && attachedUrls.length === 0) || isLoading) return;
     
     try {
+      let uploadedFileIds: string[] = [];
+      
+      // Upload files first if any are attached
+      if (attachedFiles.length > 0) {
+        console.log('[ChatInput] Uploading files before sending to Luna...');
+        
+        for (const { file } of attachedFiles) {
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          // Upload to the same endpoint used by the knowledge base
+          const uploadResponse = await fetch('/api/knowledge-base/upload', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include', // Include cookies for authentication
+          });
+          
+          if (uploadResponse.ok) {
+            const uploadResult = await uploadResponse.json();
+            if (uploadResult.id) {
+              uploadedFileIds.push(uploadResult.id);
+              console.log(`[ChatInput] Successfully uploaded ${file.name} with ID: ${uploadResult.id}`);
+            } else {
+              console.error(`[ChatInput] Upload response missing ID:`, uploadResult);
+            }
+          } else {
+            const errorText = await uploadResponse.text();
+            console.error(`[ChatInput] Failed to upload ${file.name}:`, uploadResponse.status, uploadResponse.statusText, errorText);
+          }
+        }
+      }
+      
       // Detect URLs in the message and add them to attachedUrls
       const detectedUrls = detectUrls(message);
       const newUrls = detectedUrls.map(url => ({
@@ -119,12 +151,14 @@ const ChatInput: React.FC<ChatInputProps> = ({ persona }) => {
         id: Math.random().toString(36).substr(2, 9)
       }));
       
-      // For now, combine message with attachment info as text
-      // TODO: Update useLunaContext to handle structured message data
+      // Combine message with attachment info
       let fullMessage = message;
       
-      if (attachedFiles.length > 0) {
-        fullMessage += '\n\n[Files attached: ' + attachedFiles.map(f => f.file.name).join(', ') + ']';
+      // Include uploaded file IDs instead of just filenames
+      if (uploadedFileIds.length > 0) {
+        fullMessage += '\n\n[Uploaded Files: ' + uploadedFileIds.join(', ') + ']';
+        // Also include original filenames for context
+        fullMessage += '\n[File Names: ' + attachedFiles.map(f => f.file.name).join(', ') + ']';
       }
       
       if (attachedUrls.length > 0 || newUrls.length > 0) {

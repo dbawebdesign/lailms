@@ -5,6 +5,7 @@ import WelcomeCard from "@/components/dashboard/WelcomeCard";
 import NextUpCard from "@/components/dashboard/student/NextUpCard";
 import ActiveCourseItem, { ActiveCourseItemProps } from "@/components/dashboard/student/ActiveCourseItem";
 import { Tables } from "packages/types/db";
+import { calculateOverallProgress } from "@/lib/student/progress.server";
 
 // Helper function to fetch Next Up data
 async function getNextUpData(supabase: any, userId: string) {
@@ -58,7 +59,7 @@ async function getActiveCoursesData(supabase: any, userId: string): Promise<Acti
         name,
         base_classes (
           id,
-          settings
+          description
         )
       )
     `)
@@ -73,18 +74,24 @@ async function getActiveCoursesData(supabase: any, userId: string): Promise<Acti
     return [];
   }
 
-  return enrollments.map((enrollment: any) => {
+  const coursePromises = enrollments.map(async (enrollment: any) => {
     const instance = enrollment.class_instances;
-    // Access subject from settings
-    const subject = instance.base_classes?.settings?.subject || "General Subject"; 
+    if (!instance) return null;
+
+    const description = instance.base_classes?.description || "No description available."; 
+    const progress = await calculateOverallProgress(instance.base_classes.id, userId);
+
     return {
       id: instance.id,
       title: instance.name || "Unnamed Course",
-      description: subject, // Use the extracted subject as description
-      progress: Math.floor(Math.random() * 100), // Placeholder progress
+      description: description,
+      progress: Math.round(progress),
       href: `/learn/courses/${instance.id}`,
     };
-  }).filter(Boolean) as ActiveCourseItemProps[];
+  });
+
+  const courses = await Promise.all(coursePromises);
+  return courses.filter(Boolean) as ActiveCourseItemProps[];
 }
 
 export default async function StudentDashboardPage() {
