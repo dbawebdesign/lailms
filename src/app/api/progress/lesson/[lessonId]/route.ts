@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { updateClassInstanceProgress } from "@/lib/student/progress.server";
 
 export async function POST(
     request: Request,
@@ -22,10 +23,16 @@ export async function POST(
             lastPosition = null 
         } = body;
 
-        // Validate lesson exists
+        // Validate lesson exists and get base class info
         const { data: lesson, error: lessonError } = await supabase
             .from('lessons')
-            .select('id')
+            .select(`
+                id,
+                path_id,
+                paths (
+                    base_class_id
+                )
+            `)
             .eq('id', lessonId)
             .single();
 
@@ -59,6 +66,29 @@ export async function POST(
         if (fetchError) {
             console.error('Error fetching updated lesson progress:', fetchError);
             return NextResponse.json({ error: 'Failed to fetch updated progress' }, { status: 500 });
+        }
+
+        // Update class instance progress
+        try {
+            // Get the base class ID from the lesson
+            const baseClassId = lesson.paths?.base_class_id;
+            if (baseClassId) {
+                // Find the class instance this user is enrolled in for this base class
+                const { data: enrollment } = await supabase
+                    .from('rosters')
+                    .select('class_instances (id)')
+                    .eq('profile_id', user.id)
+                    .eq('role', 'student')
+                    .eq('class_instances.base_class_id', baseClassId)
+                    .single();
+
+                if (enrollment?.class_instances?.id) {
+                    await updateClassInstanceProgress(enrollment.class_instances.id, user.id);
+                }
+            }
+        } catch (classProgressError) {
+            console.error('Error updating class instance progress:', classProgressError);
+            // Don't fail the request if class progress update fails
         }
 
         return NextResponse.json({ 

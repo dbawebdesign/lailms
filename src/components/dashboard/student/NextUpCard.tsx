@@ -33,14 +33,14 @@ const NextUpCard: React.FC<NextUpCardProps> = ({
   if (!lessonTitle || lessonTitle === "Your Next Lesson") { // Indicates no specific lesson found
      return (
       <div className="bg-card p-6 rounded-lg shadow">
-        <BookOpenCheck className="h-8 w-8 text-primary mb-3" />
-        <h2 className="text-xl font-semibold mb-2">Ready to Learn?</h2>
+        <BookOpenCheck className="h-8 w-8 text-muted-foreground mb-3" />
+        <h2 className="text-xl font-semibold mb-2">No Active Lessons</h2>
         <p className="text-muted-foreground mb-4">
-          Dive into your courses and pick up where you left off, or start something new!
+          You don't have any active lessons right now. Enroll in a class to get started!
         </p>
-        <Link href="/learn/courses">
+        <Link href="/learn/enroll">
           <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-            Explore My Courses <ArrowRight className="ml-2 h-4 w-4" />
+            Enroll in a Class <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </Link>
       </div>

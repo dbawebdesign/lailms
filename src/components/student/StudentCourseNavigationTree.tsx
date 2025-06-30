@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { progressEvents } from '@/lib/utils/progressEvents';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +19,8 @@ import {
   PlayCircle,
   Award,
   Target,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 
 interface StudentCourseNavigationTreeProps {
@@ -82,6 +84,7 @@ export default function StudentCourseNavigationTree({
 }: StudentCourseNavigationTreeProps) {
   const [courseData, setCourseData] = useState<CourseData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [expandedLessons, setExpandedLessons] = useState<Set<string>>(new Set());
 
@@ -89,8 +92,39 @@ export default function StudentCourseNavigationTree({
     fetchCourseData();
   }, [baseClassId]);
 
-  const fetchCourseData = async () => {
-    setLoading(true);
+  // Listen for progress updates and refresh course data (with debouncing)
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    const unsubscribe = progressEvents.subscribe((event) => {
+      console.log('Progress event received:', event);
+      
+      // Clear existing timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      
+             // Debounce the refresh to avoid too many API calls
+       timeoutId = setTimeout(() => {
+         fetchCourseData(true); // Mark as refresh
+       }, 1000); // Wait 1 second after the last progress update
+    });
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      unsubscribe();
+    };
+  }, []);
+
+  const fetchCourseData = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    
     try {
       console.log('Fetching course data for baseClassId:', baseClassId);
       const response = await fetch(`/api/learn/courses/${baseClassId}/navigation`);
@@ -110,6 +144,7 @@ export default function StudentCourseNavigationTree({
       console.error('Error fetching course data:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -376,7 +411,19 @@ export default function StudentCourseNavigationTree({
       {/* Course Header */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">{courseData.title}</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl">{courseData.title}</CardTitle>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => fetchCourseData(true)}
+              disabled={loading || refreshing}
+              className="h-8 w-8 p-0"
+              title="Refresh progress"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading || refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
           <div className="flex items-center space-x-4 mt-2">
             <div className="flex-1">
               <Progress value={courseData.overallProgress} className="h-3" />

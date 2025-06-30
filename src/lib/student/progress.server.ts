@@ -34,21 +34,21 @@ export async function calculateOverallProgress(baseClassId: string, userId: stri
   if (totalItems === 0) return 0;
 
   // 2. Get all completed items for the user in this class
-  // This is a simplified example. A real implementation might need a dedicated progress table.
-  // Assuming a 'student_lesson_progress' and 'student_assessment_progress' table
   const { count: completedLessons, error: lessonProgressError } = await supabase
-    .from('student_lesson_progress')
+    .from('progress')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .in('lesson_id', lessonIds)
+    .eq('item_type', 'lesson')
+    .in('item_id', lessonIds)
     .eq('status', 'completed');
 
   const { count: completedAssessments, error: assessmentProgressError } = await supabase
-    .from('student_assessment_progress')
+    .from('progress')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .in('assessment_id', assessmentIds)
-    .eq('status', 'passed'); // Or 'completed', depending on requirements
+    .eq('item_type', 'assessment')
+    .in('item_id', assessmentIds)
+    .in('status', ['completed', 'passed']); // Either completed or passed for assessments
 
   if (lessonProgressError || assessmentProgressError) {
     console.error('Error fetching progress:', lessonProgressError, assessmentProgressError);
@@ -58,4 +58,53 @@ export async function calculateOverallProgress(baseClassId: string, userId: stri
   const totalCompleted = (completedLessons || 0) + (completedAssessments || 0);
 
   return (totalCompleted / totalItems) * 100;
+}
+
+/**
+ * Updates the class instance progress for a user.
+ * This should be called whenever lesson progress changes.
+ * @param classInstanceId - The ID of the class instance.
+ * @param userId - The ID of the user.
+ */
+export async function updateClassInstanceProgress(classInstanceId: string, userId: string): Promise<void> {
+  const supabase = createSupabaseServerClient();
+
+  // 1. Get the base class ID for this instance
+  const { data: instance, error: instanceError } = await supabase
+    .from('class_instances')
+    .select('base_class_id')
+    .eq('id', classInstanceId)
+    .single();
+
+  if (instanceError || !instance) {
+    console.error('Error fetching class instance:', instanceError);
+    return;
+  }
+
+  // 2. Calculate the overall progress
+  const progressPercentage = await calculateOverallProgress(instance.base_class_id, userId);
+
+  // 3. Determine status based on progress
+  let status = 'in_progress';
+  if (progressPercentage === 0) {
+    status = 'not_started';
+  } else if (progressPercentage >= 100) {
+    status = 'completed';
+  }
+
+  // 4. Upsert the class instance progress
+  const { error: upsertError } = await supabase.rpc('upsert_progress' as any, {
+    p_user_id: userId,
+    p_item_type: 'class_instance',
+    p_item_id: classInstanceId,
+    p_status: status,
+    p_progress_percentage: Math.round(progressPercentage),
+    p_last_position: null
+  });
+
+  if (upsertError) {
+    console.error('Error updating class instance progress:', upsertError);
+  } else {
+    console.log(`Updated class instance progress: ${classInstanceId} -> ${Math.round(progressPercentage)}%`);
+  }
 } 

@@ -1,144 +1,144 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { UserRole } from "@/config/navConfig";
 import WelcomeCard from "@/components/dashboard/WelcomeCard";
-import NextUpCard from "@/components/dashboard/student/NextUpCard";
 import ActiveCourseItem, { ActiveCourseItemProps } from "@/components/dashboard/student/ActiveCourseItem";
 import { Tables } from "packages/types/db";
-import { calculateOverallProgress } from "@/lib/student/progress.server";
+import { progressEvents } from '@/lib/utils/progressEvents';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
+import Link from 'next/link';
 
-// Helper function to fetch Next Up data
-async function getNextUpData(supabase: any, userId: string) {
-  const { data: enrollments, error: enrollmentsError } = await supabase
-    .from('rosters')
-    .select('class_instances (id, name, base_class_id)')
-    .eq('profile_id', userId)
-    .eq('role', 'student')
-    .limit(1);
-
-  if (enrollmentsError || !enrollments || enrollments.length === 0 || !enrollments[0].class_instances) {
-    return { lessonTitle: undefined, courseTitle: undefined, lessonHref: undefined };
-  }
-  const currentInstance = enrollments[0].class_instances;
-  const courseTitle = currentInstance.name || "Unnamed Course";
-  const baseClassId = currentInstance.base_class_id;
-
-  const { data: path, error: pathError } = await supabase
-    .from('paths')
-    .select('id')
-    .eq('base_class_id', baseClassId)
-    .order('sort_index', { ascending: true })
-    .limit(1);
-  if (pathError || !path || path.length === 0) {
-    return { lessonTitle: undefined, courseTitle: courseTitle, lessonHref: undefined };
-  }
-  const firstPathId = path[0].id;
-
-  const { data: lesson, error: lessonError } = await supabase
-    .from('lessons')
-    .select('id, title')
-    .eq('path_id', firstPathId)
-    .order('sort_index', { ascending: true })
-    .limit(1);
-  if (lessonError || !lesson || lesson.length === 0) {
-    return { lessonTitle: undefined, courseTitle: courseTitle, lessonHref: undefined };
-  }
-  const firstLesson = lesson[0];
-  const lessonTitle = firstLesson.title || "Unnamed Lesson";
-  const lessonHref = `/learn/courses/${currentInstance.id}/lessons/${firstLesson.id}`;
-  return { lessonTitle, courseTitle, lessonHref };
+interface StudentDashboardData {
+  userName: string;
+  userRole: UserRole;
+  activeCourses: ActiveCourseItemProps[];
 }
 
-// Helper function to fetch Active Courses data
-async function getActiveCoursesData(supabase: any, userId: string): Promise<ActiveCourseItemProps[]> {
-  const { data: enrollments, error: enrollmentsError } = await supabase
-    .from('rosters')
-    .select(`
-      class_instances (
-        id,
-        name,
-        base_classes (
-          id,
-          description
-        )
-      )
-    `)
-    .eq('profile_id', userId)
-    .eq('role', 'student')
-    // .eq('class_instances.archived', false) // Add if you have an archived flag
-    // .order('class_instances.last_accessed_at', { ascending: false }) // For most recent
-    .limit(3); // Limit to 3 courses
+export default function StudentDashboardPage() {
+  const [data, setData] = useState<StudentDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  if (enrollmentsError || !enrollments) {
-    console.error("Error fetching active courses:", enrollmentsError);
-    return [];
-  }
+  // Fetch dashboard data
+  const fetchDashboardData = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    
+    try {
+      const response = await fetch('/api/student/dashboard');
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data');
+      }
+      const dashboardData = await response.json();
+      setData(dashboardData);
+      setError(null);
+    } catch (err: any) {
+      console.error('Error fetching dashboard data:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
-  const coursePromises = enrollments.map(async (enrollment: any) => {
-    const instance = enrollment.class_instances;
-    if (!instance) return null;
+  // Initial load
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
-    const description = instance.base_classes?.description || "No description available."; 
-    const progress = await calculateOverallProgress(instance.base_classes.id, userId);
+  // Listen for progress updates and refresh dashboard data (with debouncing)
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    const unsubscribe = progressEvents.subscribe((event) => {
+      console.log('Progress event received on dashboard:', event);
+      
+      // Clear existing timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      
+      // Debounce the refresh to avoid too many API calls
+      timeoutId = setTimeout(() => {
+        fetchDashboardData(true); // Mark as refresh
+      }, 1500); // Wait 1.5 seconds after the last progress update
+    });
 
-    return {
-      id: instance.id,
-      title: instance.name || "Unnamed Course",
-      description: description,
-      progress: Math.round(progress),
-      href: `/learn/courses/${instance.id}`,
+    return () => {
+      unsubscribe();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
-  });
+  }, []);
 
-  const courses = await Promise.all(coursePromises);
-  return courses.filter(Boolean) as ActiveCourseItemProps[];
-}
-
-export default async function StudentDashboardPage() {
-  const supabase = createSupabaseServerClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    console.error('Auth error or no user:', authError);
-    redirect("/login?error=auth");
+  if (loading) {
+    return (
+      <div className="container mx-auto p-4 sm:p-6 md:p-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">Loading your dashboard...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role, first_name, last_name, user_id")
-    .eq("user_id", user.id)
-    .single<Tables<"profiles">>();
-
-  if (profileError || !profile) {
-    console.error("Error fetching student profile:", profileError);
-    redirect("/login?error=profile");
+  if (error || !data) {
+    return (
+      <div className="container mx-auto p-4 sm:p-6 md:p-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <p className="text-red-500 mb-4">Error loading dashboard: {error}</p>
+            <Button onClick={() => fetchDashboardData()} variant="outline">
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
-  if (profile.role !== 'student') {
-    console.warn(`User role mismatch: ${profile.role}, expected student`);
-    redirect("/dashboard?error=unauthorized");
-  }
-  
-  const userName = profile.first_name || user.email || "Learner";
-  const nextUpData = await getNextUpData(supabase, user.id);
-  const activeCourses = await getActiveCoursesData(supabase, user.id);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 md:p-8">
-      <WelcomeCard userName={userName} userRole={profile.role as UserRole} />
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="md:col-span-1">
-          <NextUpCard 
-            lessonTitle={nextUpData.lessonTitle}
-            courseTitle={nextUpData.courseTitle}
-            lessonHref={nextUpData.lessonHref}
-          />
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <WelcomeCard userName={data.userName} userRole={data.userRole} />
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => fetchDashboardData(true)}
+            disabled={refreshing}
+            className="h-8 w-8 p-0 ml-4"
+            title="Refresh dashboard"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
-        <div className="md:col-span-2 bg-card p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4">My Active Courses</h2>
-          {activeCourses.length > 0 ? (
+      </div>
+      
+      <div className="grid grid-cols-1 gap-6 mb-6">
+        <div className="bg-card p-6 rounded-lg shadow">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">My Active Courses</h2>
+            {refreshing && (
+              <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+            )}
+          </div>
+          {data.activeCourses.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {activeCourses.map(course => (
+              {data.activeCourses.map(course => (
                 <ActiveCourseItem key={course.id} {...course} />
               ))}
             </div>
@@ -148,7 +148,7 @@ export default async function StudentDashboardPage() {
         </div>
       </div>
 
-      {/* Remaining placeholders */}
+      {/* Bottom section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-card p-6 rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-3">Achievements</h2>
@@ -156,7 +156,12 @@ export default async function StudentDashboardPage() {
         </div>
         <div className="bg-card p-6 rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-3">Join a Class</h2>
-          <p className="text-muted-foreground">CTA to join a new class.</p>
+          <p className="text-muted-foreground mb-4">Enroll in new classes using enrollment codes from your instructors.</p>
+          <Link href="/learn/enroll">
+            <Button className="w-full">
+              Enroll with Code
+            </Button>
+          </Link>
         </div>
       </div>
     </div>

@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LunaContextElement from '@/components/luna/LunaContextElement';
+import { emitProgressUpdate } from '@/lib/utils/progressEvents';
 
 interface LessonContentRendererProps {
   content?: LessonContent;
@@ -429,6 +430,9 @@ const MisconceptionsSection = ({ misconceptions }: { misconceptions: CommonMisco
 export default function LessonContentRenderer({ content, lessonId }: LessonContentRendererProps) {
   const { data: lessonData, loading, error } = useLessonContent(lessonId || null);
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [viewedSections, setViewedSections] = useState<Set<number>>(new Set());
+  const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
+  const [currentProgressFromDB, setCurrentProgressFromDB] = useState<{progress: number, status: string} | null>(null);
 
   // Use the comprehensive lesson data if available, otherwise fall back to the passed content
   const lesson = lessonData?.lesson;
@@ -440,7 +444,117 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
   const currentSection = sections[currentSectionIndex];
   const displayContent = currentSection?.content || content;
 
+  // Fetch current progress from database
+  const fetchCurrentProgress = async () => {
+    if (!lessonId) return null;
+    
+    try {
+      const response = await fetch(`/api/progress/lesson/${lessonId}`);
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          progress: data.progress?.progress_percentage || 0,
+          status: data.progress?.status || 'not_started'
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching current progress:', error);
+    }
+    return null;
+  };
 
+  // Track section views and update progress (only if progress increases)
+  const updateLessonProgress = async (progressPercentage: number, status: string = 'in_progress') => {
+    if (!lessonId || isUpdatingProgress) return;
+
+    // Don't update if new progress is lower than current progress
+    if (currentProgressFromDB && progressPercentage < currentProgressFromDB.progress) {
+      console.log(`Skipping progress update: ${progressPercentage}% < ${currentProgressFromDB.progress}%`);
+      return;
+    }
+
+    // Don't update if lesson is already completed and we're trying to set a lower status
+    if (currentProgressFromDB?.status === 'completed' && status !== 'completed') {
+      console.log(`Skipping status downgrade: lesson already completed`);
+      return;
+    }
+
+    setIsUpdatingProgress(true);
+    try {
+      const response = await fetch(`/api/progress/lesson/${lessonId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          progressPercentage,
+          status,
+          lastPosition: currentSectionIndex.toString()
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to update lesson progress');
+      } else {
+        // Update local state to reflect new progress
+        setCurrentProgressFromDB({
+          progress: progressPercentage,
+          status
+        });
+        
+        // Emit progress update event for other components to listen to
+        emitProgressUpdate('lesson', lessonId, progressPercentage, status);
+      }
+    } catch (error) {
+      console.error('Error updating lesson progress:', error);
+    } finally {
+      setIsUpdatingProgress(false);
+    }
+  };
+
+  // Fetch current progress when lesson loads
+  useEffect(() => {
+    const loadCurrentProgress = async () => {
+      if (lessonId) {
+        const progress = await fetchCurrentProgress();
+        console.log('Loaded current progress from DB:', progress);
+        setCurrentProgressFromDB(progress);
+      }
+    };
+    loadCurrentProgress();
+  }, [lessonId]);
+
+  // Mark current section as viewed when component loads or section changes
+  useEffect(() => {
+    if (sections.length > 0) {
+      setViewedSections(prev => {
+        const newViewed = new Set(prev);
+        newViewed.add(currentSectionIndex);
+        
+        // Calculate progress based on viewed sections
+        const progressPercentage = Math.round((newViewed.size / sections.length) * 100);
+        
+        // Update progress in database
+        if (newViewed.size === sections.length) {
+          // All sections viewed - mark as completed
+          updateLessonProgress(100, 'completed');
+        } else {
+          // Partial progress
+          updateLessonProgress(progressPercentage, 'in_progress');
+        }
+        
+        return newViewed;
+      });
+    }
+  }, [currentSectionIndex, sections.length, lessonId]);
+
+  // Initialize progress for single-section lessons or lessons without sections
+  useEffect(() => {
+    if (lessonId && (sections.length <= 1 || (!sections.length && displayContent))) {
+      // For lessons with no sections or single section, mark as completed when viewed
+      updateLessonProgress(100, 'completed');
+    }
+  }, [lessonId, sections.length, displayContent]);
 
   if (loading) {
     return (
@@ -489,8 +603,9 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
     }
   };
 
-  // Calculate progress
-  const progress = sections.length > 0 ? Math.round(((currentSectionIndex + 1) / sections.length) * 100) : 0;
+  // Calculate progress based on viewed sections, but never go below current DB progress
+  const calculatedProgress = sections.length > 0 ? Math.round((viewedSections.size / sections.length) * 100) : 0;
+  const progress = Math.max(calculatedProgress, currentProgressFromDB?.progress || 0);
 
   return (
     <LunaContextElement
@@ -544,6 +659,9 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
                 </span>
                 <Progress value={progress} className="w-24" />
                 <span className="text-sm text-muted-foreground">{progress}%</span>
+                {viewedSections.has(currentSectionIndex) && (
+                  <span className="text-xs text-green-600 font-medium">✓ Viewed</span>
+                )}
               </div>
               
               <Button 
@@ -563,6 +681,23 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
             <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-4">
               {currentSection.title}
             </h2>
+          )}
+
+          {/* Completion message */}
+          {sections.length > 0 && (viewedSections.size === sections.length || currentProgressFromDB?.status === 'completed') && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6"
+            >
+              <div className="flex items-center space-x-2 text-green-700 dark:text-green-300">
+                <Target className="h-5 w-5" />
+                <span className="font-medium">Lesson Completed!</span>
+              </div>
+              <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                You've viewed all sections of this lesson. Great job!
+              </p>
+            </motion.div>
           )}
           
           <div className="flex items-center justify-center space-x-4 text-sm text-muted-foreground">

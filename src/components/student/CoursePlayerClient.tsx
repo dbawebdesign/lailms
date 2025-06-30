@@ -70,12 +70,7 @@ const ContentPlayer = ({ selectedItemId, selectedItemType }: { selectedItemId?: 
     fetchContent();
   }, [selectedItemId, selectedItemType, user]);
 
-  const handleMarkComplete = async () => {
-    if (user && selectedItemId && selectedItemType) {
-      await updateItemProgress(selectedItemId, selectedItemType, user.id, 'completed');
-      alert('Progress updated!');
-    }
-  };
+
 
   const renderContent = () => {
     if (loading) {
@@ -120,11 +115,7 @@ const ContentPlayer = ({ selectedItemId, selectedItemType }: { selectedItemId?: 
   return (
     <div className="p-4 h-full">
       {renderContent()}
-      {content && (
-         <div className="mt-4 flex justify-end">
-            <Button onClick={handleMarkComplete}>Mark as Complete</Button>
-        </div>
-      )}
+
     </div>
   );
 };
