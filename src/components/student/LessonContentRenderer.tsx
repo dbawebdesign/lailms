@@ -28,7 +28,8 @@ import {
   Sparkles,
   Eye,
   EyeOff,
-  ChevronLeft
+  ChevronLeft,
+  Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LunaContextElement from '@/components/luna/LunaContextElement';
@@ -439,6 +440,8 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
   const currentSection = sections[currentSectionIndex];
   const displayContent = currentSection?.content || content;
 
+
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -622,15 +625,15 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
                 </ContentSection>
               )}
               
-              {displayContent.conceptIntroduction && (
+              {displayContent.expertTeachingContent?.conceptIntroduction && (
                 <ContentSection title="Concept Introduction" icon={Sparkles} gradient="from-blue-500/10 to-cyan-500/10" delay={0.2}>
-                  <ReactMarkdown>{displayContent.conceptIntroduction}</ReactMarkdown>
+                  <ReactMarkdown>{displayContent.expertTeachingContent.conceptIntroduction}</ReactMarkdown>
                 </ContentSection>
               )}
               
-              {displayContent.detailedExplanation && (
+              {displayContent.expertTeachingContent?.detailedExplanation && (
                 <ContentSection title="Detailed Explanation" icon={Brain} gradient="from-purple-500/10 to-pink-500/10" delay={0.3}>
-                  <ReactMarkdown>{displayContent.detailedExplanation}</ReactMarkdown>
+                  <ReactMarkdown>{displayContent.expertTeachingContent.detailedExplanation}</ReactMarkdown>
                 </ContentSection>
               )}
 
@@ -648,9 +651,9 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
                 </ContentSection>
               )}
               
-              {displayContent.commonMisconceptions && (
+              {displayContent.expertTeachingContent?.commonMisconceptions && (
                 <ContentSection title="Common Misconceptions" icon={AlertTriangle}>
-                  <MisconceptionsSection misconceptions={displayContent.commonMisconceptions} />
+                  <MisconceptionsSection misconceptions={displayContent.expertTeachingContent.commonMisconceptions} />
                 </ContentSection>
               )}
             </TabsContent>
@@ -688,6 +691,25 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
                       >
                         <Target className="h-4 w-4 text-orange-500 mt-1 flex-shrink-0" />
                         <span>{question}</span>
+                      </motion.li>
+                    ))}
+                  </ul>
+                </ContentSection>
+              )}
+
+              {displayContent.expertTeachingContent?.realWorldConnections && (
+                <ContentSection title="Real-World Connections" icon={Globe} gradient="from-emerald-500/10 to-teal-500/10">
+                  <ul className="space-y-3">
+                    {displayContent.expertTeachingContent.realWorldConnections.map((connection: string, i: number) => (
+                      <motion.li 
+                        key={i}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        className="flex items-start space-x-3 p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg"
+                      >
+                        <Globe className="h-4 w-4 text-emerald-500 mt-1 flex-shrink-0" />
+                        <span>{connection}</span>
                       </motion.li>
                     ))}
                   </ul>
