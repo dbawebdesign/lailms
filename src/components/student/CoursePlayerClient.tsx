@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Tables } from 'packages/types/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { updateItemProgress } from '@/lib/student/progress.client';
+import { ProgressService } from '@/lib/services/progressService';
 import { Button } from '@/components/ui/button';
 import LessonContentRenderer from './LessonContentRenderer';
 import { LessonContent } from '@/lib/types/lesson';
@@ -18,19 +18,23 @@ const ContentPlayer = ({ selectedItemId, selectedItemType }: { selectedItemId?: 
   const [content, setContent] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null); // Supabase user
+  const [progressService, setProgressService] = useState<ProgressService | null>(null);
 
   useEffect(() => {
     const getUser = async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      if (user) {
+        setProgressService(new ProgressService(user.id));
+      }
     }
     getUser();
   }, []);
 
   useEffect(() => {
     const fetchContent = async () => {
-      if (!selectedItemId || !selectedItemType || !user) {
+      if (!selectedItemId || !selectedItemType || !user || !progressService) {
         setContent(null);
         return;
       }
@@ -51,11 +55,15 @@ const ContentPlayer = ({ selectedItemId, selectedItemType }: { selectedItemId?: 
           if (error) throw error;
           setContent(data);
           
-          // Mark as 'in_progress' when viewed
-          await updateItemProgress(selectedItemId, selectedItemType, user.id, 'in_progress');
+          // Mark as 'in_progress' when viewed using ProgressService
+          await progressService.updateAssessmentProgress(selectedItemId, {
+            status: 'in_progress'
+          });
         } else if (selectedItemType === 'lesson') {
           // For lessons, just mark progress - content will be fetched by LessonContentRenderer
-          await updateItemProgress(selectedItemId, selectedItemType, user.id, 'in_progress');
+          await progressService.updateLessonProgress(selectedItemId, {
+            status: 'in_progress'
+          });
           setContent({ id: selectedItemId }); // Minimal content to indicate something is selected
         }
 
@@ -68,7 +76,7 @@ const ContentPlayer = ({ selectedItemId, selectedItemType }: { selectedItemId?: 
     };
 
     fetchContent();
-  }, [selectedItemId, selectedItemType, user]);
+  }, [selectedItemId, selectedItemType, user, progressService]);
 
 
 

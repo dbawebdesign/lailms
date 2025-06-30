@@ -1750,7 +1750,58 @@ ${chatHistory.slice(-6).map((msg, index) => {
 4. **Focus on immediate help**: What can you do right now to help them?
 5. **Use natural language**: Avoid formal structure, bullet points, and lengthy explanations
 
-## Response Approach Based on Context
+## User Role Detection & Response Approach
+${(() => {
+  // Detect if this is a teacher or student interface
+  const hasTeacherComponents = context.components?.some(comp => 
+    comp.type === 'base-class-studio-page' || 
+    comp.type === 'content-editor' || 
+    (comp.type === 'navigation-tree' && comp.content?.selectedItemType)
+  );
+  
+  const hasStudentComponents = context.components?.some(comp => 
+    comp.type === 'course-navigation' || 
+    comp.type === 'lesson-content-renderer' || 
+    comp.type === 'course-overview'
+  );
+  
+  if (hasTeacherComponents && !hasStudentComponents) {
+    return `**DETECTED ROLE: TEACHER/INSTRUCTOR** - User is in teacher/creator interface
+    
+**Response Guidelines for Teachers:**
+- **Base Class Studio**: Help with course design, curriculum structure, lesson planning, content organization
+- **Lesson/Path Editing**: Assist with educational content creation, learning objectives, assessment strategies
+- **Content Creation**: Suggest improvements, help generate content, assist with pedagogical decisions
+- **Technical Assistance**: Help with platform features, content management, student progress tracking
+- **Available Tools**: Can use content modification tools (updateContent, addLessonSection, etc.)`;
+  } else if (hasStudentComponents && !hasTeacherComponents) {
+    return `**DETECTED ROLE: STUDENT/LEARNER** - User is in student learning interface
+    
+**Response Guidelines for Students:**
+- **Learning Support**: Explain concepts, provide additional context, clarify difficult topics
+- **Navigation Help**: Guide through course structure, help find specific lessons or resources
+- **Progress Tracking**: Help understand progress, suggest next steps in learning path
+- **Content Clarification**: Answer questions about lesson material, provide examples
+- **Study Assistance**: Help with understanding, not doing homework/assessments for them
+- **Limited Tools**: Primarily use search tool for additional information, cannot modify course content`;
+  } else if (hasTeacherComponents && hasStudentComponents) {
+    return `**DETECTED ROLE: MIXED INTERFACE** - Components from both teacher and student interfaces detected
+    
+**Response Guidelines:**
+- Determine context from user's specific question and visible components
+- Default to more cautious approach - explain rather than modify
+- Ask for clarification if role/intent is unclear`;
+  } else {
+    return `**DETECTED ROLE: GENERAL/UNKNOWN** - No specific role-indicating components detected
+    
+**Response Guidelines:**
+- **Knowledge Base**: Help with document management, content organization, search strategies
+- **General Navigation**: Guide users to relevant features and explain platform capabilities
+- **Platform Help**: Provide general assistance with LearnologyAI features`;
+  }
+})()}
+
+## Context-Specific Response Approach
 - **Base Class Studio**: Help with course design, curriculum structure, lesson planning, content organization
 - **Lesson/Path Editing**: Assist with educational content creation, learning objectives, assessment strategies
 - **Student Course Navigation**: Help students understand course structure, track progress, navigate to specific lessons
@@ -2628,8 +2679,24 @@ export async function POST(request: Request) {
       { role: 'user', content: message }
     ];
 
-    // Define function tools for OpenAI (same as before)
-    const tools: OpenAI.Chat.ChatCompletionTool[] = [
+    // Detect user role to determine available tools
+    const hasTeacherComponents = (context as SerializedUIContext).components?.some(comp => 
+      comp.type === 'base-class-studio-page' || 
+      comp.type === 'content-editor' || 
+      (comp.type === 'navigation-tree' && comp.content?.selectedItemType)
+    );
+    
+    const hasStudentComponents = (context as SerializedUIContext).components?.some(comp => 
+      comp.type === 'course-navigation' || 
+      comp.type === 'lesson-content-renderer' || 
+      comp.type === 'course-overview'
+    );
+    
+    const isTeacherInterface = hasTeacherComponents && !hasStudentComponents;
+    const isStudentInterface = hasStudentComponents && !hasTeacherComponents;
+
+    // Define function tools for OpenAI - filtered based on user role
+    const allTools: OpenAI.Chat.ChatCompletionTool[] = [
       {
         type: "function",
         function: {
@@ -2946,6 +3013,16 @@ export async function POST(request: Request) {
         }
       }
     ];
+
+    // Filter tools based on user role
+    const studentOnlyTools = ['search']; // Tools available to students
+    
+    const tools = isStudentInterface 
+      ? allTools.filter(tool => studentOnlyTools.includes(tool.function.name))
+      : allTools; // Teachers get all tools, mixed/unknown interfaces get all tools too
+
+    console.log(`[Luna Chat API] User role detected - Teacher: ${isTeacherInterface}, Student: ${isStudentInterface}`);
+    console.log(`[Luna Chat API] Available tools: ${tools.map(t => t.function.name).join(', ')}`);
 
     // Make the FIRST direct API call to OpenAI
     let responseMessage: OpenAI.Chat.ChatCompletionMessage;

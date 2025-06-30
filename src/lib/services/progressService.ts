@@ -1,11 +1,12 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createClient } from '@/lib/supabase/client';
 
 export type ProgressStatus = 'not_started' | 'in_progress' | 'completed' | 'paused';
 export type ItemType = 'lesson' | 'lesson_section' | 'assessment' | 'path' | 'course';
 export type MasteryLevel = 'novice' | 'developing' | 'proficient' | 'advanced' | 'expert';
 
 export interface ProgressUpdate {
-    status?: ProgressStatus;
+    status?: 'not_started' | 'in_progress' | 'completed' | 'passed' | 'failed';
     progressPercentage?: number;
     lastPosition?: string | null;
 }
@@ -27,14 +28,15 @@ export class ProgressService {
     private userId: string;
 
     constructor(userId: string) {
-        this.supabase = createSupabaseServerClient();
+        this.supabase = createClient();
         this.userId = userId;
     }
 
     /**
-     * Update lesson progress using raw SQL to avoid type conflicts
+     * Update lesson progress and automatically update class instance progress
      */
     async updateLessonProgress(lessonId: string, update: ProgressUpdate) {
+        // First update the lesson progress
         const { data, error } = await this.supabase.rpc('upsert_progress' as any, {
             p_user_id: this.userId,
             p_item_type: 'lesson',
@@ -45,13 +47,89 @@ export class ProgressService {
         });
 
         if (error) throw error;
+
+        // Now update the class instance progress
+        try {
+            await this.updateClassInstanceProgressForLesson(lessonId);
+        } catch (classProgressError) {
+            console.error('Error updating class instance progress:', classProgressError);
+            // Don't fail the main operation if class progress update fails
+        }
+
         return data;
     }
 
     /**
-     * Update assessment progress
+     * Helper method to update class instance progress when a lesson changes
+     */
+    private async updateClassInstanceProgressForLesson(lessonId: string) {
+        // Get the lesson's base class
+        const { data: lesson, error: lessonError } = await this.supabase
+            .from('lessons')
+            .select(`
+                id,
+                path_id,
+                paths (
+                    base_class_id
+                )
+            `)
+            .eq('id', lessonId)
+            .single();
+
+        if (lessonError || !lesson) {
+            console.error('Error fetching lesson for class instance update:', lessonError);
+            return;
+        }
+
+        const baseClassId = (lesson.paths as any)?.base_class_id;
+        if (!baseClassId) {
+            console.error('No base class ID found for lesson:', lessonId);
+            return;
+        }
+
+        // Find the class instance this user is enrolled in for this base class
+        const { data: enrollment, error: enrollmentError } = await this.supabase
+            .from('rosters')
+            .select('class_instances (id)')
+            .eq('profile_id', this.userId)
+            .eq('role', 'student')
+            .eq('class_instances.base_class_id', baseClassId)
+            .single();
+
+        if (enrollmentError || !enrollment?.class_instances) {
+            console.error('Error finding enrollment for class instance update:', enrollmentError);
+            return;
+        }
+
+        const classInstanceId = (enrollment.class_instances as any)?.id;
+        if (!classInstanceId) {
+            console.error('No class instance ID found for enrollment');
+            return;
+        }
+
+        // Call the API to update class instance progress (this ensures consistency)
+        try {
+            const response = await fetch(`/api/progress/class-instance/${classInstanceId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ userId: this.userId })
+            });
+
+            if (!response.ok) {
+                console.error('Failed to update class instance progress via API');
+            }
+        } catch (error) {
+            console.error('Error calling class instance progress API:', error);
+        }
+    }
+
+    /**
+     * Update assessment progress and automatically update class instance progress
      */
     async updateAssessmentProgress(assessmentId: string, update: ProgressUpdate) {
+        // First update the assessment progress
         const { data, error } = await this.supabase.rpc('upsert_progress' as any, {
             p_user_id: this.userId,
             p_item_type: 'assessment',
@@ -62,7 +140,82 @@ export class ProgressService {
         });
 
         if (error) throw error;
+
+        // Now update the class instance progress
+        try {
+            await this.updateClassInstanceProgressForAssessment(assessmentId);
+        } catch (classProgressError) {
+            console.error('Error updating class instance progress:', classProgressError);
+            // Don't fail the main operation if class progress update fails
+        }
+
         return data;
+    }
+
+    /**
+     * Helper method to update class instance progress when an assessment changes
+     */
+    private async updateClassInstanceProgressForAssessment(assessmentId: string) {
+        // Get the assessment's base class
+        const { data: assessment, error: assessmentError } = await this.supabase
+            .from('assessments')
+            .select(`
+                id,
+                path_id,
+                paths (
+                    base_class_id
+                )
+            `)
+            .eq('id', assessmentId)
+            .single();
+
+        if (assessmentError || !assessment) {
+            console.error('Error fetching assessment for class instance update:', assessmentError);
+            return;
+        }
+
+        const baseClassId = (assessment.paths as any)?.base_class_id;
+        if (!baseClassId) {
+            console.error('No base class ID found for assessment:', assessmentId);
+            return;
+        }
+
+        // Find the class instance this user is enrolled in for this base class
+        const { data: enrollment, error: enrollmentError } = await this.supabase
+            .from('rosters')
+            .select('class_instances (id)')
+            .eq('profile_id', this.userId)
+            .eq('role', 'student')
+            .eq('class_instances.base_class_id', baseClassId)
+            .single();
+
+        if (enrollmentError || !enrollment?.class_instances) {
+            console.error('Error finding enrollment for class instance update:', enrollmentError);
+            return;
+        }
+
+        const classInstanceId = (enrollment.class_instances as any)?.id;
+        if (!classInstanceId) {
+            console.error('No class instance ID found for enrollment');
+            return;
+        }
+
+        // Call the API to update class instance progress (this ensures consistency)
+        try {
+            const response = await fetch(`/api/progress/class-instance/${classInstanceId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ userId: this.userId })
+            });
+
+            if (!response.ok) {
+                console.error('Failed to update class instance progress via API');
+            }
+        } catch (error) {
+            console.error('Error calling class instance progress API:', error);
+        }
     }
 
     /**
@@ -252,6 +405,19 @@ export class ProgressService {
         });
 
         if (error) throw error;
+
+        // Update class instance progress for lessons and assessments
+        try {
+            if (itemType === 'lesson') {
+                await this.updateClassInstanceProgressForLesson(itemId);
+            } else if (itemType === 'assessment') {
+                await this.updateClassInstanceProgressForAssessment(itemId);
+            }
+        } catch (classProgressError) {
+            console.error('Error updating class instance progress:', classProgressError);
+            // Don't fail the main operation if class progress update fails
+        }
+
         return data;
     }
 } 

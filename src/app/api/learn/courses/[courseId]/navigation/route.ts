@@ -166,10 +166,18 @@ export async function GET(
                     };
                 });
             
-            // Calculate path progress
+            // Calculate path progress - include both lessons and assessments
             const totalLessons = pathLessons.length;
             const completedLessons = pathLessons.filter(l => l.completed).length;
-            const pathProgress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+            
+            // Count assessments as well
+            const allAssessments = pathLessons.flatMap(l => l.assessments);
+            const completedAssessments = allAssessments.filter(a => a.status === 'completed' || a.status === 'passed').length;
+            
+            const totalItems = totalLessons + allAssessments.length;
+            const completedItems = completedLessons + completedAssessments;
+            
+            const pathProgress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
             
             return {
                 id: path.id,

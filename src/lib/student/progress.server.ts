@@ -57,7 +57,7 @@ export async function calculateOverallProgress(baseClassId: string, userId: stri
     
   const totalCompleted = (completedLessons || 0) + (completedAssessments || 0);
 
-  return (totalCompleted / totalItems) * 100;
+  return Math.round((totalCompleted / totalItems) * 100);
 }
 
 /**

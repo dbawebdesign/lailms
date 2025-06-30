@@ -309,11 +309,6 @@ export default function MediaAssetsPanel({
             Generate educational content based on your lesson
           </p>
         </div>
-        {gradeLevel && (
-          <Badge variant="outline" className="text-sm">
-            Grade {gradeLevel}
-          </Badge>
-        )}
       </div>
 
       {error && (
