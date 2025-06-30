@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Tables } from 'packages/types/db';
 import { QuestionGenerationService } from '@/lib/services/question-generation-service';
 
-type QuestionType = 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'matching' | 'fill_in_blank';
+type QuestionType = 'multiple_choice' | 'true_false' | 'short_answer' | 'long_answer' | 'coding';
 
 export async function GET(
   request: NextRequest,
