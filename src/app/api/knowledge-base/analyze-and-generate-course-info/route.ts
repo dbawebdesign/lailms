@@ -17,7 +17,7 @@ interface DocumentChunk {
 interface Document {
   id: string;
   file_name: string;
-  file_type?: string;
+  file_type: string | null;
   status: string;
   metadata?: any;
   created_at: string;
