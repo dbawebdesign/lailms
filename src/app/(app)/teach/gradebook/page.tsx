@@ -144,7 +144,7 @@ export default function GradebookPage() {
             status
           )
         `)
-        .eq('enrollments.profile_id', profile.id)
+        .eq('enrollments.profile_id', profile.user_id)
         .eq('enrollments.role', 'teacher')
         .eq('enrollments.status', 'active')
         .order('name');
