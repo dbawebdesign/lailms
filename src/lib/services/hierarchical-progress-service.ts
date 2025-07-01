@@ -207,37 +207,45 @@ export class HierarchicalProgressService {
     async updateClassInstanceProgress(baseClassId: string, userId: string): Promise<void> {
         console.log(`🔄 Calculating class instance progress for base class: ${baseClassId}, user: ${userId}`);
         
-        // Find the class instance this user is enrolled in
         const supabase = await this.getSupabaseClient();
-        const { data: enrollment } = await supabase
+
+        // 1. Get all class instances for this base class
+        const { data: classInstances, error: classInstancesError } = await supabase
+            .from('class_instances')
+            .select('id')
+            .eq('base_class_id', baseClassId);
+        
+        if (classInstancesError || !classInstances || classInstances.length === 0) {
+            console.error(`Could not find class instances for base class ${baseClassId}.`, classInstancesError);
+            return;
+        }
+
+        // 2. Find which of these class instances the user is enrolled in
+        const classInstanceIds = classInstances.map((ci: { id: string }) => ci.id);
+        const { data: enrollment, error: enrollmentError } = await supabase
             .from('rosters')
             .select('class_instance_id')
             .eq('profile_id', userId)
-            .eq('role', 'student')
-            .single();
+            .in('class_instance_id', classInstanceIds)
+            .maybeSingle();
+
+        if (enrollmentError) {
+            console.error(`Error finding enrollment for user ${userId} in class instances [${classInstanceIds.join(', ')}]`, enrollmentError);
+            return;
+        }
 
         if (!enrollment?.class_instance_id) {
-            console.log('No enrollment found - user may be in self-paced learning mode');
+            console.log(`User ${userId} is not enrolled in any class instance for base class ${baseClassId}.`);
             return;
         }
-
-        // Verify this class instance belongs to the correct base class
-        const { data: classInstance } = await supabase
-            .from('class_instances')
-            .select('base_class_id')
-            .eq('id', enrollment.class_instance_id)
-            .eq('base_class_id', baseClassId)
-            .single();
-
-        if (!classInstance) {
-            console.log(`Class instance ${enrollment.class_instance_id} does not match base class ${baseClassId}`);
-            return;
-        }
+        
+        const classInstanceId = enrollment.class_instance_id;
+        console.log(`Found user enrollment in class instance ${classInstanceId}`);
 
         const classProgress = await this.calculateClassInstanceProgress(baseClassId, userId);
         
         // Get current class instance progress to ensure we never go backwards
-        const currentProgress = await this.getProgress(userId, 'class_instance', enrollment.class_instance_id);
+        const currentProgress = await this.getProgress(userId, 'class_instance', classInstanceId);
         const safeUpdate = await this.ensureProgressNeverGoesBackwards(currentProgress, {
             status: classProgress.status,
             progressPercentage: classProgress.progressPercentage
@@ -249,17 +257,17 @@ export class HierarchicalProgressService {
         }
 
         // Update class instance progress in database
-        await this.updateProgressInDatabase(userId, 'class_instance', enrollment.class_instance_id, safeUpdate.update);
+        await this.updateProgressInDatabase(userId, 'class_instance', classInstanceId, safeUpdate.update);
 
         // Emit progress update event
         emitProgressUpdate(
             'class_instance', 
-            enrollment.class_instance_id, 
+            classInstanceId, 
             safeUpdate.update.progressPercentage || 0, 
             safeUpdate.update.status || 'in_progress'
         );
 
-        console.log(`✅ Updated class instance progress: ${enrollment.class_instance_id} -> ${safeUpdate.update.progressPercentage}%`);
+        console.log(`✅ Updated class instance progress: ${classInstanceId} -> ${safeUpdate.update.progressPercentage}%`);
     }
 
     /**
