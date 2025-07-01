@@ -29,7 +29,8 @@ import {
   Eye,
   EyeOff,
   ChevronLeft,
-  Globe
+  Globe,
+  CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LunaContextElement from '@/components/luna/LunaContextElement';
@@ -450,7 +451,7 @@ const MisconceptionsSection = ({ misconceptions }: { misconceptions: CommonMisco
 export default function LessonContentRenderer({ content, lessonId }: LessonContentRendererProps) {
   const { data: lessonData, loading, error } = useLessonContent(lessonId || null);
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
-  const [viewedSections, setViewedSections] = useState<Set<number>>(new Set());
+  const [completedSections, setCompletedSections] = useState<Set<number>>(new Set());
   const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
   const [currentProgressFromDB, setCurrentProgressFromDB] = useState<{progress: number, status: string} | null>(null);
 
@@ -483,7 +484,7 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
     return null;
   };
 
-  // Track section views and update progress (only if progress increases)
+  // Track section completion and update progress (only if progress increases)
   const updateLessonProgress = async (progressPercentage: number, status: string = 'in_progress') => {
     if (!lessonId || isUpdatingProgress) return;
 
@@ -539,42 +540,62 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
         const progress = await fetchCurrentProgress();
         console.log('Loaded current progress from DB:', progress);
         setCurrentProgressFromDB(progress);
+        
+        // Initialize completed sections based on current progress
+        if (progress && progress.progress > 0) {
+          const completedCount = Math.floor((progress.progress / 100) * sections.length);
+          const newCompleted = new Set<number>();
+          for (let i = 0; i < completedCount; i++) {
+            newCompleted.add(i);
+          }
+          setCompletedSections(newCompleted);
+        }
       }
     };
     loadCurrentProgress();
-  }, [lessonId]);
+  }, [lessonId, sections.length]);
 
-  // Mark current section as viewed when component loads or section changes
-  useEffect(() => {
-    if (sections.length > 0) {
-      setViewedSections(prev => {
-        const newViewed = new Set(prev);
-        newViewed.add(currentSectionIndex);
-        
-        // Calculate progress based on viewed sections
-        const progressPercentage = Math.round((newViewed.size / sections.length) * 100);
-        
-        // Update progress in database
-        if (newViewed.size === sections.length) {
-          // All sections viewed - mark as completed
-          updateLessonProgress(100, 'completed');
-        } else {
-          // Partial progress
-          updateLessonProgress(progressPercentage, 'in_progress');
-        }
-        
-        return newViewed;
-      });
-    }
-  }, [currentSectionIndex, sections.length, lessonId]);
+  // Mark the current section as completed when moving to next section
+  const markCurrentSectionComplete = () => {
+    setCompletedSections(prev => {
+      const newCompleted = new Set(prev);
+      newCompleted.add(currentSectionIndex);
+      
+      // Calculate progress based on completed sections
+      const progressPercentage = Math.round((newCompleted.size / sections.length) * 100);
+      
+      // Update progress in database
+      updateLessonProgress(progressPercentage, 'in_progress');
+      
+      return newCompleted;
+    });
+  };
 
-  // Initialize progress for single-section lessons or lessons without sections
+  // Mark the entire lesson as complete
+  const markLessonComplete = () => {
+    setCompletedSections(prev => {
+      const newCompleted = new Set(prev);
+      // Mark all sections as complete
+      for (let i = 0; i < sections.length; i++) {
+        newCompleted.add(i);
+      }
+      
+      // Mark lesson as completed
+      updateLessonProgress(100, 'completed');
+      
+      return newCompleted;
+    });
+  };
+
+  // Initialize progress for single-section lessons or lessons without sections (only mark as in_progress, not completed)
   useEffect(() => {
     if (lessonId && (sections.length <= 1 || (!sections.length && displayContent))) {
-      // For lessons with no sections or single section, mark as completed when viewed
-      updateLessonProgress(100, 'completed');
+      // For lessons with no sections or single section, mark as in_progress when viewed
+      if (currentProgressFromDB?.status === 'not_started') {
+        updateLessonProgress(0, 'in_progress');
+      }
     }
-  }, [lessonId, sections.length, displayContent]);
+  }, [lessonId, sections.length, displayContent, currentProgressFromDB?.status]);
 
   if (loading) {
     return (
@@ -613,6 +634,8 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
   // Navigation functions for sections
   const goToNextSection = () => {
     if (currentSectionIndex < sections.length - 1) {
+      // Mark current section as complete before moving to next
+      markCurrentSectionComplete();
       setCurrentSectionIndex(prev => prev + 1);
     }
   };
@@ -623,9 +646,14 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
     }
   };
 
-  // Calculate progress based on viewed sections, but never go below current DB progress
-  const calculatedProgress = sections.length > 0 ? Math.round((viewedSections.size / sections.length) * 100) : 0;
+  // Calculate progress based on completed sections, but never go below current DB progress
+  const calculatedProgress = sections.length > 0 ? Math.round((completedSections.size / sections.length) * 100) : 0;
   const progress = Math.max(calculatedProgress, currentProgressFromDB?.progress || 0);
+
+  // Check if this is the last section and it's not completed yet
+  const isLastSection = currentSectionIndex === sections.length - 1;
+  const isCurrentSectionCompleted = completedSections.has(currentSectionIndex);
+  const isLessonCompleted = currentProgressFromDB?.status === 'completed';
 
   return (
     <LunaContextElement
@@ -643,7 +671,7 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
           id: section.id,
           title: section.title,
           isCurrentSection: index === currentSectionIndex,
-          isCompleted: index < currentSectionIndex
+          isCompleted: completedSections.has(index)
         })),
         audioContent: brainbytes ? {
           title: brainbytes.title,
@@ -714,19 +742,47 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
                 </span>
                 <Progress value={progress} className="w-24" />
                 <span className="text-sm text-muted-foreground">{progress}%</span>
-                {viewedSections.has(currentSectionIndex) && (
-                  <span className="text-xs text-green-600 font-medium">✓ Viewed</span>
+                {completedSections.has(currentSectionIndex) && (
+                  <span className="text-xs text-green-600 font-medium">✓ Complete</span>
                 )}
               </div>
               
+              {!isLastSection ? (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={goToNextSection}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              ) : (
+                !isLessonCompleted && (
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    onClick={markLessonComplete}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                    Mark as Complete
+                  </Button>
+                )
+              )}
+            </div>
+          )}
+
+          {/* Single section completion button */}
+          {sections.length <= 1 && !isLessonCompleted && (
+            <div className="mb-6">
               <Button 
-                variant="outline" 
+                variant="default" 
                 size="sm" 
-                onClick={goToNextSection}
-                disabled={currentSectionIndex === sections.length - 1}
+                onClick={markLessonComplete}
+                className="bg-green-600 hover:bg-green-700"
               >
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
+                <CheckCircle2 className="h-4 w-4 mr-1" />
+                Mark Lesson as Complete
               </Button>
             </div>
           )}
@@ -739,7 +795,7 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
           )}
 
           {/* Completion message */}
-          {sections.length > 0 && (viewedSections.size === sections.length || currentProgressFromDB?.status === 'completed') && (
+          {isLessonCompleted && (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -750,7 +806,7 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
                 <span className="font-medium">Lesson Completed!</span>
               </div>
               <p className="text-sm text-green-600 dark:text-green-400 mt-1">
-                You've viewed all sections of this lesson. Great job!
+                You've completed this lesson. Great job!
               </p>
             </motion.div>
           )}
@@ -994,7 +1050,7 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
                 id: section.id,
                 title: section.title,
                 isCurrentSection: index === currentSectionIndex,
-                isCompleted: index < currentSectionIndex
+                isCompleted: completedSections.has(index)
               }))
             }}
             metadata={{
@@ -1022,15 +1078,27 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
                 <Progress value={progress} className="w-32" />
               </div>
               
-              <Button 
-                variant="outline" 
-                onClick={goToNextSection}
-                disabled={currentSectionIndex === sections.length - 1}
-                className="flex items-center space-x-2"
-              >
-                <span>Next Section</span>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              {!isLastSection ? (
+                <Button 
+                  variant="outline" 
+                  onClick={goToNextSection}
+                  className="flex items-center space-x-2"
+                >
+                  <span>Next Section</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              ) : (
+                !isLessonCompleted && (
+                  <Button 
+                    variant="default" 
+                    onClick={markLessonComplete}
+                    className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Mark as Complete</span>
+                  </Button>
+                )
+              )}
             </div>
           </LunaContextElement>
         )}
