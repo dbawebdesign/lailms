@@ -45,11 +45,13 @@ interface LessonContentRendererProps {
 
 interface MediaAsset {
   id: string;
-  type: 'mind_map' | 'podcast';
+  asset_type: 'mind_map' | 'podcast';
   title: string;
-  url?: string;
+  file_url?: string;
   duration?: number;
   status: string;
+  content?: string;
+  svg_content?: string;
 }
 
 // Modern content section component with Apple-inspired design
@@ -455,7 +457,7 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [completedSections, setCompletedSections] = useState<Set<number>>(new Set());
   const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
-  const [currentProgressFromDB, setCurrentProgressFromDB] = useState<{progress: number, status: string} | null>(null);
+  const [currentProgressFromDB, setCurrentProgressFromDB] = useState<{progress: number, status: string, lastPosition?: string} | null>(null);
   const [showMediaPanel, setShowMediaPanel] = useState(false);
 
   // Use the comprehensive lesson data if available, otherwise fall back to the passed content
@@ -468,24 +470,7 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
   const currentSection = sections[currentSectionIndex];
   const displayContent = currentSection?.content || content;
 
-  // Fetch current progress from database
-  const fetchCurrentProgress = async () => {
-    if (!lessonId) return null;
-    
-    try {
-      const response = await fetch(`/api/progress/lesson/${lessonId}`);
-      if (response.ok) {
-        const data = await response.json();
-        return {
-          progress: data.progress?.progress_percentage || 0,
-          status: data.progress?.status || 'not_started'
-        };
-      }
-    } catch (error) {
-      console.error('Error fetching current progress:', error);
-    }
-    return null;
-  };
+
 
   // Track section completion and update progress (only if progress increases)
   const updateLessonProgress = async (progressPercentage: number, status: string = 'in_progress') => {
@@ -523,7 +508,8 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
         // Update local state to reflect new progress
         setCurrentProgressFromDB({
           progress: progressPercentage,
-          status
+          status,
+          lastPosition: currentSectionIndex.toString()
         });
         
         // Emit progress update event for other components to listen to
@@ -540,18 +526,35 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
   useEffect(() => {
     const loadCurrentProgress = async () => {
       if (lessonId) {
-        const progress = await fetchCurrentProgress();
-        console.log('Loaded current progress from DB:', progress);
-        setCurrentProgressFromDB(progress);
-        
-        // Initialize completed sections based on current progress
-        if (progress && progress.progress > 0) {
-          const completedCount = Math.floor((progress.progress / 100) * sections.length);
-          const newCompleted = new Set<number>();
-          for (let i = 0; i < completedCount; i++) {
-            newCompleted.add(i);
+        const response = await fetch(`/api/progress/lesson/${lessonId}`);
+        if (response.ok) {
+          const data = await response.json();
+          const progress = {
+            progress: data.progress?.progress_percentage || 0,
+            status: data.progress?.status || 'not_started',
+            lastPosition: data.progress?.last_position
+          };
+          
+          console.log('Loaded current progress from DB:', progress);
+          setCurrentProgressFromDB(progress);
+          
+          // Restore current section index from last_position
+          if (progress.lastPosition !== null && progress.lastPosition !== undefined) {
+            const savedSectionIndex = parseInt(progress.lastPosition);
+            if (!isNaN(savedSectionIndex) && savedSectionIndex >= 0 && savedSectionIndex < sections.length) {
+              setCurrentSectionIndex(savedSectionIndex);
+            }
           }
-          setCompletedSections(newCompleted);
+          
+          // Initialize completed sections based on current progress
+          if (progress && progress.progress > 0) {
+            const completedCount = Math.floor((progress.progress / 100) * sections.length);
+            const newCompleted = new Set<number>();
+            for (let i = 0; i < completedCount; i++) {
+              newCompleted.add(i);
+            }
+            setCompletedSections(newCompleted);
+          }
         }
       }
     };
@@ -678,8 +681,8 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
         })),
         audioContent: brainbytes ? {
           title: brainbytes.title,
-          hasAudio: !!brainbytes.audio_url,
-          url: brainbytes.audio_url
+          hasAudio: !!(brainbytes as any).file_url,
+          url: (brainbytes as any).file_url
         } : null,
         mindMapContent: mindMap ? {
           title: mindMap.title,
@@ -814,121 +817,74 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
             </motion.div>
           )}
           
-          <div className="flex items-center justify-between">
-            <div className="flex items-center justify-center space-x-4 text-sm text-muted-foreground">
-              <div className="flex items-center space-x-2">
-                <Sparkles className="h-4 w-4" />
-                <span>Enhanced Learning Experience</span>
-              </div>
-              {brainbytes && (
-                <div className="flex items-center space-x-2">
-                  <Volume2 className="h-4 w-4" />
-                  <span>Audio Available</span>
-                </div>
-              )}
-              {mindMap && (
-                <div className="flex items-center space-x-2">
-                  <Brain className="h-4 w-4" />
-                  <span>Mind Map Available</span>
-                </div>
-              )}
+          <div className="flex items-center justify-center space-x-4 text-sm text-muted-foreground">
+            <div className="flex items-center space-x-2">
+              <Sparkles className="h-4 w-4" />
+              <span>Enhanced Learning Experience</span>
             </div>
-            
-            {/* Media Panel Toggle */}
-            {(mindMap || brainbytes) && (
-              <Button
-                variant={showMediaPanel ? "default" : "outline"}
-                size="sm"
-                onClick={() => setShowMediaPanel(!showMediaPanel)}
-                className="ml-4"
-              >
-                <Brain className="h-4 w-4 mr-2" />
-                Media
-              </Button>
-            )}
           </div>
         </motion.div>
 
-        {/* Audio Player */}
-        {brainbytes && brainbytes.audio_url && (
-          <LunaContextElement
-            type="lesson-audio-player"
-            role="media"
-            content={{
-              title: brainbytes.title,
-              audioUrl: brainbytes.audio_url,
-              contentType: "brainbytes",
-              description: "Audio summary of lesson content for auditory learning"
-            }}
-            metadata={{
-              lessonId,
-              sectionIndex: currentSectionIndex,
-              mediaType: "audio"
-            }}
-            actionable={true}
-          >
-            <div data-testid="audio-player">
-              <AudioPlayer src={brainbytes.audio_url} title={brainbytes.title} />
-            </div>
-          </LunaContextElement>
-        )}
-
-        {/* Mind Map Section */}
-        {mindMap && (
-          <LunaContextElement
-            type="lesson-media-assets"
-            role="media"
-            content={{
-              mediaType: "mind_map",
-              title: mindMap.title,
-              assetId: mindMap.id
-            }}
-            metadata={{
-              lessonId,
-              sectionIndex: currentSectionIndex
-            }}
-            actionable={true}
-          >
-            <div data-testid="mind-map-display" className="my-8">
-              <ContentSection title="Interactive Mind Map" icon={Brain} gradient="from-blue-500/10 to-purple-500/10" delay={0.5}>
-                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <h4 className="font-medium text-gray-900 dark:text-white">{mindMap.title}</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      Visual concept map to reinforce understanding
-                    </p>
-                  </div>
-                  <div className="relative" style={{ height: '600px' }}>
-                    <iframe
-                      src={`/api/student/lessons/${lessonId}/mind-map/${mindMap.id}`}
-                      title={mindMap.title}
-                      className="w-full h-full border-0"
-                      style={{
-                        background: 'transparent'
-                      }}
-                      sandbox="allow-scripts allow-same-origin"
-                    />
-                  </div>
+        {/* Sticky Media Bar - Only show when media assets are available */}
+        {(mindMap || brainbytes) && (
+          <div className="sticky top-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 mb-6">
+            <div className="flex items-center justify-between p-3">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Enhanced Learning Tools Available
+                  </span>
                 </div>
-              </ContentSection>
+                <div className="flex items-center gap-2">
+                  {mindMap && (
+                    <Badge variant="secondary" className="text-xs">
+                      Mind Map
+                    </Badge>
+                  )}
+                  {brainbytes && (
+                    <Badge variant="secondary" className="text-xs">
+                      Brain Bytes Podcast
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowMediaPanel(!showMediaPanel)}
+                className="flex items-center gap-2"
+              >
+                {showMediaPanel ? (
+                  <>
+                    <EyeOff className="h-4 w-4" />
+                    Hide Tools
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-4 w-4" />
+                    Show Tools
+                  </>
+                )}
+              </Button>
             </div>
-          </LunaContextElement>
+          </div>
         )}
 
-        {/* Floating Media Panel */}
+        {/* Enhanced Floating Media Panel */}
         <AnimatePresence>
           {showMediaPanel && (mindMap || brainbytes) && (
             <motion.div
               initial={{ opacity: 0, x: 300 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 300 }}
-              className="fixed right-4 top-1/2 transform -translate-y-1/2 w-80 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 max-h-[80vh] overflow-y-auto"
+              className="fixed right-4 top-1/2 transform -translate-y-1/2 w-96 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 max-h-[80vh] overflow-hidden"
             >
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold flex items-center gap-2">
-                    <Brain className="h-4 w-4" />
-                    Interactive Media
+                    <Brain className="h-5 w-5 text-blue-600" />
+                    Learning Enhancement Tools
                   </h3>
                   <Button
                     variant="ghost"
@@ -938,83 +894,77 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
                     <EyeOff className="h-4 w-4" />
                   </Button>
                 </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Complementary resources to deepen your understanding
+                </p>
               </div>
               
-              <div className="p-4 space-y-4">
+              <div className="overflow-y-auto max-h-[calc(80vh-120px)]">
                 {mindMap && (
-                  <Card className="cursor-pointer hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
-                          <Brain className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm">{mindMap.title}</h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                            Visual concept map to reinforce understanding
-                          </p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                // Scroll to mind map section
-                                const mindMapElement = document.querySelector('[data-testid="mind-map-display"]');
-                                if (mindMapElement) {
-                                  mindMapElement.scrollIntoView({ behavior: 'smooth' });
-                                }
-                                setShowMediaPanel(false);
-                              }}
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              View
-                            </Button>
-                            <Badge variant="secondary" className="text-xs">
-                              Mind Map
-                            </Badge>
+                  <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+                    <Card className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/20">
+                            <Brain className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-base">{mindMap.title}</h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                              Visual concept map showing key relationships and connections
+                            </p>
+                            <div className="mt-3">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  // Open mind map in modal
+                                  window.open(`/api/student/lessons/${lessonId}/mind-map/${mindMap.id}`, '_blank', 'width=1200,height=800');
+                                }}
+                                className="w-full"
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                Open Mind Map
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  </div>
                 )}
 
                 {brainbytes && (
-                  <Card className="cursor-pointer hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20">
-                          <Volume2 className="h-4 w-4 text-purple-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm">{brainbytes.title}</h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                            Audio summary for auditory learners
-                          </p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                // Scroll to audio player section
-                                const audioElement = document.querySelector('[data-testid="audio-player"]');
-                                if (audioElement) {
-                                  audioElement.scrollIntoView({ behavior: 'smooth' });
-                                }
-                                setShowMediaPanel(false);
-                              }}
-                            >
-                              <Play className="h-3 w-3 mr-1" />
-                              Listen
-                            </Button>
-                            <Badge variant="secondary" className="text-xs">
-                              {brainbytes.duration ? `${Math.round(brainbytes.duration / 60)} min` : 'Audio'}
-                            </Badge>
+                  <div className="p-4">
+                    <Card className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/20">
+                            <Volume2 className="h-5 w-5 text-purple-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-base">{brainbytes.title}</h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                              Audio summary perfect for reviewing key concepts
+                            </p>
+                            <div className="flex items-center gap-2 mt-2 mb-3">
+                              <Badge variant="outline" className="text-xs">
+                                {brainbytes.duration ? `${Math.round(brainbytes.duration / 60)} min` : 'Audio'}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                Brain Bytes
+                              </Badge>
+                            </div>
+                            <div className="space-y-3">
+                              <AudioPlayer 
+                                src={(brainbytes as any).file_url || ''} 
+                                title={brainbytes.title}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  </div>
                 )}
               </div>
             </motion.div>

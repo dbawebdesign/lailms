@@ -24,8 +24,7 @@ async function getActiveCoursesData(supabase: any, userId: string): Promise<Acti
     .eq('profile_id', userId)
     .eq('role', 'student')
     // .eq('class_instances.archived', false) // Add if you have an archived flag
-    // .order('class_instances.last_accessed_at', { ascending: false }) // For most recent
-    .limit(3); // Limit to 3 courses
+    .order('created_at', { ascending: false }); // Show most recently enrolled first
 
   if (enrollmentsError || !enrollments) {
     console.error("Error fetching active courses:", enrollmentsError);
