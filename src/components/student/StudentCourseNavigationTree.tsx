@@ -124,6 +124,23 @@ export default function StudentCourseNavigationTree({
     };
   }, []); // Remove courseData dependency to prevent subscription recreation
 
+  // Add this effect to refresh the selected path/lesson when courseData is updated
+  useEffect(() => {
+    if (courseData && selectedPath) {
+      const newSelectedPath = courseData.paths.find(p => p.id === selectedPath.id);
+      if (newSelectedPath) {
+        setSelectedPath(newSelectedPath);
+
+        if (selectedLesson) {
+          const newSelectedLesson = newSelectedPath.lessons.find(l => l.id === selectedLesson.id);
+          if (newSelectedLesson) {
+            setSelectedLesson(newSelectedLesson);
+          }
+        }
+      }
+    }
+  }, [courseData]);
+
   const fetchCourseData = async (isRefresh = false, retryCount = 0) => {
     if (isRefresh) {
       setRefreshing(true);
