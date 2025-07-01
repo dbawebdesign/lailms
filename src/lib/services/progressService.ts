@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createClient } from '@/lib/supabase/client';
+import { emitProgressUpdate } from '@/lib/utils/progressEvents';
 
 export type ProgressStatus = 'not_started' | 'in_progress' | 'completed' | 'paused';
 export type ItemType = 'lesson' | 'lesson_section' | 'assessment' | 'path' | 'course';
@@ -47,6 +48,14 @@ export class ProgressService {
         });
 
         if (error) throw error;
+
+        // Emit progress update event
+        emitProgressUpdate(
+            'lesson', 
+            lessonId, 
+            update.progressPercentage || 0, 
+            update.status || 'in_progress'
+        );
 
         // Now update the class instance progress
         try {
@@ -145,6 +154,14 @@ export class ProgressService {
         });
 
         if (error) throw error;
+
+        // Emit progress update event
+        emitProgressUpdate(
+            'assessment', 
+            assessmentId, 
+            update.progressPercentage || 0, 
+            update.status || 'in_progress'
+        );
 
         // Now update the class instance progress
         try {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '../../../../../lib/supabase/server'
 import { Database, Tables, TablesInsert, TablesUpdate } from '../../../../../../packages/types/db'
+import { emitProgressUpdate } from '@/lib/utils/progressEvents'
 
 // Types for V2 schema
 type Assessment = Tables<'assessments'>
@@ -205,6 +206,31 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       return NextResponse.json({ error: 'Failed to update attempt scores' }, { status: 500 })
+    }
+
+    // Update progress table for assessment completion
+    try {
+      const progressStatus = hasSubjectiveQuestions ? 'in_progress' : (passed ? 'passed' : 'failed');
+      const progressPercentage = hasSubjectiveQuestions ? 50 : 100; // 50% if waiting for AI grading, 100% if completed
+      
+      const { error: progressError } = await supabase.rpc('upsert_progress' as any, {
+        p_user_id: user.id,
+        p_item_type: 'assessment',
+        p_item_id: assessmentId,
+        p_status: progressStatus,
+        p_progress_percentage: progressPercentage,
+        p_last_position: null
+      });
+
+      if (progressError) {
+        console.error('Error updating assessment progress:', progressError);
+      } else {
+        // Emit progress update event for navigation tree to update
+        emitProgressUpdate('assessment', assessmentId, progressPercentage, progressStatus);
+      }
+    } catch (progressUpdateError) {
+      console.error('Error updating assessment progress:', progressUpdateError);
+      // Don't fail the request if progress update fails
     }
 
     return NextResponse.json({

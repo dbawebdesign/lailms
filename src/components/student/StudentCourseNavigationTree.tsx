@@ -13,7 +13,11 @@ import {
   Trophy,
   ArrowLeft,
   Home,
-  RefreshCw
+  RefreshCw,
+  CheckCircle2,
+  Clock,
+  ChevronRight,
+  Lock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -97,7 +101,8 @@ export default function StudentCourseNavigationTree({
     let timeoutId: NodeJS.Timeout;
     
     const unsubscribe = progressEvents.subscribe((event) => {
-      console.log('Progress event received:', event);
+      console.log('🔄 Navigation Tree: Progress event received:', event);
+      console.log('🔄 Navigation Tree: Current course data before refresh:', courseData);
       
       // Clear existing timeout
       if (timeoutId) {
@@ -106,8 +111,9 @@ export default function StudentCourseNavigationTree({
       
       // Debounce the refresh to avoid too many API calls
       timeoutId = setTimeout(() => {
+        console.log('🔄 Navigation Tree: Refreshing course data after progress event...');
         fetchCourseData(true); // Mark as refresh
-      }, 1000); // Wait 1 second after the last progress update
+      }, 300); // Reduced from 1000ms to 300ms for more immediate updates
     });
 
     return () => {
@@ -116,32 +122,47 @@ export default function StudentCourseNavigationTree({
       }
       unsubscribe();
     };
-  }, []);
+  }, []); // Remove courseData dependency to prevent subscription recreation
 
   const fetchCourseData = async (isRefresh = false) => {
     if (isRefresh) {
       setRefreshing(true);
+      console.log('🔄 Navigation Tree: Refreshing course data...');
     } else {
       setLoading(true);
+      console.log('🔄 Navigation Tree: Initial course data fetch...');
     }
     
     try {
-      console.log('Fetching course data for baseClassId:', baseClassId);
+      console.log('🔄 Navigation Tree: Fetching course data for baseClassId:', baseClassId);
       const response = await fetch(`/api/learn/courses/${baseClassId}/navigation`);
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      console.log('🔄 Navigation Tree: Response status:', response.status);
+      console.log('🔄 Navigation Tree: Response ok:', response.ok);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API Error:', errorText);
+        console.error('🔄 Navigation Tree: API Error:', errorText);
         throw new Error(`Failed to fetch course data: ${response.status} ${errorText}`);
       }
       
       const data = await response.json();
-      console.log('Fetched course data:', data);
+      console.log('🔄 Navigation Tree: Fetched course data:', data);
+      console.log('🔄 Navigation Tree: Previous course data:', courseData);
+      
+      // Log specific lesson progress if available
+      if (data.paths && data.paths.length > 0) {
+        data.paths.forEach((path: any, pathIndex: number) => {
+          if (path.lessons && path.lessons.length > 0) {
+            path.lessons.forEach((lesson: any, lessonIndex: number) => {
+              console.log(`🔄 Navigation Tree: Path ${pathIndex + 1}, Lesson ${lessonIndex + 1} (${lesson.title}): ${lesson.progress}% - ${lesson.status}`);
+            });
+          }
+        });
+      }
+      
       setCourseData(data);
     } catch (error) {
-      console.error('Error fetching course data:', error);
+      console.error('🔄 Navigation Tree: Error fetching course data:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -159,6 +180,28 @@ export default function StudentCourseNavigationTree({
       return <div className="w-2 h-2 rounded-full bg-red-500" />;
     }
     return <div className="w-2 h-2 rounded-full bg-gray-300" />;
+  };
+
+  // Check if an assessment is accessible based on prerequisites
+  const isAssessmentAccessible = (assessment: AssessmentWithProgress, context?: { lesson?: LessonWithProgress, path?: PathWithProgress }) => {
+    // Lesson assessments: require the lesson to be completed
+    if (assessment.assessment_type === 'lesson' && context?.lesson) {
+      return context.lesson.completed || context.lesson.status === 'completed';
+    }
+    
+    // Path assessments: require all lessons in the path to be completed
+    if (assessment.assessment_type === 'path' && context?.path) {
+      return context.path.lessons.every(lesson => lesson.completed || lesson.status === 'completed');
+    }
+    
+    // Class assessments: require all paths to be completed
+    if (assessment.assessment_type === 'class' && courseData) {
+      return courseData.paths.every(path => 
+        path.lessons.every(lesson => lesson.completed || lesson.status === 'completed')
+      );
+    }
+    
+    return true; // Default to accessible if we can't determine prerequisites
   };
 
   const navigateToPath = (path: PathWithProgress) => {
@@ -193,25 +236,43 @@ export default function StudentCourseNavigationTree({
     setSelectedLesson(null);
   };
 
-  const AssessmentItem = ({ assessment, compact = false }: { assessment: AssessmentWithProgress; compact?: boolean }) => {
+  const AssessmentItem = ({ assessment, compact = false, context }: { 
+    assessment: AssessmentWithProgress; 
+    compact?: boolean; 
+    context?: { lesson?: LessonWithProgress, path?: PathWithProgress } 
+  }) => {
     const isSelected = selectedItemId === assessment.id && selectedItemType === 'assessment';
     const isPassed = assessment.passed || assessment.status === 'passed';
     const isFailed = assessment.status === 'failed';
     const hasProgress = assessment.progress && assessment.progress > 0 && assessment.progress < 100;
+    const isAccessible = isAssessmentAccessible(assessment, context);
+    
+    const handleClick = () => {
+      if (isAccessible) {
+        onSelectItem('assessment', assessment.id);
+      }
+    };
     
     return (
       <button
-        onClick={() => onSelectItem('assessment', assessment.id)}
+        onClick={handleClick}
+        disabled={!isAccessible}
         className={cn(
           "w-full text-left group transition-all duration-200 rounded-lg",
           compact ? "py-2 px-3" : "py-3 px-4",
-          isSelected 
-            ? "bg-blue-50 dark:bg-blue-950/30" 
-            : "hover:bg-gray-50/50 dark:hover:bg-white/5"
+          !isAccessible 
+            ? "opacity-50 cursor-not-allowed bg-gray-50/30 dark:bg-gray-800/30" 
+            : isSelected 
+              ? "bg-blue-50 dark:bg-blue-950/30" 
+              : "hover:bg-gray-50/50 dark:hover:bg-white/5"
         )}
       >
         <div className="flex items-center space-x-3">
-          {getStatusIndicator(assessment.status, true, isPassed)}
+          {!isAccessible ? (
+            <Lock className="w-4 h-4 text-gray-400" />
+          ) : (
+            getStatusIndicator(assessment.status, true, isPassed)
+          )}
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
@@ -219,6 +280,7 @@ export default function StudentCourseNavigationTree({
                 <span className={cn(
                   "font-medium",
                   compact ? "text-sm" : "text-base",
+                  !isAccessible ? "text-gray-400 dark:text-gray-500" :
                   isPassed ? "text-emerald-700 dark:text-emerald-300" : 
                   isFailed ? "text-red-700 dark:text-red-300" : 
                   "text-gray-900 dark:text-white"
@@ -226,25 +288,35 @@ export default function StudentCourseNavigationTree({
                   {assessment.title}
                 </span>
                 
-                {hasProgress && (
+                {!isAccessible && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {assessment.assessment_type === 'lesson' ? 'Complete the lesson first' :
+                     assessment.assessment_type === 'path' ? 'Complete all lessons in this path first' :
+                     'Complete all course content first'}
+                  </p>
+                )}
+                
+                {hasProgress && isAccessible && (
                   <div className="mt-2">
                     <Progress value={assessment.progress} className="h-1" />
                   </div>
                 )}
               </div>
               
-              <div className="flex items-center space-x-2 text-xs text-gray-500 ml-4">
-                {assessment.score !== null && assessment.score !== undefined && (
-                  <span className={cn(
-                    "px-2 py-1 rounded-full text-xs font-medium",
-                    isPassed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" :
-                    isFailed ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" :
-                    "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                  )}>
-                    {assessment.score}%
-                  </span>
-                )}
-              </div>
+              {isAccessible && (
+                <div className="flex items-center space-x-2 text-xs text-gray-500 ml-4">
+                  {assessment.score !== null && assessment.score !== undefined && (
+                    <span className={cn(
+                      "px-2 py-1 rounded-full text-xs font-medium",
+                      isPassed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" :
+                      isFailed ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" :
+                      "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                    )}>
+                      {assessment.score}%
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -396,7 +468,7 @@ export default function StudentCourseNavigationTree({
               </div>
               <div className="space-y-1">
                 {courseData.classAssessments.map(assessment => (
-                  <AssessmentItem key={assessment.id} assessment={assessment} />
+                  <AssessmentItem key={assessment.id} assessment={assessment} context={{}} />
                 ))}
               </div>
             </div>
@@ -536,7 +608,7 @@ export default function StudentCourseNavigationTree({
               </div>
               <div className="space-y-1">
                 {selectedPath.assessments.map(assessment => (
-                  <AssessmentItem key={assessment.id} assessment={assessment} />
+                  <AssessmentItem key={assessment.id} assessment={assessment} context={{ path: selectedPath }} />
                 ))}
               </div>
             </div>
@@ -660,7 +732,7 @@ export default function StudentCourseNavigationTree({
               </div>
               <div className="space-y-1">
                 {selectedLesson.assessments.map(assessment => (
-                  <AssessmentItem key={assessment.id} assessment={assessment} />
+                  <AssessmentItem key={assessment.id} assessment={assessment} context={{ lesson: selectedLesson }} />
                 ))}
               </div>
             </div>

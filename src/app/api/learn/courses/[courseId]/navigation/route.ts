@@ -188,18 +188,12 @@ export async function GET(
                     };
                 });
             
-            // Calculate path progress - include both lessons and assessments
+            // Calculate path progress - weight lessons 80% and assessments 20%
             const totalLessons = pathLessons.length;
             const completedLessons = pathLessons.filter(l => l.completed).length;
             
-            // Count assessments as well
-            const allAssessments = pathLessons.flatMap(l => l.assessments);
-            const completedAssessments = allAssessments.filter(a => a.status === 'completed' || a.status === 'passed').length;
-            
-            const totalItems = totalLessons + allAssessments.length;
-            const completedItems = completedLessons + completedAssessments;
-            
-            // Add path assessments
+            // Count all assessments (lesson + path assessments)
+            const lessonAssessmentsForPath = pathLessons.flatMap(l => l.assessments);
             const pathAssessmentsForPath = pathAssessments
                 .filter(a => a.path_id === path.id)
                 .map(assessment => {
@@ -220,9 +214,28 @@ export async function GET(
                         progress: assessmentProgress?.progress_percentage || 0,
                     };
                 });
-
-            const pathProgress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
             
+            const allAssessments = [...lessonAssessmentsForPath, ...pathAssessmentsForPath];
+            const completedAssessments = allAssessments.filter(a => a.status === 'completed' || a.status === 'passed').length;
+            
+            // Weight-based progress calculation: lessons 80%, assessments 20%
+            const lessonProgress = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
+            const assessmentProgress = allAssessments.length > 0 ? (completedAssessments / allAssessments.length) * 100 : 0;
+            
+            // If there are no assessments, lessons count for 100%
+            // If there are no lessons, assessments count for 100%
+            // Otherwise, apply the 80/20 weighting
+            let pathProgress = 0;
+            if (totalLessons > 0 && allAssessments.length > 0) {
+                pathProgress = Math.round((lessonProgress * 0.8) + (assessmentProgress * 0.2));
+            } else if (totalLessons > 0) {
+                pathProgress = Math.round(lessonProgress);
+            } else if (allAssessments.length > 0) {
+                pathProgress = Math.round(assessmentProgress);
+            }
+            
+            // Add path assessments (already calculated above)
+
             return {
                 id: path.id,
                 title: path.title,
@@ -255,11 +268,42 @@ export async function GET(
             };
         });
 
-        // Calculate overall progress
+        // Calculate overall progress with 80/20 weighting (lessons 80%, assessments 20%)
         const totalPaths = pathsWithProgress.length;
-        const overallProgress = totalPaths > 0 
-            ? Math.round(pathsWithProgress.reduce((sum, path) => sum + path.progress, 0) / totalPaths)
-            : 0;
+        
+        // Calculate total lesson and assessment progress across all paths
+        const totalLessons = pathsWithProgress.reduce((sum, path) => sum + path.lessons.length, 0);
+        const completedLessons = pathsWithProgress.reduce((sum, path) => 
+            sum + path.lessons.filter(l => l.completed).length, 0);
+        
+        // Count all assessments (lesson + path + class assessments)
+        const allPathAssessments = pathsWithProgress.reduce((sum, path) => 
+            sum + path.lessons.flatMap(l => l.assessments).length + path.assessments.length, 0);
+        const completedPathAssessments = pathsWithProgress.reduce((sum, path) => {
+            const lessonAssessments = path.lessons.flatMap(l => l.assessments);
+            const pathAssessments = path.assessments;
+            const allAssessments = [...lessonAssessments, ...pathAssessments];
+            return sum + allAssessments.filter(a => a.status === 'completed' || a.status === 'passed').length;
+        }, 0);
+        
+        const completedClassAssessments = classAssessmentsWithProgress.filter(a => 
+            a.status === 'completed' || a.status === 'passed').length;
+        
+        const totalAssessments = allPathAssessments + classAssessmentsWithProgress.length;
+        const completedAssessments = completedPathAssessments + completedClassAssessments;
+        
+        // Apply 80/20 weighting for overall course progress
+        const lessonProgress = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
+        const assessmentProgress = totalAssessments > 0 ? (completedAssessments / totalAssessments) * 100 : 0;
+        
+        let overallProgress = 0;
+        if (totalLessons > 0 && totalAssessments > 0) {
+            overallProgress = Math.round((lessonProgress * 0.8) + (assessmentProgress * 0.2));
+        } else if (totalLessons > 0) {
+            overallProgress = Math.round(lessonProgress);
+        } else if (totalAssessments > 0) {
+            overallProgress = Math.round(assessmentProgress);
+        }
 
         const responseData = {
             id: baseClass.id,

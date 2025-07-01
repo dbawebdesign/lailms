@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import LessonContentRenderer from './LessonContentRenderer';
 import { LessonContent } from '@/lib/types/lesson';
 import LunaContextElement from '@/components/luna/LunaContextElement';
+import { NewSchemaAssessmentTaker } from '@/components/assessments/v2/NewSchemaAssessmentTaker';
 
 // A more detailed content player
 const ContentPlayer = ({ selectedItemId, selectedItemType }: { selectedItemId?: string, selectedItemType?: 'lesson' | 'assessment' }) => {
@@ -103,17 +104,17 @@ const ContentPlayer = ({ selectedItemId, selectedItemType }: { selectedItemId?: 
     }
 
     if (selectedItemType === 'assessment') {
-        // Keep existing assessment view for now
         return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>{content.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p>{content.description}</p>
-                    <pre className="mt-4 p-4 bg-muted rounded-lg">{JSON.stringify(content, null, 2)}</pre>
-                </CardContent>
-            </Card>
+          <NewSchemaAssessmentTaker
+            assessmentId={selectedItemId!}
+            onComplete={(attemptId) => {
+              console.log('Assessment completed:', attemptId);
+              // TODO: Navigate to results or next item
+              // For now, we'll just refresh the navigation to show updated progress
+              window.location.reload();
+            }}
+            className="h-full"
+          />
         );
     }
 

@@ -69,7 +69,7 @@ export function NewSchemaAssessmentTaker({
       setError(null);
       
       try {
-        const response = await fetch('/api/teach/assessments/attempt', {
+        const response = await fetch('/api/learn/assessments/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ assessmentId }),
@@ -134,13 +134,13 @@ export function NewSchemaAssessmentTaker({
     setError(null);
     
     try {
-      const response = await fetch('/api/teach/assessments/attempt', {
+      const response = await fetch('/api/learn/assessments/submit', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           attemptId: currentAttempt.id,
           responses: responses,
-          timeSpent: timeSpent,
+          timeSpent: Math.floor(timeSpent / 60), // Convert seconds to minutes
           isSubmission: true,
         }),
       });

@@ -513,6 +513,12 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
         });
         
         // Emit progress update event for other components to listen to
+        console.log('📢 Lesson Content: Emitting progress event:', {
+          type: 'lesson',
+          itemId: lessonId,
+          progress: progressPercentage,
+          status
+        });
         emitProgressUpdate('lesson', lessonId, progressPercentage, status);
       }
     } catch (error) {
