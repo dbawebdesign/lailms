@@ -195,7 +195,7 @@ export async function PUT(request: NextRequest) {
         const progressPercentage = hasSubjectiveQuestions ? 50 : 100; // 50% if waiting for AI grading, 100% if completed
         
         // Use ProgressService to update assessment progress, which will also update class instance progress
-        const hierarchicalService = new HierarchicalProgressService(supabase);
+        const hierarchicalService = new HierarchicalProgressService(true);
         const progressService = new ProgressService(user.id, supabase, hierarchicalService);
         await progressService.updateAssessmentProgress(attempt.assessment_id, {
           status: progressStatus,
