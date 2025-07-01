@@ -1,6 +1,6 @@
 // Simple event system for progress updates
 type ProgressUpdateEvent = {
-  type: 'lesson' | 'assessment';
+  type: 'lesson' | 'assessment' | 'path' | 'class_instance';
   itemId: string;
   progress: number;
   status: string;
@@ -39,7 +39,7 @@ export const progressEvents = new ProgressEventManager();
 
 // Helper function to emit progress updates
 export const emitProgressUpdate = (
-  type: 'lesson' | 'assessment',
+  type: 'lesson' | 'assessment' | 'path' | 'class_instance',
   itemId: string,
   progress: number,
   status: string

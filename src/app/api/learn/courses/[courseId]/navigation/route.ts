@@ -115,7 +115,7 @@ export async function GET(
 
         // 5. Fetch student progress for all items using the unified progress table
         const allAssessments = [...lessonAssessments, ...pathAssessments, ...classAssessments];
-        const allItemIds = [...lessonIds, ...allAssessments.map(a => a.id)];
+        const allItemIds = [...lessonIds, ...allAssessments.map(a => a.id), ...pathIds];
         
         const { data: progressData, error: progressError } = await supabase
             .from('progress')
@@ -188,12 +188,7 @@ export async function GET(
                     };
                 });
             
-            // Calculate path progress - weight lessons 80% and assessments 20%
-            const totalLessons = pathLessons.length;
-            const completedLessons = pathLessons.filter(l => l.completed).length;
-            
-            // Count all assessments (lesson + path assessments)
-            const lessonAssessmentsForPath = pathLessons.flatMap(l => l.assessments);
+            // Get path assessments
             const pathAssessmentsForPath = pathAssessments
                 .filter(a => a.path_id === path.id)
                 .map(assessment => {
@@ -215,24 +210,10 @@ export async function GET(
                     };
                 });
             
-            const allAssessments = [...lessonAssessmentsForPath, ...pathAssessmentsForPath];
-            const completedAssessments = allAssessments.filter(a => a.status === 'completed' || a.status === 'passed').length;
-            
-            // Weight-based progress calculation: lessons 80%, assessments 20%
-            const lessonProgress = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
-            const assessmentProgress = allAssessments.length > 0 ? (completedAssessments / allAssessments.length) * 100 : 0;
-            
-            // If there are no assessments, lessons count for 100%
-            // If there are no lessons, assessments count for 100%
-            // Otherwise, apply the 80/20 weighting
-            let pathProgress = 0;
-            if (totalLessons > 0 && allAssessments.length > 0) {
-                pathProgress = Math.round((lessonProgress * 0.8) + (assessmentProgress * 0.2));
-            } else if (totalLessons > 0) {
-                pathProgress = Math.round(lessonProgress);
-            } else if (allAssessments.length > 0) {
-                pathProgress = Math.round(assessmentProgress);
-            }
+            // Get stored path progress (calculated by HierarchicalProgressService)
+            const pathProgressRecord = progressMap.get(path.id);
+            const pathProgress = pathProgressRecord?.progress_percentage || 0;
+            const pathCompleted = pathProgressRecord?.status === 'completed';
             
             // Add path assessments (already calculated above)
 
@@ -243,7 +224,7 @@ export async function GET(
                 order: path.order_index || 0,
                 lessons: pathLessons,
                 assessments: pathAssessmentsForPath,
-                completed: completedLessons === totalLessons && totalLessons > 0,
+                completed: pathCompleted,
                 progress: pathProgress,
             };
         });

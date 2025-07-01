@@ -113,7 +113,7 @@ export default function StudentCourseNavigationTree({
       timeoutId = setTimeout(() => {
         console.log('🔄 Navigation Tree: Refreshing course data after progress event...');
         fetchCourseData(true); // Mark as refresh
-      }, 300); // Reduced from 1000ms to 300ms for more immediate updates
+      }, 1000); // Increased to 1000ms to allow hierarchical progress updates to complete
     });
 
     return () => {
@@ -124,7 +124,7 @@ export default function StudentCourseNavigationTree({
     };
   }, []); // Remove courseData dependency to prevent subscription recreation
 
-  const fetchCourseData = async (isRefresh = false) => {
+  const fetchCourseData = async (isRefresh = false, retryCount = 0) => {
     if (isRefresh) {
       setRefreshing(true);
       console.log('🔄 Navigation Tree: Refreshing course data...');
@@ -135,7 +135,12 @@ export default function StudentCourseNavigationTree({
     
     try {
       console.log('🔄 Navigation Tree: Fetching course data for baseClassId:', baseClassId);
-      const response = await fetch(`/api/learn/courses/${baseClassId}/navigation`);
+      const response = await fetch(`/api/learn/courses/${baseClassId}/navigation`, {
+        cache: 'no-store', // Ensure we get fresh data
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
       console.log('🔄 Navigation Tree: Response status:', response.status);
       console.log('🔄 Navigation Tree: Response ok:', response.ok);
       
@@ -149,9 +154,10 @@ export default function StudentCourseNavigationTree({
       console.log('🔄 Navigation Tree: Fetched course data:', data);
       console.log('🔄 Navigation Tree: Previous course data:', courseData);
       
-      // Log specific lesson progress if available
+      // Log specific lesson and path progress if available
       if (data.paths && data.paths.length > 0) {
         data.paths.forEach((path: any, pathIndex: number) => {
+          console.log(`🔄 Navigation Tree: Path ${pathIndex + 1} (${path.title}): ${path.progress}%`);
           if (path.lessons && path.lessons.length > 0) {
             path.lessons.forEach((lesson: any, lessonIndex: number) => {
               console.log(`🔄 Navigation Tree: Path ${pathIndex + 1}, Lesson ${lessonIndex + 1} (${lesson.title}): ${lesson.progress}% - ${lesson.status}`);

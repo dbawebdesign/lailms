@@ -4,7 +4,7 @@ import { HierarchicalProgressService } from "@/lib/services/hierarchical-progres
 
 export async function POST(
     request: Request,
-    { params }: { params: Promise<{ lessonId: string }> }
+    { params }: { params: Promise<{ pathId: string }> }
 ) {
     const supabase = createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -13,38 +13,27 @@ export async function POST(
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { lessonId } = await params;
+    const { pathId } = await params;
     
     try {
-        const body = await request.json();
-        const { 
-            status = 'in_progress', 
-            progressPercentage = 0, 
-            lastPosition = null 
-        } = body;
-
-        // Validate lesson exists
-        const { data: lesson, error: lessonError } = await supabase
-            .from('lessons')
-            .select('id, base_class_id, path_id')
-            .eq('id', lessonId)
+        // Validate path exists
+        const { data: path, error: pathError } = await supabase
+            .from('paths')
+            .select('id, base_class_id')
+            .eq('id', pathId)
             .single();
 
-        if (lessonError || !lesson) {
-            return NextResponse.json({ error: 'Lesson not found' }, { status: 404 });
+        if (pathError || !path) {
+            return NextResponse.json({ error: 'Path not found' }, { status: 404 });
         }
 
-        // Use hierarchical progress service for proper updates
+        // Use hierarchical progress service to recalculate and update path progress
         const progressService = new HierarchicalProgressService(true);
         
-        await progressService.updateLessonProgress(lessonId, user.id, {
-            status,
-            progressPercentage,
-            lastPosition
-        });
+        await progressService.updatePathProgress(pathId, user.id);
 
         // Fetch the updated progress record
-        const updatedProgress = await progressService.getProgress(user.id, 'lesson', lessonId);
+        const updatedProgress = await progressService.getProgress(user.id, 'path', pathId);
 
         return NextResponse.json({ 
             success: true, 
@@ -52,9 +41,9 @@ export async function POST(
         });
 
     } catch (error: any) {
-        console.error('Error in lesson progress update:', error);
+        console.error('Error in path progress update:', error);
         return NextResponse.json({ 
-            error: 'Failed to update lesson progress', 
+            error: 'Failed to update path progress', 
             details: error.message 
         }, { status: 500 });
     }
@@ -62,7 +51,7 @@ export async function POST(
 
 export async function GET(
     request: Request,
-    { params }: { params: Promise<{ lessonId: string }> }
+    { params }: { params: Promise<{ pathId: string }> }
 ) {
     const supabase = createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -71,18 +60,18 @@ export async function GET(
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { lessonId } = await params;
+    const { pathId } = await params;
 
     try {
         const progressService = new HierarchicalProgressService(true);
-        const progress = await progressService.getProgress(user.id, 'lesson', lessonId);
+        const progress = await progressService.getProgress(user.id, 'path', pathId);
 
         return NextResponse.json({ progress });
 
     } catch (error: any) {
-        console.error('Error fetching lesson progress:', error);
+        console.error('Error fetching path progress:', error);
         return NextResponse.json({ 
-            error: 'Failed to fetch lesson progress', 
+            error: 'Failed to fetch path progress', 
             details: error.message 
         }, { status: 500 });
     }

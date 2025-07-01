@@ -4,7 +4,7 @@ import { HierarchicalProgressService } from "@/lib/services/hierarchical-progres
 
 export async function POST(
     request: Request,
-    { params }: { params: Promise<{ lessonId: string }> }
+    { params }: { params: Promise<{ assessmentId: string }> }
 ) {
     const supabase = createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -13,7 +13,7 @@ export async function POST(
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { lessonId } = await params;
+    const { assessmentId } = await params;
     
     try {
         const body = await request.json();
@@ -23,28 +23,28 @@ export async function POST(
             lastPosition = null 
         } = body;
 
-        // Validate lesson exists
-        const { data: lesson, error: lessonError } = await supabase
-            .from('lessons')
-            .select('id, base_class_id, path_id')
-            .eq('id', lessonId)
+        // Validate assessment exists
+        const { data: assessment, error: assessmentError } = await supabase
+            .from('assessments')
+            .select('id, base_class_id, path_id, lesson_id')
+            .eq('id', assessmentId)
             .single();
 
-        if (lessonError || !lesson) {
-            return NextResponse.json({ error: 'Lesson not found' }, { status: 404 });
+        if (assessmentError || !assessment) {
+            return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
         }
 
         // Use hierarchical progress service for proper updates
         const progressService = new HierarchicalProgressService(true);
         
-        await progressService.updateLessonProgress(lessonId, user.id, {
+        await progressService.updateAssessmentProgress(assessmentId, user.id, {
             status,
             progressPercentage,
             lastPosition
         });
 
         // Fetch the updated progress record
-        const updatedProgress = await progressService.getProgress(user.id, 'lesson', lessonId);
+        const updatedProgress = await progressService.getProgress(user.id, 'assessment', assessmentId);
 
         return NextResponse.json({ 
             success: true, 
@@ -52,9 +52,9 @@ export async function POST(
         });
 
     } catch (error: any) {
-        console.error('Error in lesson progress update:', error);
+        console.error('Error in assessment progress update:', error);
         return NextResponse.json({ 
-            error: 'Failed to update lesson progress', 
+            error: 'Failed to update assessment progress', 
             details: error.message 
         }, { status: 500 });
     }
@@ -62,7 +62,7 @@ export async function POST(
 
 export async function GET(
     request: Request,
-    { params }: { params: Promise<{ lessonId: string }> }
+    { params }: { params: Promise<{ assessmentId: string }> }
 ) {
     const supabase = createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -71,18 +71,18 @@ export async function GET(
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { lessonId } = await params;
+    const { assessmentId } = await params;
 
     try {
         const progressService = new HierarchicalProgressService(true);
-        const progress = await progressService.getProgress(user.id, 'lesson', lessonId);
+        const progress = await progressService.getProgress(user.id, 'assessment', assessmentId);
 
         return NextResponse.json({ progress });
 
     } catch (error: any) {
-        console.error('Error fetching lesson progress:', error);
+        console.error('Error fetching assessment progress:', error);
         return NextResponse.json({ 
-            error: 'Failed to fetch lesson progress', 
+            error: 'Failed to fetch assessment progress', 
             details: error.message 
         }, { status: 500 });
     }

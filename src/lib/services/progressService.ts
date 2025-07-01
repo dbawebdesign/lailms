@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createClient } from '@/lib/supabase/client';
 import { emitProgressUpdate } from '@/lib/utils/progressEvents';
+import { HierarchicalProgressServiceClient } from './hierarchical-progress-service.client';
 
 export type ProgressStatus = 'not_started' | 'in_progress' | 'completed' | 'paused';
 export type ItemType = 'lesson' | 'lesson_section' | 'assessment' | 'path' | 'course';
@@ -27,238 +28,34 @@ export interface ProgressData {
 export class ProgressService {
     private supabase;
     private userId: string;
+    private hierarchicalService: HierarchicalProgressServiceClient;
 
     constructor(userId: string) {
         this.supabase = createClient();
         this.userId = userId;
+        this.hierarchicalService = new HierarchicalProgressServiceClient();
     }
 
     /**
-     * Update lesson progress and automatically update class instance progress
+     * Update lesson progress using hierarchical service
+     * This ensures proper progress flow: lesson → path → class instance
+     * Progress will never go backwards
      */
     async updateLessonProgress(lessonId: string, update: ProgressUpdate) {
-        // First update the lesson progress
-        const { data, error } = await this.supabase.rpc('upsert_progress' as any, {
-            p_user_id: this.userId,
-            p_item_type: 'lesson',
-            p_item_id: lessonId,
-            p_status: update.status || 'in_progress',
-            p_progress_percentage: update.progressPercentage || 0,
-            p_last_position: update.lastPosition || undefined
-        });
-
-        if (error) throw error;
-
-        // Emit progress update event
-        emitProgressUpdate(
-            'lesson', 
-            lessonId, 
-            update.progressPercentage || 0, 
-            update.status || 'in_progress'
-        );
-
-        // Now update the class instance progress
-        try {
-            await this.updateClassInstanceProgressForLesson(lessonId);
-        } catch (classProgressError) {
-            console.error('Error updating class instance progress:', classProgressError);
-            // Don't fail the main operation if class progress update fails
-        }
-
-        return data;
+        return await this.hierarchicalService.updateLessonProgress(lessonId, this.userId, update);
     }
 
     /**
-     * Helper method to update class instance progress when a lesson changes
-     */
-    private async updateClassInstanceProgressForLesson(lessonId: string) {
-        // Get the lesson's base class
-        const { data: lesson, error: lessonError } = await this.supabase
-            .from('lessons')
-            .select(`
-                id,
-                base_class_id,
-                path_id
-            `)
-            .eq('id', lessonId)
-            .single();
-
-        if (lessonError || !lesson) {
-            console.error('Error fetching lesson for class instance update:', lessonError);
-            return;
-        }
-
-        const baseClassId = lesson.base_class_id;
-        if (!baseClassId) {
-            console.error('No base class ID found for lesson:', lessonId);
-            return;
-        }
-
-        // Find the class instance this user is enrolled in
-        const { data: enrollment, error: enrollmentError } = await this.supabase
-            .from('rosters')
-            .select('class_instance_id')
-            .eq('profile_id', this.userId)
-            .eq('role', 'student')
-            .single();
-
-        if (enrollmentError) {
-            console.error('Error finding enrollment for class instance update:', enrollmentError);
-            return;
-        }
-        
-        if (!enrollment?.class_instance_id) {
-            console.log('No enrollment found - user may be in self-paced learning mode');
-            return;
-        }
-
-        // Verify this class instance belongs to the correct base class
-        const { data: classInstance, error: classInstanceError } = await this.supabase
-            .from('class_instances')
-            .select('base_class_id')
-            .eq('id', enrollment.class_instance_id)
-            .eq('base_class_id', baseClassId)
-            .single();
-
-        if (classInstanceError || !classInstance) {
-            console.log(`Class instance ${enrollment.class_instance_id} does not match base class ${baseClassId}`);
-            return;
-        }
-
-        // Call the API to update class instance progress (this ensures consistency)
-        try {
-            const response = await fetch(`/api/progress/class-instance/${enrollment.class_instance_id}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ userId: this.userId })
-            });
-
-            if (!response.ok) {
-                console.error('Failed to update class instance progress via API');
-            } else {
-                console.log(`Successfully updated class instance progress: ${enrollment.class_instance_id} for lesson ${lessonId}`);
-            }
-        } catch (error) {
-            console.error('Error calling class instance progress API:', error);
-        }
-    }
-
-    /**
-     * Update assessment progress and automatically update class instance progress
+     * Update assessment progress using hierarchical service
+     * This ensures proper progress flow and triggers path/class updates
+     * Progress will never go backwards
      */
     async updateAssessmentProgress(assessmentId: string, update: ProgressUpdate) {
-        // First update the assessment progress
-        const { data, error } = await this.supabase.rpc('upsert_progress' as any, {
-            p_user_id: this.userId,
-            p_item_type: 'assessment',
-            p_item_id: assessmentId,
-            p_status: update.status || 'in_progress',
-            p_progress_percentage: update.progressPercentage || 0,
-            p_last_position: update.lastPosition || undefined
-        });
-
-        if (error) throw error;
-
-        // Emit progress update event
-        emitProgressUpdate(
-            'assessment', 
-            assessmentId, 
-            update.progressPercentage || 0, 
-            update.status || 'in_progress'
-        );
-
-        // Now update the class instance progress
-        try {
-            await this.updateClassInstanceProgressForAssessment(assessmentId);
-        } catch (classProgressError) {
-            console.error('Error updating class instance progress:', classProgressError);
-            // Don't fail the main operation if class progress update fails
-        }
-
-        return data;
+        return await this.hierarchicalService.updateAssessmentProgress(assessmentId, this.userId, update);
     }
 
     /**
-     * Helper method to update class instance progress when an assessment changes
-     */
-    private async updateClassInstanceProgressForAssessment(assessmentId: string) {
-        // Get the assessment's base class
-        const { data: assessment, error: assessmentError } = await this.supabase
-            .from('assessments')
-            .select(`
-                id,
-                base_class_id,
-                path_id
-            `)
-            .eq('id', assessmentId)
-            .single();
-
-        if (assessmentError || !assessment) {
-            console.error('Error fetching assessment for class instance update:', assessmentError);
-            return;
-        }
-
-        const baseClassId = assessment.base_class_id;
-        if (!baseClassId) {
-            console.error('No base class ID found for assessment:', assessmentId);
-            return;
-        }
-
-        // Find the class instance this user is enrolled in
-        const { data: enrollment, error: enrollmentError } = await this.supabase
-            .from('rosters')
-            .select('class_instance_id')
-            .eq('profile_id', this.userId)
-            .eq('role', 'student')
-            .single();
-
-        if (enrollmentError) {
-            console.error('Error finding enrollment for class instance update:', enrollmentError);
-            return;
-        }
-        
-        if (!enrollment?.class_instance_id) {
-            console.log('No enrollment found - user may be in self-paced learning mode');
-            return;
-        }
-
-        // Verify this class instance belongs to the correct base class
-        const { data: classInstance, error: classInstanceError } = await this.supabase
-            .from('class_instances')
-            .select('base_class_id')
-            .eq('id', enrollment.class_instance_id)
-            .eq('base_class_id', baseClassId)
-            .single();
-
-        if (classInstanceError || !classInstance) {
-            console.log(`Class instance ${enrollment.class_instance_id} does not match base class ${baseClassId}`);
-            return;
-        }
-
-        // Call the API to update class instance progress (this ensures consistency)
-        try {
-            const response = await fetch(`/api/progress/class-instance/${enrollment.class_instance_id}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ userId: this.userId })
-            });
-
-            if (!response.ok) {
-                console.error('Failed to update class instance progress via API');
-            } else {
-                console.log(`Successfully updated class instance progress: ${enrollment.class_instance_id} for assessment ${assessmentId}`);
-            }
-        } catch (error) {
-            console.error('Error calling class instance progress API:', error);
-        }
-    }
-
-    /**
-     * Get current position in a course
+     * Get current position in course
      */
     async getCurrentPosition(courseId: string): Promise<{
         currentPath?: string;
@@ -266,89 +63,113 @@ export class ProgressService {
         currentSection?: string;
         lastPosition?: string | null;
     }> {
-        // Get all progress for this course
-        const { data: paths } = await this.supabase
+        // Get all paths for this course
+        const { data: paths, error: pathsError } = await this.supabase
             .from('paths')
-            .select('id')
-            .eq('base_class_id', courseId);
+            .select(`
+                id,
+                title,
+                order_index,
+                lessons (
+                    id,
+                    title,
+                    order_index
+                )
+            `)
+            .eq('base_class_id', courseId)
+            .order('order_index');
 
-        if (!paths?.length) return {};
+        if (pathsError || !paths) {
+            console.error('Error fetching paths:', pathsError);
+            return {};
+        }
 
-        const pathIds = paths.map(p => p.id);
-
-        // Get lessons for these paths
-        const { data: lessons } = await this.supabase
-            .from('lessons')
-            .select('id, path_id')
-            .in('path_id', pathIds);
-
-        if (!lessons?.length) return {};
-
-        const lessonIds = lessons.map(l => l.id);
+        // Get all lesson IDs
+        const allLessons = paths.flatMap(path => 
+            (path.lessons as any[]).map(lesson => ({
+                ...lesson,
+                path_id: path.id,
+                path_title: path.title,
+                path_order: path.order_index
+            }))
+        ).sort((a, b) => {
+            if (a.path_order !== b.path_order) {
+                return a.path_order - b.path_order;
+            }
+            return a.order_index - b.order_index;
+        });
 
         // Get progress for all lessons
-        const { data: progress } = await this.supabase
+        const lessonIds = allLessons.map(l => l.id);
+        const { data: progressData, error: progressError } = await this.supabase
             .from('progress')
-            .select('item_id, item_type, status, last_position, updated_at')
+            .select('*')
             .eq('user_id', this.userId)
-            .in('item_id', lessonIds)
             .eq('item_type', 'lesson')
-            .order('updated_at', { ascending: false });
+            .in('item_id', lessonIds);
 
-        if (!progress?.length) {
-            // No progress yet, return first lesson
-            const firstLesson = lessons.find(l => l.path_id === pathIds[0]);
+        if (progressError) {
+            console.error('Error fetching progress:', progressError);
+            return {};
+        }
+
+        // Create progress map
+        const progressMap = new Map(progressData?.map(p => [p.item_id, p]) || []);
+
+        // Find the current lesson (first incomplete lesson)
+        for (const lesson of allLessons) {
+            const progress = progressMap.get(lesson.id);
+            if (!progress || progress.status !== 'completed') {
+                return {
+                    currentPath: lesson.path_id,
+                    currentLesson: lesson.id,
+                    lastPosition: progress?.last_position || null
+                };
+            }
+        }
+
+        // All lessons completed, return last lesson
+        if (allLessons.length > 0) {
+            const lastLesson = allLessons[allLessons.length - 1];
+            const lastProgress = progressMap.get(lastLesson.id);
             return {
-                currentPath: pathIds[0],
-                currentLesson: firstLesson?.id
+                currentPath: lastLesson.path_id,
+                currentLesson: lastLesson.id,
+                lastPosition: lastProgress?.last_position || null
             };
         }
 
-        // Find the most recent lesson that's in progress or the last completed one
-        const inProgressLesson = progress.find(p => p.status === 'in_progress');
-        const lastLesson = inProgressLesson || progress[0];
-
-        const lesson = lessons.find(l => l.id === lastLesson.item_id);
-
-        return {
-            currentPath: lesson?.path_id,
-            currentLesson: lesson?.id,
-            lastPosition: lastLesson.last_position
-        };
+        return {};
     }
 
     /**
-     * Calculate mastery level based on assessment scores
+     * Calculate mastery level based on performance
      */
     async calculateMastery(itemId: string, itemType: ItemType): Promise<MasteryLevel> {
-        if (itemType !== 'assessment') {
-            return 'novice'; // Only assessments have mastery levels for now
+        // Get progress data
+        const { data: progress, error } = await this.supabase
+            .from('progress')
+            .select('progress_percentage, status')
+            .eq('user_id', this.userId)
+            .eq('item_type', itemType)
+            .eq('item_id', itemId)
+            .single();
+
+        if (error || !progress) {
+            return 'novice';
         }
 
-        // Get all attempts for this assessment
-        const { data: attempts } = await this.supabase
-            .from('student_attempts')
-            .select('percentage_score, created_at')
-            .eq('student_id', this.userId)
-            .eq('assessment_id', itemId)
-            .order('created_at', { ascending: true });
-
-        if (!attempts?.length) return 'novice';
-
-        const scores = attempts.map(a => a.percentage_score || 0);
-        const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
-        const latestScore = scores[scores.length - 1];
-        const improvement = scores.length > 1 ? latestScore - scores[0] : 0;
-
-        if (latestScore >= 95 && avgScore >= 90) return 'expert';
-        if (latestScore >= 85 && avgScore >= 80) return 'advanced';
-        if (latestScore >= 75 && avgScore >= 70) return 'proficient';
-        if (latestScore >= 60 || improvement > 20) return 'developing';
+        const percentage = progress.progress_percentage || 0;
+        
+        if (percentage >= 95) return 'expert';
+        if (percentage >= 85) return 'advanced';
+        if (percentage >= 70) return 'proficient';
+        if (percentage >= 50) return 'developing';
         return 'novice';
     }
 
     /**
-     * Get resume point for a course
+     * Get resume point for course
      */
     async getResumePoint(courseId: string): Promise<{
         type: 'lesson' | 'assessment' | null;
@@ -356,82 +177,72 @@ export class ProgressService {
         title: string | null;
         position?: string | null;
     }> {
-        const currentPosition = await this.getCurrentPosition(courseId);
+        const position = await this.getCurrentPosition(courseId);
         
-        if (!currentPosition.currentLesson) {
-            return { type: null, id: null, title: null };
+        if (position.currentLesson) {
+            // Get lesson details
+            const { data: lesson } = await this.supabase
+                .from('lessons')
+                .select('title')
+                .eq('id', position.currentLesson)
+                .single();
+
+            return {
+                type: 'lesson',
+                id: position.currentLesson,
+                title: lesson?.title || null,
+                position: position.lastPosition
+            };
         }
 
-        // Get lesson details
-        const { data: lesson } = await this.supabase
-            .from('lessons')
-            .select('title')
-            .eq('id', currentPosition.currentLesson)
-            .single();
-
         return {
-            type: 'lesson',
-            id: currentPosition.currentLesson,
-            title: lesson?.title || 'Unknown Lesson',
-            position: currentPosition.lastPosition
+            type: null,
+            id: null,
+            title: null
         };
     }
 
     /**
-     * Get progress for a specific item
+     * Get progress for specific item using hierarchical service
      */
     async getProgress(itemId: string) {
-        const { data, error } = await this.supabase
-            .from('progress')
-            .select('*')
-            .eq('user_id', this.userId)
-            .eq('item_id', itemId)
-            .maybeSingle();
-
-        if (error) throw error;
-        return data;
+        // Determine item type - this is a simplified approach
+        // In practice, you might want to pass the item type explicitly
+        return await this.hierarchicalService.getProgress(this.userId, 'lesson', itemId);
     }
 
     /**
-     * Get all progress for a user in a specific course/path
+     * Get course progress overview
      */
     async getCourseProgress(courseId: string) {
-        // Simple approach - get all progress for user and filter by course items
-        const { data: allProgress, error } = await this.supabase
-            .from('progress')
-            .select('*')
-            .eq('user_id', this.userId);
+        const position = await this.getCurrentPosition(courseId);
+        const resumePoint = await this.getResumePoint(courseId);
 
-        if (error) throw error;
-        
-        // Get all lessons in this course to filter progress
-        const { data: courseLessons } = await this.supabase
-            .from('lessons')
-            .select('id')
-            .eq('base_class_id', courseId);
-
-        const lessonIds = courseLessons?.map(l => l.id) || [];
-        
-        // Filter progress to only include items from this course
-        const courseProgress = allProgress?.filter(p => 
-            lessonIds.includes(p.item_id) || p.item_id === courseId
-        ) || [];
-
-        return courseProgress;
+        return {
+            currentPosition: position,
+            resumePoint,
+            overallProgress: 0 // This would be calculated based on all progress
+        };
     }
 
     /**
-     * Mark an item as completed
+     * Mark item as completed using hierarchical service
      */
     async markCompleted(itemId: string, itemType: ItemType) {
-        return this.updateProgress(itemId, itemType, {
-            status: 'completed',
-            progressPercentage: 100
-        });
+        const update = { status: 'completed' as const, progressPercentage: 100 };
+        
+        if (itemType === 'lesson') {
+            return await this.hierarchicalService.updateLessonProgress(itemId, this.userId, update);
+        } else if (itemType === 'assessment') {
+            return await this.hierarchicalService.updateAssessmentProgress(itemId, this.userId, update);
+        }
+        
+        // For other types, use the generic update method
+        return await this.updateProgress(itemId, itemType, update);
     }
 
     /**
-     * Generic progress update method
+     * Generic progress update method (for backward compatibility)
      */
     private async updateProgress(itemId: string, itemType: ItemType, update: ProgressUpdate) {
         const { data, error } = await this.supabase.rpc('upsert_progress' as any, {
@@ -445,17 +256,13 @@ export class ProgressService {
 
         if (error) throw error;
 
-        // Update class instance progress for lessons and assessments
-        try {
-            if (itemType === 'lesson') {
-                await this.updateClassInstanceProgressForLesson(itemId);
-            } else if (itemType === 'assessment') {
-                await this.updateClassInstanceProgressForAssessment(itemId);
-            }
-        } catch (classProgressError) {
-            console.error('Error updating class instance progress:', classProgressError);
-            // Don't fail the main operation if class progress update fails
-        }
+        // Emit progress update event
+        emitProgressUpdate(
+            itemType as any, 
+            itemId, 
+            update.progressPercentage || 0, 
+            update.status || 'in_progress'
+        );
 
         return data;
     }

@@ -472,21 +472,10 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
 
 
 
-  // Track section completion and update progress (only if progress increases)
+  // Track section completion and update progress 
+  // Progress will never go backwards thanks to the hierarchical progress service
   const updateLessonProgress = async (progressPercentage: number, status: string = 'in_progress') => {
     if (!lessonId || isUpdatingProgress) return;
-
-    // Don't update if new progress is lower than current progress
-    if (currentProgressFromDB && progressPercentage < currentProgressFromDB.progress) {
-      console.log(`Skipping progress update: ${progressPercentage}% < ${currentProgressFromDB.progress}%`);
-      return;
-    }
-
-    // Don't update if lesson is already completed and we're trying to set a lower status
-    if (currentProgressFromDB?.status === 'completed' && status !== 'completed') {
-      console.log(`Skipping status downgrade: lesson already completed`);
-      return;
-    }
 
     setIsUpdatingProgress(true);
     try {
@@ -505,21 +494,26 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
       if (!response.ok) {
         console.error('Failed to update lesson progress');
       } else {
-        // Update local state to reflect new progress
-        setCurrentProgressFromDB({
-          progress: progressPercentage,
-          status,
-          lastPosition: currentSectionIndex.toString()
-        });
+        const data = await response.json();
+        
+        // Update local state to reflect new progress from server
+        // The server ensures progress never goes backwards
+        if (data.progress) {
+          setCurrentProgressFromDB({
+            progress: data.progress.progress_percentage || progressPercentage,
+            status: data.progress.status || status,
+            lastPosition: data.progress.last_position || currentSectionIndex.toString()
+          });
+        }
         
         // Emit progress update event for other components to listen to
         console.log('📢 Lesson Content: Emitting progress event:', {
           type: 'lesson',
           itemId: lessonId,
-          progress: progressPercentage,
-          status
+          progress: data.progress?.progress_percentage || progressPercentage,
+          status: data.progress?.status || status
         });
-        emitProgressUpdate('lesson', lessonId, progressPercentage, status);
+        emitProgressUpdate('lesson', lessonId, data.progress?.progress_percentage || progressPercentage, data.progress?.status || status);
       }
     } catch (error) {
       console.error('Error updating lesson progress:', error);
