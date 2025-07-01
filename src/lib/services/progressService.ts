@@ -94,34 +94,40 @@ export class ProgressService {
             return;
         }
 
-        // Find the class instance this user is enrolled in for this base class
-        const { data: enrollments, error: enrollmentError } = await this.supabase
+        // Find the class instance this user is enrolled in
+        const { data: enrollment, error: enrollmentError } = await this.supabase
             .from('rosters')
-            .select('class_instances (id)')
+            .select('class_instance_id')
             .eq('profile_id', this.userId)
             .eq('role', 'student')
-            .eq('class_instances.base_class_id', baseClassId)
-            .limit(1);
+            .single();
 
         if (enrollmentError) {
             console.error('Error finding enrollment for class instance update:', enrollmentError);
             return;
         }
         
-        if (!enrollments?.length || !enrollments[0]?.class_instances) {
-            // This is normal for self-paced learning - user may not be enrolled in a class
+        if (!enrollment?.class_instance_id) {
+            console.log('No enrollment found - user may be in self-paced learning mode');
             return;
         }
 
-        const classInstanceId = (enrollments[0].class_instances as any)?.id;
-        if (!classInstanceId) {
-            console.error('No class instance ID found for enrollment');
+        // Verify this class instance belongs to the correct base class
+        const { data: classInstance, error: classInstanceError } = await this.supabase
+            .from('class_instances')
+            .select('base_class_id')
+            .eq('id', enrollment.class_instance_id)
+            .eq('base_class_id', baseClassId)
+            .single();
+
+        if (classInstanceError || !classInstance) {
+            console.log(`Class instance ${enrollment.class_instance_id} does not match base class ${baseClassId}`);
             return;
         }
 
         // Call the API to update class instance progress (this ensures consistency)
         try {
-            const response = await fetch(`/api/progress/class-instance/${classInstanceId}`, {
+            const response = await fetch(`/api/progress/class-instance/${enrollment.class_instance_id}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -131,6 +137,8 @@ export class ProgressService {
 
             if (!response.ok) {
                 console.error('Failed to update class instance progress via API');
+            } else {
+                console.log(`Successfully updated class instance progress: ${enrollment.class_instance_id} for lesson ${lessonId}`);
             }
         } catch (error) {
             console.error('Error calling class instance progress API:', error);
@@ -198,34 +206,40 @@ export class ProgressService {
             return;
         }
 
-        // Find the class instance this user is enrolled in for this base class
-        const { data: enrollments, error: enrollmentError } = await this.supabase
+        // Find the class instance this user is enrolled in
+        const { data: enrollment, error: enrollmentError } = await this.supabase
             .from('rosters')
-            .select('class_instances (id)')
+            .select('class_instance_id')
             .eq('profile_id', this.userId)
             .eq('role', 'student')
-            .eq('class_instances.base_class_id', baseClassId)
-            .limit(1);
+            .single();
 
         if (enrollmentError) {
             console.error('Error finding enrollment for class instance update:', enrollmentError);
             return;
         }
         
-        if (!enrollments?.length || !enrollments[0]?.class_instances) {
-            // This is normal for self-paced learning - user may not be enrolled in a class
+        if (!enrollment?.class_instance_id) {
+            console.log('No enrollment found - user may be in self-paced learning mode');
             return;
         }
 
-        const classInstanceId = (enrollments[0].class_instances as any)?.id;
-        if (!classInstanceId) {
-            console.error('No class instance ID found for enrollment');
+        // Verify this class instance belongs to the correct base class
+        const { data: classInstance, error: classInstanceError } = await this.supabase
+            .from('class_instances')
+            .select('base_class_id')
+            .eq('id', enrollment.class_instance_id)
+            .eq('base_class_id', baseClassId)
+            .single();
+
+        if (classInstanceError || !classInstance) {
+            console.log(`Class instance ${enrollment.class_instance_id} does not match base class ${baseClassId}`);
             return;
         }
 
         // Call the API to update class instance progress (this ensures consistency)
         try {
-            const response = await fetch(`/api/progress/class-instance/${classInstanceId}`, {
+            const response = await fetch(`/api/progress/class-instance/${enrollment.class_instance_id}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -235,6 +249,8 @@ export class ProgressService {
 
             if (!response.ok) {
                 console.error('Failed to update class instance progress via API');
+            } else {
+                console.log(`Successfully updated class instance progress: ${enrollment.class_instance_id} for assessment ${assessmentId}`);
             }
         } catch (error) {
             console.error('Error calling class instance progress API:', error);

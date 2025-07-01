@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { Tables, TablesInsert, TablesUpdate } from '../../../../../../packages/types/db'
 import { emitProgressUpdate } from '@/lib/utils/progressEvents'
+import { ProgressService } from '@/lib/services/progressService'
 
 type Assessment = Tables<'assessments'>
 type AssessmentQuestion = Tables<'assessment_questions'>
@@ -187,26 +188,20 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to update attempt scores' }, { status: 500 })
       }
 
-      // Update progress table for assessment completion
+      // Update progress table for assessment completion using ProgressService
       try {
         const progressStatus = hasSubjectiveQuestions ? 'in_progress' : (passed ? 'passed' : 'failed');
         const progressPercentage = hasSubjectiveQuestions ? 50 : 100; // 50% if waiting for AI grading, 100% if completed
         
-        const { error: progressError } = await supabase.rpc('upsert_progress' as any, {
-          p_user_id: user.id,
-          p_item_type: 'assessment',
-          p_item_id: attempt.assessment_id,
-          p_status: progressStatus,
-          p_progress_percentage: progressPercentage,
-          p_last_position: null
+        // Use ProgressService to update assessment progress, which will also update class instance progress
+        const progressService = new ProgressService(user.id);
+        await progressService.updateAssessmentProgress(attempt.assessment_id, {
+          status: progressStatus,
+          progressPercentage: progressPercentage,
+          lastPosition: null
         });
 
-        if (progressError) {
-          console.error('Error updating assessment progress:', progressError);
-        } else {
-          // Emit progress update event for navigation tree to update
-          emitProgressUpdate('assessment', attempt.assessment_id, progressPercentage, progressStatus);
-        }
+        console.log(`Updated assessment progress: ${attempt.assessment_id} -> ${progressPercentage}%`);
       } catch (progressUpdateError) {
         console.error('Error updating assessment progress:', progressUpdateError);
         // Don't fail the request if progress update fails

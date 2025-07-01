@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { NewSchemaAssessment, NewSchemaQuestion, NewSchemaStudentAttempt, NewSchemaStudentResponse } from './types/newSchemaTypes';
 
@@ -50,6 +50,9 @@ export function NewSchemaAssessmentTaker({
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Prevent concurrent initialization
+  const initializingRef = useRef(false);
 
   // Timer for tracking time spent
   useEffect(() => {
@@ -63,8 +66,12 @@ export function NewSchemaAssessmentTaker({
   // Initialize assessment attempt
   useEffect(() => {
     if (!assessmentId) return;
+    
+    // Prevent multiple concurrent requests
+    if (initializingRef.current) return;
 
     const initializeAttempt = async () => {
+      initializingRef.current = true;
       setLoading(true);
       setError(null);
       
@@ -90,10 +97,16 @@ export function NewSchemaAssessmentTaker({
         setError(err.message);
       } finally {
         setLoading(false);
+        initializingRef.current = false;
       }
     };
 
     initializeAttempt();
+
+    // Cleanup function to reset the ref if the effect re-runs
+    return () => {
+      initializingRef.current = false;
+    };
   }, [assessmentId]);
 
   // Handle answer changes

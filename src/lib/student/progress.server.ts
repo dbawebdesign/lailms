@@ -1,7 +1,8 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 /**
- * Calculates the overall progress for a base class.
+ * Calculates the overall progress for a base class using weighted calculation.
+ * Lessons account for 80% and assessments account for 20% of the total progress.
  * This should be called on the server.
  * @param baseClassId - The ID of the base class.
  * @param userId - The ID of the user.
@@ -10,17 +11,12 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 export async function calculateOverallProgress(baseClassId: string, userId: string): Promise<number> {
   const supabase = createSupabaseServerClient();
 
-  type PathWithItems = {
-    lessons: { id: string }[],
-    assessments: { id: string }[]
-  }
-
-  // 1. Get all lessons and assessments for the class
+  // 1. Get all lessons for the class
   const { data: paths, error: pathsError } = await supabase
     .from('paths')
-    .select('lessons(id), assessments(id)')
+    .select('lessons(id)')
     .eq('base_class_id', baseClassId)
-    .returns<PathWithItems[]>();
+    .returns<{ lessons: { id: string }[] }[]>();
 
   if (pathsError || !paths) {
     console.error('Error fetching paths for progress:', pathsError);
@@ -28,10 +24,19 @@ export async function calculateOverallProgress(baseClassId: string, userId: stri
   }
 
   const lessonIds = paths.flatMap(p => p.lessons.map(l => l.id));
-  const assessmentIds = paths.flatMap(p => p.assessments.map(a => a.id));
-  const totalItems = lessonIds.length + assessmentIds.length;
 
-  if (totalItems === 0) return 0;
+  // Get all assessments for the class (lesson, path, and class assessments)
+  const { data: assessments, error: assessmentsError } = await supabase
+    .from('assessments')
+    .select('id')
+    .eq('base_class_id', baseClassId);
+
+  if (assessmentsError) {
+    console.error('Error fetching assessments for progress:', assessmentsError);
+    return 0;
+  }
+
+  const assessmentIds = assessments?.map(a => a.id) || [];
 
   // 2. Get all completed items for the user in this class
   const { count: completedLessons, error: lessonProgressError } = await supabase
@@ -54,10 +59,31 @@ export async function calculateOverallProgress(baseClassId: string, userId: stri
     console.error('Error fetching progress:', lessonProgressError, assessmentProgressError);
     return 0;
   }
-    
-  const totalCompleted = (completedLessons || 0) + (completedAssessments || 0);
 
-  return Math.round((totalCompleted / totalItems) * 100);
+  // 3. Calculate weighted progress: lessons 80%, assessments 20%
+  const totalLessons = lessonIds.length;
+  const totalAssessments = assessmentIds.length;
+  
+  if (totalLessons === 0 && totalAssessments === 0) return 0;
+
+  // Calculate individual progress percentages
+  const lessonProgress = totalLessons > 0 ? ((completedLessons || 0) / totalLessons) * 100 : 0;
+  const assessmentProgress = totalAssessments > 0 ? ((completedAssessments || 0) / totalAssessments) * 100 : 0;
+
+  // Apply weighted calculation
+  let overallProgress = 0;
+  if (totalLessons > 0 && totalAssessments > 0) {
+    // Both lessons and assessments exist: apply 80/20 weighting
+    overallProgress = (lessonProgress * 0.8) + (assessmentProgress * 0.2);
+  } else if (totalLessons > 0) {
+    // Only lessons exist: lessons count for 100%
+    overallProgress = lessonProgress;
+  } else if (totalAssessments > 0) {
+    // Only assessments exist: assessments count for 100%
+    overallProgress = assessmentProgress;
+  }
+
+  return Math.round(overallProgress);
 }
 
 /**
@@ -84,27 +110,45 @@ export async function updateClassInstanceProgress(classInstanceId: string, userI
   // 2. Calculate the overall progress
   const progressPercentage = await calculateOverallProgress(instance.base_class_id, userId);
 
-  // 3. Determine status based on progress
+  // 3. Get existing progress to ensure we never go backwards
+  const { data: existingProgress } = await supabase
+    .from('progress')
+    .select('progress_percentage')
+    .eq('user_id', userId)
+    .eq('item_type', 'class_instance')
+    .eq('item_id', classInstanceId)
+    .single();
+
+  // Only update if progress has increased or if no existing progress
+  const currentProgress = existingProgress?.progress_percentage || 0;
+  const newProgress = Math.round(progressPercentage);
+  
+  if (newProgress <= currentProgress) {
+    console.log(`Skipping class instance progress update: ${newProgress}% <= ${currentProgress}%`);
+    return;
+  }
+
+  // 4. Determine status based on progress
   let status = 'in_progress';
-  if (progressPercentage === 0) {
+  if (newProgress === 0) {
     status = 'not_started';
-  } else if (progressPercentage >= 100) {
+  } else if (newProgress >= 100) {
     status = 'completed';
   }
 
-  // 4. Upsert the class instance progress
+  // 5. Upsert the class instance progress
   const { error: upsertError } = await supabase.rpc('upsert_progress' as any, {
     p_user_id: userId,
     p_item_type: 'class_instance',
     p_item_id: classInstanceId,
     p_status: status,
-    p_progress_percentage: Math.round(progressPercentage),
+    p_progress_percentage: newProgress,
     p_last_position: null
   });
 
   if (upsertError) {
     console.error('Error updating class instance progress:', upsertError);
   } else {
-    console.log(`Updated class instance progress: ${classInstanceId} -> ${Math.round(progressPercentage)}%`);
+    console.log(`Updated class instance progress: ${classInstanceId} -> ${newProgress}% (was ${currentProgress}%)`);
   }
 } 

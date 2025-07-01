@@ -62,10 +62,10 @@ export async function POST(request: NextRequest) {
       }
 
       // Remove answer keys from questions before sending to client
-      const sanitizedQuestions = questions.map(question => ({
-        ...question,
-        answer_key: undefined
-      }))
+      const sanitizedQuestions = questions.map(question => {
+        const { answer_key, ...questionWithoutAnswerKey } = question
+        return questionWithoutAnswerKey
+      })
 
       return NextResponse.json({
         assessment,
@@ -113,10 +113,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Remove answer keys from questions before sending to client
-    const sanitizedQuestions = questions.map(question => ({
-      ...question,
-      answer_key: undefined // Don't send correct answers to the client
-    }))
+    const sanitizedQuestions = questions.map(question => {
+      const { answer_key, ...questionWithoutAnswerKey } = question
+      return questionWithoutAnswerKey
+    })
 
     return NextResponse.json({
       assessment,

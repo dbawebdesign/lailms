@@ -72,16 +72,32 @@ export async function POST(
             const baseClassId = lesson.base_class_id;
             if (baseClassId) {
                 // Find the class instance this user is enrolled in for this base class
-                const { data: enrollment } = await supabase
+                const { data: enrollment, error: enrollmentError } = await supabase
                     .from('rosters')
-                    .select('class_instances (id)')
+                    .select('class_instance_id')
                     .eq('profile_id', user.id)
                     .eq('role', 'student')
-                    .eq('class_instances.base_class_id', baseClassId)
                     .single();
 
-                if (enrollment?.class_instances?.id) {
-                    await updateClassInstanceProgress(enrollment.class_instances.id, user.id);
+                if (enrollmentError) {
+                    console.error('Error finding enrollment for class instance update:', enrollmentError);
+                } else if (enrollment?.class_instance_id) {
+                    // Verify this class instance belongs to the correct base class
+                    const { data: classInstance } = await supabase
+                        .from('class_instances')
+                        .select('base_class_id')
+                        .eq('id', enrollment.class_instance_id)
+                        .eq('base_class_id', baseClassId)
+                        .single();
+
+                    if (classInstance) {
+                        console.log(`Updating class instance progress: ${enrollment.class_instance_id} for user ${user.id}`);
+                        await updateClassInstanceProgress(enrollment.class_instance_id, user.id);
+                    } else {
+                        console.log(`Class instance ${enrollment.class_instance_id} does not match base class ${baseClassId}`);
+                    }
+                } else {
+                    console.log(`No enrollment found for user ${user.id} in base class ${baseClassId}`);
                 }
             }
         } catch (classProgressError) {
