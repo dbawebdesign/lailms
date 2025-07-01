@@ -77,10 +77,8 @@ export class ProgressService {
             .from('lessons')
             .select(`
                 id,
-                path_id,
-                paths (
-                    base_class_id
-                )
+                base_class_id,
+                path_id
             `)
             .eq('id', lessonId)
             .single();
@@ -90,7 +88,7 @@ export class ProgressService {
             return;
         }
 
-        const baseClassId = (lesson.paths as any)?.base_class_id;
+        const baseClassId = lesson.base_class_id;
         if (!baseClassId) {
             console.error('No base class ID found for lesson:', lessonId);
             return;
@@ -183,10 +181,8 @@ export class ProgressService {
             .from('assessments')
             .select(`
                 id,
-                path_id,
-                paths (
-                    base_class_id
-                )
+                base_class_id,
+                path_id
             `)
             .eq('id', assessmentId)
             .single();
@@ -196,7 +192,7 @@ export class ProgressService {
             return;
         }
 
-        const baseClassId = (assessment.paths as any)?.base_class_id;
+        const baseClassId = assessment.base_class_id;
         if (!baseClassId) {
             console.error('No base class ID found for assessment:', assessmentId);
             return;
@@ -395,8 +391,8 @@ export class ProgressService {
         // Get all lessons in this course to filter progress
         const { data: courseLessons } = await this.supabase
             .from('lessons')
-            .select('id, paths!inner(base_class_id)')
-            .eq('paths.base_class_id', courseId);
+            .select('id')
+            .eq('base_class_id', courseId);
 
         const lessonIds = courseLessons?.map(l => l.id) || [];
         

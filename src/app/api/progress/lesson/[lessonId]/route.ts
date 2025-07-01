@@ -28,10 +28,8 @@ export async function POST(
             .from('lessons')
             .select(`
                 id,
-                path_id,
-                paths (
-                    base_class_id
-                )
+                base_class_id,
+                path_id
             `)
             .eq('id', lessonId)
             .single();
@@ -71,7 +69,7 @@ export async function POST(
         // Update class instance progress
         try {
             // Get the base class ID from the lesson
-            const baseClassId = lesson.paths?.base_class_id;
+            const baseClassId = lesson.base_class_id;
             if (baseClassId) {
                 // Find the class instance this user is enrolled in for this base class
                 const { data: enrollment } = await supabase

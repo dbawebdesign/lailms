@@ -29,8 +29,14 @@ export function NewSchemaQuestionMultipleChoice({
   onChange,
   disabled = false
 }: NewSchemaQuestionMultipleChoiceProps) {
-  // Extract options from answer_key JSON structure
-  const options: MultipleChoiceOption[] = question.answer_key?.options || [];
+  // Extract options from the question's options field (array of strings)
+  const optionStrings: string[] = question.options || question.answer_key?.options || [];
+  
+  // Convert string array to objects with id and text
+  const options: MultipleChoiceOption[] = optionStrings.map((optionText, index) => ({
+    id: String.fromCharCode(65 + index), // A, B, C, D, etc.
+    text: optionText
+  }));
 
   if (options.length === 0) {
     return (

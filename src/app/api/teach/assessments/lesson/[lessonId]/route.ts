@@ -215,6 +215,7 @@ export async function POST(
       .select(`
         id,
         title,
+        base_class_id,
         paths!inner(
           base_class_id,
           base_classes!inner(
@@ -269,7 +270,7 @@ export async function POST(
       .from('assessments')
       .insert({
         lesson_id: lessonId,
-        base_class_id: (lesson.paths as any).base_class_id,
+        base_class_id: lesson.base_class_id,
         title,
         description,
         assessment_type: assessmentType,

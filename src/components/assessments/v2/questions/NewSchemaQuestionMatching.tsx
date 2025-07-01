@@ -31,9 +31,9 @@ export function NewSchemaQuestionMatching({
   disabled = false
 }: NewSchemaQuestionMatchingProps) {
   
-  // Extract matching data from answer_key
-  const leftItems: string[] = question.answer_key?.left_items || [];
-  const rightItems: string[] = question.answer_key?.right_items || [];
+  // Extract matching data from options or answer_key
+  const leftItems: string[] = question.options?.left_items || question.answer_key?.left_items || [];
+  const rightItems: string[] = question.options?.right_items || question.answer_key?.right_items || [];
 
   if (leftItems.length === 0 || rightItems.length === 0) {
     return (
@@ -53,8 +53,20 @@ export function NewSchemaQuestionMatching({
     onChange(newMatches);
   };
 
-  // Get used right items to prevent duplicate selections
-  const usedRightItems = Object.values(value);
+  // Get unique right items for display (remove duplicates for UI)
+  const uniqueRightItems = Array.from(new Set(rightItems));
+  
+  // Count how many times each right item appears in the original array
+  const rightItemCounts: Record<string, number> = {};
+  rightItems.forEach(item => {
+    rightItemCounts[item] = (rightItemCounts[item] || 0) + 1;
+  });
+  
+  // Count how many times each right item has been used
+  const usedRightItemCounts: Record<string, number> = {};
+  Object.values(value).forEach(item => {
+    usedRightItemCounts[item] = (usedRightItemCounts[item] || 0) + 1;
+  });
 
   return (
     <div className="space-y-4">
@@ -94,20 +106,31 @@ export function NewSchemaQuestionMatching({
                       <SelectItem value="unselected">
                         <span className="text-muted-foreground">-- Select a match --</span>
                       </SelectItem>
-                      {rightItems.map((rightItem, rightIndex) => {
-                        const isUsed = usedRightItems.includes(rightItem) && value[leftItem] !== rightItem;
+                      {uniqueRightItems.map((rightItem, rightIndex) => {
+                        // Check if this item is fully used (used count >= available count)
+                        // But allow selection if it's already selected for this left item
+                        const availableCount = rightItemCounts[rightItem] || 0;
+                        const usedCount = usedRightItemCounts[rightItem] || 0;
+                        const isCurrentlySelected = value[leftItem] === rightItem;
+                        const isFullyUsed = usedCount >= availableCount && !isCurrentlySelected;
+                        
                         return (
                           <SelectItem 
                             key={rightIndex} 
                             value={rightItem}
-                            disabled={isUsed}
+                            disabled={isFullyUsed}
                           >
                             <div className="flex items-center justify-between w-full">
-                              <span className={isUsed ? 'text-muted-foreground line-through' : ''}>
+                              <span className={isFullyUsed ? 'text-muted-foreground line-through' : ''}>
                                 {rightItem}
                               </span>
-                              {isUsed && (
+                              {isFullyUsed && (
                                 <span className="text-xs text-muted-foreground ml-2">(used)</span>
+                              )}
+                              {availableCount > 1 && !isFullyUsed && (
+                                <span className="text-xs text-muted-foreground ml-2">
+                                  ({usedCount + (isCurrentlySelected ? 0 : 1)}/{availableCount})
+                                </span>
                               )}
                             </div>
                           </SelectItem>

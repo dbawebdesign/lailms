@@ -50,7 +50,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Attempt not found' }, { status: 404 })
     }
 
-    if (attempt.status === 'submitted') {
+    if (attempt.status === 'completed' || attempt.status === 'graded') {
       return NextResponse.json({ error: 'Assessment already submitted' }, { status: 400 })
     }
 
@@ -87,7 +87,18 @@ export async function PUT(request: NextRequest) {
         // Auto-grade objective questions
         if (question.question_type === 'multiple_choice') {
           const correctAnswer = (question.answer_key as any)?.correct_option
-          const userAnswer = responseData.response_data?.selected_option
+          const userAnswerLetter = responseData.response_data?.selected_option
+          
+          // Convert letter (A, B, C, D) back to option text
+          const options = question.options || (question.answer_key as any)?.options || []
+          let userAnswer = userAnswerLetter
+          if (userAnswerLetter && userAnswerLetter.match(/^[A-Z]$/)) {
+            const optionIndex = userAnswerLetter.charCodeAt(0) - 65 // A=0, B=1, C=2, D=3
+            if (optionIndex >= 0 && optionIndex < options.length) {
+              userAnswer = options[optionIndex]
+            }
+          }
+          
           isCorrect = correctAnswer === userAnswer
           pointsEarned = isCorrect ? questionPoints : 0
         } else if (question.question_type === 'true_false') {
@@ -96,8 +107,14 @@ export async function PUT(request: NextRequest) {
           isCorrect = correctAnswer === userAnswer
           pointsEarned = isCorrect ? questionPoints : 0
         } else if (question.question_type === 'matching') {
-          const correctPairs = (question.answer_key as any)?.correct_pairs || {}
+          const correctPairsArray = (question.answer_key as any)?.pairs || []
           const userPairs = responseData.response_data?.matches || {}
+          
+          // Convert pairs array to object for comparison
+          const correctPairs: Record<string, string> = {}
+          correctPairsArray.forEach((pair: any) => {
+            correctPairs[pair.left] = pair.right
+          })
           
           let correctMatches = 0
           const totalMatches = Object.keys(correctPairs).length
@@ -151,7 +168,7 @@ export async function PUT(request: NextRequest) {
       const passed = percentageScore >= passingScore
 
       const attemptUpdate: TablesUpdate<'student_attempts'> = {
-        status: 'submitted',
+        status: hasSubjectiveQuestions ? 'grading' : 'completed',
         submitted_at: new Date().toISOString(),
         time_spent_minutes: timeSpent || 0,
         total_points: totalPoints,

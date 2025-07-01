@@ -36,14 +36,42 @@ export async function POST(request: NextRequest) {
     // Check existing attempts
     const { data: existingAttempts, error: attemptsError } = await supabase
       .from('student_attempts')
-      .select('attempt_number')
+      .select('*')
       .eq('assessment_id', assessmentId)
       .eq('student_id', user.id)
       .order('attempt_number', { ascending: false })
-      .returns<Pick<StudentAttempt, 'attempt_number'>[]>()
+      .returns<StudentAttempt[]>()
 
     if (attemptsError) {
       return NextResponse.json({ error: 'Failed to check existing attempts' }, { status: 500 })
+    }
+
+    // Check if there's already an in-progress attempt
+    const inProgressAttempt = existingAttempts?.find(attempt => attempt.status === 'in_progress')
+    if (inProgressAttempt) {
+      // Return the existing in-progress attempt instead of creating a new one
+      const { data: questions, error: questionsError } = await supabase
+        .from('assessment_questions')
+        .select('*')
+        .eq('assessment_id', assessmentId)
+        .order('order_index')
+        .returns<AssessmentQuestion[]>()
+
+      if (questionsError || !questions) {
+        return NextResponse.json({ error: 'Failed to load questions' }, { status: 500 })
+      }
+
+      // Remove answer keys from questions before sending to client
+      const sanitizedQuestions = questions.map(question => ({
+        ...question,
+        answer_key: undefined
+      }))
+
+      return NextResponse.json({
+        assessment,
+        questions: sanitizedQuestions,
+        attempt: inProgressAttempt
+      })
     }
 
     // Check attempt limits
@@ -71,7 +99,7 @@ export async function POST(request: NextRequest) {
       attempt_number: currentAttemptNumber,
       status: 'in_progress',
       started_at: new Date().toISOString(),
-      ai_grading_status: 'not_started'
+      ai_grading_status: 'pending'
     }
 
     const { data: newAttempt, error: attemptError } = await supabase
