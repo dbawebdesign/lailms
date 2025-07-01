@@ -290,29 +290,57 @@ QUESTION TYPE SPECIFICATIONS:
 multiple_choice:
 - options: ["Option A text", "Option B text", "Option C text", "Option D text"]
 - correct_answer: "Option A text" (the exact text of the correct option)
-- answer_key: {"explanation": "Why this is correct", "distractors": {"Option B text": "Why wrong", "Option C text": "Why wrong", "Option D text": "Why wrong"}}
+- answer_key: {
+    "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
+    "correct_option": "Option A text",
+    "explanations": {
+      "Option A text": "Why this is correct",
+      "Option B text": "Why this is wrong",
+      "Option C text": "Why this is wrong", 
+      "Option D text": "Why this is wrong"
+    }
+  }
 
 true_false:
 - options: null (no options needed)
 - correct_answer: true or false
-- answer_key: {"explanation": "Detailed explanation of why this is true/false"}
+- answer_key: {
+    "correct_answer": true,
+    "explanation": "Detailed explanation of why this is true/false"
+  }
 
 short_answer:
 - options: null (no options needed)
 - correct_answer: ["primary answer", "alternative answer"]
-- answer_key: {"keywords": ["keyword1", "keyword2"], "min_score_threshold": 0.7, "grading_notes": "What to look for"}
+- answer_key: {
+    "acceptable_answers": ["primary answer", "alternative answer", "synonym"],
+    "keywords": ["keyword1", "keyword2"],
+    "min_score_threshold": 0.7,
+    "grading_notes": "What to look for"
+  }
 - sample_response: "Model correct answer"
 
 essay:
 - options: null (no options needed)
 - correct_answer: null (no single correct answer)
-- answer_key: {"key_points": ["point1", "point2", "point3"], "grading_criteria": "What to evaluate", "rubric": {"content": 40, "organization": 30, "analysis": 30}}
+- answer_key: {
+    "grading_criteria": "What to evaluate when grading this essay",
+    "key_points": ["point1", "point2", "point3"],
+    "rubric": {"content": 40, "organization": 30, "analysis": 30}
+  }
 - sample_response: "Model essay response"
 
 matching:
 - options: {"left_items": ["Item 1", "Item 2", "Item 3"], "right_items": ["Match A", "Match B", "Match C"]}
 - correct_answer: {"Item 1": "Match A", "Item 2": "Match B", "Item 3": "Match C"}
-- answer_key: {"explanation": "Brief explanation of the matching logic"}
+- answer_key: {
+    "pairs": [
+      {"left": "Item 1", "right": "Match A"},
+      {"left": "Item 2", "right": "Match B"},
+      {"left": "Item 3", "right": "Match C"}
+    ],
+    "explanation": "Brief explanation of the matching logic"
+  }
 
 OUTPUT FORMAT (JSON array):
 [
@@ -378,17 +406,22 @@ Generate the questions now:`;
         q.question_text && 
         q.question_type && 
         q.answer_key
-      ).map((q, index) => ({
-        question_text: q.question_text,
-        question_type: q.question_type,
-        options: q.options || null, // Include options field
-        correct_answer: q.correct_answer || null, // Include correct_answer field
-        answer_key: q.answer_key,
-        sample_response: q.sample_response || null,
-        grading_rubric: q.grading_rubric || null,
-        points: q.points || 1,
-        explanation: q.explanation || null
-      }));
+      ).map((q, index) => {
+        const question: GeneratedQuestion = {
+          question_text: q.question_text,
+          question_type: q.question_type,
+          options: q.options || null, // Include options field
+          correct_answer: q.correct_answer || null, // Include correct_answer field
+          answer_key: q.answer_key,
+          sample_response: q.sample_response || null,
+          grading_rubric: q.grading_rubric || null,
+          points: q.points || 1,
+          explanation: q.explanation || null
+        };
+        
+        // Transform answer key to ensure database compatibility
+        return this.transformAnswerKeyForDatabase(question);
+      });
 
     } catch (error) {
       console.error('Failed to parse questions response:', error);
@@ -962,5 +995,109 @@ Focus on extracting concepts that can be assessed through questions.`;
       answerKey.pairs.length >= 3 &&
       answerKey.pairs.every((pair: any) => pair.left && pair.right)
     );
+  }
+
+  private transformAnswerKeyForDatabase(question: GeneratedQuestion): GeneratedQuestion {
+    // Ensure answer_key conforms to database validation function requirements
+    const { question_type, answer_key } = question;
+    
+    try {
+      switch (question_type) {
+        case 'multiple_choice':
+          // Ensure we have options and correct_option
+          if (!answer_key.options || !answer_key.correct_option) {
+            // Try to construct from existing data
+            const options = question.options || answer_key.options || [];
+            const correctOption = answer_key.correct_option || question.correct_answer;
+            
+            return {
+              ...question,
+              answer_key: {
+                ...answer_key,
+                options: options,
+                correct_option: correctOption,
+                explanations: answer_key.explanations || answer_key.distractors || {}
+              }
+            };
+          }
+          break;
+          
+        case 'true_false':
+          // Ensure we have correct_answer boolean
+          if (typeof answer_key.correct_answer !== 'boolean') {
+            const correctAnswer = question.correct_answer === true || question.correct_answer === 'true' || 
+                                question.correct_answer === 'True';
+            
+            return {
+              ...question,
+              answer_key: {
+                ...answer_key,
+                correct_answer: correctAnswer,
+                explanation: answer_key.explanation || 'No explanation provided'
+              }
+            };
+          }
+          break;
+          
+        case 'short_answer':
+          // Ensure we have acceptable_answers array
+          if (!answer_key.acceptable_answers) {
+            const acceptableAnswers = Array.isArray(question.correct_answer) 
+              ? question.correct_answer 
+              : [question.correct_answer].filter(Boolean);
+              
+            return {
+              ...question,
+              answer_key: {
+                ...answer_key,
+                acceptable_answers: acceptableAnswers,
+                keywords: answer_key.keywords || [],
+                min_score_threshold: answer_key.min_score_threshold || 0.7
+              }
+            };
+          }
+          break;
+          
+        case 'essay':
+          // Ensure we have grading_criteria
+          if (!answer_key.grading_criteria) {
+            return {
+              ...question,
+              answer_key: {
+                ...answer_key,
+                grading_criteria: answer_key.grading_criteria || 'Evaluate based on content knowledge, organization, and analysis',
+                key_points: answer_key.key_points || [],
+                rubric: answer_key.rubric || {}
+              }
+            };
+          }
+          break;
+          
+        case 'matching':
+          // Ensure we have pairs array
+          if (!answer_key.pairs) {
+            const correctAnswer = question.correct_answer || {};
+            const pairs = Object.entries(correctAnswer).map(([left, right]) => ({
+              left,
+              right
+            }));
+            
+            return {
+              ...question,
+              answer_key: {
+                ...answer_key,
+                pairs: pairs,
+                explanation: answer_key.explanation || 'Match the items correctly'
+              }
+            };
+          }
+          break;
+      }
+      
+      return question;
+    } catch (error) {
+      console.error('Error transforming answer key for database:', error);
+      return question;
+    }
   }
 } 
