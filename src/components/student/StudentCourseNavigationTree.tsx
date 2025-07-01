@@ -3,30 +3,23 @@
 import React, { useState, useEffect } from 'react';
 import { progressEvents } from '@/lib/utils/progressEvents';
 import LunaContextElement from '@/components/luna/LunaContextElement';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   BookOpen, 
-  FileText, 
   GraduationCap,
-  ChevronDown,
-  ChevronRight,
-  CheckCircle2,
-  Circle,
-  Clock,
-  PlayCircle,
-  Award,
+  ChevronLeft,
   Target,
-  AlertCircle,
+  Trophy,
+  ArrowLeft,
+  Home,
   RefreshCw
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface StudentCourseNavigationTreeProps {
   baseClassId: string;
-  onSelectItem: (type: 'lesson' | 'assessment', itemId: string) => void;
+  onSelectItem: (type: 'lesson' | 'assessment' | 'clear', itemId: string) => void;
   selectedItemId?: string;
   selectedItemType?: string;
 }
@@ -40,21 +33,24 @@ interface LessonWithProgress {
   completed: boolean;
   progress: number; // 0-100
   assessments: AssessmentWithProgress[];
+  status: string;
+  lastPosition?: string;
 }
 
 interface AssessmentWithProgress {
   id: string;
   title: string;
-  assessment_type: 'lesson_assessment' | 'path_quiz' | 'class_exam';
+  assessment_type: 'lesson' | 'path' | 'class';
   time_limit_minutes?: number;
   passing_score_percentage: number;
-  // Student progress data
   status: 'not_started' | 'in_progress' | 'completed' | 'passed' | 'failed';
   score?: number;
   attempts: number;
   maxAttempts?: number;
   lastAttemptDate?: string;
   dueDate?: string;
+  passed?: boolean;
+  progress?: number;
 }
 
 interface PathWithProgress {
@@ -77,6 +73,8 @@ interface CourseData {
   overallProgress: number;
 }
 
+type NavigationState = 'overview' | 'path' | 'lesson';
+
 export default function StudentCourseNavigationTree({ 
   baseClassId, 
   onSelectItem, 
@@ -86,8 +84,9 @@ export default function StudentCourseNavigationTree({
   const [courseData, setCourseData] = useState<CourseData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
-  const [expandedLessons, setExpandedLessons] = useState<Set<string>>(new Set());
+  const [navigationState, setNavigationState] = useState<NavigationState>('overview');
+  const [selectedPath, setSelectedPath] = useState<PathWithProgress | null>(null);
+  const [selectedLesson, setSelectedLesson] = useState<LessonWithProgress | null>(null);
 
   useEffect(() => {
     fetchCourseData();
@@ -105,10 +104,10 @@ export default function StudentCourseNavigationTree({
         clearTimeout(timeoutId);
       }
       
-             // Debounce the refresh to avoid too many API calls
-       timeoutId = setTimeout(() => {
-         fetchCourseData(true); // Mark as refresh
-       }, 1000); // Wait 1 second after the last progress update
+      // Debounce the refresh to avoid too many API calls
+      timeoutId = setTimeout(() => {
+        fetchCourseData(true); // Mark as refresh
+      }, 1000); // Wait 1 second after the last progress update
     });
 
     return () => {
@@ -149,242 +148,107 @@ export default function StudentCourseNavigationTree({
     }
   };
 
-  const togglePathExpansion = (pathId: string) => {
-    setExpandedPaths(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(pathId)) {
-        newSet.delete(pathId);
-      } else {
-        newSet.add(pathId);
-      }
-      return newSet;
-    });
+  const getStatusIndicator = (status: string, isAssessment = false, passed = false) => {
+    if (status === 'completed' || (isAssessment && passed)) {
+      return <div className="w-2 h-2 rounded-full bg-emerald-500" />;
+    }
+    if (status === 'in_progress') {
+      return <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />;
+    }
+    if (isAssessment && status === 'failed') {
+      return <div className="w-2 h-2 rounded-full bg-red-500" />;
+    }
+    return <div className="w-2 h-2 rounded-full bg-gray-300" />;
   };
 
-  const toggleLessonExpansion = (lessonId: string) => {
-    setExpandedLessons(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(lessonId)) {
-        newSet.delete(lessonId);
-      } else {
-        newSet.add(lessonId);
-      }
-      return newSet;
-    });
+  const navigateToPath = (path: PathWithProgress) => {
+    setSelectedPath(path);
+    setNavigationState('path');
   };
 
-  const getAssessmentStatusIcon = (assessment: AssessmentWithProgress) => {
-    switch (assessment.status) {
-      case 'completed':
-      case 'passed':
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-      case 'failed':
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
-      case 'in_progress':
-        return <PlayCircle className="h-4 w-4 text-blue-500" />;
-      default:
-        return <Circle className="h-4 w-4 text-muted-foreground" />;
+  const navigateToLesson = (lesson: LessonWithProgress) => {
+    setSelectedLesson(lesson);
+    setNavigationState('lesson');
+  };
+
+  const navigateBack = () => {
+    // Clear selected content when navigating back
+    onSelectItem('clear', ''); // This will clear the content in the parent by passing invalid type
+    
+    if (navigationState === 'lesson') {
+      setNavigationState('path');
+      setSelectedLesson(null);
+    } else if (navigationState === 'path') {
+      setNavigationState('overview');
+      setSelectedPath(null);
     }
   };
 
-  const getAssessmentStatusBadge = (assessment: AssessmentWithProgress) => {
-    const variant = assessment.status === 'passed' || assessment.status === 'completed' 
-      ? 'default' 
-      : assessment.status === 'failed' 
-        ? 'destructive' 
-        : assessment.status === 'in_progress'
-          ? 'secondary'
-          : 'outline';
-
-    return (
-      <Badge variant={variant} className="text-xs">
-        {assessment.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-        {assessment.score !== undefined && ` (${assessment.score}%)`}
-      </Badge>
-    );
+  const navigateToOverview = () => {
+    // Clear selected content when navigating to overview
+    onSelectItem('clear', ''); // This will clear the content in the parent by passing invalid type
+    
+    setNavigationState('overview');
+    setSelectedPath(null);
+    setSelectedLesson(null);
   };
 
-  const AssessmentItem = ({ assessment, level = 0 }: { assessment: AssessmentWithProgress; level?: number }) => {
-    const isSelected = selectedItemType === 'assessment' && selectedItemId === assessment.id;
-    const indentClass = level === 0 ? 'ml-0' : level === 1 ? 'ml-6' : 'ml-12';
+  const AssessmentItem = ({ assessment, compact = false }: { assessment: AssessmentWithProgress; compact?: boolean }) => {
+    const isSelected = selectedItemId === assessment.id && selectedItemType === 'assessment';
+    const isPassed = assessment.passed || assessment.status === 'passed';
+    const isFailed = assessment.status === 'failed';
+    const hasProgress = assessment.progress && assessment.progress > 0 && assessment.progress < 100;
     
     return (
-      <div 
-        className={`${indentClass} p-3 rounded-lg cursor-pointer transition-colors hover:bg-muted/50 ${
-          isSelected ? 'bg-primary/10 border border-primary/20' : ''
-        }`}
+      <button
         onClick={() => onSelectItem('assessment', assessment.id)}
+        className={cn(
+          "w-full text-left group transition-all duration-200 rounded-lg",
+          compact ? "py-2 px-3" : "py-3 px-4",
+          isSelected 
+            ? "bg-blue-50 dark:bg-blue-950/30" 
+            : "hover:bg-gray-50/50 dark:hover:bg-white/5"
+        )}
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3 flex-1">
-            {getAssessmentStatusIcon(assessment)}
-            <div className="flex-1">
-              <div className="flex items-center space-x-2">
-                <span className="font-medium text-sm">{assessment.title}</span>
-                {assessment.assessment_type === 'lesson_assessment' && (
-                  <FileText className="h-3 w-3 text-muted-foreground" />
-                )}
-                {assessment.assessment_type === 'path_quiz' && (
-                  <BookOpen className="h-3 w-3 text-muted-foreground" />
-                )}
-                {assessment.assessment_type === 'class_exam' && (
-                  <GraduationCap className="h-3 w-3 text-muted-foreground" />
+        <div className="flex items-center space-x-3">
+          {getStatusIndicator(assessment.status, true, isPassed)}
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <span className={cn(
+                  "font-medium",
+                  compact ? "text-sm" : "text-base",
+                  isPassed ? "text-emerald-700 dark:text-emerald-300" : 
+                  isFailed ? "text-red-700 dark:text-red-300" : 
+                  "text-gray-900 dark:text-white"
+                )}>
+                  {assessment.title}
+                </span>
+                
+                {hasProgress && (
+                  <div className="mt-2">
+                    <Progress value={assessment.progress} className="h-1" />
+                  </div>
                 )}
               </div>
-              <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                {assessment.time_limit_minutes && (
-                  <span className="flex items-center">
-                    <Clock className="h-3 w-3 mr-1" />
-                    {assessment.time_limit_minutes} min
+              
+              <div className="flex items-center space-x-2 text-xs text-gray-500 ml-4">
+                {assessment.score !== null && assessment.score !== undefined && (
+                  <span className={cn(
+                    "px-2 py-1 rounded-full text-xs font-medium",
+                    isPassed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" :
+                    isFailed ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" :
+                    "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                  )}>
+                    {assessment.score}%
                   </span>
                 )}
-                <span>Pass: {assessment.passing_score_percentage}%</span>
-                {assessment.attempts > 0 && (
-                  <span>Attempts: {assessment.attempts}{assessment.maxAttempts ? `/${assessment.maxAttempts}` : ''}</span>
-                )}
               </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            {getAssessmentStatusBadge(assessment)}
           </div>
         </div>
-      </div>
-    );
-  };
-
-  const LessonItem = ({ lesson, pathId }: { lesson: LessonWithProgress; pathId: string }) => {
-    const isExpanded = expandedLessons.has(lesson.id);
-    const isSelected = selectedItemType === 'lesson' && selectedItemId === lesson.id;
-    const hasAssessments = lesson.assessments.length > 0;
-    
-    return (
-      <div className="ml-6">
-        <Collapsible open={isExpanded} onOpenChange={() => hasAssessments && toggleLessonExpansion(lesson.id)}>
-          <div 
-            className={`p-3 rounded-lg cursor-pointer transition-colors hover:bg-muted/50 ${
-              isSelected ? 'bg-primary/10 border border-primary/20' : ''
-            }`}
-            onClick={() => onSelectItem('lesson', lesson.id)}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3 flex-1">
-                {lesson.completed ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Circle className="h-4 w-4 text-muted-foreground" />
-                )}
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">{lesson.title}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {lesson.estimatedDurationHours}h
-                    </Badge>
-                    {hasAssessments && (
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleLessonExpansion(lesson.id);
-                          }}
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="h-3 w-3" />
-                          ) : (
-                            <ChevronRight className="h-3 w-3" />
-                          )}
-                        </Button>
-                      </CollapsibleTrigger>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <Progress value={lesson.progress} className="flex-1 h-2" />
-                    <span className="text-xs text-muted-foreground">{lesson.progress}%</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {hasAssessments && (
-            <CollapsibleContent className="space-y-1 mt-2">
-              {lesson.assessments.map(assessment => (
-                <AssessmentItem key={assessment.id} assessment={assessment} level={2} />
-              ))}
-            </CollapsibleContent>
-          )}
-        </Collapsible>
-      </div>
-    );
-  };
-
-  const PathItem = ({ path }: { path: PathWithProgress }) => {
-    const isExpanded = expandedPaths.has(path.id);
-    const hasContent = path.lessons.length > 0 || path.assessments.length > 0;
-    
-    return (
-      <Card className="mb-4">
-        <Collapsible open={isExpanded} onOpenChange={() => hasContent && togglePathExpansion(path.id)}>
-          <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3 flex-1">
-                  {path.completed ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <Circle className="h-5 w-5 text-muted-foreground" />
-                  )}
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">{path.title}</CardTitle>
-                    <div className="flex items-center space-x-2 mt-2">
-                      <Progress value={path.progress} className="flex-1 h-2" />
-                      <span className="text-sm text-muted-foreground">{path.progress}%</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Badge variant="outline">
-                    {path.lessons.length} lessons
-                  </Badge>
-                  {path.assessments.length > 0 && (
-                    <Badge variant="secondary">
-                      {path.assessments.length} quizzes
-                    </Badge>
-                  )}
-                  {hasContent && (
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-          </CollapsibleTrigger>
-          
-          {hasContent && (
-            <CollapsibleContent>
-              <CardContent className="pt-0 space-y-2">
-                {/* Path-level assessments */}
-                {path.assessments.map(assessment => (
-                  <AssessmentItem key={assessment.id} assessment={assessment} level={1} />
-                ))}
-                
-                {/* Lessons */}
-                {path.lessons.map(lesson => (
-                  <LessonItem key={lesson.id} lesson={lesson} pathId={path.id} />
-                ))}
-              </CardContent>
-            </CollapsibleContent>
-          )}
-        </Collapsible>
-      </Card>
+      </button>
     );
   };
 
@@ -392,8 +256,8 @@ export default function StudentCourseNavigationTree({
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-          <p className="text-muted-foreground">Loading course content...</p>
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-gray-600 dark:text-gray-400 text-sm">Loading course...</p>
         </div>
       </div>
     );
@@ -402,184 +266,409 @@ export default function StudentCourseNavigationTree({
   if (!courseData) {
     return (
       <div className="text-center p-8">
-        <p className="text-muted-foreground">No course data available</p>
+        <p className="text-gray-600 dark:text-gray-400">No course data available</p>
       </div>
     );
   }
 
-  return (
-    <LunaContextElement
-      type="course-navigation"
-      role="navigation"
-      content={{
-        courseTitle: courseData.title,
-        courseDescription: courseData.description,
-        overallProgress: courseData.overallProgress,
-        totalPaths: courseData.paths.length,
-        totalLessons: courseData.paths.reduce((acc, path) => acc + path.lessons.length, 0),
-        totalAssessments: courseData.paths.reduce((acc, path) => acc + path.assessments.length + path.lessons.reduce((lessonAcc, lesson) => lessonAcc + lesson.assessments.length, 0), 0) + courseData.classAssessments.length,
-        pathsData: courseData.paths.map(path => ({
-          id: path.id,
-          title: path.title,
-          description: path.description,
-          progress: path.progress,
-          completed: path.completed,
-          lessonsCount: path.lessons.length,
-          assessmentsCount: path.assessments.length,
-          lessons: path.lessons.map(lesson => ({
-            id: lesson.id,
-            title: lesson.title,
-            description: lesson.description,
-            progress: lesson.progress,
-            completed: lesson.completed,
-            estimatedDuration: lesson.estimatedDurationHours,
-            assessmentsCount: lesson.assessments.length
-          })),
-          assessments: path.assessments.map(assessment => ({
-            id: assessment.id,
-            title: assessment.title,
-            type: assessment.assessment_type,
-            status: assessment.status,
-            score: assessment.score,
-            passingScore: assessment.passing_score_percentage,
-            timeLimit: assessment.time_limit_minutes,
-            attempts: assessment.attempts,
-            maxAttempts: assessment.maxAttempts
-          }))
-        })),
-        classAssessments: courseData.classAssessments.map(assessment => ({
-          id: assessment.id,
-          title: assessment.title,
-          type: assessment.assessment_type,
-          status: assessment.status,
-          score: assessment.score,
-          passingScore: assessment.passing_score_percentage,
-          timeLimit: assessment.time_limit_minutes,
-          attempts: assessment.attempts,
-          maxAttempts: assessment.maxAttempts
-        }))
-      }}
-      metadata={{
-        baseClassId,
-        selectedItemId,
-        selectedItemType,
-        expandedPaths: Array.from(expandedPaths),
-        expandedLessons: Array.from(expandedLessons)
-      }}
-      state={{
-        loading,
-        refreshing,
-        hasSelectedItem: !!selectedItemId
-      }}
-      actionable={true}
-    >
-      <div className="space-y-6">
-        {/* Course Header */}
-        <LunaContextElement
-          type="course-overview"
-          role="display"
-          content={{
-            title: courseData.title,
-            description: courseData.description,
-            overallProgress: courseData.overallProgress,
-            progressText: `${courseData.overallProgress}% Complete`
-          }}
-          metadata={{ courseId: courseData.id }}
-          actionable={true}
-        >
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl">{courseData.title}</CardTitle>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => fetchCourseData(true)}
-                  disabled={loading || refreshing}
-                  className="h-8 w-8 p-0"
-                  title="Refresh progress"
-                >
-                  <RefreshCw className={`h-4 w-4 ${loading || refreshing ? 'animate-spin' : ''}`} />
-                </Button>
+  // Overview State - List of all paths
+  if (navigationState === 'overview') {
+    return (
+      <LunaContextElement
+        type="course-navigation"
+        role="navigation"
+        content={{
+          courseTitle: courseData.title,
+          courseDescription: courseData.description,
+          overallProgress: courseData.overallProgress,
+          totalPaths: courseData.paths.length,
+          navigationState: 'overview'
+        }}
+        metadata={{
+          baseClassId,
+          selectedItemId,
+          selectedItemType
+        }}
+        state={{
+          loading,
+          refreshing
+        }}
+        actionable={true}
+      >
+        <div className="space-y-6">
+          {/* Course Header */}
+          <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+            <div className="flex items-center space-x-3 flex-1 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <GraduationCap className="w-4 h-4 text-white" />
               </div>
-              <div className="flex items-center space-x-4 mt-2">
-                <div className="flex-1">
-                  <Progress value={courseData.overallProgress} className="h-3" />
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {courseData.title}
+                </h1>
+                <div className="flex items-center space-x-3 mt-1">
+                  <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1">
+                    <div 
+                      className="h-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
+                      style={{ width: `${courseData.overallProgress}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    {courseData.overallProgress}%
+                  </span>
                 </div>
-                <span className="text-sm font-medium">{courseData.overallProgress}% Complete</span>
               </div>
-            </CardHeader>
-          </Card>
-        </LunaContextElement>
+            </div>
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => fetchCourseData(true)}
+              disabled={loading || refreshing}
+              className="w-8 h-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <RefreshCw className={cn("w-4 h-4", (loading || refreshing) && "animate-spin")} />
+            </Button>
+          </div>
 
-        {/* Class-level Exams */}
-        {courseData.classAssessments.length > 0 && (
-          <LunaContextElement
-            type="class-assessments-section"
-            role="navigation"
-            content={{
-              sectionTitle: "Class Exams",
-              assessmentsCount: courseData.classAssessments.length,
-              assessments: courseData.classAssessments.map(assessment => ({
-                id: assessment.id,
-                title: assessment.title,
-                type: assessment.assessment_type,
-                status: assessment.status,
-                score: assessment.score,
-                passingScore: assessment.passing_score_percentage,
-                timeLimit: assessment.time_limit_minutes,
-                attempts: assessment.attempts,
-                maxAttempts: assessment.maxAttempts
-              }))
-            }}
-            actionable={true}
-          >
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center">
-                  <GraduationCap className="h-5 w-5 mr-2" />
-                  Class Exams
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
+          {/* Learning Paths List */}
+          <div className="space-y-3">
+            {courseData.paths.map((path, index) => (
+              <button
+                key={path.id}
+                onClick={() => navigateToPath(path)}
+                className="w-full text-left p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-white/5 transition-all duration-200 group"
+              >
+                <div className="flex items-center space-x-4">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                    <BookOpen className="w-5 h-5 text-white" />
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                          {path.title}
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                          {path.description}
+                        </p>
+                        <div className="flex items-center space-x-3 mt-2">
+                          <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1">
+                            <div 
+                              className="h-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
+                              style={{ width: `${path.progress}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                            {path.progress}%
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col items-end space-y-2 ml-4">
+                        <span className="text-xs text-gray-500 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-full">
+                          {path.lessons.length} lesson{path.lessons.length !== 1 ? 's' : ''}
+                        </span>
+                        {path.assessments.length > 0 && (
+                          <span className="text-xs text-amber-700 dark:text-amber-300 px-2 py-1 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+                            {path.assessments.length} quiz{path.assessments.length !== 1 ? 'zes' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Final Exams */}
+          {courseData.classAssessments.length > 0 && (
+            <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 rounded-xl border border-purple-200 dark:border-purple-800/30">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                  <Trophy className="w-4 h-4 text-white" />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Final Exams
+                </h2>
+              </div>
+              <div className="space-y-1">
                 {courseData.classAssessments.map(assessment => (
                   <AssessmentItem key={assessment.id} assessment={assessment} />
                 ))}
-              </CardContent>
-            </Card>
-          </LunaContextElement>
-        )}
+              </div>
+            </div>
+          )}
+        </div>
+      </LunaContextElement>
+    );
+  }
 
-        {/* Learning Paths */}
-        <LunaContextElement
-          type="learning-paths-section"
-          role="navigation"
-          content={{
-            sectionTitle: "Learning Paths",
-            pathsCount: courseData.paths.length,
-            paths: courseData.paths.map(path => ({
-              id: path.id,
-              title: path.title,
-              description: path.description,
-              progress: path.progress,
-              completed: path.completed,
-              lessonsCount: path.lessons.length,
-              assessmentsCount: path.assessments.length
-            }))
-          }}
-          actionable={true}
-        >
-          <div>
-            <h3 className="text-lg font-semibold mb-4 flex items-center">
-              <BookOpen className="h-5 w-5 mr-2" />
-              Learning Paths
-            </h3>
-            {courseData.paths.map(path => (
-              <PathItem key={path.id} path={path} />
+  // Path State - Detailed view of a specific path
+  if (navigationState === 'path' && selectedPath) {
+    return (
+      <LunaContextElement
+        type="path-navigation"
+        role="navigation"
+        content={{
+          pathTitle: selectedPath.title,
+          pathDescription: selectedPath.description,
+          pathProgress: selectedPath.progress,
+          totalLessons: selectedPath.lessons.length,
+          navigationState: 'path'
+        }}
+        metadata={{
+          baseClassId,
+          pathId: selectedPath.id,
+          selectedItemId,
+          selectedItemType
+        }}
+        state={{
+          loading,
+          refreshing
+        }}
+        actionable={true}
+      >
+        <div className="space-y-6">
+          {/* Path Header with Navigation */}
+          <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+            <div className="flex items-center space-x-3 mb-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={navigateBack}
+                className="w-8 h-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={navigateToOverview}
+                className="w-8 h-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <Home className="w-4 h-4" />
+              </Button>
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <BookOpen className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1">
+                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {selectedPath.title}
+                </h1>
+                <div className="flex items-center space-x-3 mt-1">
+                  <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1">
+                    <div 
+                      className="h-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
+                      style={{ width: `${selectedPath.progress}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    {selectedPath.progress}%
+                  </span>
+                </div>
+              </div>
+            </div>
+            {selectedPath.description && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 pl-20">
+                {selectedPath.description}
+              </p>
+            )}
+          </div>
+
+          {/* Lessons List */}
+          <div className="space-y-2">
+            {selectedPath.lessons.map((lesson, index) => (
+              <div key={lesson.id} className="space-y-1">
+                <button
+                  onClick={() => lesson.assessments.length > 0 ? navigateToLesson(lesson) : onSelectItem('lesson', lesson.id)}
+                  className={cn(
+                    "w-full text-left p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 transition-all duration-200 group",
+                    selectedItemId === lesson.id && selectedItemType === 'lesson'
+                      ? "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800" 
+                      : "hover:bg-gray-50/50 dark:hover:bg-white/5"
+                  )}
+                >
+                  <div className="flex items-center space-x-3">
+                    {getStatusIndicator(lesson.status)}
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-base text-gray-900 dark:text-white">
+                            {lesson.title}
+                          </h3>
+                          
+                          {lesson.progress > 0 && lesson.progress < 100 && (
+                            <div className="mt-2">
+                              <Progress value={lesson.progress} className="h-1" />
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center space-x-3 text-xs text-gray-500 ml-4">
+                          {lesson.assessments.length > 0 && (
+                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-full">
+                              {lesson.assessments.length} quiz{lesson.assessments.length !== 1 ? 'zes' : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              </div>
             ))}
           </div>
-        </LunaContextElement>
-      </div>
-    </LunaContextElement>
-  );
+
+          {/* Path Assessments */}
+          {selectedPath.assessments.length > 0 && (
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800/30">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                  <Target className="w-4 h-4 text-white" />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Path Quiz{selectedPath.assessments.length !== 1 ? 'zes' : ''}
+                </h2>
+              </div>
+              <div className="space-y-1">
+                {selectedPath.assessments.map(assessment => (
+                  <AssessmentItem key={assessment.id} assessment={assessment} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </LunaContextElement>
+    );
+  }
+
+  // Lesson State - Detailed view of a specific lesson
+  if (navigationState === 'lesson' && selectedLesson && selectedPath) {
+    return (
+      <LunaContextElement
+        type="lesson-navigation"
+        role="navigation"
+        content={{
+          lessonTitle: selectedLesson.title,
+          lessonDescription: selectedLesson.description,
+          lessonProgress: selectedLesson.progress,
+          totalAssessments: selectedLesson.assessments.length,
+          navigationState: 'lesson'
+        }}
+        metadata={{
+          baseClassId,
+          pathId: selectedPath.id,
+          lessonId: selectedLesson.id,
+          selectedItemId,
+          selectedItemType
+        }}
+        state={{
+          loading,
+          refreshing
+        }}
+        actionable={true}
+      >
+        <div className="space-y-6">
+          {/* Lesson Header with Navigation */}
+          <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+            <div className="flex items-center space-x-3 mb-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={navigateBack}
+                className="w-8 h-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={navigateToOverview}
+                className="w-8 h-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <Home className="w-4 h-4" />
+              </Button>
+              {getStatusIndicator(selectedLesson.status)}
+              <div className="flex-1">
+                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {selectedLesson.title}
+                </h1>
+                <div className="flex items-center space-x-3 mt-1">
+                  <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1">
+                    <div 
+                      className="h-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
+                      style={{ width: `${selectedLesson.progress}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    {selectedLesson.progress}%
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="pl-20">
+              <p className="text-xs text-gray-500 mb-2">
+                {selectedPath.title} • Lesson {selectedPath.lessons.findIndex(l => l.id === selectedLesson.id) + 1} of {selectedPath.lessons.length}
+              </p>
+              {selectedLesson.description && (
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {selectedLesson.description}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Lesson Content Button */}
+          <button
+            onClick={() => onSelectItem('lesson', selectedLesson.id)}
+            className={cn(
+              "w-full text-left p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 transition-all duration-200",
+              selectedItemId === selectedLesson.id && selectedItemType === 'lesson'
+                ? "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800" 
+                : "hover:bg-gray-50/50 dark:hover:bg-white/5"
+            )}
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center">
+                <BookOpen className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-base text-gray-900 dark:text-white">
+                  Start Learning
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Begin or continue this lesson
+                </p>
+              </div>
+            </div>
+          </button>
+
+          {/* Lesson Assessments */}
+          {selectedLesson.assessments.length > 0 && (
+            <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-xl border border-blue-200 dark:border-blue-800/30">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <Target className="w-4 h-4 text-white" />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Lesson Quiz{selectedLesson.assessments.length !== 1 ? 'zes' : ''}
+                </h2>
+              </div>
+              <div className="space-y-1">
+                {selectedLesson.assessments.map(assessment => (
+                  <AssessmentItem key={assessment.id} assessment={assessment} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </LunaContextElement>
+    );
+  }
+
+  return null;
 } 

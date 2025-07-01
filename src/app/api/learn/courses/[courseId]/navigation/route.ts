@@ -84,16 +84,38 @@ export async function GET(
         const lessonIds = lessons.map(l => l.id);
         console.log('Lesson IDs:', lessonIds);
         
+        // Fetch lesson assessments
         const { data: lessonAssessments, error: lessonAssessmentsError } = await supabase
             .from('assessments')
             .select('*')
             .in('lesson_id', lessonIds);
             
         if (lessonAssessmentsError) throw lessonAssessmentsError;
-        console.log('Fetched assessments:', lessonAssessments);
+        console.log('Fetched lesson assessments:', lessonAssessments);
+
+        // Fetch path assessments
+        const { data: pathAssessments, error: pathAssessmentsError } = await supabase
+            .from('assessments')
+            .select('*')
+            .in('path_id', pathIds);
+            
+        if (pathAssessmentsError) throw pathAssessmentsError;
+        console.log('Fetched path assessments:', pathAssessments);
+
+        // Fetch class assessments
+        const { data: classAssessments, error: classAssessmentsError } = await supabase
+            .from('assessments')
+            .select('*')
+            .eq('base_class_id', courseId)
+            .is('lesson_id', null)
+            .is('path_id', null);
+            
+        if (classAssessmentsError) throw classAssessmentsError;
+        console.log('Fetched class assessments:', classAssessments);
 
         // 5. Fetch student progress for all items using the unified progress table
-        const allItemIds = [...lessonIds, ...lessonAssessments.map(a => a.id)];
+        const allAssessments = [...lessonAssessments, ...pathAssessments, ...classAssessments];
+        const allItemIds = [...lessonIds, ...allAssessments.map(a => a.id)];
         
         const { data: progressData, error: progressError } = await supabase
             .from('progress')
@@ -104,7 +126,7 @@ export async function GET(
         if (progressError) throw progressError;
 
         // 6. Fetch assessment attempts for scoring data
-        const assessmentIds = lessonAssessments.map(a => a.id);
+        const assessmentIds = allAssessments.map(a => a.id);
         const { data: assessmentAttempts, error: attemptsError } = await supabase
             .from('student_attempts')
             .select('assessment_id, percentage_score, passed, status')
@@ -140,7 +162,7 @@ export async function GET(
                             return {
                                 id: assessment.id,
                                 title: assessment.title,
-                                assessment_type: assessment.assessment_type || 'lesson_assessment',
+                                assessment_type: 'lesson',
                                 time_limit_minutes: assessment.time_limit_minutes,
                                 passing_score_percentage: assessment.passing_score_percentage || 70,
                                 status: assessmentProgress?.status || 'not_started',
@@ -177,6 +199,28 @@ export async function GET(
             const totalItems = totalLessons + allAssessments.length;
             const completedItems = completedLessons + completedAssessments;
             
+            // Add path assessments
+            const pathAssessmentsForPath = pathAssessments
+                .filter(a => a.path_id === path.id)
+                .map(assessment => {
+                    const assessmentProgress = progressMap.get(assessment.id);
+                    const latestAttempt = attemptMap.get(assessment.id);
+                    
+                    return {
+                        id: assessment.id,
+                        title: assessment.title,
+                        assessment_type: 'path',
+                        time_limit_minutes: assessment.time_limit_minutes,
+                        passing_score_percentage: assessment.passing_score_percentage || 70,
+                        status: assessmentProgress?.status || 'not_started',
+                        score: latestAttempt?.percentage_score || null,
+                        attempts: latestAttempt ? 1 : 0,
+                        maxAttempts: assessment.max_attempts,
+                        passed: latestAttempt?.passed || false,
+                        progress: assessmentProgress?.progress_percentage || 0,
+                    };
+                });
+
             const pathProgress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
             
             return {
@@ -185,9 +229,29 @@ export async function GET(
                 description: path.description || '',
                 order: path.order_index || 0,
                 lessons: pathLessons,
-                assessments: [], // For path-level quizzes, not implemented yet
+                assessments: pathAssessmentsForPath,
                 completed: completedLessons === totalLessons && totalLessons > 0,
                 progress: pathProgress,
+            };
+        });
+
+        // Add class assessments
+        const classAssessmentsWithProgress = classAssessments.map(assessment => {
+            const assessmentProgress = progressMap.get(assessment.id);
+            const latestAttempt = attemptMap.get(assessment.id);
+            
+            return {
+                id: assessment.id,
+                title: assessment.title,
+                assessment_type: 'class',
+                time_limit_minutes: assessment.time_limit_minutes,
+                passing_score_percentage: assessment.passing_score_percentage || 70,
+                status: assessmentProgress?.status || 'not_started',
+                score: latestAttempt?.percentage_score || null,
+                attempts: latestAttempt ? 1 : 0,
+                maxAttempts: assessment.max_attempts,
+                passed: latestAttempt?.passed || false,
+                progress: assessmentProgress?.progress_percentage || 0,
             };
         });
 
@@ -202,7 +266,7 @@ export async function GET(
             title: baseClass.name,
             description: baseClass.description,
             paths: pathsWithProgress,
-            classAssessments: [], // For class-level exams, not implemented yet
+            classAssessments: classAssessmentsWithProgress,
             overallProgress,
         };
 
