@@ -68,11 +68,11 @@ export async function GET(
             .order('order_index');
 
         if (pathsError) throw pathsError;
-        console.log('Fetched paths:', paths);
+        
 
         // 4. Fetch all lessons and assessments for all paths
         const pathIds = paths.map(p => p.id);
-        console.log('Path IDs:', pathIds);
+        
         
         const { data: lessons, error: lessonsError } = await supabase
             .from('lessons')
@@ -81,10 +81,10 @@ export async function GET(
             .order('order_index');
         
         if (lessonsError) throw lessonsError;
-        console.log('Fetched lessons:', lessons);
+        
 
         const lessonIds = lessons.map(l => l.id);
-        console.log('Lesson IDs:', lessonIds);
+        
         
         // Fetch lesson assessments
         const { data: lessonAssessments, error: lessonAssessmentsError } = await supabase
@@ -93,7 +93,7 @@ export async function GET(
             .in('lesson_id', lessonIds);
             
         if (lessonAssessmentsError) throw lessonAssessmentsError;
-        console.log('Fetched lesson assessments:', lessonAssessments);
+        
 
         // Fetch path assessments
         const { data: pathAssessments, error: pathAssessmentsError } = await supabase
@@ -102,7 +102,7 @@ export async function GET(
             .in('path_id', pathIds);
             
         if (pathAssessmentsError) throw pathAssessmentsError;
-        console.log('Fetched path assessments:', pathAssessments);
+        
 
         // Fetch class assessments
         const { data: classAssessments, error: classAssessmentsError } = await supabase
@@ -113,7 +113,7 @@ export async function GET(
             .is('path_id', null);
             
         if (classAssessmentsError) throw classAssessmentsError;
-        console.log('Fetched class assessments:', classAssessments);
+        
 
         // 5. Fetch student progress for all items using the unified progress table
         const allAssessments = [...lessonAssessments, ...pathAssessments, ...classAssessments];

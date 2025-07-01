@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { Tables, TablesInsert, TablesUpdate } from '../../../../../../packages/types/db'
 import { emitProgressUpdate } from '@/lib/utils/progressEvents'
 import { ProgressService } from '@/lib/services/progressService'
+import { HierarchicalProgressService } from '@/lib/services/hierarchical-progress-service'
 
 type Assessment = Tables<'assessments'>
 type AssessmentQuestion = Tables<'assessment_questions'>
@@ -194,7 +195,8 @@ export async function PUT(request: NextRequest) {
         const progressPercentage = hasSubjectiveQuestions ? 50 : 100; // 50% if waiting for AI grading, 100% if completed
         
         // Use ProgressService to update assessment progress, which will also update class instance progress
-        const progressService = new ProgressService(user.id);
+        const hierarchicalService = new HierarchicalProgressService(supabase);
+        const progressService = new ProgressService(user.id, supabase, hierarchicalService);
         await progressService.updateAssessmentProgress(attempt.assessment_id, {
           status: progressStatus,
           progressPercentage: progressPercentage,

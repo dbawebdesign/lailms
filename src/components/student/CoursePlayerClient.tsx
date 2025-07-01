@@ -7,6 +7,7 @@ import { Tables } from 'packages/types/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressService } from '@/lib/services/progressService';
+import { HierarchicalProgressServiceClient } from '@/lib/services/hierarchical-progress-service.client';
 import { Button } from '@/components/ui/button';
 import LessonContentRenderer from './LessonContentRenderer';
 import { LessonContent } from '@/lib/types/lesson';
@@ -27,7 +28,8 @@ const ContentPlayer = ({ selectedItemId, selectedItemType }: { selectedItemId?: 
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
       if (user) {
-        setProgressService(new ProgressService(user.id));
+        const hierarchicalService = new HierarchicalProgressServiceClient();
+        setProgressService(new ProgressService(user.id, supabase, hierarchicalService));
       }
     }
     getUser();

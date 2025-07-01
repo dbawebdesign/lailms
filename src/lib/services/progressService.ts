@@ -2,6 +2,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createClient } from '@/lib/supabase/client';
 import { emitProgressUpdate } from '@/lib/utils/progressEvents';
 import { HierarchicalProgressServiceClient } from './hierarchical-progress-service.client';
+import { HierarchicalProgressService } from './hierarchical-progress-service';
+import { SupabaseClient } from "@supabase/supabase-js";
 
 export type ProgressStatus = 'not_started' | 'in_progress' | 'completed' | 'paused';
 export type ItemType = 'lesson' | 'lesson_section' | 'assessment' | 'path' | 'course';
@@ -26,14 +28,18 @@ export interface ProgressData {
 }
 
 export class ProgressService {
-    private supabase;
+    private supabase: SupabaseClient;
     private userId: string;
-    private hierarchicalService: HierarchicalProgressServiceClient;
+    private hierarchicalService: HierarchicalProgressService | HierarchicalProgressServiceClient;
 
-    constructor(userId: string) {
-        this.supabase = createClient();
+    constructor(
+        userId: string, 
+        supabaseClient: SupabaseClient,
+        hierarchicalService: HierarchicalProgressService | HierarchicalProgressServiceClient
+    ) {
+        this.supabase = supabaseClient;
         this.userId = userId;
-        this.hierarchicalService = new HierarchicalProgressServiceClient();
+        this.hierarchicalService = hierarchicalService;
     }
 
     /**
