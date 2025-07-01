@@ -6,6 +6,108 @@ type Assessment = Tables<'assessments'>
 type AssessmentQuestion = Tables<'assessment_questions'>
 type StudentAttempt = Tables<'student_attempts'>
 
+// Function to get base_class_id and verify enrollment
+async function verifyEnrollment(
+  supabase: any,
+  userId: string,
+  assessment: Assessment
+): Promise<{ isEnrolled: boolean; error?: string }> {
+  try {
+    console.log(`Starting enrollment verification for assessment ID: ${assessment.id}, type: ${assessment.assessment_type}`);
+    
+    let baseClassId: string | null = null;
+
+    if (assessment.assessment_type === 'class') {
+      baseClassId = assessment.base_class_id;
+      console.log(`Assessment type is 'class'. Found base_class_id directly: ${baseClassId}`);
+    } else if (assessment.assessment_type === 'path') {
+      if (!assessment.path_id) {
+        return { isEnrolled: false, error: `Path assessment is missing a path_id.` };
+      }
+      console.log(`Assessment type is 'path'. Looking up base_class_id for path_id: ${assessment.path_id}`);
+      const { data: path, error: pathError } = await supabase
+        .from('paths')
+        .select('base_class_id')
+        .eq('id', assessment.path_id)
+        .single();
+      
+      if (pathError || !path?.base_class_id) {
+        console.error('Error finding base class for path:', pathError);
+        return { isEnrolled: false, error: `Could not find a valid base class for path ID: ${assessment.path_id}` };
+      }
+      baseClassId = path.base_class_id;
+      console.log(`Found base_class_id: ${baseClassId} for path_id: ${assessment.path_id}`);
+    } else if (assessment.assessment_type === 'lesson') {
+      if (!assessment.lesson_id) {
+        return { isEnrolled: false, error: `Lesson assessment is missing a lesson_id.` };
+      }
+      console.log(`Assessment type is 'lesson'. Looking up path for lesson_id: ${assessment.lesson_id}`);
+      const { data: lesson, error: lessonError } = await supabase
+        .from('lessons')
+        .select('path_id')
+        .eq('id', assessment.lesson_id)
+        .single();
+      
+      if (lessonError || !lesson?.path_id) {
+        console.error('Error finding path for lesson:', lessonError);
+        return { isEnrolled: false, error: `Could not find a valid path for lesson ID: ${assessment.lesson_id}` };
+      }
+
+      console.log(`Found path_id: ${lesson.path_id}. Looking up base_class_id.`);
+      const { data: path, error: pathError } = await supabase
+        .from('paths')
+        .select('base_class_id')
+        .eq('id', lesson.path_id)
+        .single();
+
+      if (pathError || !path?.base_class_id) {
+        console.error('Error finding base class for path:', pathError);
+        return { isEnrolled: false, error: `Could not find a valid base class for path ID: ${lesson.path_id}` };
+      }
+      baseClassId = path.base_class_id;
+      console.log(`Found base_class_id: ${baseClassId} for lesson_id: ${assessment.lesson_id}`);
+    }
+
+    if (!baseClassId) {
+      console.error(`Could not determine a base class for assessment ID: ${assessment.id}`);
+      return { isEnrolled: false, error: 'Could not determine a base class for the assessment.' };
+    }
+
+    console.log(`Verifying enrollment for user ${userId} in base_class_id ${baseClassId}`);
+    const { data: classInstances, error: ciError } = await supabase
+      .from('class_instances')
+      .select('id')
+      .eq('base_class_id', baseClassId);
+    
+    if (ciError || !classInstances || classInstances.length === 0) {
+      console.error(`No class instances found for base_class_id: ${baseClassId}`, ciError);
+      return { isEnrolled: false, error: `No class instances found for base class ID: ${baseClassId}` };
+    }
+
+    const instanceIds = classInstances.map((ci: { id: string }) => ci.id);
+    console.log(`Found class instance IDs: ${instanceIds.join(', ')}`);
+
+    const { data: enrollment, error: enrollmentError } = await supabase
+      .from('rosters')
+      .select('id')
+      .eq('profile_id', userId)
+      .in('class_instance_id', instanceIds)
+      .maybeSingle();
+
+    if (enrollmentError) {
+      console.error('Database error while checking enrollment:', enrollmentError.message);
+      return { isEnrolled: false, error: `Database error while checking enrollment: ${enrollmentError.message}` };
+    }
+
+    console.log(`Enrollment check successful: ${!!enrollment}`);
+    return { isEnrolled: !!enrollment };
+
+  } catch (e: any) {
+    console.error('Unexpected error in verifyEnrollment:', e.message);
+    return { isEnrolled: false, error: 'An unexpected error occurred during enrollment verification.' };
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
@@ -31,6 +133,12 @@ export async function POST(request: NextRequest) {
 
     if (assessmentError || !assessment) {
       return NextResponse.json({ error: 'Assessment not found' }, { status: 404 })
+    }
+
+    // NEW: Verify that the user is enrolled in the course for this assessment
+    const { isEnrolled, error: enrollmentError } = await verifyEnrollment(supabase, user.id, assessment);
+    if (!isEnrolled) {
+      return NextResponse.json({ error: enrollmentError || 'You are not enrolled in this course.' }, { status: 403 });
     }
 
     // Check existing attempts
