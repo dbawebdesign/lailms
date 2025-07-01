@@ -84,15 +84,15 @@ export async function GET(
       .eq('item_type', 'lesson')
       .single();
 
-    // Check for mind map and audio content in lesson_media_assets
-    const { data: mediaAssets } = await supabase
+    // Check for mind map and podcast content in lesson_media_assets
+    const { data: mediaAssets, error: mediaError } = await supabase
       .from('lesson_media_assets')
       .select('*')
       .eq('lesson_id', lessonId)
-      .in('asset_type', ['mind_map', 'audio']);
+      .in('asset_type', ['mind_map', 'podcast']);
 
     const mindMap = mediaAssets?.find(asset => asset.asset_type === 'mind_map') || null;
-    const brainbytes = mediaAssets?.find(asset => asset.asset_type === 'audio') || null;
+    const brainbytes = mediaAssets?.find(asset => asset.asset_type === 'podcast') || null;
 
     // Structure the response
     const response = {

@@ -88,20 +88,25 @@ export class ProgressService {
         }
 
         // Find the class instance this user is enrolled in for this base class
-        const { data: enrollment, error: enrollmentError } = await this.supabase
+        const { data: enrollments, error: enrollmentError } = await this.supabase
             .from('rosters')
             .select('class_instances (id)')
             .eq('profile_id', this.userId)
             .eq('role', 'student')
             .eq('class_instances.base_class_id', baseClassId)
-            .single();
+            .limit(1);
 
-        if (enrollmentError || !enrollment?.class_instances) {
+        if (enrollmentError) {
             console.error('Error finding enrollment for class instance update:', enrollmentError);
             return;
         }
+        
+        if (!enrollments?.length || !enrollments[0]?.class_instances) {
+            // This is normal for self-paced learning - user may not be enrolled in a class
+            return;
+        }
 
-        const classInstanceId = (enrollment.class_instances as any)?.id;
+        const classInstanceId = (enrollments[0].class_instances as any)?.id;
         if (!classInstanceId) {
             console.error('No class instance ID found for enrollment');
             return;
@@ -181,20 +186,25 @@ export class ProgressService {
         }
 
         // Find the class instance this user is enrolled in for this base class
-        const { data: enrollment, error: enrollmentError } = await this.supabase
+        const { data: enrollments, error: enrollmentError } = await this.supabase
             .from('rosters')
             .select('class_instances (id)')
             .eq('profile_id', this.userId)
             .eq('role', 'student')
             .eq('class_instances.base_class_id', baseClassId)
-            .single();
+            .limit(1);
 
-        if (enrollmentError || !enrollment?.class_instances) {
+        if (enrollmentError) {
             console.error('Error finding enrollment for class instance update:', enrollmentError);
             return;
         }
+        
+        if (!enrollments?.length || !enrollments[0]?.class_instances) {
+            // This is normal for self-paced learning - user may not be enrolled in a class
+            return;
+        }
 
-        const classInstanceId = (enrollment.class_instances as any)?.id;
+        const classInstanceId = (enrollments[0].class_instances as any)?.id;
         if (!classInstanceId) {
             console.error('No class instance ID found for enrollment');
             return;
