@@ -113,13 +113,15 @@ export class AIGradingService {
       const question = responseData.assessment_questions;
       const studentAnswer = this.extractStudentAnswer(responseData.response_data, question.question_type);
       
+
       if (!studentAnswer || studentAnswer.trim().length === 0) {
         // Handle empty responses
         await this.saveGradingResult(responseData.id, {
           score: 0,
-          feedback: 'No response provided',
+          feedback: 'No response was provided for this question. To earn points, please provide a complete answer that addresses the question prompt. You may retake this assessment if your instructor allows it.',
           confidence: 1.0,
-          reasoning: 'Empty response automatically scored as 0'
+          reasoning: 'Empty response automatically scored as 0 points',
+          suggestions: ['Provide a complete response to the question', 'Review the question carefully before answering']
         });
         return;
       }
@@ -181,9 +183,10 @@ export class AIGradingService {
       console.error('Error in AI grading API call:', error);
       return {
         score: 0,
-        feedback: 'Grading system error - manual review required',
+        feedback: 'The AI grading system encountered an issue while evaluating your response. Your submission has been saved and will be manually reviewed by your instructor. You will receive feedback once the manual review is complete.',
         confidence: 0,
-        reasoning: 'AI grading failed'
+        reasoning: 'AI grading service error - requires manual instructor review',
+        suggestions: ['Your instructor will provide feedback after manual review']
       };
     }
   }
@@ -215,8 +218,9 @@ ${gradingRubric ? `GRADING RUBRIC: ${JSON.stringify(gradingRubric)}` : ''}
 GRADING INSTRUCTIONS:
 1. Compare the student response to the sample response and answer key
 2. Award points based on accuracy, completeness, and understanding demonstrated
-3. Provide specific, constructive feedback
+3. Provide specific, constructive feedback (minimum 20 words) explaining what the student did well and what could be improved
 4. Rate your confidence in the grading (0.0-1.0)
+5. REQUIRED: The feedback field must contain helpful, specific comments for the student
 
 OUTPUT FORMAT (JSON):
 {
@@ -235,8 +239,9 @@ ANSWER KEY: ${JSON.stringify(answerKey)}
 GRADING INSTRUCTIONS:
 1. Evaluate based on the answer key criteria
 2. Award partial credit for partially correct responses
-3. Provide constructive feedback
+3. Provide constructive feedback (minimum 20 words) explaining the student's performance and areas for improvement
 4. Rate your confidence in the grading (0.0-1.0)
+5. REQUIRED: The feedback field must contain helpful, specific comments for the student
 
 OUTPUT FORMAT (JSON):
 {
@@ -258,11 +263,17 @@ OUTPUT FORMAT (JSON):
       const score = Math.max(0, Math.min(maxPoints, parsed.score || 0));
       const confidence = Math.max(0, Math.min(1, parsed.confidence || 0.5));
 
+      // Ensure we always have meaningful feedback
+      let feedback = parsed.feedback || '';
+      if (!feedback || feedback.trim().length < 10) {
+        feedback = `Score: ${score}/${maxPoints}. ${parsed.reasoning || 'Response evaluated based on answer key criteria.'}`;
+      }
+
       return {
         score,
-        feedback: parsed.feedback || 'No feedback provided',
+        feedback: feedback.trim(),
         confidence,
-        reasoning: parsed.reasoning || 'No reasoning provided',
+        reasoning: parsed.reasoning || 'Evaluated based on answer key and grading criteria',
         suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : []
       };
 
@@ -270,9 +281,10 @@ OUTPUT FORMAT (JSON):
       console.error('Error parsing grading result:', error);
       return {
         score: 0,
-        feedback: 'Unable to parse grading result - manual review required',
+        feedback: `AI grading encountered a technical issue and could not be completed automatically. Your response has been saved and will be reviewed manually. Please contact your instructor if you have questions about this assessment.`,
         confidence: 0,
-        reasoning: 'JSON parsing failed'
+        reasoning: 'Technical error during AI grading - requires manual review',
+        suggestions: ['Contact instructor for manual review']
       };
     }
   }
@@ -281,13 +293,19 @@ OUTPUT FORMAT (JSON):
   private extractStudentAnswer(responseData: any, questionType: string): string {
     if (!responseData) return '';
 
+    // Handle different response data structures
     switch (questionType) {
       case 'short_answer':
-        return responseData.answer || responseData.text || '';
+        return responseData.text_answer || responseData.answer || responseData.text || responseData.value || '';
       case 'essay':
-        return responseData.essay || responseData.text || responseData.content || '';
+        return responseData.text_answer || responseData.essay || responseData.text || responseData.content || responseData.value || '';
+      case 'multiple_choice':
+        return responseData.selected_option || responseData.answer || '';
+      case 'true_false':
+        return responseData.selected_option || responseData.answer || '';
       default:
-        return responseData.text || responseData.answer || '';
+        // Fallback: try common field names
+        return responseData.text_answer || responseData.answer || responseData.text || responseData.value || responseData.content || '';
     }
   }
 
@@ -296,11 +314,17 @@ OUTPUT FORMAT (JSON):
     const supabase = createSupabaseServerClient();
 
     try {
+      // Ensure feedback is always meaningful (minimum 15 characters)
+      let finalFeedback = result.feedback;
+      if (!finalFeedback || finalFeedback.trim().length < 15) {
+        finalFeedback = `Score: ${result.score}. ${result.reasoning || 'Response evaluated based on assessment criteria.'}`;
+      }
+
       const { error } = await supabase
         .from('student_responses')
         .update({
           ai_score: result.score,
-          ai_feedback: result.feedback,
+          ai_feedback: finalFeedback.trim(),
           ai_confidence: result.confidence,
           ai_graded_at: new Date().toISOString(),
           final_score: result.score // Use AI score as final score initially
@@ -308,6 +332,8 @@ OUTPUT FORMAT (JSON):
         .eq('id', responseId);
 
       if (error) throw error;
+
+      console.log(`Successfully saved AI grading result for response ${responseId}: Score ${result.score}, Feedback: "${finalFeedback.substring(0, 100)}..."`);
 
     } catch (error) {
       console.error('Error saving grading result:', error);

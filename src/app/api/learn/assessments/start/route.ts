@@ -109,18 +109,25 @@ async function verifyEnrollment(
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
+    console.log(`[${requestId}] Starting assessment start request`);
+    
     const supabase = createSupabaseServerClient()
     
     // Get the current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
+      console.log(`[${requestId}] Unauthorized: ${userError?.message || 'No user'}`);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { assessmentId } = await request.json()
+    console.log(`[${requestId}] Assessment ID: ${assessmentId}, User ID: ${user.id}`);
 
     if (!assessmentId) {
+      console.log(`[${requestId}] Missing assessment ID`);
       return NextResponse.json({ error: 'Assessment ID is required' }, { status: 400 })
     }
 
@@ -132,16 +139,23 @@ export async function POST(request: NextRequest) {
       .single<Assessment>()
 
     if (assessmentError || !assessment) {
+      console.log(`[${requestId}] Assessment not found: ${assessmentError?.message}`);
       return NextResponse.json({ error: 'Assessment not found' }, { status: 404 })
     }
+
+    console.log(`[${requestId}] Found assessment: ${assessment.title}`);
 
     // NEW: Verify that the user is enrolled in the course for this assessment
     const { isEnrolled, error: enrollmentError } = await verifyEnrollment(supabase, user.id, assessment);
     if (!isEnrolled) {
+      console.log(`[${requestId}] Enrollment verification failed: ${enrollmentError}`);
       return NextResponse.json({ error: enrollmentError || 'You are not enrolled in this course.' }, { status: 403 });
     }
 
-    // Check existing attempts
+    console.log(`[${requestId}] Enrollment verified successfully`);
+
+    // Check existing attempts with explicit logging
+    console.log(`[${requestId}] Checking existing attempts...`);
     const { data: existingAttempts, error: attemptsError } = await supabase
       .from('student_attempts')
       .select('*')
@@ -151,12 +165,17 @@ export async function POST(request: NextRequest) {
       .returns<StudentAttempt[]>()
 
     if (attemptsError) {
+      console.error(`[${requestId}] Failed to check existing attempts:`, attemptsError);
       return NextResponse.json({ error: 'Failed to check existing attempts' }, { status: 500 })
     }
+
+    console.log(`[${requestId}] Found ${existingAttempts?.length || 0} existing attempts`);
 
     // Check if there's already an in-progress attempt
     const inProgressAttempt = existingAttempts?.find(attempt => attempt.status === 'in_progress')
     if (inProgressAttempt) {
+      console.log(`[${requestId}] Returning existing in-progress attempt: ${inProgressAttempt.id}`);
+      
       // Return the existing in-progress attempt instead of creating a new one
       const { data: questions, error: questionsError } = await supabase
         .from('assessment_questions')
@@ -166,6 +185,7 @@ export async function POST(request: NextRequest) {
         .returns<AssessmentQuestion[]>()
 
       if (questionsError || !questions) {
+        console.error(`[${requestId}] Failed to load questions for existing attempt:`, questionsError);
         return NextResponse.json({ error: 'Failed to load questions' }, { status: 500 })
       }
 
@@ -175,6 +195,7 @@ export async function POST(request: NextRequest) {
         return questionWithoutAnswerKey
       })
 
+      console.log(`[${requestId}] Successfully returning existing attempt with ${sanitizedQuestions.length} questions`);
       return NextResponse.json({
         assessment,
         questions: sanitizedQuestions,
@@ -184,11 +205,15 @@ export async function POST(request: NextRequest) {
 
     // Check attempt limits
     const currentAttemptNumber = (existingAttempts?.[0]?.attempt_number || 0) + 1
+    console.log(`[${requestId}] Creating attempt number: ${currentAttemptNumber}`);
+    
     if (assessment.max_attempts && currentAttemptNumber > assessment.max_attempts) {
+      console.log(`[${requestId}] Maximum attempts exceeded: ${currentAttemptNumber} > ${assessment.max_attempts}`);
       return NextResponse.json({ error: 'Maximum attempts exceeded' }, { status: 400 })
     }
 
     // Get all questions for this assessment
+    console.log(`[${requestId}] Loading questions...`);
     const { data: questions, error: questionsError } = await supabase
       .from('assessment_questions')
       .select('*')
@@ -197,8 +222,11 @@ export async function POST(request: NextRequest) {
       .returns<AssessmentQuestion[]>()
 
     if (questionsError || !questions) {
+      console.error(`[${requestId}] Failed to load questions:`, questionsError);
       return NextResponse.json({ error: 'Failed to load questions' }, { status: 500 })
     }
+
+    console.log(`[${requestId}] Loaded ${questions.length} questions`);
 
     // Create a new attempt record with 'in_progress' status
     const attemptData: TablesInsert<'student_attempts'> = {
@@ -210,6 +238,7 @@ export async function POST(request: NextRequest) {
       ai_grading_status: 'pending'
     }
 
+    console.log(`[${requestId}] Creating new attempt...`);
     const { data: newAttempt, error: attemptError } = await supabase
       .from('student_attempts')
       .insert(attemptData)
@@ -217,8 +246,11 @@ export async function POST(request: NextRequest) {
       .single<StudentAttempt>()
 
     if (attemptError || !newAttempt) {
-      return NextResponse.json({ error: 'Failed to create attempt' }, { status: 500 })
+      console.error(`[${requestId}] Failed to create attempt:`, attemptError);
+      return NextResponse.json({ error: `Failed to create attempt: ${attemptError?.message || 'Unknown error'}` }, { status: 500 })
     }
+
+    console.log(`[${requestId}] Successfully created new attempt: ${newAttempt.id}`);
 
     // Remove answer keys from questions before sending to client
     const sanitizedQuestions = questions.map(question => {
@@ -226,14 +258,18 @@ export async function POST(request: NextRequest) {
       return questionWithoutAnswerKey
     })
 
+    console.log(`[${requestId}] Successfully completed request`);
     return NextResponse.json({
       assessment,
       questions: sanitizedQuestions,
       attempt: newAttempt
     })
 
-  } catch (error) {
-    console.error('Error starting assessment:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (error: any) {
+    console.error(`[${requestId}] Error starting assessment:`, error);
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    }, { status: 500 })
   }
 } 

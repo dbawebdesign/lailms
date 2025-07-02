@@ -66,13 +66,7 @@ export interface ChatMessage {
   persona?: PersonaType; // Track which persona generated the message
   // Specific data payloads for different message types
   citations?: Citation[];
-  actionButtons?: Array<{ 
-    id: string; 
-    label: string; 
-    action: 'confirm' | 'deny' | 'select' | 'navigate' | 'complete' | 'cancel' | 'skip' | 'edit'; 
-    data: Record<string, any>; 
-    style: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' 
-  }>; // Dynamic action buttons from Luna
+
   isLoading?: boolean;
   isOutline?: boolean; // Flag to indicate this message contains an outline
   outlineData?: GeneratedCourseOutline; // The actual outline data
@@ -454,7 +448,6 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
         content: result.response,
         timestamp: new Date(),
         citations: result.citations,
-        actionButtons: result.actionButtons,
         persona: currentPersona,
         isLoading: false,
         isOutline: isOutlineResponse,
@@ -636,23 +629,13 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
   };
 
   // Handle action button clicks
-  const handleActionButtonClick = async (button: { id: string; label: string; action: string; data: Record<string, any> }) => {
-    // Create a message that includes the button data
-    const buttonResponse = `[Action: ${button.action}] ${button.label}`;
-    
-    // Send the button response directly with the button data
-    await handleSendMessage(buttonResponse, {
-      buttonAction: button.action,
-      buttonId: button.id,
-      ...button.data
-    });
-  };
+
 
   // --- Message Formatting --- 
   const formatMessageContent = (content: string) => {
     // This is a placeholder - ideally use a markdown parser like react-markdown
     return content.split('\n').map((line, i) => (
-      <p key={i} className={`${i > 0 ? 'mt-2' : ''} break-words text-wrap overflow-hidden`}>
+      <p key={i} className={`${i > 0 ? 'mt-2' : ''} break-words text-wrap overflow-wrap-anywhere word-break-break-all max-w-full`}>
         {line}
       </p>
     ));
@@ -737,7 +720,7 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
                           : 'max-w-[92%] p-3 text-sm'
                       }`}
                   >
-                  <div className="min-w-0 overflow-hidden">
+                  <div className="min-w-0 overflow-hidden break-words">
                       {message.isLoading ? (
                         <div className="flex space-x-1.5">
                           <div className="h-2 w-2 rounded-full bg-current animate-bounce"></div>
@@ -753,50 +736,11 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
                       )}
                   </div>
                   
-                    {/* Render Dynamic Action Buttons from Luna */}
-                    {message.actionButtons && message.actionButtons.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {message.actionButtons.map((button) => {
-                          const getButtonVariant = (style: string) => {
-                            switch (style) {
-                              case 'primary': return 'default';
-                              case 'secondary': return 'secondary';
-                              case 'success': return 'default';
-                              case 'warning': return 'secondary';
-                              case 'danger': return 'destructive';
-                              default: return 'secondary';
-                            }
-                          };
 
-                          const getButtonClassName = (style: string) => {
-                            switch (style) {
-                              case 'success': return 'bg-green-600 hover:bg-green-700 text-white';
-                              case 'warning': return 'bg-yellow-600 hover:bg-yellow-700 text-white';
-                              default: return '';
-                            }
-                          };
-
-                          return (
-                            <Button
-                              key={button.id}
-                              variant={getButtonVariant(button.style)}
-                              size={isMobile ? "default" : "sm"}
-                              onClick={() => handleActionButtonClick(button)}
-                              disabled={isLoading}
-                              className={`transition-all duration-200 hover:scale-105 ${getButtonClassName(button.style)} ${
-                                isMobile ? 'text-sm px-4 py-2' : ''
-                              }`}
-                            >
-                              {button.label}
-                            </Button>
-                          );
-                        })}
-                      </div>
-                    )}
                   
                     {/* Render Action Buttons (Displayed below content/outline) */}
                     {message.actions && message.actions.length > 0 && (
-                      <div className="mt-3 pt-2 border-t border-muted-foreground/20 flex flex-wrap gap-2 min-w-0 overflow-hidden">
+                      <div className="mt-3 pt-2 border-t border-muted-foreground/20 flex flex-wrap gap-2 w-full max-w-full overflow-hidden">
                         {message.actions.map((action, index) => (
                           <Button 
                             key={index} 
@@ -804,9 +748,9 @@ export function LunaAIChat({ userRole, isMobile = false }: LunaAIChatProps) { //
                             variant="outline" 
                             onClick={action.action} 
                             disabled={isLoading} 
-                            className={`break-words ${isMobile ? 'text-sm px-3 py-2' : 'text-xs px-2 py-1'}`}
+                            className={`break-words text-wrap max-w-full ${isMobile ? 'text-sm px-3 py-2' : 'text-xs px-2 py-1'}`}
                           >
-                            {action.label}
+                            <span className="break-words text-wrap">{action.label}</span>
                           </Button>
                         ))}
                       </div>

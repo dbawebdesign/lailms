@@ -54,8 +54,9 @@ export function NewSchemaAssessmentTaker({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Prevent concurrent initialization
+  // Prevent concurrent initialization - use a more robust approach
   const initializingRef = useRef(false);
+  const initializationPromiseRef = useRef<Promise<void> | null>(null);
 
   // Register component with Luna on mount
   useEffect(() => {
@@ -124,10 +125,15 @@ export function NewSchemaAssessmentTaker({
   useEffect(() => {
     if (!assessmentId) return;
     
-    // Prevent multiple concurrent requests
-    if (initializingRef.current) return;
+    // If already initializing, wait for the existing promise
+    if (initializingRef.current && initializationPromiseRef.current) {
+      return;
+    }
 
     const initializeAttempt = async () => {
+      // Double-check to prevent race conditions
+      if (initializingRef.current) return;
+      
       initializingRef.current = true;
       setLoading(true);
       setError(null);
@@ -141,7 +147,7 @@ export function NewSchemaAssessmentTaker({
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to start assessment');
+          throw new Error(errorData.error || errorData.message || 'Failed to start assessment');
         }
 
         const data = await response.json();
@@ -155,14 +161,17 @@ export function NewSchemaAssessmentTaker({
       } finally {
         setLoading(false);
         initializingRef.current = false;
+        initializationPromiseRef.current = null;
       }
     };
 
-    initializeAttempt();
+    // Store the promise to prevent duplicate calls
+    initializationPromiseRef.current = initializeAttempt();
 
-    // Cleanup function to reset the ref if the effect re-runs
+    // Don't reset the ref in cleanup - let the async function handle it
     return () => {
-      initializingRef.current = false;
+      // Only reset if the component is truly unmounting
+      // The async function will reset initializingRef when it completes
     };
   }, [assessmentId]);
 

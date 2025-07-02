@@ -4,6 +4,7 @@ import { Tables, TablesInsert, TablesUpdate } from '../../../../../../packages/t
 import { emitProgressUpdate } from '@/lib/utils/progressEvents'
 import { ProgressService } from '@/lib/services/progressService'
 import { HierarchicalProgressService } from '@/lib/services/hierarchical-progress-service'
+import { AIGradingService } from '@/lib/services/ai-grading-service'
 
 type Assessment = Tables<'assessments'>
 type AssessmentQuestion = Tables<'assessment_questions'>
@@ -207,6 +208,66 @@ export async function PUT(request: NextRequest) {
       } catch (progressUpdateError) {
         console.error('Error updating assessment progress:', progressUpdateError);
         // Don't fail the request if progress update fails
+      }
+
+      // Trigger AI grading for subjective questions automatically
+      if (hasSubjectiveQuestions) {
+        try {
+          // Update grading status to in_progress
+          await supabase
+            .from('student_attempts')
+            .update({ 
+              ai_grading_status: 'in_progress'
+            })
+            .eq('id', attemptId);
+
+          // Initialize AI grading service and start grading asynchronously
+          const gradingService = new AIGradingService();
+          
+          // Run grading in background (don't await to avoid timeout)
+          gradingService.gradeAttempt(attemptId, (message) => {
+            console.log(`AI Grading Progress for ${attemptId}: ${message}`);
+          }).then(async () => {
+            // After successful grading, update progress to completed
+            try {
+              const { data: updatedAttempt } = await supabase
+                .from('student_attempts')
+                .select('percentage_score, passed')
+                .eq('id', attemptId)
+                .single();
+
+              if (updatedAttempt) {
+                const finalStatus = updatedAttempt.passed ? 'passed' : 'failed';
+                const hierarchicalService = new HierarchicalProgressService(true);
+                const progressService = new ProgressService(user.id, supabase, hierarchicalService);
+                await progressService.updateAssessmentProgress(attempt.assessment_id, {
+                  status: finalStatus,
+                  progressPercentage: 100,
+                  lastPosition: null
+                });
+                console.log(`AI grading completed for ${attemptId}, final status: ${finalStatus}`);
+              }
+            } catch (progressError) {
+              console.error('Error updating progress after AI grading:', progressError);
+            }
+          }).catch(async (error) => {
+            console.error('AI grading failed:', error);
+            
+            // Update status to failed
+            await supabase
+              .from('student_attempts')
+              .update({ 
+                ai_grading_status: 'failed',
+                ai_graded_at: new Date().toISOString()
+              })
+              .eq('id', attemptId);
+          });
+
+          console.log(`Started AI grading for attempt ${attemptId} with subjective questions`);
+        } catch (gradingError) {
+          console.error('Error starting AI grading:', gradingError);
+          // Don't fail the submission if AI grading fails to start
+        }
       }
 
       return NextResponse.json({

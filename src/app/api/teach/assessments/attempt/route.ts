@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '../../../../../lib/supabase/server'
 import { Database, Tables, TablesInsert, TablesUpdate } from '../../../../../../packages/types/db'
 import { emitProgressUpdate } from '@/lib/utils/progressEvents'
+import { AIGradingService } from '@/lib/services/ai-grading-service'
 
 // Types for V2 schema
 type Assessment = Tables<'assessments'>
@@ -231,6 +232,71 @@ export async function POST(request: NextRequest) {
     } catch (progressUpdateError) {
       console.error('Error updating assessment progress:', progressUpdateError);
       // Don't fail the request if progress update fails
+    }
+
+    // Trigger AI grading for subjective questions automatically
+    if (hasSubjectiveQuestions) {
+      try {
+        // Update grading status to in_progress
+        await supabase
+          .from('student_attempts')
+          .update({ 
+            ai_grading_status: 'in_progress'
+          })
+          .eq('id', newAttempt.id);
+
+        // Initialize AI grading service and start grading asynchronously
+        const gradingService = new AIGradingService();
+        
+        // Run grading in background (don't await to avoid timeout)
+        gradingService.gradeAttempt(newAttempt.id, (message) => {
+          console.log(`AI Grading Progress for ${newAttempt.id}: ${message}`);
+        }).then(async () => {
+          // After successful grading, update progress to completed
+          try {
+            const { data: updatedAttempt } = await supabase
+              .from('student_attempts')
+              .select('percentage_score, passed')
+              .eq('id', newAttempt.id)
+              .single();
+
+            if (updatedAttempt) {
+              const finalStatus = updatedAttempt.passed ? 'passed' : 'failed';
+              const finalProgressPercentage = 100;
+              
+              await supabase.rpc('upsert_progress' as any, {
+                p_user_id: user.id,
+                p_item_type: 'assessment',
+                p_item_id: assessmentId,
+                p_status: finalStatus,
+                p_progress_percentage: finalProgressPercentage,
+                p_last_position: null
+              });
+              
+              emitProgressUpdate('assessment', assessmentId, finalProgressPercentage, finalStatus);
+              console.log(`AI grading completed for ${newAttempt.id}, final status: ${finalStatus}`);
+            }
+          } catch (progressError) {
+            console.error('Error updating progress after AI grading:', progressError);
+          }
+        }).catch(async (error) => {
+          console.error('AI grading failed:', error);
+          
+          // Update status to failed
+          await supabase
+            .from('student_attempts')
+            .update({ 
+              ai_grading_status: 'failed',
+              ai_graded_at: new Date().toISOString()
+            })
+            .eq('id', newAttempt.id);
+        });
+
+        console.log(`Started AI grading for attempt ${newAttempt.id} with subjective questions`);
+      } catch (gradingError) {
+        console.error('Error starting AI grading:', gradingError);
+        // Don't fail the submission if AI grading fails to start
+      }
     }
 
     return NextResponse.json({

@@ -735,31 +735,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     console.log('🛠️ Debug functions available: debugLunaAuth() and debugLunaDatabase() in console');
   }
 
-  const handleActionButtonClick = async (button: any) => {
-    console.log('🔘 Action button clicked:', button);
-    
-    // Handle redirect actions
-    if (button.type === 'redirectToKB' && button.url) {
-      console.log('🔗 Redirecting to KB Course Generator:', button.url);
-      window.open(button.url, '_blank');
-      return;
-    }
-    
-    // Determine response text based on button
-    let responseText = '';
-    if (button.action === 'confirm' || button.label === 'Yes') {
-      responseText = 'Yes';
-    } else if (button.action === 'deny' || button.label === 'No') {
-      responseText = 'No';
-    } else if (button.data && button.data.responseText) {
-      responseText = button.data.responseText;
-    } else {
-      responseText = button.label;
-    }
 
-    // Send response directly to Luna without showing in input
-    await sendDirectResponseToLuna(responseText);
-  };
 
   const sendDirectResponseToLuna = async (responseText: string) => {
     if (!currentConversation?.id || !responseText.trim()) return;
@@ -859,7 +835,6 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
         ...assistantMsg,
         content: result.response || 'Sorry, I encountered an error.',
         isLoading: false,
-        actionButtons: result.actionButtons || [],
         citations: result.citations || [],
         isOutline: result.isOutline || false,
         outlineData: result.outlineData || null,
@@ -969,7 +944,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
           is_outline: finalAssistantMsg.isOutline || false,
           outline_data: finalAssistantMsg.outlineData || null,
           citations: finalAssistantMsg.citations || [],
-          action_buttons: finalAssistantMsg.actionButtons || [],
+
           created_at: new Date().toISOString(),
         };
         
@@ -1337,7 +1312,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
         timestamp: new Date(),
         persona: currentPersona,
         citations: result.citations,
-        actionButtons: result.actionButtons,
+
         isOutline: isOutlineResponse,
         outlineData: result.outlineData,
         // New properties for interactive message types
@@ -1388,7 +1363,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
           is_outline: assistantMsg.isOutline || false,
           outline_data: assistantMsg.outlineData || null,
           citations: assistantMsg.citations || [],
-          action_buttons: assistantMsg.actionButtons || [],
+
           created_at: new Date().toISOString(),
         };
         
@@ -2010,23 +1985,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
                     </div>
                   )}
 
-                  {/* Dynamic Action Buttons from Luna API - Don't show for course outlines */}
-                  {!msg.isOutline && msg.actionButtons && msg.actionButtons.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {msg.actionButtons.map((button: any) => (
-                        <Button
-                          key={button.id}
-                          size="sm"
-                          variant={button.style === 'primary' ? 'default' : 'secondary'}
-                          disabled={isLoading}
-                          className="text-xs px-3 py-1"
-                          onClick={() => handleActionButtonClick(button)}
-                        >
-                          {button.label}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
+
 
                   {/* Citations */}
                   {msg.citations && msg.citations.length > 0 && (
