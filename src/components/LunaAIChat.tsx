@@ -66,6 +66,7 @@ export interface ChatMessage {
   persona?: PersonaType; // Track which persona generated the message
   // Specific data payloads for different message types
   citations?: Citation[];
+  actionButtons?: Array<{ id: string; label: string; action: string; data: Record<string, any>; style: string }>; // For action buttons
 
   isLoading?: boolean;
   isOutline?: boolean; // Flag to indicate this message contains an outline
