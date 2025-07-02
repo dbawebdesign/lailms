@@ -898,7 +898,8 @@ What makes this particularly important for ${request.academicLevel || 'college'}
     // Check overall completion
     if (completedTask.type === 'class_exam') {
       console.log('🎉 Course generation completed successfully!');
-      await this.updateJobStatus(state.jobId, 'completed', 100);
+      const taskSummary = this.generateTaskSummary(state);
+      await this.updateJobStatus(state.jobId, 'completed', 100, taskSummary);
     }
   }
 
@@ -957,7 +958,8 @@ What makes this particularly important for ${request.academicLevel || 'college'}
         await this.executeTask(state, examTask);
       } else if (!examTask) {
         console.log(`✅ No final exam configured - course generation complete`);
-        await this.updateJobStatus(state.jobId, 'completed', 100);
+        const taskSummary = this.generateTaskSummary(state);
+        await this.updateJobStatus(state.jobId, 'completed', 100, taskSummary);
       } else {
         console.log(`⚠️ Class exam task not pending:`, {
           status: examTask?.status,
@@ -1179,6 +1181,64 @@ What makes this particularly important for ${request.academicLevel || 'college'}
     } catch (error) {
       console.error('Error updating job status:', error);
     }
+  }
+
+  /**
+   * Generate a summary of task completion data for storage in result_data
+   */
+  private generateTaskSummary(state: OrchestrationState): any {
+    const tasks = Array.from(state.tasks.values());
+    const completedTasks = tasks.filter(t => t.status === 'completed');
+    const failedTasks = tasks.filter(t => t.status === 'failed');
+    const totalTasks = tasks.length;
+
+    // Calculate generation time
+    const allTimes = tasks
+      .filter(t => t.startTime && t.completeTime)
+      .map(t => ({
+        start: t.startTime!.getTime(),
+        end: t.completeTime!.getTime()
+      }));
+    
+    const earliestStart = allTimes.length > 0 ? Math.min(...allTimes.map(t => t.start)) : Date.now();
+    const latestEnd = allTimes.length > 0 ? Math.max(...allTimes.map(t => t.end)) : Date.now();
+    const generationTimeMs = latestEnd - earliestStart;
+
+    // Group tasks by type for detailed breakdown
+    const tasksByType = tasks.reduce((acc, task) => {
+      if (!acc[task.type]) {
+        acc[task.type] = { total: 0, completed: 0, failed: 0 };
+      }
+      acc[task.type].total++;
+      if (task.status === 'completed') acc[task.type].completed++;
+      if (task.status === 'failed') acc[task.type].failed++;
+      return acc;
+    }, {} as Record<string, { total: number; completed: number; failed: number }>);
+
+    return {
+      taskSummary: {
+        totalItems: totalTasks,
+        completedItems: completedTasks.length,
+        failedItems: failedTasks.length,
+        successRate: totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 100,
+        generationTimeMs,
+        tasksByType,
+        hasTaskDetails: true
+      },
+      completedAt: new Date().toISOString(),
+      tasks: tasks.map(task => ({
+        id: task.id,
+        type: task.type,
+        status: task.status,
+        lessonId: task.lessonId,
+        pathId: task.pathId,
+        sectionTitle: task.sectionTitle,
+        error: task.error,
+        startTime: task.startTime?.toISOString(),
+        completeTime: task.completeTime?.toISOString(),
+        retryCount: task.retryCount
+      }))
+    };
   }
 }
 

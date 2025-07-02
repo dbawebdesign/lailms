@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -20,11 +20,15 @@ import {
   FileText,
   FlaskConical,
   HelpCircle,
-  FileCheck
+  FileCheck,
+  Calendar,
+  Timer,
+  BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatEstimatedTime } from '@/lib/utils/courseGenerationEstimator';
 import Link from 'next/link';
+import JSConfetti from 'js-confetti';
 
 // --- Types ---
 interface GenerationTask {
@@ -77,12 +81,83 @@ const getTaskIcon = (type: GenerationTask['type']) => {
   }
 };
 
+const formatDuration = (startTime: string, endTime: string) => {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const duration = end.getTime() - start.getTime();
+  
+  const minutes = Math.floor(duration / (1000 * 60));
+  const seconds = Math.floor((duration % (1000 * 60)) / 1000);
+  
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+};
+
+const formatDurationFromMs = (durationMs: number) => {
+  const minutes = Math.floor(durationMs / (1000 * 60));
+  const seconds = Math.floor((durationMs % (1000 * 60)) / 1000);
+  
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+};
+
+const getTaskTypeLabel = (type: GenerationTask['type']) => {
+  switch (type) {
+    case 'lesson_section': return 'Lesson Section';
+    case 'lesson_assessment': return 'Lesson Assessment';
+    case 'path_quiz': return 'Path Quiz';
+    case 'class_exam': return 'Class Exam';
+  }
+};
+
 // --- Sub-component for a single Job ---
 
 function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob, onDismiss: (jobId: string) => void }) {
   const [job, setJob] = useState(initialJob);
   const [isPolling, setIsPolling] = useState(false);
   const [isRetrying, setIsRetrying] = useState<string | null>(null);
+  const [hasTriggeredConfetti, setHasTriggeredConfetti] = useState(false);
+  const [previousStatus, setPreviousStatus] = useState(initialJob.status);
+  const jsConfettiRef = useRef<JSConfetti | null>(null);
+
+  // Initialize confetti instance
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      jsConfettiRef.current = new JSConfetti();
+    }
+  }, []);
+
+  // Trigger confetti on completion (both on status change and initial load if already completed)
+  useEffect(() => {
+    const shouldTriggerConfetti = (
+      job.status === 'completed' && 
+      !hasTriggeredConfetti && 
+      jsConfettiRef.current &&
+      // Trigger if status just changed to completed OR if it was already completed on load
+      (previousStatus !== 'completed' || initialJob.status === 'completed')
+    );
+
+    if (shouldTriggerConfetti) {
+      // Check if there are any failed tasks (only if tasks data is available)
+      const failedTasksCount = job.tasks?.filter(t => t.status === 'failed').length || 0;
+      
+      // Trigger confetti if no failed tasks or if tasks data is not available (assume success)
+      if (failedTasksCount === 0 && jsConfettiRef.current) {
+        jsConfettiRef.current.addConfetti({
+          emojis: ['🎉', '📚', '✨', '🎓', '📖'],
+          emojiSize: 50,
+          confettiNumber: 100,
+        });
+        setHasTriggeredConfetti(true);
+      }
+    }
+    
+    setPreviousStatus(job.status);
+  }, [job.status, hasTriggeredConfetti, job.tasks, previousStatus, initialJob.status]);
 
   const pollStatus = useCallback(async () => {
     if (isPolling) return;
@@ -128,6 +203,42 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
   };
   
   const failedTasks = job.tasks?.filter(t => t.status === 'failed') || [];
+  const completedTasks = job.tasks?.filter(t => t.status === 'completed') || [];
+  const totalTasks = job.tasks?.length || 0;
+
+  // Try to get task summary from stored result_data first
+  const storedSummary = (job as any).result?.taskSummary;
+  
+  // Generate summary data with fallbacks for completed jobs without task details
+  const generationSummary = storedSummary ? {
+    totalItems: storedSummary.totalItems,
+    completedItems: storedSummary.completedItems,
+    failedItems: storedSummary.failedItems,
+    successRate: storedSummary.successRate,
+    generationTime: storedSummary.generationTimeMs 
+      ? formatDurationFromMs(storedSummary.generationTimeMs)
+      : formatDuration(job.createdAt, job.updatedAt),
+    startTime: new Date(job.createdAt).toLocaleString(),
+    endTime: (job.status === 'completed' || job.status === 'failed') 
+      ? new Date(job.updatedAt).toLocaleString() 
+      : null,
+    hasTaskDetails: storedSummary.hasTaskDetails,
+    tasksByType: storedSummary.tasksByType
+  } : {
+    totalItems: totalTasks > 0 ? totalTasks : (job.status === 'completed' ? 'N/A' : 0),
+    completedItems: totalTasks > 0 ? completedTasks.length : (job.status === 'completed' ? 'N/A' : 0),
+    failedItems: totalTasks > 0 ? failedTasks.length : 0,
+    successRate: totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : (job.status === 'completed' ? 100 : 0),
+    generationTime: job.status === 'completed' || job.status === 'failed' 
+      ? formatDuration(job.createdAt, job.updatedAt)
+      : null,
+    startTime: new Date(job.createdAt).toLocaleString(),
+    endTime: (job.status === 'completed' || job.status === 'failed') 
+      ? new Date(job.updatedAt).toLocaleString() 
+      : null,
+    hasTaskDetails: totalTasks > 0,
+    tasksByType: undefined
+  };
 
   return (
     <div className="border rounded-lg bg-card/50 relative">
@@ -167,36 +278,132 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
                  <div className='text-xs text-green-500 flex items-center gap-1'>
                   <CheckCircle className='h-3 w-3'/>
                   Course generated successfully.
+                  {/* Confetti trigger button for testing - remove in production */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        if (jsConfettiRef.current) {
+                          jsConfettiRef.current.addConfetti({
+                            emojis: ['🎉', '📚', '✨', '🎓', '📖'],
+                            emojiSize: 50,
+                            confettiNumber: 100,
+                          });
+                        }
+                      }}
+                      className="ml-2 h-5 px-2 text-xs"
+                    >
+                      🎉 Test
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
-            {job.tasks && job.tasks.length > 0 ? (
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                {job.tasks.map(task => (
-                  <div key={task.id} className="text-xs p-2 rounded-md bg-background">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(task.status)}
-                        {getTaskIcon(task.type)}
-                        <span className="font-medium">{task.sectionTitle || task.type.replace('_', ' ')}</span>
+            <div className="space-y-4">
+              {/* Generation Summary */}
+              {(job.status === 'completed' || job.status === 'failed') && (
+                <div className="bg-background/50 rounded-lg p-4 space-y-3">
+                  <h5 className="font-medium text-sm flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    Generation Summary
+                  </h5>
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Items:</span>
+                        <span className="font-medium">{generationSummary.totalItems}</span>
                       </div>
-                      {task.status === 'failed' && (
-                        <Button size="sm" variant="outline" onClick={() => handleRegenerateTask(task.id)} disabled={isRetrying === task.id}>
-                           {isRetrying === task.id ? <RefreshCw className="h-3 w-3 animate-spin"/> : 'Retry'}
-                        </Button>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Completed:</span>
+                        <span className="font-medium text-green-600">{generationSummary.completedItems}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Failed:</span>
+                        <span className="font-medium text-red-600">{generationSummary.failedItems}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Success Rate:</span>
+                        <span className="font-medium">{generationSummary.successRate}%</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Started:
+                        </span>
+                        <span className="font-medium text-right text-xs">{generationSummary.startTime}</span>
+                      </div>
+                      {generationSummary.endTime && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            Completed:
+                          </span>
+                          <span className="font-medium text-right text-xs">{generationSummary.endTime}</span>
+                        </div>
+                      )}
+                      {generationSummary.generationTime && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Timer className="h-3 w-3" />
+                            Duration:
+                          </span>
+                          <span className="font-medium">{generationSummary.generationTime}</span>
+                        </div>
                       )}
                     </div>
-                    {task.status === 'failed' && task.error && (
-                      <p className="mt-1 pl-8 text-red-600">{task.error}</p>
-                    )}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className='text-xs text-muted-foreground'>No detailed task information available.</p>
-            )}
+                  {!generationSummary.hasTaskDetails && (
+                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded text-xs">
+                      <p className="text-blue-700 dark:text-blue-300">
+                        <strong>Note:</strong> Detailed task breakdown is not available for this completed generation. 
+                        The course was successfully created and is ready to use.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Task Details */}
+              {job.tasks && job.tasks.length > 0 ? (
+                <div className="space-y-2">
+                  <h5 className="font-medium text-sm flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Task Details
+                  </h5>
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                    {job.tasks.map(task => (
+                      <div key={task.id} className="text-xs p-2 rounded-md bg-background">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(task.status)}
+                            {getTaskIcon(task.type)}
+                            <span className="font-medium">{task.sectionTitle || getTaskTypeLabel(task.type)}</span>
+                            <Badge variant="outline" className="text-xs px-1 py-0">
+                              {getTaskTypeLabel(task.type)}
+                            </Badge>
+                          </div>
+                          {task.status === 'failed' && (
+                            <Button size="sm" variant="outline" onClick={() => handleRegenerateTask(task.id)} disabled={isRetrying === task.id}>
+                               {isRetrying === task.id ? <RefreshCw className="h-3 w-3 animate-spin"/> : 'Retry'}
+                            </Button>
+                          )}
+                        </div>
+                        {task.status === 'failed' && task.error && (
+                          <p className="mt-1 pl-8 text-red-600">{task.error}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className='text-xs text-muted-foreground'>No detailed task information available.</p>
+              )}
+            </div>
           </AccordionContent>
         </AccordionItem>
       </Accordion>

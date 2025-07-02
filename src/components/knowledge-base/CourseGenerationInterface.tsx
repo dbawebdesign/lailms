@@ -340,6 +340,44 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
               {generationJob.status === 'processing' && generationJob.progress >= 70 && generationJob.progress < 90 && 'Generating lesson content...'}
               {generationJob.status === 'processing' && generationJob.progress >= 90 && 'Creating assessments and quizzes...'}
             </div>
+            
+            {/* Background Generation Notice */}
+            <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0">
+                  <Sparkles className="h-5 w-5 text-blue-600 mt-0.5" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    Course Generation in Progress
+                  </h4>
+                  <div className="mt-2 text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                    <p>Your course is being generated in the background. This process may take several minutes depending on the complexity and size of your knowledge base.</p>
+                    <p className="font-medium">You can safely:</p>
+                    <ul className="list-disc list-inside ml-2 space-y-0.5">
+                      <li>Navigate back to your dashboard to work on other tasks</li>
+                      <li>Check on other courses or manage your content</li>
+                    </ul>
+                    <p className="mt-2 font-medium">You'll be notified in the dashboard when your course is ready!</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Dashboard Navigation Button */}
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                onClick={() => window.location.href = '/teach'}
+                className="flex items-center space-x-2"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
+                </svg>
+                <span>Go to Dashboard</span>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -986,11 +1024,7 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
       )}
 
       {/* Generate Button */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <Sparkles className="h-4 w-4" />
-          <span>Course will be generated in the background</span>
-        </div>
+      <div className="flex justify-end">
         <Button 
           onClick={generateCourse} 
           disabled={loading || !title.trim() || !selectedMode}

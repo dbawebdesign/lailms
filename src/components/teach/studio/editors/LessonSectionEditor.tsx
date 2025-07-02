@@ -93,6 +93,25 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
   const lowlightInstance = createLowlight();
   lowlightInstance.register('javascript', javascript);
 
+  // Function to get initial editor content from structured data
+  const getInitialEditorContent = () => {
+    if (section.content && typeof section.content === 'object') {
+      // If we have structured content, get the detailedExplanation
+      if (section.content.expertTeachingContent?.detailedExplanation) {
+        return section.content.expertTeachingContent.detailedExplanation;
+      }
+      // Fallback to text field if it exists
+      if (section.content.text) {
+        return section.content.text;
+      }
+    }
+    // Fallback to raw content if it's a string
+    if (typeof section.content === 'string') {
+      return section.content;
+    }
+    return '';
+  };
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -118,8 +137,8 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
         lowlight: lowlightInstance,
       }),
     ],
-    content: section.content || '', // Initialize with section content (should be JSON for Tiptap)
-    editable: sectionType === 'text' && isEditing, // Only editable if sectionType is 'text' and in editing mode
+    content: getInitialEditorContent(), // Initialize with content from detailedExplanation
+    editable: isEditing, // Always editable when in editing mode
     onUpdate: ({ editor }) => {
       // Debounced save or auto-save logic could go here
       // For now, content is updated on manual save.
@@ -137,8 +156,11 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
       
       try {
         // Handle structured lesson content
-        if (section.content && typeof section.content === 'object' && section.content.text) {
-          // For structured content, use the text field for TipTap editing
+        if (section.content && typeof section.content === 'object' && section.content.expertTeachingContent?.detailedExplanation) {
+          // For structured content, use the detailedExplanation field for TipTap editing
+          newContent = section.content.expertTeachingContent.detailedExplanation;
+        } else if (section.content && typeof section.content === 'object' && section.content.text) {
+          // Fallback to text field for TipTap editing
           newContent = section.content.text;
         } else if (section.content && typeof section.content === 'object' && section.content.type) {
           // For TipTap JSON structure
@@ -162,16 +184,16 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
         editor.commands.setContent('', false);
       }
       
-      editor.setEditable(section.section_type === 'text' && isEditing);
+      editor.setEditable(isEditing);
     }
   }, [section, editor, isEditing]);
 
   // Update editor editability when editing mode changes
   useEffect(() => {
     if (editor) {
-      editor.setEditable(sectionType === 'text' && isEditing);
+      editor.setEditable(isEditing);
     }
-  }, [editor, sectionType, isEditing]); // Ensured isEditing is in the dependency array
+  }, [editor, sectionType, isEditing]);
 
   // Define setLink for BubbleMenu
   const setLinkBubble = useCallback(() => {
@@ -186,43 +208,75 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   }, [editor]);
 
-  // Debounce save function
+  // Debounce save function - ALWAYS saves in structured format
   const debouncedSave = useCallback(
     async (currentTitle: string, currentContent: any, currentSectionType: string) => {
       setIsSaving(true);
       
+      // ALWAYS save content in the structured format
       let contentToSave;
       
-      if (currentSectionType === 'text') {
-        // For text content, preserve the structured format
-        if (section.content && typeof section.content === 'object' && section.content.knowledge_base_integration) {
-          // If we have existing structured content, preserve the metadata and update the text
-          contentToSave = {
-            ...section.content,
-            text: typeof currentContent === 'string' ? currentContent : (editor ? editor.getText() : JSON.stringify(currentContent))
-          };
-        } else {
-          // If we don't have structured content yet, create it
-          contentToSave = {
-            text: typeof currentContent === 'string' ? currentContent : (editor ? editor.getText() : JSON.stringify(currentContent))
-          };
-        }
-      } else if (['introduction', 'core_concept', 'example', 'analysis', 'summary'].includes(currentSectionType)) {
-        // For structured content types, preserve metadata and update text
-        if (section.content && typeof section.content === 'object') {
-          contentToSave = {
-            ...section.content,
-            text: typeof currentContent === 'string' ? currentContent : String(currentContent)
-          };
-        } else {
-          // Create new structured content
-          contentToSave = {
-            text: typeof currentContent === 'string' ? currentContent : String(currentContent)
-          };
-        }
+      // Check if we already have structured content to preserve
+      const hasStructuredContent = section.content && 
+        typeof section.content === 'object' && 
+        (section.content.bridgeToNext || section.content.introduction || section.content.sectionTitle);
+      
+      if (hasStructuredContent) {
+        // Preserve existing structured content and update title and detailedExplanation
+        contentToSave = {
+          ...section.content,
+          sectionTitle: currentTitle,
+          expertTeachingContent: {
+            ...section.content.expertTeachingContent,
+            detailedExplanation: currentContent
+          }
+        };
       } else {
-        // For other content types (video_url, quiz, etc.), save as-is
-        contentToSave = currentContent;
+        // Create new structured content format
+        contentToSave = {
+          bridgeToNext: "This section connects to the next part of the lesson, building on the concepts learned here.",
+          introduction: "This section introduces key concepts that students need to understand.",
+          sectionTitle: currentTitle,
+          expertSummary: "By completing this section, students will have gained important knowledge and skills that prepare them for future learning.",
+          checkForUnderstanding: [
+            "What are the main concepts covered in this section?",
+            "How do these concepts connect to what you learned previously?"
+          ],
+          expertTeachingContent: {
+            expertInsights: [
+              "This content represents foundational knowledge in the subject area.",
+              "Students often benefit from connecting these concepts to real-world applications.",
+              "Building understanding gradually helps students retain information better."
+            ],
+            practicalExamples: [
+              {
+                title: "Understanding the Concept",
+                context: "This example helps illustrate the main ideas presented in this section.",
+                walkthrough: "Step by step, students can see how the concept applies in practice.",
+                keyTakeaways: [
+                  "The main concept is important for understanding the subject.",
+                  "Practical application helps reinforce learning."
+                ]
+              }
+            ],
+            conceptIntroduction: "This section introduces students to important concepts that form the foundation for deeper learning.",
+            detailedExplanation: typeof currentContent === 'string' ? currentContent : 
+              (currentContent && typeof currentContent === 'object' && currentContent.type === 'doc' ? 
+                "Content from the TipTap editor will be displayed here." : 
+                "This section provides detailed explanation of the key concepts."),
+            commonMisconceptions: [
+              {
+                correction: "The correct understanding is based on accurate information and careful analysis.",
+                prevention: "Students can avoid this misconception by focusing on the key principles.",
+                misconception: "Students sometimes misunderstand the basic concepts."
+              }
+            ],
+            realWorldConnections: [
+              "These concepts apply to many situations in the real world.",
+              "Understanding these ideas helps students see the relevance of their learning."
+            ]
+          }
+        };
       }
       
       const updatedData: Partial<LessonSection> = {
@@ -242,12 +296,12 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
         setIsSaving(false);
       }
     },
-    [onSave, section.id, section.content] // section.content in dependencies for preserving metadata
+    [onSave, section.id, section.content]
   );
 
   // Auto-save on content change (debounced)
   useEffect(() => {
-    if (!editor || sectionType !== 'text') {
+    if (!editor) {
       return;
     }
     const handleUpdate = () => {
@@ -263,11 +317,12 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
 
 
   const handleManualSave = async () => {
-    if (!editor && sectionType === 'text') {
-      console.error("Editor not available for saving text content");
+    if (!editor) {
+      console.error("Editor not available for saving content");
       return;
     }
-    const currentContent = sectionType === 'text' && editor ? editor.getJSON() : contentInput; // contentInput for non-text types
+    // Get the content from the editor (this will go into detailedExplanation)
+    const currentContent = editor.getHTML(); // Use HTML for better formatting preservation
     debouncedSave(title, currentContent, sectionType);
   };
   
@@ -329,53 +384,51 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
         </div>
 
         
-        {sectionType === 'text' && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-foreground">
-                Content
-              </label>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEditing(!isEditing)}
-                className="flex items-center gap-2"
-              >
-                {isEditing ? (
-                  <>
-                    <Eye className="h-4 w-4" />
-                    Student Preview
-                  </>
-                ) : (
-                  <>
-                    <Edit className="h-4 w-4" />
-                    Edit Content
-                  </>
-                )}
-              </Button>
-            </div>
-            
-            {isEditing && editor ? (
-              <div>
-                <EditorToolbar editor={editor} />
-                <EditorContent editor={editor} className="mt-0 border border-input rounded-b-md min-h-[200px] p-2 focus:outline-none focus:ring-2 focus:ring-ring prose dark:prose-invert max-w-full" />
-                {editor && (
-                  <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }} className="bg-background border border-input rounded-md shadow-xl p-1 flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()} className={editor.isActive('bold') ? 'is-active bg-muted' : ''}><Bold className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleItalic().run()} className={editor.isActive('italic') ? 'is-active bg-muted' : ''}><Italic className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="sm" onClick={setLinkBubble}><LinkIcon className="h-4 w-4" /></Button>
-                  </BubbleMenu>
-                )}
-              </div>
-            ) : (
-              <div className="border border-input rounded-md min-h-[200px] p-4 bg-background">
-                <ContentRenderer content={section.content} className="prose dark:prose-invert max-w-none" showStudentView={true} sectionType={sectionType} />
-              </div>
-            )}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-foreground">
+              Content (goes into Detailed Explanation)
+            </label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditing(!isEditing)}
+              className="flex items-center gap-2"
+            >
+              {isEditing ? (
+                <>
+                  <Eye className="h-4 w-4" />
+                  Student Preview
+                </>
+              ) : (
+                <>
+                  <Edit className="h-4 w-4" />
+                  Edit Content
+                </>
+              )}
+            </Button>
           </div>
-        )}
+          
+          {isEditing && editor ? (
+            <div>
+              <EditorToolbar editor={editor} />
+              <EditorContent editor={editor} className="mt-0 border border-input rounded-b-md min-h-[200px] p-2 focus:outline-none focus:ring-2 focus:ring-ring prose dark:prose-invert max-w-full" />
+              {editor && (
+                <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }} className="bg-background border border-input rounded-md shadow-xl p-1 flex gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()} className={editor.isActive('bold') ? 'is-active bg-muted' : ''}><Bold className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleItalic().run()} className={editor.isActive('italic') ? 'is-active bg-muted' : ''}><Italic className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="sm" onClick={setLinkBubble}><LinkIcon className="h-4 w-4" /></Button>
+                </BubbleMenu>
+              )}
+            </div>
+          ) : (
+            <div className="border border-input rounded-md min-h-[200px] p-4 bg-background">
+              <ContentRenderer content={section.content} className="prose dark:prose-invert max-w-none" showStudentView={true} sectionType={sectionType} />
+            </div>
+          )}
+        </div>
 
-        {sectionType !== 'text' && (
+        {false && (
         <div>
           <div className="flex items-center justify-between mb-2">
             <label htmlFor="nonTextContent" className="block text-sm font-medium text-foreground">
@@ -442,7 +495,7 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
         <div className="flex items-center justify-between mt-6">
             <Button 
               onClick={handleManualSave} 
-              disabled={isSaving || (sectionType === 'text' && !isEditing)}
+              disabled={isSaving}
             >
                 {isSaving ? 'Saving...' : 'Save Section'}
             </Button>

@@ -63,6 +63,10 @@ export async function GET(
       });
     } else {
       // Fallback to database record if not live in memory
+      // If result_data contains task summary, extract tasks for compatibility
+      const resultData = job.result_data as any;
+      const tasks = resultData?.tasks || undefined;
+      
       return NextResponse.json({
         success: true,
         isLive: false,
@@ -71,7 +75,8 @@ export async function GET(
           status: job.status,
           progress: job.progress_percentage,
           error: job.error_message,
-          result: job.result_data
+          result: job.result_data,
+          tasks: tasks // Include tasks from stored result_data if available
         },
         createdAt: job.created_at,
         updatedAt: job.updated_at
