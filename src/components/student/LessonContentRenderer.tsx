@@ -459,6 +459,7 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
   const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
   const [currentProgressFromDB, setCurrentProgressFromDB] = useState<{progress: number, status: string, lastPosition?: string} | null>(null);
   const [showMediaPanel, setShowMediaPanel] = useState(false);
+  const [activeTab, setActiveTab] = useState("content");
 
   // Use the comprehensive lesson data if available, otherwise fall back to the passed content
   const lesson = lessonData?.lesson;
@@ -469,6 +470,11 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
   // Get current section content
   const currentSection = sections[currentSectionIndex];
   const displayContent = currentSection?.content || content;
+
+  // Reset tab to "content" whenever section changes
+  useEffect(() => {
+    setActiveTab("content");
+  }, [currentSectionIndex]);
 
 
 
@@ -1002,7 +1008,7 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
             }}
             actionable={true}
           >
-            <Tabs defaultValue="content" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-3 mb-8">
                 <TabsTrigger value="content" className="flex items-center space-x-2">
                   <BookOpen className="h-4 w-4" />

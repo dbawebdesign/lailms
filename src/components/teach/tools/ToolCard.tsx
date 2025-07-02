@@ -21,6 +21,7 @@ import {
   ArrowRight,
   FolderOpen
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // Icon mapping for the tools
 const iconMap = {
@@ -147,15 +148,23 @@ export function ToolCard({ tool, onSelect }: ToolCardProps) {
           Use Tool
           <ArrowRight className="w-4 h-4 ml-2 transition-transform duration-300 group-hover:translate-x-1" />
         </Button>
-        <Button 
-          variant="outline"
-          size="sm"
-          onClick={handleLibraryClick}
-          className="px-3 transition-all duration-300 hover:bg-primary hover:text-primary-foreground"
-          title={`View ${tool.name} Library`}
-        >
-          <FolderOpen className="w-4 h-4" />
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={handleLibraryClick}
+                className="px-3 transition-all duration-300 hover:bg-primary hover:text-primary-foreground"
+              >
+                <FolderOpen className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>
+              <p>View {tool.name} Library</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </CardFooter>
 
       {/* Subtle hover overlay */}

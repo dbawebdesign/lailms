@@ -441,7 +441,7 @@ export default function StudentCourseNavigationTree({
                       {courseData.description}
                     </p>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-md">
+                  <TooltipContent side="right" sideOffset={8} className="max-w-md">
                     <p className="text-sm">{courseData.description}</p>
                   </TooltipContent>
                 </Tooltip>
@@ -548,7 +548,7 @@ export default function StudentCourseNavigationTree({
                               {path.description}
                             </p>
                           </TooltipTrigger>
-                          <TooltipContent side="bottom" className="max-w-md">
+                          <TooltipContent side="right" sideOffset={8} className="max-w-md">
                             <p className="text-sm">{path.description}</p>
                           </TooltipContent>
                         </Tooltip>
@@ -689,7 +689,7 @@ export default function StudentCourseNavigationTree({
                       {selectedPath.description}
                     </p>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-md">
+                  <TooltipContent side="right" sideOffset={8} className="max-w-md">
                     <p className="text-sm">{selectedPath.description}</p>
                   </TooltipContent>
                 </Tooltip>
@@ -891,7 +891,7 @@ export default function StudentCourseNavigationTree({
                         {selectedLesson.description}
                       </p>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-md">
+                    <TooltipContent side="right" sideOffset={8} className="max-w-md">
                       <p className="text-sm">{selectedLesson.description}</p>
                     </TooltipContent>
                   </Tooltip>
