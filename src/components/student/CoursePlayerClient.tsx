@@ -15,7 +15,15 @@ import LunaContextElement from '@/components/luna/LunaContextElement';
 import { NewSchemaAssessmentTaker } from '@/components/assessments/v2/NewSchemaAssessmentTaker';
 
 // A more detailed content player
-const ContentPlayer = ({ selectedItemId, selectedItemType }: { selectedItemId?: string, selectedItemType?: 'lesson' | 'assessment' }) => {
+const ContentPlayer = ({ 
+  selectedItemId, 
+  selectedItemType, 
+  onClearSelection 
+}: { 
+  selectedItemId?: string, 
+  selectedItemType?: 'lesson' | 'assessment',
+  onClearSelection?: () => void 
+}) => {
   const [loading, setLoading] = useState(false);
   const [content, setContent] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -111,9 +119,10 @@ const ContentPlayer = ({ selectedItemId, selectedItemType }: { selectedItemId?: 
             assessmentId={selectedItemId!}
             onComplete={(attemptId) => {
               console.log('Assessment completed:', attemptId);
-              // TODO: Navigate to results or next item
-              // For now, we'll just refresh the navigation to show updated progress
-              window.location.reload();
+              // Clear the selected item to return to the course view
+              if (onClearSelection) {
+                onClearSelection();
+              }
             }}
             className="h-full"
           />
@@ -219,6 +228,10 @@ export default function CoursePlayerClient({ courseId }: CoursePlayerClientProps
           <ContentPlayer
             selectedItemId={selectedItemId}
             selectedItemType={selectedItemType}
+            onClearSelection={() => {
+              setSelectedItemId(undefined);
+              setSelectedItemType(undefined);
+            }}
           />
         </div>
       </div>

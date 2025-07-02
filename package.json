@@ -81,6 +81,7 @@
     "framer-motion": "^12.19.2",
     "gpt-tokenizer": "^3.0.1",
     "idb": "^8.0.3",
+    "js-confetti": "^0.12.0",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
     "lowlight": "^3.3.0",

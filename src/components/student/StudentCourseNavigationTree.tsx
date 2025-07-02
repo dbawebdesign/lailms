@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Lock
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface StudentCourseNavigationTreeProps {
@@ -205,6 +206,26 @@ export default function StudentCourseNavigationTree({
     return <div className="w-2 h-2 rounded-full bg-gray-300" />;
   };
 
+  // Check if a path is accessible based on sequential completion
+  const isPathAccessible = (path: PathWithProgress, pathIndex: number) => {
+    // First path is always accessible
+    if (pathIndex === 0) return true;
+    
+    // For subsequent paths, check if the previous path is completed
+    const previousPath = courseData?.paths[pathIndex - 1];
+    return previousPath?.completed || false;
+  };
+
+  // Check if a lesson is accessible based on sequential completion
+  const isLessonAccessible = (lesson: LessonWithProgress, lessonIndex: number, lessons: LessonWithProgress[]) => {
+    // First lesson is always accessible
+    if (lessonIndex === 0) return true;
+    
+    // For subsequent lessons, check if the previous lesson is completed
+    const previousLesson = lessons[lessonIndex - 1];
+    return previousLesson?.completed || false;
+  };
+
   // Check if an assessment is accessible based on prerequisites
   const isAssessmentAccessible = (assessment: AssessmentWithProgress, context?: { lesson?: LessonWithProgress, path?: PathWithProgress }) => {
     // Lesson assessments: require the lesson to be completed
@@ -227,14 +248,20 @@ export default function StudentCourseNavigationTree({
     return true; // Default to accessible if we can't determine prerequisites
   };
 
-  const navigateToPath = (path: PathWithProgress) => {
-    setSelectedPath(path);
-    setNavigationState('path');
+  const navigateToPath = (path: PathWithProgress, pathIndex: number) => {
+    // Only allow navigation if the path is accessible
+    if (isPathAccessible(path, pathIndex)) {
+      setSelectedPath(path);
+      setNavigationState('path');
+    }
   };
 
-  const navigateToLesson = (lesson: LessonWithProgress) => {
-    setSelectedLesson(lesson);
-    setNavigationState('lesson');
+  const navigateToLesson = (lesson: LessonWithProgress, lessonIndex: number, lessons: LessonWithProgress[]) => {
+    // Only allow navigation if the lesson is accessible
+    if (isLessonAccessible(lesson, lessonIndex, lessons)) {
+      setSelectedLesson(lesson);
+      setNavigationState('lesson');
+    }
   };
 
   const navigateBack = () => {
@@ -392,90 +419,202 @@ export default function StudentCourseNavigationTree({
       >
         <div className="space-y-6">
           {/* Course Header */}
-          <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
-            <div className="flex items-center space-x-3 flex-1 min-w-0">
+          <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 space-y-3">
+            {/* Top row: Icon + Title */}
+            <div className="flex items-center space-x-3">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                 <GraduationCap className="w-4 h-4 text-white" />
               </div>
-              <div className="min-w-0 flex-1">
+              <div className="flex-1 min-w-0">
                 <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
                   {courseData.title}
                 </h1>
-                <div className="flex items-center space-x-3 mt-1">
-                  <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1">
-                    <div 
-                      className="h-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
-                      style={{ width: `${courseData.overallProgress}%` }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    {courseData.overallProgress}%
-                  </span>
-                </div>
               </div>
             </div>
+
+            {/* Description */}
+            {courseData.description && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 cursor-help">
+                      {courseData.description}
+                    </p>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-md">
+                    <p className="text-sm">{courseData.description}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => fetchCourseData(true)}
-              disabled={loading || refreshing}
-              className="w-8 h-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              <RefreshCw className={cn("w-4 h-4", (loading || refreshing) && "animate-spin")} />
-            </Button>
+            {/* Bottom row: Progress + Refresh */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3 flex-1">
+                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                  <div 
+                    className="h-1.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
+                    style={{ width: `${courseData.overallProgress}%` }}
+                  />
+                </div>
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  {courseData.overallProgress}%
+                </span>
+              </div>
+              
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => fetchCourseData(true)}
+                disabled={loading || refreshing}
+                className="w-8 h-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 ml-4"
+              >
+                <RefreshCw className={cn("w-4 h-4", (loading || refreshing) && "animate-spin")} />
+              </Button>
+            </div>
           </div>
 
           {/* Learning Paths List */}
           <div className="space-y-3">
-            {courseData.paths.map((path, index) => (
-              <button
-                key={path.id}
-                onClick={() => navigateToPath(path)}
-                className="w-full text-left p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-white/5 transition-all duration-200 group"
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                    <BookOpen className="w-5 h-5 text-white" />
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
+            {courseData.paths.map((path, index) => {
+              const isAccessible = isPathAccessible(path, index);
+              const isCompleted = path.completed;
+              
+              return (
+                <button
+                  key={path.id}
+                  onClick={() => navigateToPath(path, index)}
+                  disabled={!isAccessible}
+                  className={cn(
+                    "w-full text-left p-4 rounded-xl border transition-all duration-200 group relative",
+                    isCompleted 
+                      ? "bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 border-emerald-200 dark:border-emerald-800/30" 
+                      : isAccessible 
+                        ? "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-white/5" 
+                        : "bg-gray-50/50 dark:bg-gray-800/30 border-gray-200/50 dark:border-gray-700/50 opacity-60 cursor-not-allowed"
+                  )}
+                >
+                  <div className="space-y-3">
+                    {/* Top row: Icon + Title */}
+                    <div className="flex items-center space-x-3">
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center",
+                        isCompleted 
+                          ? "bg-gradient-to-br from-emerald-500 to-green-600" 
+                          : isAccessible 
+                            ? "bg-gradient-to-br from-blue-500 to-purple-600" 
+                            : "bg-gray-400 dark:bg-gray-600"
+                      )}>
+                        {isCompleted ? (
+                          <CheckCircle2 className="w-4 h-4 text-white" />
+                        ) : !isAccessible ? (
+                          <Lock className="w-4 h-4 text-white" />
+                        ) : (
+                          <BookOpen className="w-4 h-4 text-white" />
+                        )}
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                        <h3 className={cn(
+                          "text-base font-semibold",
+                          isCompleted 
+                            ? "text-emerald-900 dark:text-emerald-100" 
+                            : isAccessible 
+                              ? "text-gray-900 dark:text-white" 
+                              : "text-gray-500 dark:text-gray-400"
+                        )}>
                           {path.title}
                         </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                          {path.description}
-                        </p>
-                        <div className="flex items-center space-x-3 mt-2">
-                          <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1">
-                            <div 
-                              className="h-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
-                              style={{ width: `${path.progress}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                            {path.progress}%
+                        {!isAccessible && index > 0 && (
+                          <span className="text-xs text-gray-400 dark:text-gray-500">
+                            Complete previous path to unlock
                           </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    {path.description && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <p className={cn(
+                              "text-sm line-clamp-2 cursor-help",
+                              isCompleted 
+                                ? "text-emerald-700 dark:text-emerald-300" 
+                                : isAccessible 
+                                  ? "text-gray-600 dark:text-gray-400" 
+                                  : "text-gray-400 dark:text-gray-500"
+                            )}>
+                              {path.description}
+                            </p>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-md">
+                            <p className="text-sm">{path.description}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                    
+                    {/* Bottom row: Progress + Badges */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3 flex-1">
+                        <div className={cn(
+                          "flex-1 rounded-full h-1.5",
+                          isCompleted 
+                            ? "bg-emerald-200 dark:bg-emerald-800" 
+                            : "bg-gray-200 dark:bg-gray-700"
+                        )}>
+                          <div 
+                            className={cn(
+                              "h-1.5 rounded-full transition-all duration-300",
+                              isCompleted 
+                                ? "bg-gradient-to-r from-emerald-500 to-green-500" 
+                                : "bg-gradient-to-r from-blue-500 to-purple-600"
+                            )}
+                            style={{ width: `${path.progress}%` }}
+                          />
                         </div>
+                        <span className={cn(
+                          "text-xs font-medium",
+                          isCompleted 
+                            ? "text-emerald-700 dark:text-emerald-300" 
+                            : isAccessible 
+                              ? "text-gray-600 dark:text-gray-400" 
+                              : "text-gray-400 dark:text-gray-500"
+                        )}>
+                          {path.progress}%
+                        </span>
                       </div>
                       
-                      <div className="flex flex-col items-end space-y-2 ml-4">
-                        <span className="text-xs text-gray-500 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-full">
+                      <div className="flex items-center space-x-2 ml-4">
+                        <span className={cn(
+                          "text-xs px-2 py-1 rounded-full",
+                          isCompleted 
+                            ? "text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30" 
+                            : isAccessible 
+                              ? "text-gray-500 bg-gray-100 dark:bg-gray-800" 
+                              : "text-gray-400 bg-gray-100/50 dark:bg-gray-800/50"
+                        )}>
                           {path.lessons.length} lesson{path.lessons.length !== 1 ? 's' : ''}
                         </span>
                         {path.assessments.length > 0 && (
-                          <span className="text-xs text-amber-700 dark:text-amber-300 px-2 py-1 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+                          <span className={cn(
+                            "text-xs px-2 py-1 rounded-full",
+                            isCompleted 
+                              ? "text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30" 
+                              : isAccessible 
+                                ? "text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30" 
+                                : "text-gray-400 bg-gray-100/50 dark:bg-gray-800/50"
+                          )}>
                             {path.assessments.length} quiz{path.assessments.length !== 1 ? 'zes' : ''}
                           </span>
                         )}
                       </div>
                     </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
 
           {/* Final Exams */}
@@ -528,8 +667,37 @@ export default function StudentCourseNavigationTree({
       >
         <div className="space-y-6">
           {/* Path Header with Navigation */}
-          <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
-            <div className="flex items-center space-x-3 mb-3">
+          <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 space-y-3">
+            {/* Top row: Icon + Title */}
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <BookOpen className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {selectedPath.title}
+                </h1>
+              </div>
+            </div>
+
+            {/* Description */}
+            {selectedPath.description && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 cursor-help">
+                      {selectedPath.description}
+                    </p>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-md">
+                    <p className="text-sm">{selectedPath.description}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            
+            {/* Bottom row: Navigation + Progress */}
+            <div className="flex items-center space-x-3">
               <Button
                 variant="ghost"
                 size="sm"
@@ -546,76 +714,106 @@ export default function StudentCourseNavigationTree({
               >
                 <Home className="w-4 h-4" />
               </Button>
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                <BookOpen className="w-4 h-4 text-white" />
+              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                <div 
+                  className="h-1.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
+                  style={{ width: `${selectedPath.progress}%` }}
+                />
               </div>
-              <div className="flex-1">
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {selectedPath.title}
-                </h1>
-                <div className="flex items-center space-x-3 mt-1">
-                  <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1">
-                    <div 
-                      className="h-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
-                      style={{ width: `${selectedPath.progress}%` }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    {selectedPath.progress}%
-                  </span>
-                </div>
-              </div>
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                {selectedPath.progress}%
+              </span>
             </div>
-            {selectedPath.description && (
-              <p className="text-sm text-gray-600 dark:text-gray-400 pl-20">
-                {selectedPath.description}
-              </p>
-            )}
           </div>
 
           {/* Lessons List */}
           <div className="space-y-2">
-            {selectedPath.lessons.map((lesson, index) => (
-              <div key={lesson.id} className="space-y-1">
-                <button
-                  onClick={() => lesson.assessments.length > 0 ? navigateToLesson(lesson) : onSelectItem('lesson', lesson.id)}
-                  className={cn(
-                    "w-full text-left p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 transition-all duration-200 group",
-                    selectedItemId === lesson.id && selectedItemType === 'lesson'
-                      ? "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800" 
-                      : "hover:bg-gray-50/50 dark:hover:bg-white/5"
-                  )}
-                >
-                  <div className="flex items-center space-x-3">
-                    {getStatusIndicator(lesson.status)}
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-base text-gray-900 dark:text-white">
-                            {lesson.title}
-                          </h3>
+            {selectedPath.lessons.map((lesson, index) => {
+              const isAccessible = isLessonAccessible(lesson, index, selectedPath.lessons);
+              const isCompleted = lesson.completed || lesson.status === 'completed';
+              
+              return (
+                <div key={lesson.id} className="space-y-1">
+                  <button
+                    onClick={() => {
+                      if (isAccessible) {
+                        lesson.assessments.length > 0 ? navigateToLesson(lesson, index, selectedPath.lessons) : onSelectItem('lesson', lesson.id);
+                      }
+                    }}
+                    disabled={!isAccessible}
+                    className={cn(
+                      "w-full text-left p-4 rounded-lg border transition-all duration-200 group",
+                      !isAccessible 
+                        ? "bg-gray-100/50 dark:bg-gray-800/30 border-gray-200/50 dark:border-gray-700/50 cursor-not-allowed" 
+                        : isCompleted
+                          ? "bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-emerald-200 dark:border-emerald-800/50"
+                          : selectedItemId === lesson.id && selectedItemType === 'lesson'
+                            ? "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800" 
+                            : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-white/5"
+                    )}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-3">
+                        {!isAccessible ? (
+                          <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                            <Lock className="w-4 h-4 text-gray-400" />
+                          </div>
+                        ) : isCompleted ? (
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
+                            <CheckCircle2 className="w-4 h-4 text-white" />
+                          </div>
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                            <BookOpen className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                        {getStatusIndicator(lesson.status)}
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <h3 className={cn(
+                              "font-medium text-base",
+                              !isAccessible ? "text-gray-400 dark:text-gray-500" :
+                              isCompleted ? "text-emerald-700 dark:text-emerald-300" :
+                              "text-gray-900 dark:text-white"
+                            )}>
+                              {lesson.title}
+                            </h3>
+                            
+                            {!isAccessible && (
+                              <p className="text-xs text-gray-400 mt-1">
+                                Complete the previous lesson first
+                              </p>
+                            )}
+                            
+                            {lesson.progress > 0 && lesson.progress < 100 && isAccessible && (
+                              <div className="mt-2">
+                                <Progress value={lesson.progress} className="h-1" />
+                              </div>
+                            )}
+                          </div>
                           
-                          {lesson.progress > 0 && lesson.progress < 100 && (
-                            <div className="mt-2">
-                              <Progress value={lesson.progress} className="h-1" />
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center space-x-3 text-xs text-gray-500 ml-4">
-                          {lesson.assessments.length > 0 && (
-                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-full">
-                              {lesson.assessments.length} quiz{lesson.assessments.length !== 1 ? 'zes' : ''}
-                            </span>
-                          )}
+                          <div className="flex items-center space-x-3 text-xs text-gray-500 ml-4">
+                            {lesson.assessments.length > 0 && (
+                              <span className={cn(
+                                "px-2 py-1 rounded-full",
+                                !isAccessible ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500" :
+                                isCompleted ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" :
+                                "bg-gray-100 dark:bg-gray-800"
+                              )}>
+                                {lesson.assessments.length} quiz{lesson.assessments.length !== 1 ? 'zes' : ''}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </button>
-              </div>
-            ))}
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           {/* Path Assessments */}
@@ -669,8 +867,40 @@ export default function StudentCourseNavigationTree({
       >
         <div className="space-y-6">
           {/* Lesson Header with Navigation */}
-          <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
-            <div className="flex items-center space-x-3 mb-3">
+          <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 space-y-3">
+            {/* Top row: Icon + Title */}
+            <div className="flex items-center space-x-3">
+              {getStatusIndicator(selectedLesson.status)}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {selectedLesson.title}
+                </h1>
+              </div>
+            </div>
+
+            {/* Description and breadcrumb */}
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500">
+                {selectedPath.title} • Lesson {selectedPath.lessons.findIndex(l => l.id === selectedLesson.id) + 1} of {selectedPath.lessons.length}
+              </p>
+              {selectedLesson.description && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 cursor-help">
+                        {selectedLesson.description}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-md">
+                      <p className="text-sm">{selectedLesson.description}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+            
+            {/* Bottom row: Navigation + Progress */}
+            <div className="flex items-center space-x-3">
               <Button
                 variant="ghost"
                 size="sm"
@@ -687,33 +917,15 @@ export default function StudentCourseNavigationTree({
               >
                 <Home className="w-4 h-4" />
               </Button>
-              {getStatusIndicator(selectedLesson.status)}
-              <div className="flex-1">
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {selectedLesson.title}
-                </h1>
-                <div className="flex items-center space-x-3 mt-1">
-                  <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1">
-                    <div 
-                      className="h-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
-                      style={{ width: `${selectedLesson.progress}%` }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    {selectedLesson.progress}%
-                  </span>
-                </div>
+              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                <div 
+                  className="h-1.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
+                  style={{ width: `${selectedLesson.progress}%` }}
+                />
               </div>
-            </div>
-            <div className="pl-20">
-              <p className="text-xs text-gray-500 mb-2">
-                {selectedPath.title} • Lesson {selectedPath.lessons.findIndex(l => l.id === selectedLesson.id) + 1} of {selectedPath.lessons.length}
-              </p>
-              {selectedLesson.description && (
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {selectedLesson.description}
-                </p>
-              )}
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                {selectedLesson.progress}%
+              </span>
             </div>
           </div>
 

@@ -380,6 +380,24 @@ OUTPUT FORMAT (JSON):
       const totalEarned = responses?.reduce((sum, r) => sum + ((r as any).final_score || 0), 0) || 0;
       const percentage = totalPossible > 0 ? (totalEarned / totalPossible) * 100 : 0;
 
+      // Get the assessment's passing score to determine if student passed
+      const { data: attempt, error: attemptError } = await supabase
+        .from('student_attempts')
+        .select(`
+          assessment:assessments (
+            passing_score_percentage
+          )
+        `)
+        .eq('id', attemptId)
+        .single();
+
+      if (attemptError) throw attemptError;
+
+      const passingScore = (attempt as any)?.assessment?.passing_score_percentage || 70;
+      const passed = percentage >= passingScore;
+
+      console.log(`AI Grading Final Results for ${attemptId}: ${totalEarned}/${totalPossible} = ${percentage.toFixed(1)}% (${passed ? 'PASSED' : 'FAILED'}, threshold: ${passingScore}%)`);
+
       // Update attempt with calculated scores
       const { error: updateError } = await supabase
         .from('student_attempts')
@@ -387,6 +405,7 @@ OUTPUT FORMAT (JSON):
           total_points: totalPossible,
           earned_points: totalEarned,
           percentage_score: percentage,
+          passed: passed, // Add the passed status!
           ai_grading_status: 'completed',
           ai_graded_at: new Date().toISOString(),
           status: 'graded'

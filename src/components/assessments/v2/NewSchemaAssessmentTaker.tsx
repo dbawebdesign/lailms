@@ -19,6 +19,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { Trophy, CheckCircle, Clock, ArrowLeft } from 'lucide-react';
 
 import { NewSchemaQuestionMultipleChoice } from './questions/NewSchemaQuestionMultipleChoice';
 import { NewSchemaQuestionTrueFalse } from './questions/NewSchemaQuestionTrueFalse';
@@ -26,10 +28,24 @@ import { NewSchemaQuestionShortAnswer } from './questions/NewSchemaQuestionShort
 import { NewSchemaQuestionEssay } from './questions/NewSchemaQuestionEssay';
 import { NewSchemaQuestionMatching } from './questions/NewSchemaQuestionMatching';
 
+// @ts-ignore - js-confetti doesn't have types
+import JSConfetti from 'js-confetti';
+
 interface NewSchemaAssessmentTakerProps {
   assessmentId: string;
   onComplete?: (attemptId: string) => void;
   className?: string;
+}
+
+interface AssessmentResults {
+  success: boolean;
+  attemptId: string;
+  totalPoints: number;
+  earnedPoints: number;
+  percentageScore: number;
+  passed: boolean | null;
+  needsAiGrading: boolean;
+  message: string;
 }
 
 export function NewSchemaAssessmentTaker({ 
@@ -57,6 +73,16 @@ export function NewSchemaAssessmentTaker({
   // Prevent concurrent initialization - use a more robust approach
   const initializingRef = useRef(false);
   const initializationPromiseRef = useRef<Promise<void> | null>(null);
+
+  // New completion state
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [completionResults, setCompletionResults] = useState<AssessmentResults | null>(null);
+  const [showScore, setShowScore] = useState(false);
+  const [justGraded, setJustGraded] = useState(false);
+  
+  const confettiRef = useRef<JSConfetti | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Register component with Luna on mount
   useEffect(() => {
@@ -114,12 +140,19 @@ export function NewSchemaAssessmentTaker({
 
   // Timer for tracking time spent
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeSpent(prev => prev + 1);
-    }, 1000);
+    if (!isCompleted) {
+      timerRef.current = setInterval(() => {
+        setTimeSpent(prev => prev + 1);
+      }, 1000);
+    }
 
-    return () => clearInterval(timer);
-  }, []);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [isCompleted]);
 
   // Initialize assessment attempt
   useEffect(() => {
@@ -175,6 +208,91 @@ export function NewSchemaAssessmentTaker({
     };
   }, [assessmentId]);
 
+  // Initialize confetti
+  useEffect(() => {
+    confettiRef.current = new JSConfetti();
+    return () => {
+      confettiRef.current = null;
+    };
+  }, []);
+
+  // Poll for AI grading completion
+  const pollGradingStatus = async (attemptId: string) => {
+    try {
+      const response = await fetch(`/api/learn/assessments/status?attemptId=${attemptId}`);
+      if (!response.ok) return;
+      
+      const statusData = await response.json();
+      
+      // If grading is complete, update the results
+      if (statusData.isGradingComplete && completionResults) {
+        setJustGraded(true);
+        setCompletionResults({
+          ...completionResults,
+          totalPoints: statusData.totalPoints,
+          earnedPoints: statusData.earnedPoints,
+          percentageScore: statusData.percentageScore,
+          passed: statusData.passed,
+          needsAiGrading: false,
+          message: statusData.gradingFailed 
+            ? 'Grading completed with some issues. Please contact support if needed.'
+            : 'Assessment graded successfully!'
+        });
+        
+        // Stop polling
+        if (pollTimerRef.current) {
+          clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
+        
+        // Trigger a celebratory confetti burst for the final score
+        if (confettiRef.current && !statusData.gradingFailed) {
+          setTimeout(() => {
+            if (confettiRef.current) {
+              confettiRef.current.addConfetti({
+                confettiColors: ['#4ade80', '#22c55e', '#16a34a'],
+                confettiRadius: 5,
+                confettiNumber: 150,
+              });
+            }
+          }, 500);
+        }
+        
+        // Reset the "just graded" indicator after animation
+        setTimeout(() => {
+          setJustGraded(false);
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Error polling grading status:', error);
+    }
+  };
+
+  // Start polling when AI grading is needed
+  useEffect(() => {
+    if (completionResults?.needsAiGrading && completionResults.attemptId) {
+      // Start polling every 3 seconds
+      pollTimerRef.current = setInterval(() => {
+        pollGradingStatus(completionResults.attemptId);
+      }, 3000);
+      
+      // Stop polling after 10 minutes to prevent infinite polling
+      setTimeout(() => {
+        if (pollTimerRef.current) {
+          clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
+      }, 600000); // 10 minutes
+    }
+    
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
+  }, [completionResults?.needsAiGrading, completionResults?.attemptId, completionResults]);
+
   // Handle answer changes
   const handleAnswerChange = (questionId: string, responseData: any) => {
     setResponses(prev => {
@@ -229,13 +347,53 @@ export function NewSchemaAssessmentTaker({
         throw new Error(errorData.message || 'Failed to submit assessment');
       }
       
-      const result = await response.json();
+      const result: AssessmentResults = await response.json();
       
-      if (onComplete) {
-        onComplete(result.attemptId);
-      } else {
-        router.push(`/assessments/results/${result.attemptId}`);
+      // Stop the timer immediately
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
+      
+      // Set completion state and trigger confetti
+      setCompletionResults(result);
+      setIsCompleted(true);
+      
+      // Trigger spectacular confetti animation
+      if (confettiRef.current) {
+        // Initial burst
+        confettiRef.current.addConfetti({
+          confettiRadius: 6,
+          confettiNumber: 300,
+        });
+        
+        // Second burst with different colors after a short delay
+        setTimeout(() => {
+          if (confettiRef.current) {
+            confettiRef.current.addConfetti({
+              confettiColors: ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dda0dd'],
+              confettiRadius: 8,
+              confettiNumber: 200,
+            });
+          }
+        }, 300);
+        
+        // Final celebratory burst
+        setTimeout(() => {
+          if (confettiRef.current) {
+            confettiRef.current.addConfetti({
+              emojis: ['🎉', '🎊', '⭐', '🏆'],
+              emojiSize: 50,
+              confettiNumber: 50,
+            });
+          }
+        }, 600);
+      }
+      
+      // Show score after a short delay
+      setTimeout(() => {
+        setShowScore(true);
+      }, 1500);
       
     } catch (err: any) {
       console.error('Error submitting assessment:', err);
@@ -358,6 +516,144 @@ export function NewSchemaAssessmentTaker({
   const progressValue = ((currentQuestionIndex + 1) / questions.length) * 100;
   const isLastQuestion = currentQuestionIndex === questions.length - 1;
   const canGoNext = responses.some(r => r.question_id === currentQuestion.id);
+
+
+
+  // Handle navigation back
+  const handleNavigateBack = () => {
+    // Stop polling when navigating away
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    
+    if (onComplete && completionResults) {
+      onComplete(completionResults.attemptId);
+    } else {
+      router.back();
+    }
+  };
+
+  // Completion screen
+  if (isCompleted && completionResults) {
+    return (
+      <div className={`container mx-auto p-6 max-w-4xl ${className || ''}`}>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Card className="w-full max-w-2xl shadow-2xl border-0 bg-gradient-to-br from-background to-muted/20">
+            <CardContent className="p-12 text-center space-y-8">
+              {/* Celebration Icon */}
+              <div className="flex justify-center">
+                <Trophy className="h-20 w-20 text-yellow-500 animate-bounce" />
+              </div>
+
+              {/* Completion Message */}
+              <div className="space-y-4">
+                <h1 className="text-4xl font-bold text-foreground">
+                  Assessment Complete!
+                </h1>
+                <p className="text-lg text-muted-foreground">
+                  Congratulations! You've successfully completed the assessment.
+                </p>
+              </div>
+
+              {/* Score Display */}
+              {showScore && (
+                <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-700">
+                  <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-8 border">
+                    <div className="space-y-4">
+                      <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                        Your Score
+                      </p>
+                                             <div className="text-6xl font-bold text-primary transition-all duration-1000">
+                         {completionResults.needsAiGrading ? (
+                           <div className="flex items-center justify-center gap-3">
+                             <Clock className="h-12 w-12 animate-spin" />
+                             <span className="text-3xl">Grading...</span>
+                           </div>
+                         ) : (
+                           <div className="animate-in zoom-in-50 duration-700">
+                             {Math.round(completionResults.percentageScore)}%
+                           </div>
+                         )}
+                       </div>
+                      
+                      {!completionResults.needsAiGrading && (
+                        <Badge 
+                          variant={completionResults.passed ? 'default' : 'destructive'} 
+                          className="text-lg px-4 py-2"
+                        >
+                          {completionResults.passed ? 'Passed' : 'Failed'}
+                        </Badge>
+                      )}
+                      
+                                             {completionResults.needsAiGrading && (
+                         <div className="space-y-2">
+                           <Badge variant="outline" className="text-sm px-3 py-1">
+                             AI Grading in Progress
+                           </Badge>
+                           <p className="text-sm text-muted-foreground">
+                             Your essay and short answer questions are being graded. 
+                             Final results will be available shortly.
+                           </p>
+                         </div>
+                       )}
+                       
+                       {justGraded && (
+                         <div className="animate-in slide-in-from-bottom-2 duration-500">
+                           <Badge variant="default" className="text-sm px-3 py-1 bg-green-500">
+                             ✨ Grading Complete!
+                           </Badge>
+                         </div>
+                       )}
+                    </div>
+                  </div>
+
+                  {/* Score Breakdown */}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="bg-muted/50 rounded-lg p-4">
+                      <p className="font-medium text-muted-foreground">Points Earned</p>
+                      <p className="text-2xl font-bold">
+                        {completionResults.earnedPoints} / {completionResults.totalPoints}
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg p-4">
+                      <p className="font-medium text-muted-foreground">Time Spent</p>
+                      <p className="text-2xl font-bold">
+                        {Math.floor(timeSpent / 60)}:{(timeSpent % 60).toString().padStart(2, '0')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Navigation Button */}
+                  <Button 
+                    onClick={handleNavigateBack}
+                    size="lg" 
+                    className="w-full max-w-sm mx-auto text-lg py-6"
+                  >
+                    <ArrowLeft className="h-5 w-5 mr-2" />
+                    Continue Learning
+                  </Button>
+                </div>
+              )}
+
+              {/* Loading state while waiting for score */}
+              {!showScore && (
+                <div className="space-y-4">
+                  <div className="animate-pulse">
+                    <div className="h-4 bg-muted rounded w-3/4 mx-auto mb-4"></div>
+                    <div className="h-16 bg-muted rounded w-1/2 mx-auto"></div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Calculating your results...
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`container mx-auto p-6 max-w-4xl ${className || ''}`}>
