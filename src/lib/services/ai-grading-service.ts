@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Tables } from 'packages/types/db';
 import OpenAI from 'openai';
 import pLimit from 'p-limit';
+import { HierarchicalProgressService } from './hierarchical-progress-service';
 
 // Types for AI grading functionality
 interface GradingRequest {
@@ -384,7 +385,9 @@ OUTPUT FORMAT (JSON):
       const { data: attempt, error: attemptError } = await supabase
         .from('student_attempts')
         .select(`
+          student_id,
           assessment:assessments (
+            id,
             passing_score_percentage
           )
         `)
@@ -413,6 +416,30 @@ OUTPUT FORMAT (JSON):
         .eq('id', attemptId);
 
       if (updateError) throw updateError;
+
+      // CRITICAL FIX: Update progress after AI grading completes using HierarchicalProgressService
+      try {
+        const assessmentId = (attempt as any)?.assessment?.id;
+        const userId = (attempt as any)?.student_id;
+        
+        if (assessmentId && userId) {
+          const finalStatus = passed ? 'passed' : 'failed';
+          const finalProgressPercentage = 100;
+          
+          // Use HierarchicalProgressService to ensure proper progress flow (assessment -> path -> class instance)
+          const hierarchicalService = new HierarchicalProgressService(true);
+          await hierarchicalService.updateAssessmentProgress(assessmentId, userId, {
+            status: finalStatus,
+            progressPercentage: finalProgressPercentage,
+            lastPosition: null
+          });
+          
+          console.log(`✅ Assessment progress updated after AI grading using hierarchical service: ${assessmentId} -> ${finalStatus} (${finalProgressPercentage}%)`);
+        }
+      } catch (progressUpdateError) {
+        console.error('Error updating progress after AI grading completion:', progressUpdateError);
+        // Don't throw error to avoid failing the grading process
+      }
 
     } catch (error) {
       console.error('Error updating attempt grading status:', error);

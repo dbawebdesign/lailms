@@ -228,28 +228,8 @@ export async function PUT(request: NextRequest) {
           gradingService.gradeAttempt(attemptId, (message) => {
             console.log(`AI Grading Progress for ${attemptId}: ${message}`);
           }).then(async () => {
-            // After successful grading, update progress to completed
-            try {
-              const { data: updatedAttempt } = await supabase
-                .from('student_attempts')
-                .select('percentage_score, passed')
-                .eq('id', attemptId)
-                .single();
-
-              if (updatedAttempt) {
-                const finalStatus = updatedAttempt.passed ? 'passed' : 'failed';
-                const hierarchicalService = new HierarchicalProgressService(true);
-                const progressService = new ProgressService(user.id, supabase, hierarchicalService);
-                await progressService.updateAssessmentProgress(attempt.assessment_id, {
-                  status: finalStatus,
-                  progressPercentage: 100,
-                  lastPosition: null
-                });
-                console.log(`AI grading completed for ${attemptId}, final status: ${finalStatus}`);
-              }
-            } catch (progressError) {
-              console.error('Error updating progress after AI grading:', progressError);
-            }
+            // AI grading service now handles progress updates automatically
+            console.log(`AI grading completed for ${attemptId}`);
           }).catch(async (error) => {
             console.error('AI grading failed:', error);
             

@@ -252,33 +252,8 @@ export async function POST(request: NextRequest) {
         gradingService.gradeAttempt(newAttempt.id, (message) => {
           console.log(`AI Grading Progress for ${newAttempt.id}: ${message}`);
         }).then(async () => {
-          // After successful grading, update progress to completed
-          try {
-            const { data: updatedAttempt } = await supabase
-              .from('student_attempts')
-              .select('percentage_score, passed')
-              .eq('id', newAttempt.id)
-              .single();
-
-            if (updatedAttempt) {
-              const finalStatus = updatedAttempt.passed ? 'passed' : 'failed';
-              const finalProgressPercentage = 100;
-              
-              await supabase.rpc('upsert_progress' as any, {
-                p_user_id: user.id,
-                p_item_type: 'assessment',
-                p_item_id: assessmentId,
-                p_status: finalStatus,
-                p_progress_percentage: finalProgressPercentage,
-                p_last_position: null
-              });
-              
-              emitProgressUpdate('assessment', assessmentId, finalProgressPercentage, finalStatus);
-              console.log(`AI grading completed for ${newAttempt.id}, final status: ${finalStatus}`);
-            }
-          } catch (progressError) {
-            console.error('Error updating progress after AI grading:', progressError);
-          }
+          // AI grading service now handles progress updates automatically
+          console.log(`AI grading completed for ${newAttempt.id}`);
         }).catch(async (error) => {
           console.error('AI grading failed:', error);
           
