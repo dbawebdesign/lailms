@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { NewSchemaAssessment, NewSchemaQuestion, NewSchemaStudentAttempt, NewSchemaStudentResponse } from './types/newSchemaTypes';
+import { useLunaContextControl } from '@/context/LunaContextProvider';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +38,8 @@ export function NewSchemaAssessmentTaker({
   className 
 }: NewSchemaAssessmentTakerProps) {
   const router = useRouter();
+  const { registerComponent, updateComponent, unregisterComponent } = useLunaContextControl();
+  const lunaComponentId = useRef<string | null>(null);
   
   // State management following new schema structure
   const [assessment, setAssessment] = useState<NewSchemaAssessment | null>(null);
@@ -53,6 +56,60 @@ export function NewSchemaAssessmentTaker({
   
   // Prevent concurrent initialization
   const initializingRef = useRef(false);
+
+  // Register component with Luna on mount
+  useEffect(() => {
+    const componentId = registerComponent({
+      type: 'AssessmentTaker',
+      role: 'StudentAssessment',
+      props: { assessmentId },
+    });
+    lunaComponentId.current = componentId;
+
+    return () => {
+      if (componentId) {
+        unregisterComponent(componentId);
+      }
+    };
+  }, [assessmentId, registerComponent, unregisterComponent]);
+
+  // Update Luna context when data changes
+  useEffect(() => {
+    if (!lunaComponentId.current || !assessment) return;
+
+    const currentQuestion = questions[currentQuestionIndex];
+    if (!currentQuestion) return;
+
+    const currentResponse = responses.find(r => r.question_id === currentQuestion.id);
+
+    updateComponent(lunaComponentId.current, {
+      state: {
+        currentQuestionIndex,
+        totalQuestions: questions.length,
+        timeSpent,
+        isLastQuestion: currentQuestionIndex === questions.length - 1,
+      },
+      content: {
+        assessment,
+        questions, 
+        currentQuestion: {
+          ...currentQuestion,
+          question_data: currentQuestion.question_data,
+        },
+        currentResponse: currentResponse || null,
+      },
+      metadata: {
+        componentPurpose: 'This component renders a single question in an assessment. Luna should use the provided context, including the correct answer data, to help the student understand the material without giving away the answer directly unless specifically instructed.',
+      }
+    });
+  }, [
+    assessment, 
+    questions, 
+    currentQuestionIndex, 
+    timeSpent, 
+    updateComponent,
+    responses
+  ]);
 
   // Timer for tracking time spent
   useEffect(() => {

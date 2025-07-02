@@ -45,6 +45,7 @@ export interface NewSchemaQuestion {
   points?: number;
   order_index: number;
   required?: boolean;
+  question_data?: any; // JSONB field for question-specific data (MC options, matching pairs, etc.)
   options?: any; // JSONB field for question-specific options (multiple choice options, matching pairs, etc.)
   correct_answer?: any; // JSONB field for the correct answer(s)
   answer_key: Record<string, any>; // JSONB field with type-specific structure (legacy/additional grading info)
