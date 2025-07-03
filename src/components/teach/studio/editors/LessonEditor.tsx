@@ -5,8 +5,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Brain, Mic } from 'lucide-react';
+import { FileText, Brain, Mic, GraduationCap } from 'lucide-react';
 import MediaAssetsPanel from '@/components/teach/studio/editors/MediaAssetsPanel';
+import TeachingOutlineGenerator from './TeachingOutlineGenerator';
 
 interface LessonEditorProps {
   lesson: Lesson;
@@ -66,7 +67,7 @@ const LessonEditor: React.FC<LessonEditorProps> = ({
   return (
     <div className="h-full">
       <Tabs defaultValue="details" className="h-full flex flex-col">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="details" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Lesson Details
@@ -74,6 +75,10 @@ const LessonEditor: React.FC<LessonEditorProps> = ({
           <TabsTrigger value="media" className="flex items-center gap-2">
             <Brain className="h-4 w-4" />
             AI Media Assets
+          </TabsTrigger>
+          <TabsTrigger value="teaching" className="flex items-center gap-2">
+            <GraduationCap className="h-4 w-4" />
+            Teaching Outline
           </TabsTrigger>
         </TabsList>
 
@@ -139,6 +144,18 @@ const LessonEditor: React.FC<LessonEditorProps> = ({
               // Optional callback for when assets are generated
               console.log('New media asset generated for lesson:', lesson.id);
             }}
+          />
+        </TabsContent>
+
+        <TabsContent value="teaching" className="flex-1 mt-4">
+          <TeachingOutlineGenerator
+            lessonId={lesson.id}
+            lessonTitle={lesson.title}
+            lessonDescription={lesson.description || undefined}
+            gradeLevel={getGradeLevel()}
+            estimatedTime={lesson.estimated_time || undefined}
+            hasExistingOutline={!!(lesson as any).teaching_outline_content}
+            outlineGeneratedAt={(lesson as any).teaching_outline_generated_at}
           />
         </TabsContent>
       </Tabs>
