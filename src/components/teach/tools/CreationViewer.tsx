@@ -39,6 +39,8 @@ export function CreationViewer({ creationId, onBack }: CreationViewerProps) {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
+  const [updatedMindMapData, setUpdatedMindMapData] = useState<any>(null); // Track updated mind map data
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track if there are unsaved changes
 
   useEffect(() => {
     loadCreation();
@@ -94,6 +96,42 @@ export function CreationViewer({ creationId, onBack }: CreationViewerProps) {
     }
   };
 
+  const handleMindMapUpdate = (updatedMindMap: any) => {
+    // Store the updated mind map data and mark as having unsaved changes
+    setUpdatedMindMapData(updatedMindMap);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSaveChanges = async () => {
+    if (!creation || !updatedMindMapData) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      // Convert the updated mind map data to string format for saving
+      const contentToSave = JSON.stringify(updatedMindMapData, null, 2);
+      
+      // Update the creation with new content
+      const updatedCreation = await teacherToolLibraryService.updateCreation(creation.id, {
+        content: contentToSave
+      });
+      
+      setCreation(updatedCreation);
+      setHasUnsavedChanges(false);
+      setSaveSuccess(true);
+      
+      // Reset success state after 3 seconds
+      setTimeout(() => setSaveSuccess(false), 3000);
+      
+    } catch (err) {
+      setError('Failed to save changes. Please try again.');
+      console.error('Error saving changes:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const copyToClipboard = async (text: string, itemId: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -146,6 +184,7 @@ export function CreationViewer({ creationId, onBack }: CreationViewerProps) {
             onCopy={copyToClipboard}
             copiedItems={copiedItems}
             onRefineWithLuna={handleRefineWithLuna}
+            onMindMapUpdate={handleMindMapUpdate}
           />
         );
 
@@ -252,12 +291,35 @@ export function CreationViewer({ creationId, onBack }: CreationViewerProps) {
               <span className="text-sm text-muted-foreground">
                 Created {new Date(creation.created_at).toLocaleDateString()}
               </span>
+              {hasUnsavedChanges && (
+                <Badge variant="destructive" className="text-xs">
+                  Unsaved Changes
+                </Badge>
+              )}
             </div>
           </div>
         </div>
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
+          {/* Save button for mind maps with unsaved changes */}
+          {creation.tool_id === 'mindmap-generator' && hasUnsavedChanges && (
+            <Button
+              onClick={handleSaveChanges}
+              disabled={saving}
+              className="gap-2"
+            >
+              {saving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : saveSuccess ? (
+                <CheckCircle className="w-4 h-4" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              {saving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save Changes'}
+            </Button>
+          )}
+          
           <Button
             variant="outline"
             size="sm"
