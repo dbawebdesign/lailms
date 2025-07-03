@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, FileText, Loader2, GraduationCap } from 'lucide-react';
@@ -39,6 +39,11 @@ const TeachingOutlineGenerator: React.FC<TeachingOutlineGeneratorProps> = ({
       console.error('Error checking outline status:', error);
     }
   };
+
+  // Check outline status when component mounts or lessonId changes
+  useEffect(() => {
+    refreshOutlineStatus();
+  }, [lessonId]);
 
   const handleGenerateOutline = async () => {
     setIsGenerating(true);
