@@ -74,6 +74,7 @@ interface MindMapDisplayProps {
   onCopy: (text: string, itemId: string) => void;
   copiedItems: Set<string>;
   onRefineWithLuna?: (currentMindMap: any) => void;
+  onMindMapUpdate?: (updatedMindMap: MindMapData) => void; // Add callback for mind map updates
 }
 
 function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDeleteNode }: { 
@@ -82,25 +83,18 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
   onEditNode: (nodeId: string, newLabel: string, newDescription?: string) => void;
   onDeleteNode: (nodeId: string) => void;
 }) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 0.6 }); // Start zoomed out, will be auto-adjusted
+  const [nodes, setNodes] = useState<MindMapNode[]>([]);
+  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const [nodes, setNodes] = useState<MindMapNode[]>([]);
-  const [editModal, setEditModal] = useState<{
-    isOpen: boolean;
-    nodeId: string;
-    currentLabel: string;
-    currentDescription: string;
-  }>({
-    isOpen: false,
-    nodeId: '',
-    currentLabel: '',
-    currentDescription: ''
-  });
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingNode, setEditingNode] = useState<{ id: string; label: string; description: string } | null>(null);
+  const [expandingNodes, setExpandingNodes] = useState<Set<string>>(new Set()); // Track multiple expanding nodes
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const viewInitialized = useRef(false);
 
   // Convert mind map data to node structure with unique IDs
@@ -393,136 +387,121 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
     const node = findNode(nodes, nodeId);
     if (!node) return;
 
-    // Set loading state
-    const updateNodeLoading = (nodes: MindMapNode[]): MindMapNode[] => {
-      return nodes.map(n => {
-        if (n.id === nodeId) {
-          return { ...n, isLoading: true };
-        }
-        if (n.children) {
-          return { ...n, children: updateNodeLoading(n.children) };
-        }
-        return n;
-      });
-    };
-    setNodes(updateNodeLoading(nodes));
+    // Set loading state for this specific node
+    setExpandingNodes(prev => new Set([...prev, nodeId]));
 
     try {
       await onExpandNode(nodeId, node);
-      
-      // Clear loading state
-      const updateNodeLoadingComplete = (nodes: MindMapNode[]): MindMapNode[] => {
-        return nodes.map(n => {
-          if (n.id === nodeId) {
-            return { ...n, isLoading: false };
-          }
-          if (n.children) {
-            return { ...n, children: updateNodeLoadingComplete(n.children) };
-          }
-          return n;
-        });
-      };
-      setNodes(updateNodeLoadingComplete(nodes));
     } catch (error) {
       console.error('Error expanding node:', error);
+    } finally {
+      // Clear loading state for this specific node
+      setExpandingNodes(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(nodeId);
+        return newSet;
+      });
     }
   };
 
   const openEditModal = (nodeId: string, currentLabel: string, currentDescription: string = '') => {
-    setEditModal({
-      isOpen: true,
-      nodeId,
-      currentLabel,
-      currentDescription
-    });
+    setEditModalOpen(true);
+    setEditingNode({ id: nodeId, label: currentLabel, description: currentDescription });
   };
 
   const handleEditSave = () => {
-    onEditNode(editModal.nodeId, editModal.currentLabel, editModal.currentDescription);
-    setEditModal({ isOpen: false, nodeId: '', currentLabel: '', currentDescription: '' });
+    if (editingNode) {
+      onEditNode(editingNode.id, editingNode.label, editingNode.description);
+      setEditModalOpen(false);
+      setEditingNode(null);
+    }
   };
 
   const renderNode = (node: MindMapNode, index: number = 0) => {
-    const isSelected = selectedNode === node.id;
-    const isHovered = hoveredNode === node.id;
+    const isSelected = selectedNodeId === node.id;
+    const isHovered = hoveredNodeId === node.id;
+    const isExpanding = expandingNodes.has(node.id); // Check if this specific node is expanding
     const nodeRadius = node.level === 0 ? 50 : node.level === 1 ? 40 : node.level === 2 ? 32 : node.level === 3 ? 24 : 18;
     const textSize = node.level === 0 ? 11 : node.level === 1 ? 9 : node.level === 2 ? 8 : node.level === 3 ? 7 : 6;
-    const maxTextLength = node.level === 0 ? 16 : node.level === 1 ? 12 : node.level === 2 ? 10 : 8;
     
-    const displayText = node.label.length > maxTextLength 
-      ? node.label.substring(0, maxTextLength) + '...' 
-      : node.label;
+    // Truncate long labels
+    const maxLength = node.level === 0 ? 15 : node.level === 1 ? 12 : node.level === 2 ? 10 : 8;
+    const displayText = node.label.length > maxLength ? node.label.substring(0, maxLength) + '...' : node.label;
 
     return (
-      <g 
-        style={{
-          animation: `nodeAppear 0.15s ease-out ${index * 0.02}s both`
-        }}
-      >
-        {/* Subtle selection glow */}
-        {isSelected && (
-          <circle
-            cx={node.x}
-            cy={node.y}
-            r={nodeRadius + 8}
-            fill="none"
-            stroke={node.color || '#3B82F6'}
-            strokeWidth="2"
-            strokeOpacity="0.4"
-            style={{
-              animation: 'selectionPulse 2s ease-in-out infinite'
-            }}
-          />
-        )}
-        
-        {/* Premium loading glow */}
-        {node.isLoading && (
-          <circle
-            cx={node.x}
-            cy={node.y}
-            r={nodeRadius + 8}
-            fill="none"
-            stroke="url(#brand-gradient-pulse)"
-            strokeWidth="3"
-            style={{
-              animation: 'premiumGlow 1.8s ease-in-out infinite'
-            }}
-          />
-        )}
-        
-        {/* Main node circle */}
+      <g key={`node-${node.id}-${index}`}>
+        {/* Main node circle/shape */}
         <circle
           cx={node.x}
           cy={node.y}
           r={nodeRadius}
-          fill={node.isLoading ? 'url(#brand-gradient-pulse)' : (node.color || '#3B82F6')}
-          stroke={isSelected ? '#1F2937' : 'white'}
-          strokeWidth={isSelected ? 2 : 1.5}
-          className="cursor-pointer transition-all duration-100 ease-out"
+          fill={node.level === 0 ? '#1F2937' : node.level === 1 ? node.color || '#3B82F6' : node.color + '80' || '#3B82F680'}
+          stroke={node.level === 0 ? '#374151' : node.color || '#3B82F6'}
+          strokeWidth={node.level === 0 ? 3 : 2}
+          className="transition-all duration-200 cursor-pointer"
           style={{
-            filter: isHovered ? 'brightness(1.05)' : 'none',
+            filter: isSelected ? 'brightness(1.2)' : isHovered ? 'brightness(1.1)' : 'none',
             boxShadow: isSelected ? '0 0 0 2px rgba(59, 130, 246, 0.3)' : 'none',
           }}
-          onClick={() => setSelectedNode(selectedNode === node.id ? null : node.id)}
-          onMouseEnter={() => setHoveredNode(node.id)}
-          onMouseLeave={() => setHoveredNode(null)}
+          onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
+          onMouseEnter={() => setHoveredNodeId(node.id)}
+          onMouseLeave={() => setHoveredNodeId(null)}
         />
         
-        {/* Node text */}
-        <text
-          x={node.x}
-          y={node.y}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          className="pointer-events-none font-medium select-none"
-          fill={node.level === 0 || node.level === 1 ? 'white' : '#1F2937'}
-          fontSize={textSize}
-        >
-          {displayText}
-        </text>
+        {/* Loading animation overlay */}
+        {isExpanding && (
+          <g>
+            <circle
+              cx={node.x}
+              cy={node.y}
+              r={nodeRadius + 5}
+              fill="none"
+              stroke="#3B82F6"
+              strokeWidth="2"
+              strokeDasharray="8,4"
+              opacity="0.7"
+            >
+              <animateTransform
+                attributeName="transform"
+                attributeType="XML"
+                type="rotate"
+                from={`0 ${node.x} ${node.y}`}
+                to={`360 ${node.x} ${node.y}`}
+                dur="1s"
+                repeatCount="indefinite"
+              />
+            </circle>
+            <text
+              x={node.x}
+              y={node.y}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="pointer-events-none font-medium select-none"
+              fill="white"
+              fontSize="8"
+            >
+              ⟳
+            </text>
+          </g>
+        )}
+
+        {/* Node text - only show if not expanding */}
+        {!isExpanding && (
+          <text
+            x={node.x}
+            y={node.y}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="pointer-events-none font-medium select-none"
+            fill={node.level === 0 || node.level === 1 ? 'white' : '#1F2937'}
+            fontSize={textSize}
+          >
+            {displayText}
+          </text>
+        )}
         
-        {/* Minimal action buttons on hover/select */}
-        {(isHovered || isSelected) && !node.isLoading && (
+        {/* Minimal action buttons on hover/select - hide during expansion */}
+        {(isHovered || isSelected) && !isExpanding && (
           <g style={{ animation: 'actionsAppear 0.1s ease-out' }}>
             {/* Edit button */}
             <circle
@@ -763,12 +742,12 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
       </svg>
 
       {/* Selected node info panel */}
-      {selectedNode && (
+      {selectedNodeId && (
         <div className="absolute bottom-4 left-4 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-lg p-4 shadow-lg border border-slate-200 dark:border-slate-700 max-w-sm">
           {(() => {
             const findSelectedNode = (nodes: MindMapNode[]): MindMapNode | null => {
               for (const node of nodes) {
-                if (node.id === selectedNode) return node;
+                if (node.id === selectedNodeId) return node;
                 if (node.children) {
                   const found = findSelectedNode(node.children);
                   if (found) return found;
@@ -787,7 +766,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setSelectedNode(null)}
+                    onClick={() => setSelectedNodeId(null)}
                     className="h-6 w-6 p-0"
                   >
                     <X className="h-3 w-3" />
@@ -809,7 +788,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
       )}
 
       {/* Edit Modal */}
-      <Dialog open={editModal.isOpen} onOpenChange={(open) => setEditModal(prev => ({ ...prev, isOpen: open }))}>
+      <Dialog open={editModalOpen} onOpenChange={(open) => setEditModalOpen(open)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Node</DialogTitle>
@@ -819,8 +798,8 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
               <Label htmlFor="label">Label</Label>
               <Input
                 id="label"
-                value={editModal.currentLabel}
-                onChange={(e) => setEditModal(prev => ({ ...prev, currentLabel: e.target.value }))}
+                value={editingNode?.label || ''}
+                onChange={(e) => setEditingNode(prev => prev ? { ...prev, label: e.target.value } : null)}
                 placeholder="Node label"
               />
             </div>
@@ -828,15 +807,15 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
-                value={editModal.currentDescription}
-                onChange={(e) => setEditModal(prev => ({ ...prev, currentDescription: e.target.value }))}
+                value={editingNode?.description || ''}
+                onChange={(e) => setEditingNode(prev => prev ? { ...prev, description: e.target.value } : null)}
                 placeholder="Node description (optional)"
                 rows={3}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditModal(prev => ({ ...prev, isOpen: false }))}>
+            <Button variant="outline" onClick={() => setEditModalOpen(false)}>
               Cancel
             </Button>
             <Button onClick={handleEditSave}>
@@ -849,84 +828,74 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
   );
 }
 
-export function MindMapDisplay({ content, metadata, onCopy, copiedItems, onRefineWithLuna }: MindMapDisplayProps) {
-  const [isExpanding, setIsExpanding] = useState(false);
+export function MindMapDisplay({ content, metadata, onCopy, copiedItems, onRefineWithLuna, onMindMapUpdate }: MindMapDisplayProps) {
+  const [viewMode, setViewMode] = useState<'visual' | 'list'>('visual');
   const [editedMindMap, setEditedMindMap] = useState<MindMapData | null>(null);
-  const [viewMode, setViewMode] = useState<'visual' | 'structured'>('visual');
+  const [isExpanding, setIsExpanding] = useState(false);
 
   const parseMindMapContent = (content: string): MindMapData => {
     try {
-      // Try to parse JSON first
-      const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
-      if (jsonMatch) {
-        const mindMapData = JSON.parse(jsonMatch[1]);
-        return {
-          center: mindMapData.center || { label: mindMapData.centralTopic || 'Central Topic' },
-          branches: mindMapData.branches || []
-        };
+      // Try to parse as JSON first (for saved mind maps)
+      const parsed = JSON.parse(content);
+      if (parsed.center && parsed.branches) {
+        return parsed;
       }
-
-      // Enhanced text parsing for markdown format
-      const lines = content.split('\n');
-      const branches: any[] = [];
-      let currentBranch: any | null = null;
-      let centralTopic = 'Central Topic';
-      let title = 'Mind Map';
-      
-      const colors = ['#DC2626', '#059669', '#7C3AED', '#EA580C', '#0891B2', '#BE185D', '#7C2D12', '#1F2937'];
-      let colorIndex = 0;
-
-      for (const line of lines) {
-        if (line.startsWith('# Mind Map:')) {
-          title = line.replace('# Mind Map:', '').trim();
-          centralTopic = title;
-        } else if (line.startsWith('## Central Theme:')) {
-          centralTopic = line.replace('## Central Theme:', '').trim();
-        } else if (line.startsWith('### Branch') || line.startsWith('### Main Themes')) {
-          if (currentBranch) {
-            branches.push(currentBranch);
-          }
-          currentBranch = {
-            id: generateUniqueId('branch'),
-            label: line.replace(/### (Branch \d+: |Main Themes - )/g, '').trim(),
-            description: '',
-            color: colors[colorIndex % colors.length],
-            concepts: []
-          };
-          colorIndex++;
-        } else if (line.startsWith('- ') && currentBranch) {
-          const conceptText = line.replace('- ', '').trim();
-          currentBranch.concepts.push({
-            id: generateUniqueId(`concept-${currentBranch.id}`),
-            label: conceptText,
-            description: conceptText,
-            points: []
-          });
-        }
-      }
-
-      if (currentBranch) {
-        branches.push(currentBranch);
-      }
-
-      return {
-        center: { label: centralTopic },
-        branches
-      };
-    } catch (error) {
-      console.error('Error parsing mind map:', error);
-      return {
-        center: { label: 'Central Topic' },
-        branches: []
-      };
+    } catch {
+      // If JSON parsing fails, parse as markdown text
     }
+
+    // Parse markdown-style mind map content
+    const lines = content.split('\n').filter(line => line.trim());
+    const branches: any[] = [];
+    let currentBranch: any = null;
+    let centralTopic = 'Central Topic';
+    let title = 'Mind Map';
+    
+    const colors = ['#DC2626', '#059669', '#7C3AED', '#EA580C', '#0891B2', '#BE185D', '#7C2D12', '#1F2937'];
+    let colorIndex = 0;
+
+    for (const line of lines) {
+      if (line.startsWith('# Mind Map:')) {
+        title = line.replace('# Mind Map:', '').trim();
+        centralTopic = title;
+      } else if (line.startsWith('## Central Theme:')) {
+        centralTopic = line.replace('## Central Theme:', '').trim();
+      } else if (line.startsWith('### Branch') || line.startsWith('### Main Themes')) {
+        if (currentBranch) {
+          branches.push(currentBranch);
+        }
+        currentBranch = {
+          id: generateUniqueId('branch'),
+          label: line.replace(/### (Branch \d+: |Main Themes - )/g, '').trim(),
+          description: '',
+          color: colors[colorIndex % colors.length],
+          concepts: []
+        };
+        colorIndex++;
+      } else if (line.startsWith('- ') && currentBranch) {
+        const conceptText = line.replace('- ', '').trim();
+        currentBranch.concepts.push({
+          id: generateUniqueId(`concept-${currentBranch.id}`),
+          label: conceptText,
+          description: conceptText,
+          points: []
+        });
+      }
+    }
+
+    if (currentBranch) {
+      branches.push(currentBranch);
+    }
+
+    return {
+      center: { label: centralTopic },
+      branches
+    };
   };
 
   const currentMindMap = editedMindMap || parseMindMapContent(content);
 
   const handleExpandNode = async (nodeId: string, nodeData: any) => {
-    setIsExpanding(true);
-    
     try {
       // Call AI to expand the node
       const response = await fetch('/api/luna/tools', {
@@ -947,6 +916,7 @@ export function MindMapDisplay({ content, metadata, onCopy, copiedItems, onRefin
           // Add the new nodes to the mind map
           const updatedMindMap = addNodesToMindMap(currentMindMap, nodeId, data.expandedNodes);
           setEditedMindMap(updatedMindMap);
+          onMindMapUpdate?.(updatedMindMap); // Notify parent of update
           console.log(`Node Expanded: Added ${data.expandedNodes.length} new nodes to "${nodeData.label}"`);
         } else {
           console.log("Expansion Failed: " + (data.response || "Could not generate expansion data"));
@@ -957,8 +927,6 @@ export function MindMapDisplay({ content, metadata, onCopy, copiedItems, onRefin
     } catch (error) {
       console.error('Error expanding node:', error);
       console.log("Expansion Failed: Could not expand the node. Please try again.");
-    } finally {
-      setIsExpanding(false);
     }
   };
 
@@ -1131,7 +1099,7 @@ export function MindMapDisplay({ content, metadata, onCopy, copiedItems, onRefin
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setViewMode(viewMode === 'visual' ? 'structured' : 'visual')}
+              onClick={() => setViewMode(viewMode === 'visual' ? 'list' : 'visual')}
             >
               {viewMode === 'visual' ? <List className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
               {viewMode === 'visual' ? 'List View' : 'Visual View'}

@@ -95,6 +95,7 @@ export function ToolWorkflow({ tool, onBack }: ToolWorkflowProps) {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [loadedCreation, setLoadedCreation] = useState<TeacherToolCreation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [updatedMindMapData, setUpdatedMindMapData] = useState<any>(null); // Track updated mind map data
   const { togglePanelVisible } = useUIContext();
   const resultRef = useRef<HTMLDivElement>(null);
   const conversationEndRef = useRef<HTMLDivElement>(null);
@@ -315,6 +316,11 @@ What would you like to improve or expand on?`,
     setConversation([refinementMessage]);
   };
 
+  const handleMindMapUpdate = (updatedMindMap: any) => {
+    // Store the updated mind map data for saving
+    setUpdatedMindMapData(updatedMindMap);
+  };
+
   // Helper function to auto-scroll to results
   const scrollToResults = () => {
     setTimeout(() => {
@@ -366,9 +372,12 @@ What would you like to improve or expand on?`,
       // Generate title based on form data or content
       const title = generateTitle();
       
-      // Save the content as-is (string) instead of parsing it into complex structures
-      // The viewers expect the raw content string, not parsed objects
-      const content = result.content;
+      // For mind map generator, use updated mind map data if available, otherwise use original content
+      let contentToSave = result.content;
+      if (tool.id === 'mindmap-generator' && updatedMindMapData) {
+        // Convert the updated mind map data back to string format for saving
+        contentToSave = JSON.stringify(updatedMindMapData, null, 2);
+      }
       
       // Extract metadata from form data and result
       const metadata = {
@@ -388,7 +397,7 @@ What would you like to improve or expand on?`,
         tool_name: tool.name,
         title,
         description: generateDescription(),
-        content, // Save the raw content string
+        content: contentToSave, // Save the updated content
         metadata,
         tags
       };
@@ -1093,6 +1102,7 @@ What would you like to improve or expand on?`,
                   onCopy={copyToClipboard}
                   copiedItems={copiedItems}
                   onRefineWithLuna={handleMindMapRefinement}
+                  onMindMapUpdate={handleMindMapUpdate}
                 />
               ) : tool.id === 'brain-bytes' ? (
                 <BrainBytesDisplay 
