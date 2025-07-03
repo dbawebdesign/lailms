@@ -51,6 +51,7 @@ interface GenerationJob {
   createdAt: string;
   updatedAt: string;
   isCleared?: boolean;
+  confettiShown?: boolean;
 }
 
 interface CourseGenerationProgressWidgetProps {
@@ -131,10 +132,11 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
     }
   }, []);
 
-  // Trigger confetti on completion (both on status change and initial load if already completed)
+  // Trigger confetti on completion (only if not already shown in database)
   useEffect(() => {
     const shouldTriggerConfetti = (
       job.status === 'completed' && 
+      !job.confettiShown && // Only trigger if not already shown in database
       !hasTriggeredConfetti && 
       jsConfettiRef.current &&
       // Trigger if status just changed to completed OR if it was already completed on load
@@ -153,11 +155,18 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
           confettiNumber: 100,
         });
         setHasTriggeredConfetti(true);
+        
+        // Mark confetti as shown in database
+        fetch(`/api/knowledge-base/generation-jobs/${job.id}/mark-confetti-shown`, {
+          method: 'POST',
+        }).catch(error => {
+          console.error('Failed to mark confetti as shown:', error);
+        });
       }
     }
     
     setPreviousStatus(job.status);
-  }, [job.status, hasTriggeredConfetti, job.tasks, previousStatus, initialJob.status]);
+  }, [job.status, job.confettiShown, hasTriggeredConfetti, job.tasks, previousStatus, initialJob.status, job.id]);
 
   const pollStatus = useCallback(async () => {
     if (isPolling) return;

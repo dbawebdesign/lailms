@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
         updatedAt: job.updated_at,
         estimatedMinutes: jobData.estimatedMinutes,
         isCleared: job.is_cleared,
+        confettiShown: job.confetti_shown || false,
       };
     });
 

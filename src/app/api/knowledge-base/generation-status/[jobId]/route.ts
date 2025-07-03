@@ -57,6 +57,7 @@ export async function GET(
           progress: liveState.progress,
           error: job.error_message,
           tasks: tasks,
+          confettiShown: (job as any).confetti_shown || false,
         },
         createdAt: job.created_at,
         updatedAt: job.updated_at
@@ -76,7 +77,8 @@ export async function GET(
           progress: job.progress_percentage,
           error: job.error_message,
           result: job.result_data,
-          tasks: tasks // Include tasks from stored result_data if available
+          tasks: tasks, // Include tasks from stored result_data if available
+          confettiShown: (job as any).confetti_shown || false,
         },
         createdAt: job.created_at,
         updatedAt: job.updated_at
