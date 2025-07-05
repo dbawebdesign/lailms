@@ -1480,6 +1480,14 @@ interface CourseModule {
 function constructSystemPrompt(context: SerializedUIContext, persona: string, message: string, buttonData?: any, chatHistory?: { role: string, content: string }[], userProfile?: any): string {
   // Generate UI pattern analysis
   const patternInsights = analyzeUIPatterns(context);
+  
+  // Debug: Log context components for troubleshooting
+  console.log('Luna Context Debug:', {
+    route: context.route,
+    componentCount: context.components?.length || 0,
+    componentTypes: context.components?.map(c => c.type) || [],
+    lessonContentComponents: context.components?.filter(c => c.type === 'lesson-content-renderer' || c.type === 'lesson-content-tabs') || []
+  });
 
   // Serialize components, giving special treatment to course-structure
   const componentSummary = context.components
@@ -1517,8 +1525,31 @@ function constructSystemPrompt(context: SerializedUIContext, persona: string, me
     .slice(0, 10) // Keep the limit for overall summary brevity
     .join('\\n');
 
-  return `# Role & Objective
-You are Luna, an intelligent AI assistant integrated into the LearnologyAI platform. Your role is to provide contextual help, insights, and assistance based on what the user is currently viewing and working with on their screen.
+  return `# Role and Objective
+You are Luna, an advanced AI assistant integrated into the LearnologyAI educational platform. Your primary objective is to provide intelligent, context-aware support to both students and teachers by analyzing their current interface and educational content in real-time.
+
+# Instructions
+
+## Core Educational Support Tasks
+1. **Learning Support**: Explain concepts step-by-step, provide additional context, clarify difficult topics using the specific content currently visible to the user
+2. **Navigation Help**: Guide through course structure using exact interface elements visible, help find specific lessons or resources
+3. **Progress Tracking**: Help understand progress using visible indicators, suggest next steps in learning path based on current context
+4. **Content Clarification**: Answer questions about lesson material by referencing the specific content the user is currently viewing
+5. **Study Assistance**: Help with understanding concepts, not doing homework/assessments for students
+
+## Context-Aware Response Guidelines
+- **Always reference specific visible content**: When users are viewing lesson content, reference the exact tab they're viewing (content/examples/insights) and the specific material visible
+- **Use visible interface elements**: Reference specific buttons, progress indicators, navigation elements that are currently displayed
+- **Lesson content awareness**: When students are viewing lesson sections, reference the introduction, detailed explanation, expert summary, or other content they can see
+- **Assessment context**: During assessments, provide tutoring guidance based on the specific question visible, without giving direct answers
+- **Be conversational and brief**: Keep responses concise unless detailed explanation is requested
+- **Think step by step**: For complex questions, break down your reasoning clearly
+
+## Output Format
+- Use clear, conversational language appropriate for the user's role (student or teacher)
+- Reference specific content the user can see on their screen
+- Keep responses focused and actionable
+- Use bullet points or numbered lists when explaining multiple concepts
 
 ${userProfile?.first_name ? `# 👋 Personal Context
 You are helping ${userProfile.first_name}${userProfile.role === 'student' ? ', a student,' : userProfile.role === 'teacher' ? ', a teacher,' : ''} who is currently working on the LearnologyAI platform.` : ''}
@@ -1603,16 +1634,76 @@ ${context.components?.map(comp => {
     }
   } else if (comp.type === 'lesson-content-renderer' && comp.content) {
     analysis += `Student viewing lesson content`;
-    if (comp.content.lessonTitle) analysis += ` for "${comp.content.lessonTitle}"`;
+    if (comp.content.title) analysis += ` for "${comp.content.title}"`;
     if (comp.content.currentSection) analysis += ` - currently on section "${comp.content.currentSection}"`;
     if (comp.content.progress !== undefined) analysis += ` (${comp.content.progress}% complete)`;
     if (comp.content.availableTabs) {
       analysis += `. Available tabs: ${comp.content.availableTabs.join(', ')}`;
     }
     if (comp.content.activeTab) analysis += `. Currently viewing: ${comp.content.activeTab}`;
+    if (comp.state?.activeTab) analysis += `. Currently viewing: ${comp.state.activeTab}`;
+    
+    // Include detailed lesson content for context
+    if (comp.content.displayContent) {
+      analysis += `\n    **LESSON CONTENT DETAILS:**`;
+      if (comp.content.displayContent.introduction) {
+        analysis += `\n    - Introduction: ${comp.content.displayContent.introduction.substring(0, 200)}${comp.content.displayContent.introduction.length > 200 ? '...' : ''}`;
+      }
+      if (comp.content.displayContent.detailedExplanation) {
+        analysis += `\n    - Detailed Explanation: ${comp.content.displayContent.detailedExplanation.substring(0, 300)}${comp.content.displayContent.detailedExplanation.length > 300 ? '...' : ''}`;
+      }
+      if (comp.content.displayContent.expertSummary) {
+        analysis += `\n    - Expert Summary: ${comp.content.displayContent.expertSummary.substring(0, 200)}${comp.content.displayContent.expertSummary.length > 200 ? '...' : ''}`;
+      }
+    }
+    
     // Extract lesson ID
     if (comp.metadata?.lessonId || comp.content.lessonId) {
       analysis += `. Lesson ID: ${comp.metadata?.lessonId || comp.content.lessonId}`;
+    }
+  } else if (comp.type === 'lesson-content-tabs' && comp.content) {
+    analysis += `Lesson content tabs interface`;
+    if (comp.content.availableTabs) {
+      analysis += ` with tabs: ${comp.content.availableTabs.join(', ')}`;
+    }
+    if (comp.content.activeTab || comp.state?.activeTab) {
+      const activeTab = comp.content.activeTab || comp.state?.activeTab;
+      analysis += `. Student is currently viewing the "${activeTab}" tab`;
+      
+      // Include specific content from the active tab
+      if (comp.content.currentTabContent) {
+        const tabContent = comp.content.currentTabContent;
+        analysis += `\n    **CURRENT TAB CONTENT (${activeTab.toUpperCase()}):**`;
+        
+        if (activeTab === 'content') {
+          if (tabContent.introduction) {
+            analysis += `\n    - Introduction: ${tabContent.introduction.substring(0, 200)}${tabContent.introduction.length > 200 ? '...' : ''}`;
+          }
+          if (tabContent.detailedExplanation) {
+            analysis += `\n    - Detailed Explanation: ${tabContent.detailedExplanation.substring(0, 300)}${tabContent.detailedExplanation.length > 300 ? '...' : ''}`;
+          }
+          if (tabContent.expertSummary) {
+            analysis += `\n    - Expert Summary: ${tabContent.expertSummary.substring(0, 200)}${tabContent.expertSummary.length > 200 ? '...' : ''}`;
+          }
+        } else if (activeTab === 'examples') {
+          if (tabContent.practicalExamples) {
+            analysis += `\n    - Practical Examples: ${JSON.stringify(tabContent.practicalExamples).substring(0, 300)}...`;
+          }
+          if (tabContent.commonMisconceptions) {
+            analysis += `\n    - Common Misconceptions: ${JSON.stringify(tabContent.commonMisconceptions).substring(0, 300)}...`;
+          }
+        } else if (activeTab === 'insights') {
+          if (tabContent.expertInsights) {
+            analysis += `\n    - Expert Insights: ${JSON.stringify(tabContent.expertInsights).substring(0, 300)}...`;
+          }
+          if (tabContent.realWorldConnections) {
+            analysis += `\n    - Real-World Connections: ${JSON.stringify(tabContent.realWorldConnections).substring(0, 300)}...`;
+          }
+        }
+      }
+    }
+    if (comp.metadata?.lessonId) {
+      analysis += `. Lesson ID: ${comp.metadata.lessonId}`;
     }
   } else if (comp.type === 'course-overview' && comp.content) {
     analysis += `Course overview card`;
@@ -1825,12 +1916,13 @@ ${(() => {
     return `**DETECTED ROLE: STUDENT/LEARNER** - User is in student learning interface
     
 **Response Guidelines for Students:**
-- **Learning Support**: Explain concepts, provide additional context, clarify difficult topics
-- **Navigation Help**: Guide through course structure, help find specific lessons or resources
-- **Progress Tracking**: Help understand progress, suggest next steps in learning path
-- **Content Clarification**: Answer questions about lesson material, provide examples
-- **Study Assistance**: Help with understanding, not doing homework/assessments for them
-- **Limited Tools**: Primarily use search tool for additional information, cannot modify course content`;
+- **Learning Support**: Explain concepts step-by-step, provide additional context, clarify difficult topics using the specific content currently visible
+- **Navigation Help**: Guide through course structure using exact interface elements visible, help find specific lessons or resources  
+- **Progress Tracking**: Help understand progress using visible indicators, suggest next steps in learning path based on current context
+- **Content Clarification**: Answer questions about lesson material by referencing the specific content the user is currently viewing
+- **Study Assistance**: Help with understanding concepts, not doing homework/assessments for them
+- **Limited Tools**: Primarily use search tool for additional information, cannot modify course content
+- **Lesson Content Context**: When students are viewing lesson content tabs, reference the specific tab they're currently viewing (content/examples/insights) and provide context-aware explanations from that visible material`;
   } else if (hasTeacherComponents && hasStudentComponents) {
     return `**DETECTED ROLE: MIXED INTERFACE** - Components from both teacher and student interfaces detected
     
@@ -2270,7 +2362,8 @@ You are Luna, a friendly AI tutor focused on guiding students to discover knowle
 ## Natural Response Style
 - **Conversational and warm**: Be encouraging and patient, like a real tutor
 - **Brief responses**: Keep answers short unless detailed explanation is requested
-- **No robotic announcements**: Don't mention question numbers or assessment status  
+- **No robotic announcements**: Don't mention question numbers or assessment status
+- **Context-aware responses**: When students are viewing lesson content, reference what they're currently looking at (specific tab content, section material, etc.)  
 - **Growth-focused**: Emphasize learning process over getting the right answer
 - **Ask follow-up questions**: Deepen understanding through natural conversation
 ` : persona === 'peer' ? `

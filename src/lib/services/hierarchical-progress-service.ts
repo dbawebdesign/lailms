@@ -367,10 +367,18 @@ export class HierarchicalProgressService {
             .eq('item_type', 'assessment')
             .in('item_id', assessmentIds);
 
-        // Calculate lesson progress
+        // Calculate lesson progress - consider actual progress percentages, not just binary completion
         const totalLessons = lessonIds.length;
+        let lessonProgressPercentage = 0;
+        if (totalLessons > 0) {
+            // Sum up the actual progress percentages of all lessons
+            const totalLessonProgress = lessonProgress?.reduce((sum: number, p: any) => 
+                sum + (p.progress_percentage || 0), 0) || 0;
+            lessonProgressPercentage = totalLessonProgress / totalLessons;
+        }
+        
+        // For debugging: also track completed lessons count
         const completedLessons = lessonProgress?.filter((p: any) => p.status === 'completed').length || 0;
-        const lessonProgressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
 
         // Calculate assessment progress
         const totalAssessments = assessmentIds.length;
@@ -401,6 +409,24 @@ export class HierarchicalProgressService {
         } else if (progressPercentage >= 100) {
             status = 'completed';
         }
+
+        // Debug logging to help identify calculation issues
+        const oldLessonProgressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
+        console.log(`🔍 Path ${pathId} progress calculation details:`, {
+            totalLessons,
+            completedLessons,
+            lessonProgressPercentage: `${lessonProgressPercentage.toFixed(1)}% (NEW: considers partial progress)`,
+            oldLessonProgressPercentage: `${oldLessonProgressPercentage}% (OLD: binary completion only)`,
+            totalAssessments,
+            completedAssessments,
+            assessmentProgressPercentage,
+            overallProgress,
+            progressPercentage,
+            lessonIds,
+            assessmentIds,
+            lessonProgress: lessonProgress?.map((p: any) => ({ status: p.status, progress: p.progress_percentage })),
+            assessmentProgress: assessmentProgress?.map((p: any) => ({ status: p.status, progress: p.progress_percentage }))
+        });
 
         console.log(`📊 Path ${pathId} progress: ${progressPercentage}% (${completedLessons}/${totalLessons} lessons, ${completedAssessments}/${totalAssessments} assessments)`);
 
@@ -458,10 +484,18 @@ export class HierarchicalProgressService {
             .eq('item_type', 'assessment')
             .in('item_id', assessmentIds);
 
-        // Calculate lesson progress
+        // Calculate lesson progress - consider actual progress percentages, not just binary completion
         const totalLessons = lessonIds.length;
+        let lessonProgressPercentage = 0;
+        if (totalLessons > 0) {
+            // Sum up the actual progress percentages of all lessons
+            const totalLessonProgress = lessonProgress?.reduce((sum: number, p: any) => 
+                sum + (p.progress_percentage || 0), 0) || 0;
+            lessonProgressPercentage = totalLessonProgress / totalLessons;
+        }
+        
+        // For debugging: also track completed lessons count
         const completedLessons = lessonProgress?.filter((p: any) => p.status === 'completed').length || 0;
-        const lessonProgressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
 
         // Calculate assessment progress
         const totalAssessments = assessmentIds.length;

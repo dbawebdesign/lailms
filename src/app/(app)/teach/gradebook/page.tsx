@@ -112,18 +112,18 @@ export default function GradebookPage() {
         throw new Error('User not authenticated');
       }
 
-      // Check if user exists in profiles table
+      // Get user profile to ensure it exists
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, user_id, role')
+        .select('user_id, role')
         .eq('user_id', user.id)
         .single<Tables<"profiles">>();
 
       if (profileError || !profile) {
-        throw new Error('User profile not found. Please complete your profile setup.');
+        throw new Error(`Your user profile could not be found (user ID: ${user.id}). This is required to access the gradebook. Please ensure a corresponding profile exists in the 'profiles' table.`);
       }
 
-      // Get class instances where user is enrolled as teacher
+      // Get class instances created by the current user (teacher)
       const { data: instances, error: instancesError } = await supabase
         .from('class_instances')
         .select(`
@@ -132,21 +132,14 @@ export default function GradebookPage() {
           base_class_id,
           enrollment_code,
           settings,
-          base_class:base_classes(
+          base_class:base_classes!inner(
             id,
             name,
-            description
-          ),
-          enrollments!inner(
-            id,
-            profile_id,
-            role,
-            status
+            description,
+            user_id
           )
         `)
-        .eq('enrollments.profile_id', profile.user_id)
-        .eq('enrollments.role', 'teacher')
-        .eq('enrollments.status', 'active')
+        .eq('base_classes.user_id', user.id)
         .order('name');
 
       if (instancesError) {

@@ -20,6 +20,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Clock, AlertCircle, Keyboard } from 'lucide-react';
 import { SkipToMain } from '@/components/ui/skip-link';
 import { TimerAnnouncement, StatusAnnouncement, AlertAnnouncement } from '@/components/ui/live-region';
+import { emitProgressUpdate } from '@/lib/utils/progressEvents';
 
 interface StudentResponse {
   questionId: string;
@@ -75,6 +76,17 @@ const AssessmentTaker = () => {
       if (!response.ok) throw new Error('Failed to submit assessment');
       
       const results = await response.json();
+      
+      // Emit progress event to notify navigation tree of completion
+      // This ensures immediate UI updates in the navigation tree
+      if (attemptData?.assessment) {
+        const progressStatus = results.needsAiGrading ? 'in_progress' : (results.passed ? 'passed' : 'failed');
+        const progressPercentage = results.needsAiGrading ? 50 : 100;
+        
+        console.log(`🔄 Client: Emitting assessment progress event: ${attemptData.assessment.id} -> ${progressStatus} (${progressPercentage}%)`);
+        emitProgressUpdate('assessment', attemptData.assessment.id, progressPercentage, progressStatus);
+      }
+      
       router.push(`/assessments/results/${results.attemptId}`);
     } catch (err: any) {
       console.error('Error submitting assessment:', err);

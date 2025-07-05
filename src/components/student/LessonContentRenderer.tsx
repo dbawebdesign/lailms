@@ -669,7 +669,7 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
 
   return (
     <LunaContextElement
-      type="lesson-content"
+      type="lesson-content-renderer"
       role="display"
       content={{
         title: lesson?.title || displayContent?.sectionTitle,
@@ -720,7 +720,8 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
         hasError: !!error,
         currentSectionIndex,
         canNavigatePrevious: currentSectionIndex > 0,
-        canNavigateNext: currentSectionIndex < sections.length - 1
+        canNavigateNext: currentSectionIndex < sections.length - 1,
+        activeTab: activeTab
       }}
       actionable={true}
     >
@@ -984,27 +985,50 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
             role="navigation"
             content={{
               availableTabs: ["content", "examples", "insights"],
-              contentTab: {
+              activeTab: activeTab,
+              currentTabContent: activeTab === "content" ? {
                 introduction: displayContent.introduction,
                 conceptIntroduction: displayContent.expertTeachingContent?.conceptIntroduction,
                 detailedExplanation: displayContent.expertTeachingContent?.detailedExplanation,
                 expertSummary: displayContent.expertSummary
-              },
-              examplesTab: {
+              } : activeTab === "examples" ? {
                 practicalExamples: displayContent.expertTeachingContent?.practicalExamples,
                 commonMisconceptions: displayContent.expertTeachingContent?.commonMisconceptions
-              },
-              insightsTab: {
+              } : {
                 expertInsights: displayContent.expertTeachingContent?.expertInsights,
                 checkForUnderstanding: displayContent.checkForUnderstanding,
                 realWorldConnections: displayContent.expertTeachingContent?.realWorldConnections,
                 bridgeToNext: displayContent.bridgeToNext
+              },
+              allTabsContent: {
+                contentTab: {
+                  introduction: displayContent.introduction,
+                  conceptIntroduction: displayContent.expertTeachingContent?.conceptIntroduction,
+                  detailedExplanation: displayContent.expertTeachingContent?.detailedExplanation,
+                  expertSummary: displayContent.expertSummary
+                },
+                examplesTab: {
+                  practicalExamples: displayContent.expertTeachingContent?.practicalExamples,
+                  commonMisconceptions: displayContent.expertTeachingContent?.commonMisconceptions
+                },
+                insightsTab: {
+                  expertInsights: displayContent.expertTeachingContent?.expertInsights,
+                  checkForUnderstanding: displayContent.checkForUnderstanding,
+                  realWorldConnections: displayContent.expertTeachingContent?.realWorldConnections,
+                  bridgeToNext: displayContent.bridgeToNext
+                }
               }
+            }}
+            state={{
+              activeTab: activeTab,
+              currentSectionIndex: currentSectionIndex,
+              progress: progress
             }}
             metadata={{
               lessonId,
               sectionIndex: currentSectionIndex,
-              hasAllContent: !!(displayContent.introduction && displayContent.expertTeachingContent?.conceptIntroduction && displayContent.expertTeachingContent?.detailedExplanation)
+              hasAllContent: !!(displayContent.introduction && displayContent.expertTeachingContent?.conceptIntroduction && displayContent.expertTeachingContent?.detailedExplanation),
+              componentPurpose: `This component displays lesson content in tabs. The student is currently viewing the "${activeTab}" tab. Luna should reference the content from the currently active tab when answering questions about what the student is viewing.`
             }}
             actionable={true}
           >

@@ -43,12 +43,12 @@ export function NewSchemaQuestionMatching({
     );
   }
 
-  const handleMatchChange = (leftItem: string, rightItem: string) => {
+  const handleMatchChange = (leftItemKey: string, rightItem: string) => {
     const newMatches = { ...value };
     if (rightItem === 'unselected') {
-      delete newMatches[leftItem];
+      delete newMatches[leftItemKey];
     } else {
-      newMatches[leftItem] = rightItem;
+      newMatches[leftItemKey] = rightItem;
     }
     onChange(newMatches);
   };
@@ -56,17 +56,41 @@ export function NewSchemaQuestionMatching({
   // Get unique right items for display (remove duplicates for UI)
   const uniqueRightItems = Array.from(new Set(rightItems));
   
-  // Count how many times each right item appears in the original array
+  // Determine how many times each right item can be used
+  // First, try to get this from the answer key pairs
   const rightItemCounts: Record<string, number> = {};
-  rightItems.forEach(item => {
-    rightItemCounts[item] = (rightItemCounts[item] || 0) + 1;
+  
+  if (question.answer_key?.pairs) {
+    // Count how many times each right item appears in the answer key
+    question.answer_key.pairs.forEach((pair: MatchingPair) => {
+      rightItemCounts[pair.right] = (rightItemCounts[pair.right] || 0) + 1;
+    });
+    console.log('Using answer key pairs for counts:', rightItemCounts);
+  } else {
+    // Fallback: count occurrences in the right_items array
+    rightItems.forEach(item => {
+      rightItemCounts[item] = (rightItemCounts[item] || 0) + 1;
+    });
+    console.log('Using right_items array for counts:', rightItemCounts);
+  }
+  
+  // If we still don't have counts, default to allowing each right item to be used once
+  uniqueRightItems.forEach(item => {
+    if (!(item in rightItemCounts)) {
+      rightItemCounts[item] = 1;
+    }
   });
+  
+  console.log('Final rightItemCounts:', rightItemCounts);
   
   // Count how many times each right item has been used
   const usedRightItemCounts: Record<string, number> = {};
   Object.values(value).forEach(item => {
     usedRightItemCounts[item] = (usedRightItemCounts[item] || 0) + 1;
   });
+  
+  console.log('Current usedRightItemCounts:', usedRightItemCounts);
+  console.log('Current value:', value);
 
   return (
     <div className="space-y-4">
@@ -75,30 +99,34 @@ export function NewSchemaQuestionMatching({
       </div>
       
       <div className="space-y-3">
-        {leftItems.map((leftItem, index) => (
-          <Card key={index} className="p-4">
-            <CardContent className="p-0">
-              <div className="flex items-center gap-4">
-                {/* Left item */}
-                <div className="flex-1">
-                  <Label className="text-sm font-medium">
-                    <span className="text-accent mr-2">{index + 1}.</span>
-                    {leftItem}
-                  </Label>
-                </div>
-                
-                {/* Arrow */}
-                <div className="text-muted-foreground">
-                  →
-                </div>
-                
-                {/* Right item selector */}
-                <div className="flex-1">
-                  <Select
-                    value={value[leftItem] || 'unselected'}
-                    onValueChange={(selectedRight) => handleMatchChange(leftItem, selectedRight)}
-                    disabled={disabled}
-                  >
+        {leftItems.map((leftItem, index) => {
+          // Create unique key for each left item using index
+          const leftItemKey = `${index}:${leftItem}`;
+          
+          return (
+            <Card key={index} className="p-4">
+              <CardContent className="p-0">
+                <div className="flex items-center gap-4">
+                  {/* Left item */}
+                  <div className="flex-1">
+                    <Label className="text-sm font-medium">
+                      <span className="text-accent mr-2">{index + 1}.</span>
+                      {leftItem}
+                    </Label>
+                  </div>
+                  
+                  {/* Arrow */}
+                  <div className="text-muted-foreground">
+                    →
+                  </div>
+                  
+                  {/* Right item selector */}
+                  <div className="flex-1">
+                    <Select
+                      value={value[leftItemKey] || 'unselected'}
+                      onValueChange={(selectedRight) => handleMatchChange(leftItemKey, selectedRight)}
+                      disabled={disabled}
+                    >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select a match..." />
                     </SelectTrigger>
@@ -107,11 +135,11 @@ export function NewSchemaQuestionMatching({
                         <span className="text-muted-foreground">-- Select a match --</span>
                       </SelectItem>
                       {uniqueRightItems.map((rightItem, rightIndex) => {
-                        // Check if this item is fully used (used count >= available count)
+                        // Check if this item has reached its usage limit
                         // But allow selection if it's already selected for this left item
-                        const availableCount = rightItemCounts[rightItem] || 0;
+                        const availableCount = rightItemCounts[rightItem] || 1;
                         const usedCount = usedRightItemCounts[rightItem] || 0;
-                        const isCurrentlySelected = value[leftItem] === rightItem;
+                        const isCurrentlySelected = value[leftItemKey] === rightItem;
                         const isFullyUsed = usedCount >= availableCount && !isCurrentlySelected;
                         
                         return (
@@ -125,11 +153,11 @@ export function NewSchemaQuestionMatching({
                                 {rightItem}
                               </span>
                               {isFullyUsed && (
-                                <span className="text-xs text-muted-foreground ml-2">(used)</span>
+                                <span className="text-xs text-muted-foreground ml-2">(fully used)</span>
                               )}
-                              {availableCount > 1 && !isFullyUsed && (
+                              {availableCount > 1 && (
                                 <span className="text-xs text-muted-foreground ml-2">
-                                  ({usedCount + (isCurrentlySelected ? 0 : 1)}/{availableCount})
+                                  ({usedCount}/{availableCount})
                                 </span>
                               )}
                             </div>
@@ -142,7 +170,8 @@ export function NewSchemaQuestionMatching({
               </div>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
       
       {/* Progress indicator */}

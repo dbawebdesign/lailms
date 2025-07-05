@@ -45,7 +45,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
-  const [useMockData, setUseMockData] = useState(true);
+  const [useMockData, setUseMockData] = useState(false); // Default to false now
   const [gradebookData, setGradebookData] = useState({
     students: [],
     assignments: [],
@@ -168,18 +168,16 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
       setSyncStatus('syncing');
       
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Fetch real data from API
+        const response = await fetch(`/api/teach/grading/gradebook/${classInstance.id}`);
         
-        // Real data would be loaded here
-        setGradebookData({
-          students: [],
-          assignments: [],
-          grades: {},
-          standards: [],
-          settings: {}
-        });
+        if (!response.ok) {
+          throw new Error('Failed to fetch gradebook data');
+        }
         
+        const data = await response.json();
+        
+        setGradebookData(data);
         setSyncStatus('synced');
       } catch (error) {
         console.error('Error loading gradebook data:', error);
@@ -195,10 +193,25 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
   const handleRefresh = async () => {
     setSyncStatus('syncing');
     try {
-      // Simulate refresh
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (useMockData) {
+        // Just simulate refresh for mock data
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setSyncStatus('synced');
+        return;
+      }
+
+      // Fetch fresh data from API
+      const response = await fetch(`/api/teach/grading/gradebook/${classInstance.id}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to refresh gradebook data');
+      }
+      
+      const data = await response.json();
+      setGradebookData(data);
       setSyncStatus('synced');
     } catch (error) {
+      console.error('Error refreshing gradebook data:', error);
       setSyncStatus('error');
     }
   };

@@ -139,76 +139,217 @@ async function getClassInstanceData(instanceId: string, supabase: any): Promise<
 }
 
 async function getStudentPerformance(instanceId: string, supabase: any): Promise<StudentPerformance[]> {
-  // Mock data for now - replace with real queries
-  return [
-    {
-      id: "1",
-      name: "Alice Johnson",
-      email: "alice.johnson@school.edu",
-      enrolledAt: "2024-01-15T09:00:00Z",
-      lastActivity: "2024-01-20T14:30:00Z",
-      overallProgress: 85,
-      quizAverage: 92,
-      status: "active"
-    },
-    {
-      id: "2", 
-      name: "Bob Smith",
-      email: "bob.smith@school.edu",
-      enrolledAt: "2024-01-15T09:00:00Z",
-      lastActivity: "2024-01-18T10:15:00Z",
-      overallProgress: 45,
-      quizAverage: 78,
-      status: "falling_behind"
-    },
-    {
-      id: "3",
-      name: "Carol Davis", 
-      email: "carol.davis@school.edu",
-      enrolledAt: "2024-01-15T09:00:00Z",
-      lastActivity: "2024-01-16T16:45:00Z",
-      overallProgress: 15,
-      status: "inactive"
+  try {
+    // Get students enrolled in this class instance
+    const { data: rosters, error: rosterError } = await supabase
+      .from('rosters')
+      .select(`
+        id,
+        joined_at,
+        profiles!inner(
+          user_id,
+          first_name,
+          last_name
+        )
+      `)
+      .eq('class_instance_id', instanceId);
+
+    if (rosterError || !rosters) {
+      console.error('Error fetching rosters:', rosterError);
+      return [];
     }
-  ];
+
+    // For each student, calculate their performance metrics
+    const studentPerformance: StudentPerformance[] = [];
+
+    for (const roster of rosters) {
+      const user = roster.profiles;
+      const studentName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown Student';
+
+      // Get quiz attempts for this student
+      const { data: quizAttempts } = await supabase
+        .from('quiz_attempts')
+        .select('score, max_score, created_at')
+        .eq('user_id', user.user_id)
+        .order('created_at', { ascending: false });
+
+      // Calculate quiz average
+      let quizAverage = 0;
+      if (quizAttempts && quizAttempts.length > 0) {
+        const totalScore = quizAttempts.reduce((sum: number, attempt: any) => sum + (attempt.score || 0), 0);
+        const totalMaxScore = quizAttempts.reduce((sum: number, attempt: any) => sum + (attempt.max_score || 0), 0);
+        quizAverage = totalMaxScore > 0 ? Math.round((totalScore / totalMaxScore) * 100) : 0;
+      }
+
+      // Get last activity (most recent quiz attempt or lesson progress)
+      const lastActivity = quizAttempts?.[0]?.created_at || roster.joined_at;
+
+      // Calculate overall progress (this is a simplified calculation)
+      // In a real implementation, you'd want to calculate based on completed lessons/paths
+      const overallProgress = quizAverage; // Simplified for now
+
+      // Determine status based on activity and performance
+      let status: 'active' | 'falling_behind' | 'inactive' = 'active';
+      const daysSinceLastActivity = Math.floor((Date.now() - new Date(lastActivity).getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysSinceLastActivity > 7) {
+        status = 'inactive';
+      } else if (overallProgress < 60) {
+        status = 'falling_behind';
+      }
+
+      studentPerformance.push({
+        id: user.user_id,
+        name: studentName,
+        email: user.user_id, // Using user_id as email placeholder for now
+        enrolledAt: roster.joined_at,
+        lastActivity,
+        overallProgress,
+        quizAverage,
+        status
+      });
+    }
+
+    return studentPerformance;
+  } catch (error) {
+    console.error('Error fetching student performance:', error);
+    return [];
+  }
 }
 
 async function getRecentActivity(instanceId: string, supabase: any): Promise<RecentActivity[]> {
-  // Mock data for now - replace with real queries
-  return [
-    {
-      id: "1",
-      type: "quiz_submission",
-      description: "Completed 'Chapter 3 Quiz' with 95%",
-      studentName: "Alice Johnson",
-      timestamp: "2024-01-20T14:30:00Z"
-    },
-    {
-      id: "2",
-      type: "lesson_completion", 
-      description: "Finished 'Introduction to Variables'",
-      studentName: "Bob Smith",
-      timestamp: "2024-01-20T11:15:00Z"
-    },
-    {
-      id: "3",
-      type: "student_joined",
-      description: "New student enrolled in class",
-      studentName: "David Wilson",
-      timestamp: "2024-01-20T09:45:00Z"
+  try {
+    const activities: RecentActivity[] = [];
+
+    // Get recent quiz submissions
+    const { data: quizAttempts } = await supabase
+      .from('quiz_attempts')
+      .select(`
+        id,
+        score,
+        max_score,
+        created_at,
+        profiles!inner(first_name, last_name),
+        lesson_questions!inner(
+          lessons!inner(title)
+        )
+      `)
+      .eq('lesson_questions.lessons.class_instance_id', instanceId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (quizAttempts) {
+      for (const attempt of quizAttempts) {
+        const user = attempt.profiles;
+        const studentName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown Student';
+        const lessonTitle = attempt.lesson_questions?.lessons?.title || 'Unknown Lesson';
+        const percentage = attempt.max_score > 0 ? Math.round((attempt.score / attempt.max_score) * 100) : 0;
+
+        activities.push({
+          id: `quiz-${attempt.id}`,
+          type: "quiz_submission",
+          description: `Completed '${lessonTitle}' with ${percentage}%`,
+          studentName,
+          timestamp: attempt.created_at
+        });
+      }
     }
-  ];
+
+    // Get recent enrollments
+    const { data: recentEnrollments } = await supabase
+      .from('rosters')
+      .select(`
+        id,
+        joined_at,
+        profiles!inner(first_name, last_name)
+      `)
+      .eq('class_instance_id', instanceId)
+      .order('joined_at', { ascending: false })
+      .limit(5);
+
+    if (recentEnrollments) {
+      for (const enrollment of recentEnrollments) {
+        const user = enrollment.profiles;
+        const studentName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown Student';
+
+        activities.push({
+          id: `enrollment-${enrollment.id}`,
+          type: "student_joined",
+          description: "New student enrolled in class",
+          studentName,
+          timestamp: enrollment.joined_at
+        });
+      }
+    }
+
+    // Sort all activities by timestamp (most recent first)
+    activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return activities.slice(0, 10); // Return top 10 most recent activities
+  } catch (error) {
+    console.error('Error fetching recent activity:', error);
+    return [];
+  }
 }
 
 async function getClassStats(instanceId: string, supabase: any): Promise<ClassStats> {
-  // Mock data for now - replace with real calculations
-  return {
-    totalStudents: 15,
-    averageProgress: 67,
-    lessonsCompleted: 234,
-    pendingQuizzes: 8,
-    activeToday: 12
-  };
+  try {
+    // Get total students enrolled
+    const { data: rosters, count: totalStudents } = await supabase
+      .from('rosters')
+      .select('id', { count: 'exact' })
+      .eq('class_instance_id', instanceId);
+
+    // Get students active today (who have quiz attempts today)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const { data: activeToday, count: activeTodayCount } = await supabase
+      .from('quiz_attempts')
+      .select('user_id', { count: 'exact' })
+      .gte('created_at', today.toISOString())
+      .in('user_id', rosters?.map((r: any) => r.id) || []);
+
+    // Get all quiz attempts for students in this class to calculate average progress
+    const { data: allQuizAttempts } = await supabase
+      .from('quiz_attempts')
+      .select('score, max_score, user_id')
+      .in('user_id', rosters?.map((r: any) => r.id) || []);
+
+    // Calculate average progress
+    let averageProgress = 0;
+    if (allQuizAttempts && allQuizAttempts.length > 0) {
+      const totalScore = allQuizAttempts.reduce((sum: number, attempt: any) => sum + (attempt.score || 0), 0);
+      const totalMaxScore = allQuizAttempts.reduce((sum: number, attempt: any) => sum + (attempt.max_score || 0), 0);
+      averageProgress = totalMaxScore > 0 ? Math.round((totalScore / totalMaxScore) * 100) : 0;
+    }
+
+    // Get lessons completed count (simplified - count of quiz attempts)
+    const { count: lessonsCompleted } = await supabase
+      .from('quiz_attempts')
+      .select('id', { count: 'exact' })
+      .in('user_id', rosters?.map((r: any) => r.id) || []);
+
+    // Get pending quizzes (this is a simplified calculation)
+    // In a real implementation, you'd want to calculate based on assigned vs completed assessments
+    const pendingQuizzes = Math.max(0, (totalStudents || 0) * 2 - (lessonsCompleted || 0));
+
+    return {
+      totalStudents: totalStudents || 0,
+      averageProgress,
+      lessonsCompleted: lessonsCompleted || 0,
+      pendingQuizzes,
+      activeToday: activeTodayCount || 0
+    };
+  } catch (error) {
+    console.error('Error fetching class stats:', error);
+    return {
+      totalStudents: 0,
+      averageProgress: 0,
+      lessonsCompleted: 0,
+      pendingQuizzes: 0,
+      activeToday: 0
+    };
+  }
 }
 
 export default async function ClassInstancePage({ 

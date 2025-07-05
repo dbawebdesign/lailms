@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { NewSchemaAssessment, NewSchemaQuestion, NewSchemaStudentAttempt, NewSchemaStudentResponse } from './types/newSchemaTypes';
 import { useLunaContextControl } from '@/context/LunaContextProvider';
@@ -21,6 +21,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, CheckCircle, Clock, ArrowLeft } from 'lucide-react';
+import { emitProgressUpdate } from '@/lib/utils/progressEvents';
 
 import { NewSchemaQuestionMultipleChoice } from './questions/NewSchemaQuestionMultipleChoice';
 import { NewSchemaQuestionTrueFalse } from './questions/NewSchemaQuestionTrueFalse';
@@ -239,6 +240,14 @@ export function NewSchemaAssessmentTaker({
             : 'Assessment graded successfully!'
         });
         
+        // Emit progress event for AI grading completion
+        // This ensures navigation tree updates when AI grading finishes
+        if (assessment) {
+          const finalStatus = statusData.gradingFailed ? 'failed' : (statusData.passed ? 'passed' : 'failed');
+          console.log(`🔄 Client: Emitting AI grading completion progress event: ${assessment.id} -> ${finalStatus} (100%)`);
+          emitProgressUpdate('assessment', assessment.id, 100, finalStatus);
+        }
+        
         // Stop polling
         if (pollTimerRef.current) {
           clearInterval(pollTimerRef.current);
@@ -353,6 +362,16 @@ export function NewSchemaAssessmentTaker({
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
+      }
+      
+      // Emit progress event to notify navigation tree of completion
+      // This ensures immediate UI updates in the navigation tree
+      if (assessment) {
+        const progressStatus = result.needsAiGrading ? 'in_progress' : (result.passed ? 'passed' : 'failed');
+        const progressPercentage = result.needsAiGrading ? 50 : 100;
+        
+        console.log(`🔄 Client: Emitting assessment progress event: ${assessment.id} -> ${progressStatus} (${progressPercentage}%)`);
+        emitProgressUpdate('assessment', assessment.id, progressPercentage, progressStatus);
       }
       
       // Set completion state and trigger confetti
