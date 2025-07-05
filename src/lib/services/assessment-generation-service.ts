@@ -233,14 +233,14 @@ export class AssessmentGenerationService {
           messages: [
             {
               role: 'system',
-              content: 'You are an expert educational assessment creator. You generate high-quality questions that test comprehension, application, and analysis of the provided content.'
+              content: 'You are an expert educational assessment creator with deep expertise in cognitive assessment design. Your specialty is generating diverse, well-randomized questions that authentically test student understanding while avoiding predictable patterns. You excel at creating questions with varied answer positions, balanced true/false distributions, and comprehensive content coverage. Always think step-by-step through your question generation process to ensure quality and randomization.'
             },
             {
               role: 'user',
               content: prompt
             }
           ],
-          temperature: 0.7,
+          temperature: 0.8, // Slightly higher for more creative variation in question generation
           max_tokens: 4000,
         })
       );
@@ -269,95 +269,153 @@ export class AssessmentGenerationService {
   ): string {
     const processedContent = this.preprocessContent(content);
     
-    return `
-You are creating ${count} assessment questions based on the provided educational content. The questions should be ${difficulty} difficulty level.
+    return `# Role and Objective
+You are an expert educational assessment creator specializing in generating high-quality, varied questions that test comprehension, application, and analysis. Your goal is to create ${count} diverse assessment questions from the provided content with ${difficulty} difficulty level.
 
-CONTENT TO ANALYZE:
+# Instructions
+
+## Core Requirements
+1. Generate exactly ${count} questions based solely on the provided educational content
+2. Use these question types: ${questionTypes.join(', ')}
+3. Ensure ${difficulty} difficulty level throughout
+4. Output MUST be valid JSON array format
+5. Questions must directly test understanding of the provided content
+
+## Critical Randomization Requirements
+- **RANDOMIZE ANSWER POSITIONS**: For multiple choice questions, vary the correct answer position (A, B, C, D) unpredictably
+- **AVOID PATTERNS**: Do not place correct answers predominantly in position A or any single position
+- **TRUE/FALSE VARIATION**: Mix true and false answers roughly equally - avoid making most answers "true"
+- **MATCHING ORDER**: For matching questions, randomize the order of both left and right items
+- **MATCHING PAIRS**: Scramble the correct pairings - do NOT match Item 1 with Match A, Item 2 with Match B, etc.
+- **ANSWER DISTRIBUTION**: Ensure natural distribution across all possible answer choices
+
+## Question Generation Strategy
+For each question type, follow these specific guidelines:
+
+### Multiple Choice Questions
+- Create 4 plausible options with varied correct answer positions
+- Make distractors believable but clearly incorrect
+- Vary correct answer placement: sometimes A, sometimes B, C, or D
+- Include at least one question where correct answer is in each position (A, B, C, D)
+
+### True/False Questions  
+- Create balanced mix of true and false statements
+- Avoid making majority of answers "true"
+- Base statements on specific content details
+- Ensure clear distinction between true and false
+
+### Short Answer Questions
+- Accept multiple valid phrasings
+- Include synonyms and alternative expressions
+- Set appropriate scoring thresholds
+
+### Essay Questions
+- Focus on analysis and synthesis
+- Provide clear evaluation criteria
+- Include comprehensive rubrics
+
+### Matching Questions
+- Randomize item order in both columns (left and right items should NOT be in the same order)
+- Ensure one-to-one correspondence with SCRAMBLED pairing (Item 1 should NOT match with Match A, etc.)
+- Avoid alphabetical, numerical, or logical ordering patterns
+- Mix up the correct pairings so they appear random (e.g., Item 1 → Match C, Item 2 → Match A, Item 3 → Match B)
+
+# Reasoning Steps
+Before generating each question:
+1. **Content Analysis**: Identify key concepts, facts, and relationships in the content
+2. **Question Planning**: Determine which concepts to test and appropriate question types
+3. **Answer Randomization**: Deliberately vary correct answer positions and true/false distribution
+4. **Quality Check**: Ensure questions test understanding rather than memorization
+5. **Validation**: Verify answers are unambiguous and well-supported by content
+
+# Output Format
+Return a valid JSON array with this exact structure:
+
+[
+  {
+    "question_text": "Clear, specific question text",
+    "question_type": "multiple_choice|true_false|short_answer|essay|matching",
+    "options": [...] or null,
+    "correct_answer": "exact answer or array/object as appropriate",
+    "answer_key": {
+      // Detailed answer information with explanations
+    },
+    "sample_response": "For short_answer and essay only",
+    "grading_rubric": null,
+    "points": 1,
+    "explanation": "What this question tests"
+  }
+]
+
+# Question Type Specifications
+
+## Multiple Choice Format
+- **options**: ["Option A text", "Option B text", "Option C text", "Option D text"]
+- **correct_answer**: "Exact text of correct option"
+- **answer_key**: {
+    "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
+    "correct_option": "Exact text of correct option",
+    "correct_position": "A|B|C|D",
+    "explanations": {
+      "Option A text": "Explanation of why this is correct/incorrect",
+      "Option B text": "Explanation of why this is correct/incorrect",
+      "Option C text": "Explanation of why this is correct/incorrect",
+      "Option D text": "Explanation of why this is correct/incorrect"
+    }
+  }
+
+## True/False Format  
+- **options**: null
+- **correct_answer**: true or false
+- **answer_key**: {
+    "correct_answer": "true or false",
+    "explanation": "Detailed explanation of why this statement is true/false based on the content"
+  }
+
+## Short Answer Format
+- **options**: null
+- **correct_answer**: ["primary answer", "alternative answer"]
+- **answer_key**: {
+    "acceptable_answers": ["primary answer", "alternative answer", "synonym"],
+    "keywords": ["keyword1", "keyword2"],
+    "min_score_threshold": 0.7,
+    "grading_notes": "What to look for when grading"
+  }
+- **sample_response**: "Model correct answer demonstrating expected depth"
+
+## Essay Format
+- **options**: null
+- **correct_answer**: null
+- **answer_key**: {
+    "grading_criteria": "What to evaluate when grading this essay response",
+    "key_points": ["essential point 1", "essential point 2", "essential point 3"],
+    "rubric": {"content": 40, "organization": 30, "analysis": 30}
+  }
+- **sample_response**: "Comprehensive model essay response"
+
+## Matching Format
+- **options**: {"left_items": ["Item 1", "Item 2", "Item 3"], "right_items": ["Match C", "Match A", "Match B"]}
+- **correct_answer**: {"Item 1": "Match B", "Item 2": "Match C", "Item 3": "Match A"}
+- **answer_key**: {
+    "pairs": [
+      {"left": "Item 1", "right": "Match B"},
+      {"left": "Item 2", "right": "Match C"},
+      {"left": "Item 3", "right": "Match A"}
+    ],
+    "explanation": "Brief explanation of the matching logic and relationships"
+  }
+
+# Content to Analyze
 \`\`\`
 ${processedContent}
 \`\`\`
 
-REQUIREMENTS:
-1. Generate exactly ${count} questions
-2. Use these question types: ${questionTypes.join(', ')}
-3. Questions should be ${difficulty} difficulty
-4. Output MUST be valid JSON array
-5. Questions must be directly based on the provided content
-6. Include proper options, correct_answer, and answer_key fields
+# Final Instructions and Reasoning Prompt
+Now think step by step about the content and generate ${count} high-quality assessment questions. 
 
-QUESTION TYPE SPECIFICATIONS:
+**CRITICAL REMINDER**: Ensure true randomization of answer positions and avoid any predictable patterns. For multiple choice questions, deliberately vary where you place the correct answer. For true/false questions, create a natural mix of true and false statements. 
 
-multiple_choice:
-- options: ["Option A text", "Option B text", "Option C text", "Option D text"]
-- correct_answer: "Option A text" (the exact text of the correct option)
-- answer_key: {
-    "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
-    "correct_option": "Option A text",
-    "explanations": {
-      "Option A text": "Why this is correct",
-      "Option B text": "Why this is wrong",
-      "Option C text": "Why this is wrong", 
-      "Option D text": "Why this is wrong"
-    }
-  }
-
-true_false:
-- options: null (no options needed)
-- correct_answer: true or false
-- answer_key: {
-    "correct_answer": true,
-    "explanation": "Detailed explanation of why this is true/false"
-  }
-
-short_answer:
-- options: null (no options needed)
-- correct_answer: ["primary answer", "alternative answer"]
-- answer_key: {
-    "acceptable_answers": ["primary answer", "alternative answer", "synonym"],
-    "keywords": ["keyword1", "keyword2"],
-    "min_score_threshold": 0.7,
-    "grading_notes": "What to look for"
-  }
-- sample_response: "Model correct answer"
-
-essay:
-- options: null (no options needed)
-- correct_answer: null (no single correct answer)
-- answer_key: {
-    "grading_criteria": "What to evaluate when grading this essay",
-    "key_points": ["point1", "point2", "point3"],
-    "rubric": {"content": 40, "organization": 30, "analysis": 30}
-  }
-- sample_response: "Model essay response"
-
-matching:
-- options: {"left_items": ["Item 1", "Item 2", "Item 3"], "right_items": ["Match A", "Match B", "Match C"]}
-- correct_answer: {"Item 1": "Match A", "Item 2": "Match B", "Item 3": "Match C"}
-- answer_key: {
-    "pairs": [
-      {"left": "Item 1", "right": "Match A"},
-      {"left": "Item 2", "right": "Match B"},
-      {"left": "Item 3", "right": "Match C"}
-    ],
-    "explanation": "Brief explanation of the matching logic"
-  }
-
-OUTPUT FORMAT (JSON array):
-[
-  {
-    "question_text": "Question text here?",
-    "question_type": "multiple_choice",
-    "options": [...] or null,
-    "correct_answer": "..." or [...] or {...} or null,
-    "answer_key": {...},
-    "sample_response": "For short_answer and essay only",
-    "grading_rubric": null,
-    "points": 1,
-    "explanation": "Brief explanation of what this tests"
-  }
-]
-
-Generate the questions now:`;
+Begin by analyzing the content for key testable concepts, then generate questions that genuinely assess understanding while maintaining proper answer randomization throughout.`;
   }
 
   private preprocessContent(content: string): string {
