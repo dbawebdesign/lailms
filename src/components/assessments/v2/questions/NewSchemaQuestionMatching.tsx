@@ -8,9 +8,12 @@
 'use client';
 
 import { NewSchemaQuestion } from '../types/newSchemaTypes';
+import { InstantFeedback } from '@/lib/services/instant-grading-service';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle, XCircle } from 'lucide-react';
 
 interface MatchingPair {
   left: string;
@@ -22,13 +25,15 @@ interface NewSchemaQuestionMatchingProps {
   value?: Record<string, string>;
   onChange: (value: Record<string, string>) => void;
   disabled?: boolean;
+  instantFeedback?: InstantFeedback;
 }
 
 export function NewSchemaQuestionMatching({
   question,
   value = {},
   onChange,
-  disabled = false
+  disabled = false,
+  instantFeedback
 }: NewSchemaQuestionMatchingProps) {
   
   // Extract matching data from options or answer_key
@@ -92,6 +97,15 @@ export function NewSchemaQuestionMatching({
   console.log('Current usedRightItemCounts:', usedRightItemCounts);
   console.log('Current value:', value);
 
+  // Check correct matches for visual feedback
+  const correctPairs: Record<string, string> = {};
+  if (question.answer_key?.pairs) {
+    question.answer_key.pairs.forEach((pair: MatchingPair) => {
+      const leftItemKey = leftItems.indexOf(pair.left) >= 0 ? `${leftItems.indexOf(pair.left)}:${pair.left}` : pair.left;
+      correctPairs[leftItemKey] = pair.right;
+    });
+  }
+
   return (
     <div className="space-y-4">
       <div className="text-sm text-muted-foreground mb-4">
@@ -102,16 +116,36 @@ export function NewSchemaQuestionMatching({
         {leftItems.map((leftItem, index) => {
           // Create unique key for each left item using index
           const leftItemKey = `${index}:${leftItem}`;
+          const selectedMatch = value[leftItemKey];
+          const correctMatch = correctPairs[leftItemKey];
+          const isCorrectMatch = selectedMatch && selectedMatch === correctMatch;
+          const isIncorrectMatch = selectedMatch && selectedMatch !== correctMatch && instantFeedback;
+          const showCorrectAnswer = instantFeedback && !instantFeedback.isCorrect && selectedMatch;
           
           return (
-            <Card key={index} className="p-4">
+            <Card key={index} className={`p-4 transition-all duration-300 ${
+              isCorrectMatch && instantFeedback
+                ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/20'
+                : isIncorrectMatch
+                ? 'border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-950/20'
+                : ''
+            }`}>
               <CardContent className="p-0">
                 <div className="flex items-center gap-4">
                   {/* Left item */}
                   <div className="flex-1">
-                    <Label className="text-sm font-medium">
+                    <Label className="text-sm font-medium flex items-center gap-2">
                       <span className="text-accent mr-2">{index + 1}.</span>
                       {leftItem}
+                      
+                      {/* Show feedback icon for this match */}
+                      {selectedMatch && instantFeedback && (
+                        isCorrectMatch ? (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-red-600" />
+                        )
+                      )}
                     </Label>
                   </div>
                   
@@ -166,10 +200,22 @@ export function NewSchemaQuestionMatching({
                       })}
                     </SelectContent>
                   </Select>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+                
+                {/* Show correct answer hint for this specific match if incorrect */}
+                {showCorrectAnswer && correctMatch && selectedMatch !== correctMatch && (
+                  <div className="mt-2 p-2 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-800">
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="text-green-700 dark:text-green-300">
+                        Correct match: <strong>{correctMatch}</strong>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           );
         })}
       </div>
@@ -178,6 +224,40 @@ export function NewSchemaQuestionMatching({
       <div className="text-xs text-muted-foreground text-center mt-4">
         {Object.keys(value).length} of {leftItems.length} matches completed
       </div>
+      
+      {/* Instant Feedback Display */}
+      {instantFeedback && (
+        <div className={`mt-4 p-4 rounded-lg border transition-all duration-500 animate-in slide-in-from-top-2 ${
+          instantFeedback.isCorrect 
+            ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 dark:from-green-950/20 dark:to-emerald-950/20 dark:border-green-800'
+            : 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200 dark:from-red-950/20 dark:to-rose-950/20 dark:border-red-800'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-1 rounded-full ${
+              instantFeedback.isCorrect ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' : 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400'
+            }`}>
+              {instantFeedback.isCorrect ? <CheckCircle className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`font-semibold ${
+                  instantFeedback.isCorrect ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
+                }`}>
+                  {instantFeedback.isCorrect ? 'Perfect Match!' : 'Some matches need review'}
+                </span>
+                <Badge variant="outline" className="text-xs">
+                  {instantFeedback.pointsEarned}/{instantFeedback.maxPoints} pts
+                </Badge>
+              </div>
+              <p className={`text-sm ${
+                instantFeedback.isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+              }`}>
+                {instantFeedback.feedback}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

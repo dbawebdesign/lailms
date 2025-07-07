@@ -299,14 +299,14 @@ OUTPUT FORMAT (JSON):
       case 'short_answer':
         return responseData.text_answer || responseData.answer || responseData.text || responseData.value || '';
       case 'essay':
-        return responseData.text_answer || responseData.essay || responseData.text || responseData.content || responseData.value || '';
+        return responseData.essay_text || responseData.text_answer || responseData.essay || responseData.text || responseData.content || responseData.value || '';
       case 'multiple_choice':
         return responseData.selected_option || responseData.answer || '';
       case 'true_false':
         return responseData.selected_option || responseData.answer || '';
       default:
         // Fallback: try common field names
-        return responseData.text_answer || responseData.answer || responseData.text || responseData.value || responseData.content || '';
+        return responseData.essay_text || responseData.text_answer || responseData.answer || responseData.text || responseData.value || responseData.content || '';
     }
   }
 

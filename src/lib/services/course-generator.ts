@@ -2409,25 +2409,26 @@ ASSESSMENT REQUIREMENTS:
 
 ${this.getAcademicLevelGuidance(request.academicLevel)}
 
-Generate questions as JSON array:
-[
-  {
-    "questionText": "Question based on the lesson content?",
-    "questionType": "multiple_choice",
-    "options": [
-      { "text": "Option A", "correct": false, "explanation": "Why this is incorrect based on lesson content" },
-      { "text": "Option B", "correct": true, "explanation": "Why this is correct based on lesson content" },
-      { "text": "Option C", "correct": false, "explanation": "Why this is incorrect based on lesson content" },
-      { "text": "Option D", "correct": false, "explanation": "Why this is incorrect based on lesson content" }
-    ],
-    "correctAnswer": "Option B",
-    "explanation": "Detailed explanation referencing specific lesson content",
-    "points": 10,
-    "difficultyLevel": "easy|medium|hard",
-    "bloomTaxonomy": "remember|understand|apply|analyze|evaluate|create",
-    "lessonObjectiveAligned": "Which learning objective this tests"
-  }
-]
+      Generate questions as JSON array:
+      [
+        {
+          "questionText": "Question based on the lesson content?",
+          "questionType": "multiple_choice",
+          "options": ["Option A", "Option B", "Option C", "Option D"],
+          "correctAnswer": "Option B",
+          "answerKey": {
+            "Option A": "Incorrect. This is wrong because... (max 2 sentences)",
+            "Option B": "Correct! This is right because... (max 2 sentences)", 
+            "Option C": "Incorrect. This is wrong because... (max 2 sentences)",
+            "Option D": "Incorrect. This is wrong because... (max 2 sentences)"
+          },
+          "explanation": "Short explanation of what this question tests (max 2 sentences)",
+          "points": 10,
+          "difficultyLevel": "easy|medium|hard",
+          "bloomTaxonomy": "remember|understand|apply|analyze|evaluate|create",
+          "lessonObjectiveAligned": "Which learning objective this tests"
+        }
+      ]
 
 CRITICAL: Questions must be based ONLY on the actual lesson content provided above. Do not use external knowledge or make assumptions beyond what was taught in the lesson sections.`;
 
