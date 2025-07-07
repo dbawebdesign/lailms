@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { baseClassId, organisationId } = body;
+    const { baseClassId, organisationId, instructions } = body;
 
     // Validate required fields
     if (!baseClassId || !organisationId) {
@@ -177,6 +177,14 @@ Total Sources: ${allContent.length}
 Total Content: ~${totalWords.toLocaleString()} words
 Source Types: ${[...new Set(allContent.map(doc => doc.type))].join(', ')}
 
+${instructions ? `
+INSTRUCTOR GUIDANCE:
+The course creator has provided specific instructions for how to analyze and use these sources:
+"${instructions}"
+
+Please follow these instructions carefully when analyzing the content and creating the course information.
+` : ''}
+
 SOURCE MATERIALS:
 ${contentSummary.map((doc, i) => `
 Source ${i + 1}: ${doc.title}
@@ -187,15 +195,15 @@ ${doc.preview}
 ---`).join('\n')}
 
 ANALYSIS REQUIREMENTS:
-Analyze ALL sources comprehensively as a unified knowledge base to create a cohesive course. Consider:
+Analyze ALL sources comprehensively as a unified knowledge base to create a cohesive course${instructions ? ', following the instructor guidance provided above' : ''}. Consider:
 
 1. **Thematic Unity**: Identify the overarching themes that connect all sources
 2. **Content Depth**: Assess the collective knowledge depth across all materials
 3. **Learning Scope**: Determine what can be taught from this combined knowledge
-4. **Audience Alignment**: Who would benefit most from this comprehensive content
+4. **Audience Alignment**: Who would benefit most from this comprehensive content${instructions ? ' (considering the instructor guidance)' : ''}
 5. **Knowledge Gaps**: Identify areas where the sources complement each other
 
-Generate course information that reflects the COMPLETE knowledge base:
+Generate course information that reflects the COMPLETE knowledge base${instructions ? ' and aligns with the instructor guidance' : ''}:
 
 1. **Course Name**: A title that captures the unified theme of ALL sources
 2. **Course Description**: 2-3 paragraphs explaining the comprehensive learning experience

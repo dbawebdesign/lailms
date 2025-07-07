@@ -63,6 +63,7 @@ export default function KnowledgeBaseCourseCreator({ userId, organisationId, exi
   const [analysisResult, setAnalysisResult] = useState<GeneratedCourseInfo | null>(null);
   const [analysisMetrics, setAnalysisMetrics] = useState<any | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [userInstructions, setUserInstructions] = useState<string | undefined>(undefined);
 
   // Handle existing base class from Luna
   React.useEffect(() => {
@@ -108,7 +109,8 @@ export default function KnowledgeBaseCourseCreator({ userId, organisationId, exi
     }
   ];
 
-  const handleUploadComplete = async () => {
+  const handleUploadComplete = async (instructions?: string) => {
+    setUserInstructions(instructions);
     setIsProcessing(true);
     setCreationProgress({
       step: 'analyzing',
@@ -297,6 +299,7 @@ export default function KnowledgeBaseCourseCreator({ userId, organisationId, exi
         body: JSON.stringify({
           baseClassId: targetBaseClassId,
           organisationId: organisationId,
+          instructions: userInstructions,
         }),
       });
 

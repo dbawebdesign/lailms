@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Upload, 
   CheckCircle, 
@@ -21,13 +22,14 @@ import {
   Sparkles,
   Plus,
   X,
-  Globe
+  Globe,
+  Lightbulb
 } from 'lucide-react';
 
 interface FileUploadForCourseCreationProps {
   baseClassId: string | null;
   organisationId: string;
-  onUploadComplete: () => void;
+  onUploadComplete: (instructions?: string) => void;
   onSkipUploads: () => void;
 }
 
@@ -55,6 +57,7 @@ export default function FileUploadForCourseCreation({
 }: FileUploadForCourseCreationProps) {
   const [queuedItems, setQueuedItems] = useState<QueuedFile[]>([]);
   const [urlInput, setUrlInput] = useState('');
+  const [instructions, setInstructions] = useState('');
   const [processingProgress, setProcessingProgress] = useState<ProcessingProgress>({
     total: 0,
     completed: 0,
@@ -185,7 +188,7 @@ export default function FileUploadForCourseCreation({
       }));
 
       // Trigger the comprehensive analysis
-      onUploadComplete();
+      onUploadComplete(instructions.trim() || undefined);
 
     } catch (error) {
       console.error('Error processing sources:', error);
@@ -278,6 +281,35 @@ export default function FileUploadForCourseCreation({
               <Plus className="h-4 w-4 mr-2" />
               Add
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Instructions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Lightbulb className="h-5 w-5" />
+            <span>Instructions for AI (Optional)</span>
+          </CardTitle>
+          <CardDescription>
+            Provide specific guidance to help the AI understand how you want your sources used and what type of course content you want created.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="instructions-input">Course Creation Instructions</Label>
+            <Textarea
+              id="instructions-input"
+              placeholder="Example: Focus on practical applications, create a course for beginners, emphasize hands-on exercises, target software developers, include case studies, etc."
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              rows={4}
+              className="resize-none"
+            />
+            <p className="text-xs text-muted-foreground">
+              These instructions will guide the AI in analyzing your sources and creating course content that matches your specific needs and teaching style.
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -292,7 +292,8 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         if (jsConfettiRef.current) {
                           jsConfettiRef.current.addConfetti({
                             emojis: ['🎉', '📚', '✨', '🎓', '📖'],
@@ -397,7 +398,10 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
                             </Badge>
                           </div>
                           {task.status === 'failed' && (
-                            <Button size="sm" variant="outline" onClick={() => handleRegenerateTask(task.id)} disabled={isRetrying === task.id}>
+                            <Button size="sm" variant="outline" onClick={(e) => {
+                              e.stopPropagation();
+                              handleRegenerateTask(task.id);
+                            }} disabled={isRetrying === task.id}>
                                {isRetrying === task.id ? <RefreshCw className="h-3 w-3 animate-spin"/> : 'Retry'}
                             </Button>
                           )}
