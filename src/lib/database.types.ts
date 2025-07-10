@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instanciate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.3 (519615d)"
+  }
   public: {
     Tables: {
       agent_analytics: {
@@ -174,6 +179,69 @@ export type Database = {
           },
         ]
       }
+      assignments: {
+        Row: {
+          category: string | null
+          class_instance_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          name: string
+          points_possible: number
+          published: boolean | null
+          type: Database["public"]["Enums"]["assignment_type"]
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          class_instance_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          name: string
+          points_possible: number
+          published?: boolean | null
+          type: Database["public"]["Enums"]["assignment_type"]
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          class_instance_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          name?: string
+          points_possible?: number
+          published?: boolean | null
+          type?: Database["public"]["Enums"]["assignment_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignments_class_instance_id_fkey"
+            columns: ["class_instance_id"]
+            isOneToOne: false
+            referencedRelation: "class_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      // ... existing code ...
     }
     Functions: {
       upsert_progress: {
@@ -188,5 +256,52 @@ export type Database = {
         Returns: string
       }
     }
+    Enums: {
+      assessment_type:
+        | "practice"
+        | "lesson_quiz"
+        | "path_exam"
+        | "final_exam"
+        | "diagnostic"
+        | "benchmark"
+      assignment_type:
+        | "quiz"
+        | "homework"
+        | "project"
+        | "exam"
+        | "discussion"
+        | "lab"
+        | "assignment"
+      audit_action: "INSERT" | "UPDATE" | "DELETE"
+      criterion_type: "holistic" | "analytic" | "checklist" | "rating_scale"
+      document_status: "queued" | "processing" | "completed" | "error"
+      grade_status: "graded" | "missing" | "late" | "excused" | "pending"
+      grading_method:
+        | "automatic"
+        | "manual"
+        | "hybrid"
+        | "peer_review"
+        | "ai_assisted"
+      grading_scale_type:
+        | "points"
+        | "percentage"
+        | "letter_grade"
+        | "pass_fail"
+        | "rubric_scale"
+      mastery_level: "below" | "approaching" | "proficient" | "advanced"
+      question_type:
+        | "multiple_choice"
+        | "true_false"
+        | "short_answer"
+        | "long_answer"
+        | "coding"
+      role: "super_admin" | "admin" | "teacher" | "student" | "parent"
+      user_role: "student" | "teacher" | "admin" | "super_admin" | "parent"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
-} 
+}
+
+export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'] 

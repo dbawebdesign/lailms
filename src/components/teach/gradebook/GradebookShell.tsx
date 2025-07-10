@@ -75,39 +75,20 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
       late_assignments: student.late_assignments,
       mastery_level: student.mastery_level
     })),
-    assignments: gradebookData.assignments.map(assignment => {
-      // Map database assignment types to component expected types
-      let componentType: 'quiz' | 'homework' | 'project' | 'exam';
-      switch (assignment.type) {
-        case 'quiz':
-        case 'homework':
-        case 'project':
-        case 'exam':
-          componentType = assignment.type;
-          break;
-        case 'discussion':
-          componentType = 'homework';
-          break;
-        case 'lab':
-          componentType = 'project';
-          break;
-        default:
-          componentType = 'homework';
-      }
-      
-      return {
-        id: assignment.id,
-        name: assignment.name,
-        type: componentType,
-        points_possible: assignment.points_possible,
-        due_date: assignment.due_date || '',
-        published: assignment.published || false,
-        description: assignment.description || '',
-        category: assignment.category || '',
-        created_at: assignment.created_at,
-        updated_at: assignment.updated_at
-      };
-    }),
+    assignments: gradebookData.assignments.map(assignment => ({
+      id: assignment.id,
+      name: assignment.name,
+      type: assignment.type,
+      points_possible: assignment.points_possible,
+      due_date: assignment.due_date,
+      published: assignment.published,
+      description: assignment.description,
+      category: assignment.category,
+      created_at: assignment.created_at,
+      updated_at: assignment.updated_at,
+      class_instance_id: assignment.class_instance_id,
+      created_by: assignment.created_by
+    })),
     grades: Object.fromEntries(
       Object.entries(gradebookData.grades).map(([key, grade]) => [
         key,
@@ -380,6 +361,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
                 selectedStudents={selectedStudents}
                 onSelectedStudentsChange={setSelectedStudents}
                 onStudentSelect={setSelectedStudent}
+                onDataChange={handleDataChange}
                 isLoading={isLoading}
               />
             </TabsContent>
@@ -407,6 +389,9 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
                 data={transformedData}
                 onDataChange={handleDataChange}
                 isLoading={isLoading}
+                onCreateAssignment={createAssignment}
+                onUpdateAssignment={updateAssignment}
+                onDeleteAssignment={deleteAssignment}
               />
             </TabsContent>
             

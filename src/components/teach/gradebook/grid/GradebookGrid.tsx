@@ -21,19 +21,22 @@ import {
   Target,
   Sparkles,
   BookOpen,
-  Edit,
+  Users,
+  Calendar,
+  Award,
+  Star,
   Eye,
   MessageSquare,
-  FileText,
-  Calendar,
-  Settings,
-  Users,
-  CheckCircle,
-  Phone,
   Mail,
-  User
+  Phone,
+  FileText,
+  Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tables } from '../../../../../packages/types/db';
+import { gradeService } from '@/lib/services/gradebook';
+
+type Assignment = Tables<'assignments'>;
 
 interface Student {
   id: string;
@@ -45,15 +48,6 @@ interface Student {
   missing_assignments?: number;
   late_assignments?: number;
   mastery_level?: 'below' | 'approaching' | 'proficient' | 'advanced';
-}
-
-interface Assignment {
-  id: string;
-  name: string;
-  type: 'quiz' | 'homework' | 'project' | 'exam';
-  points_possible: number;
-  due_date: string;
-  published: boolean;
 }
 
 interface Grade {
@@ -86,6 +80,7 @@ interface GradebookGridProps {
   selectedStudents: string[];
   onSelectedStudentsChange: (students: string[]) => void;
   onStudentSelect: (studentId: string) => void;
+  onDataChange?: () => void; // Add callback for data refresh
   isLoading: boolean;
 }
 
@@ -95,6 +90,7 @@ export function GradebookGrid({
   selectedStudents,
   onSelectedStudentsChange,
   onStudentSelect,
+  onDataChange,
   isLoading
 }: GradebookGridProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -156,11 +152,64 @@ export function GradebookGrid({
     setCellValue(currentValue);
   };
 
-  const handleCellSave = (studentId: string, assignmentId: string) => {
-    // TODO: Save grade value
-    console.log('Saving grade:', studentId, assignmentId, cellValue);
-    setEditingCell(null);
-    setCellValue('');
+  const handleCellSave = async (studentId: string, assignmentId: string) => {
+    try {
+      if (!cellValue.trim()) {
+        // If cell value is empty, find and delete the existing grade
+        const existingGrade = await gradeService.getGrade(studentId, assignmentId);
+        if (existingGrade) {
+          await gradeService.deleteGrade(existingGrade.id);
+        }
+      } else {
+        // Parse the input based on view mode
+        let pointsEarned: number | null = null;
+        let percentage: number | null = null;
+        let letterGrade: string | null = null;
+
+        if (viewMode === 'percentage') {
+          const pct = parseFloat(cellValue);
+          if (!isNaN(pct) && pct >= 0 && pct <= 100) {
+            percentage = pct;
+            // Find the assignment to calculate points
+            const assignment = assignments.find(a => a.id === assignmentId);
+            if (assignment && assignment.points_possible) {
+              pointsEarned = Math.round((pct / 100) * assignment.points_possible * 100) / 100;
+            }
+          }
+        } else if (viewMode === 'points') {
+          const pts = parseFloat(cellValue);
+          if (!isNaN(pts) && pts >= 0) {
+            pointsEarned = pts;
+            // Find the assignment to calculate percentage
+            const assignment = assignments.find(a => a.id === assignmentId);
+            if (assignment && assignment.points_possible && assignment.points_possible > 0) {
+              percentage = Math.round((pts / assignment.points_possible) * 100 * 100) / 100;
+            }
+          }
+        } else if (viewMode === 'letter') {
+          letterGrade = cellValue.toUpperCase();
+        }
+
+        // Create or update the grade using upsert
+        await gradeService.upsertGrade({
+          student_id: studentId,
+          assignment_id: assignmentId,
+          class_instance_id: classInstance.id,
+          points_earned: pointsEarned,
+          percentage: percentage,
+          status: 'graded',
+          graded_at: new Date().toISOString(),
+          graded_by: null // Will be set by RLS policy based on current user
+        });
+      }
+      
+      setEditingCell(null);
+      setCellValue('');
+      onDataChange?.(); // Notify parent to refresh data
+    } catch (error) {
+      console.error('Error saving grade:', error);
+      alert('Failed to save grade. Please try again.');
+    }
   };
 
   const handleCellCancel = () => {
@@ -476,9 +525,12 @@ export function GradebookGrid({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="quiz">Quiz</SelectItem>
+                    <SelectItem value="assignment">Assignment</SelectItem>
                     <SelectItem value="homework">Homework</SelectItem>
                     <SelectItem value="project">Project</SelectItem>
                     <SelectItem value="exam">Exam</SelectItem>
+                    <SelectItem value="lab">Lab</SelectItem>
+                    <SelectItem value="discussion">Discussion</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

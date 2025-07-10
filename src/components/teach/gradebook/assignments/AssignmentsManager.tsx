@@ -33,25 +33,9 @@ import {
   Star
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tables } from '../../../../../packages/types/db';
 
-interface Assignment {
-  id: string;
-  name: string;
-  description: string;
-  type: 'quiz' | 'assignment' | 'project' | 'exam' | 'discussion' | 'lab';
-  category: string;
-  points_possible: number;
-  due_date: string;
-  weight: number;
-  standards?: string[];
-  rubric?: any;
-  status: 'draft' | 'published' | 'closed';
-  submissions_count?: number;
-  graded_count?: number;
-  avg_score?: number;
-  created_at: string;
-  updated_at: string;
-}
+type Assignment = Tables<'assignments'>;
 
 interface AssignmentsManagerProps {
   classInstance: {
@@ -70,13 +54,19 @@ interface AssignmentsManagerProps {
   };
   onDataChange: (data: any) => void;
   isLoading: boolean;
+  onCreateAssignment?: (assignmentData: Partial<Assignment>) => Promise<void>;
+  onUpdateAssignment?: (assignmentId: string, updates: Partial<Assignment>) => Promise<void>;
+  onDeleteAssignment?: (assignmentId: string) => Promise<void>;
 }
 
 export function AssignmentsManager({
   classInstance,
   data,
   onDataChange,
-  isLoading
+  isLoading,
+  onCreateAssignment,
+  onUpdateAssignment,
+  onDeleteAssignment
 }: AssignmentsManagerProps) {
   const [activeTab, setActiveTab] = useState('assignments');
   const [searchTerm, setSearchTerm] = useState('');
@@ -85,6 +75,16 @@ export function AssignmentsManager({
   const [selectedAssignments, setSelectedAssignments] = useState<string[]>([]);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    type: 'assignment' as Assignment['type'],
+    category: '',
+    points_possible: 100,
+    due_date: '',
+    published: false
+  });
 
   // Use live data from props
   const assignments = data.assignments;
@@ -96,25 +96,128 @@ export function AssignmentsManager({
     if (filterType !== 'all' && assignment.type !== filterType) {
       return false;
     }
-    if (filterStatus !== 'all' && assignment.status !== filterStatus) {
-      return false;
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'published' && !assignment.published) {
+        return false;
+      }
+      if (filterStatus === 'draft' && assignment.published) {
+        return false;
+      }
     }
     return true;
   });
 
   const handleCreateAssignment = () => {
     setEditingAssignment(null);
+    setFormData({
+      name: '',
+      description: '',
+      type: 'assignment',
+      category: '',
+      points_possible: 100,
+      due_date: '',
+      published: false
+    });
     setCreateDialogOpen(true);
   };
 
   const handleEditAssignment = (assignment: Assignment) => {
     setEditingAssignment(assignment);
+    
+    // Convert ISO date to datetime-local format
+    let formattedDate = '';
+    if (assignment.due_date) {
+      const date = new Date(assignment.due_date);
+      // Format for datetime-local input (YYYY-MM-DDTHH:mm)
+      formattedDate = date.toISOString().slice(0, 16);
+    }
+    
+    setFormData({
+      name: assignment.name || '',
+      description: assignment.description || '',
+      type: assignment.type,
+      category: assignment.category || '',
+      points_possible: assignment.points_possible || 100,
+      due_date: formattedDate,
+      published: assignment.published || false
+    });
     setCreateDialogOpen(true);
   };
 
-  const handleDeleteAssignment = (assignmentId: string) => {
-    // TODO: Implement delete functionality
-    console.log('Delete assignment:', assignmentId);
+  const handleDeleteAssignment = async (assignmentId: string) => {
+    if (!onDeleteAssignment) return;
+    
+    if (confirm('Are you sure you want to delete this assignment? This action cannot be undone.')) {
+      try {
+        await onDeleteAssignment(assignmentId);
+        onDataChange({}); // Trigger refresh
+      } catch (error) {
+        console.error('Failed to delete assignment:', error);
+        alert('Failed to delete assignment. Please try again.');
+      }
+    }
+  };
+
+  const handleSubmitAssignment = async () => {
+    if (!formData.name.trim()) {
+      alert('Assignment name is required');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Convert datetime-local format to ISO string for database
+      let formattedDueDate = null;
+      if (formData.due_date) {
+        const date = new Date(formData.due_date);
+        formattedDueDate = date.toISOString();
+      }
+
+      const assignmentData = {
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        type: formData.type,
+        category: formData.category.trim(),
+        points_possible: formData.points_possible,
+        due_date: formattedDueDate,
+        published: formData.published,
+        class_instance_id: classInstance.id
+      };
+
+      if (editingAssignment) {
+        // Update existing assignment
+        if (onUpdateAssignment) {
+          await onUpdateAssignment(editingAssignment.id, assignmentData);
+        }
+      } else {
+        // Create new assignment
+        if (onCreateAssignment) {
+          await onCreateAssignment(assignmentData);
+        }
+      }
+
+      // Reset form
+      setFormData({
+        name: '',
+        description: '',
+        type: 'assignment',
+        category: '',
+        points_possible: 100,
+        due_date: '',
+        published: false
+      });
+      
+      setCreateDialogOpen(false);
+      setEditingAssignment(null);
+      
+      // Trigger data refresh - the parent should handle this properly
+      onDataChange({}); 
+    } catch (error) {
+      console.error('Failed to save assignment:', error);
+      alert('Failed to save assignment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleBulkAction = (action: string) => {
@@ -132,16 +235,11 @@ export function AssignmentsManager({
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'published':
-        return <Badge className="bg-success/10 text-success border-success/20">Published</Badge>;
-      case 'draft':
-        return <Badge className="bg-warning/10 text-warning border-warning/20">Draft</Badge>;
-      case 'closed':
-        return <Badge className="bg-destructive/10 text-destructive border-destructive/20">Closed</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+  const getStatusBadge = (assignment: Assignment) => {
+    if (assignment.published) {
+      return <Badge className="bg-success/10 text-success border-success/20">Published</Badge>;
+    } else {
+      return <Badge className="bg-warning/10 text-warning border-warning/20">Draft</Badge>;
     }
   };
 
@@ -272,7 +370,7 @@ export function AssignmentsManager({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
                       <h4 className="text-h3 font-semibold text-foreground truncate">{assignment.name}</h4>
-                      {getStatusBadge(assignment.status)}
+                      {getStatusBadge(assignment)}
                       <Badge variant="outline" className="border-primary/20 text-primary bg-primary/10 text-xs">
                         {assignment.type}
                       </Badge>
@@ -392,7 +490,7 @@ export function AssignmentsManager({
         <StatCard
           icon={CheckCircle}
           title="Published"
-          value={assignments.filter(a => a.status === 'published').length}
+          value={assignments.filter(a => a.published).length}
           color="success"
         />
         <StatCard
@@ -503,13 +601,14 @@ export function AssignmentsManager({
                 <Input
                   id="name"
                   placeholder="Enter assignment name"
-                  defaultValue={editingAssignment?.name}
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
                   className="border-divider focus:border-primary/50"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="type" className="text-body font-medium text-foreground">Type</Label>
-                <Select defaultValue={editingAssignment?.type || 'assignment'}>
+                <Select value={formData.type} onValueChange={(value) => setFormData({...formData, type: value as Assignment['type']})}>
                   <SelectTrigger className="border-divider">
                     <SelectValue />
                   </SelectTrigger>
@@ -530,31 +629,22 @@ export function AssignmentsManager({
               <Textarea
                 id="description"
                 placeholder="Describe the assignment"
-                defaultValue={editingAssignment?.description}
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
                 rows={3}
                 className="border-divider focus:border-primary/50"
               />
             </div>
             
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="points" className="text-body font-medium text-foreground">Points Possible</Label>
                 <Input
                   id="points"
                   type="number"
                   placeholder="100"
-                  defaultValue={editingAssignment?.points_possible}
-                  className="border-divider focus:border-primary/50"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="weight" className="text-body font-medium text-foreground">Weight</Label>
-                <Input
-                  id="weight"
-                  type="number"
-                  step="0.1"
-                  placeholder="1.0"
-                  defaultValue={editingAssignment?.weight}
+                  value={formData.points_possible}
+                  onChange={(e) => setFormData({...formData, points_possible: Number(e.target.value)})}
                   className="border-divider focus:border-primary/50"
                 />
               </div>
@@ -563,7 +653,8 @@ export function AssignmentsManager({
                 <Input
                   id="category"
                   placeholder="e.g. Assessments"
-                  defaultValue={editingAssignment?.category}
+                  value={formData.category}
+                  onChange={(e) => setFormData({...formData, category: e.target.value})}
                   className="border-divider focus:border-primary/50"
                 />
               </div>
@@ -574,9 +665,23 @@ export function AssignmentsManager({
               <Input
                 id="due_date"
                 type="datetime-local"
-                defaultValue={editingAssignment?.due_date?.slice(0, 16)}
+                value={formData.due_date}
+                onChange={(e) => setFormData({...formData, due_date: e.target.value})}
                 className="border-divider focus:border-primary/50"
               />
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <input
+                id="published"
+                type="checkbox"
+                checked={formData.published}
+                onChange={(e) => setFormData({...formData, published: e.target.checked})}
+                className="rounded border-divider"
+              />
+              <Label htmlFor="published" className="text-body font-medium text-foreground">
+                Published (visible to students and appears in gradebook)
+              </Label>
             </div>
             
             <div className="flex justify-end gap-3 pt-4">
@@ -584,11 +689,16 @@ export function AssignmentsManager({
                 variant="outline" 
                 onClick={() => setCreateDialogOpen(false)}
                 className="border-divider hover:bg-surface/80"
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button className="bg-brand-gradient hover:opacity-90 transition-airy shadow-md hover:shadow-lg">
-                {editingAssignment ? 'Save Changes' : 'Create Assignment'}
+              <Button 
+                onClick={handleSubmitAssignment}
+                disabled={isSubmitting}
+                className="bg-brand-gradient hover:opacity-90 transition-airy shadow-md hover:shadow-lg"
+              >
+                {isSubmitting ? 'Saving...' : (editingAssignment ? 'Save Changes' : 'Create Assignment')}
               </Button>
             </div>
           </div>
