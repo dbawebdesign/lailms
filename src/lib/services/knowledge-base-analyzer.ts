@@ -110,7 +110,7 @@ export class KnowledgeBaseAnalyzer {
 
     // 5. Determine content depth and generation mode
     const contentDepth = this.determineContentDepth(totalDocuments, totalChunks, averageChunksPerDocument);
-    const recommendedMode = this.recommendGenerationMode(contentDepth, totalDocuments, contentAnalysis.contentQuality);
+    const recommendedMode = this.recommendGenerationMode(contentDepth, totalChunks, contentAnalysis.contentQuality);
 
     return {
       baseClassId,
@@ -231,14 +231,14 @@ Provide analysis in JSON format:
 
   private recommendGenerationMode(
     contentDepth: 'minimal' | 'moderate' | 'comprehensive',
-    totalDocs: number,
+    totalChunks: number,
     contentQuality: 'low' | 'medium' | 'high'
   ): 'kb_only' | 'kb_priority' | 'kb_supplemented' {
-    if (contentDepth === 'comprehensive' && contentQuality === 'high' && totalDocs >= 5) {
+    if (contentDepth === 'comprehensive' && contentQuality === 'high' && totalChunks >= 40) {
       return 'kb_only';
     }
     
-    if (contentDepth === 'moderate' && contentQuality !== 'low') {
+    if (contentDepth === 'moderate' && contentQuality !== 'low' && totalChunks >= 40) {
       return 'kb_priority';
     }
     

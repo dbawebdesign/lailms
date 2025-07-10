@@ -301,21 +301,21 @@ export async function GET(request: NextRequest) {
         kb_supplemented: {
           title: 'Knowledge Base Supplemented',
           description: 'Use knowledge base as foundation, supplement with general knowledge',
-          suitable: kbAnalysis.totalDocuments > 0
+          suitable: kbAnalysis.totalChunks > 0
         },
         kb_priority: {
           title: 'Knowledge Base Priority', 
           description: 'Prioritize knowledge base content, fill gaps with general knowledge',
-          suitable: kbAnalysis.totalDocuments > 0 && kbAnalysis.contentDepth !== 'minimal'
+          suitable: kbAnalysis.totalChunks >= 40 && kbAnalysis.contentDepth !== 'minimal'
         },
         kb_only: {
           title: 'Knowledge Base Only',
           description: 'Generate content exclusively from uploaded sources',
           suitable: kbAnalysis.contentDepth === 'comprehensive' && 
-                   kbAnalysis.totalDocuments >= 3
+                   kbAnalysis.totalChunks >= 40
         }
       },
-      recommendedMode: kbAnalysis.totalDocuments > 0 ? kbAnalysis.recommendedGenerationMode : 'general'
+      recommendedMode: kbAnalysis.totalChunks > 0 ? kbAnalysis.recommendedGenerationMode : 'general'
     });
 
   } catch (error) {
