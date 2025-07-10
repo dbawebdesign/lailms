@@ -1,0 +1,87 @@
+# Assessment System Rebuild - Product Requirements Document
+
+## Project Overview
+Complete rebuild of the course assessment system to create a simplified, content-driven approach for testing student mastery of educational content. The current system is overly complex with disconnected question generation and multiple fragmented tables.
+
+## Current Problems
+1. **Fragmented Assessment Tables**: 19+ assessment-related tables creating complexity and maintenance issues
+2. **Disconnected Question Generation**: Questions generated from knowledge base searches instead of actual lesson content
+3. **Complex Assessment Flow**: Confusing relationships between assessments, quizzes, exams, and questions
+4. **Poor Content Alignment**: Assessments don't properly test the specific educational content students learned
+5. **JSON Generation Errors**: Complex lesson content generation causing parsing failures
+6. **Database Constraint Violations**: Stack depth and duplicate key errors during generation
+
+## Solution Requirements
+
+### Core Assessment Types
+1. **Lesson Assessments**: End-of-lesson tests based on that lesson's section content
+2. **Path Quizzes**: End-of-path tests based on all lesson sections within that path
+3. **Class Exams**: End-of-class comprehensive tests based on all lesson sections across all paths
+
+### Database Schema Requirements
+- **Simple 4-table structure**: assessments, assessment_questions, student_attempts, student_responses
+- **Content-based generation**: Questions generated directly from lesson section content
+- **Hierarchical structure**: Clear parent-child relationships (class -> paths -> lessons -> assessments)
+- **Course outline integration**: Assessments appear directly in course flow
+
+### Technical Requirements
+- **Next.js 14**: Frontend components for assessment display and taking
+- **Supabase**: Database storage and real-time updates
+- **TypeScript**: Full type safety for assessment data
+- **AI Generation**: Claude-powered question generation from lesson content
+- **Responsive Design**: Mobile-friendly assessment interface
+
+### User Experience Requirements
+- **Seamless Integration**: Assessments appear naturally in course outline flow
+- **Progress Tracking**: Clear indication of completion and scores
+- **Immediate Feedback**: Instant results and explanations after submission
+- **Mastery Focus**: Questions test understanding of specific educational content
+- **Accessibility**: WCAG 2.1 AA compliant assessment interface
+
+### Assessment Generation Process
+1. **Content Analysis**: Parse lesson section content for key concepts
+2. **Question Generation**: Create questions testing specific learning objectives
+3. **Difficulty Balancing**: Mix of easy, medium, hard questions based on content depth
+4. **Answer Key Creation**: Comprehensive explanations for each correct answer
+5. **Database Storage**: Store in simplified schema with clear relationships
+
+### Integration Points
+- **Course Generator**: Modify to create assessments during course generation
+- **Course Outline UI**: Display assessments in proper sequence
+- **Student Dashboard**: Show assessment progress and scores
+- **Instructor Dashboard**: View class performance analytics
+
+### Performance Requirements
+- **Fast Generation**: Assessments created in under 30 seconds per lesson
+- **Efficient Storage**: Minimal database footprint with optimized queries
+- **Quick Loading**: Assessment UI loads in under 2 seconds
+- **Scalable**: Support 1000+ students per class without performance degradation
+
+### Quality Assurance
+- **Content Alignment**: 100% of questions must relate to actual lesson content
+- **Educational Standards**: Questions follow Bloom's taxonomy principles
+- **Grade Appropriateness**: Questions match specified grade level and complexity
+- **Error Handling**: Graceful handling of generation failures with retry mechanisms
+
+## Success Metrics
+- **Reduced Complexity**: From 19+ tables to 4 core tables
+- **Improved Alignment**: Questions directly test lesson section content
+- **Better Performance**: 90% reduction in generation errors
+- **Enhanced UX**: Seamless assessment flow in course outline
+- **Higher Engagement**: Students complete assessments at 80%+ rate
+
+## Technical Stack
+- **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
+- **Backend**: Supabase (PostgreSQL), Edge Functions
+- **AI**: Claude (Anthropic) for question generation
+- **State Management**: React hooks, Supabase real-time
+- **Testing**: Jest, React Testing Library, Playwright
+
+## Deliverables
+1. New simplified database schema with migration scripts
+2. Assessment generation service integrated with course generator
+3. Assessment UI components for taking and displaying assessments
+4. Course outline integration showing assessments in flow
+5. Student and instructor dashboards with assessment data
+6. Comprehensive testing suite for assessment functionality
+7. Documentation for assessment system architecture and usage 

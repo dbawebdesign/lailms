@@ -1,0 +1,68 @@
+'use client';
+
+import React from 'react';
+
+interface ContentLevelerDisplayProps {
+  content: string;
+  metadata?: {
+    subject?: string;
+    gradeLevel?: string;
+    assessmentType?: string;
+    generatedAt?: string;
+    wordCount?: number;
+    estimatedTime?: string;
+    difficulty?: string;
+  };
+  onCopy: (text: string, itemId: string) => void;
+  copiedItems: Set<string>;
+}
+
+export function ContentLevelerDisplay({ 
+  content, 
+  metadata, 
+  onCopy, 
+  copiedItems 
+}: ContentLevelerDisplayProps) {
+  const handleCopy = () => {
+    onCopy(content, 'content-leveler-result');
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-lg border p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Content Leveler Result</h3>
+          <button
+            onClick={handleCopy}
+            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            {copiedItems.has('content-leveler-result') ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+        
+        {metadata && (
+          <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {metadata.subject && (
+                <div><span className="font-medium">Subject:</span> {metadata.subject}</div>
+              )}
+              {metadata.gradeLevel && (
+                <div><span className="font-medium">Grade Level:</span> {metadata.gradeLevel}</div>
+              )}
+              {metadata.difficulty && (
+                <div><span className="font-medium">Difficulty:</span> {metadata.difficulty}</div>
+              )}
+              {metadata.estimatedTime && (
+                <div><span className="font-medium">Est. Time:</span> {metadata.estimatedTime}</div>
+              )}
+            </div>
+          </div>
+        )}
+        
+        <div className="prose max-w-none">
+          <div className="whitespace-pre-wrap">{content}</div>
+        </div>
+      </div>
+    </div>
+  );
+} 

@@ -1,0 +1,25 @@
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+.floating-element-1 {
+  top: 25%;
+  left: 15%;
+}
+
+.floating-element-2 {
+  top: 60%;
+  left: 85%;
+}
+
+.floating-element-3 {
+  top: 40%;
+  left: 10%;
+}
+
+.floating-element-4 {
+  top: 75%;
+  left: 90%;
+} 

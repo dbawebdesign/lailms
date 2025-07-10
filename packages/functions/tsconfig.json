@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "outDir": "./dist",
+    "declaration": true,
+    "declarationMap": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": false,
+    "noResolve": false,
+    "lib": ["ES2022", "WebWorker"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts", "deno.d.ts"],
+  "exclude": ["node_modules", "dist"]
+} 

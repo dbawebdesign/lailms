@@ -1,0 +1,9 @@
+{
+  "name": "@learnologyai/types",
+  "version": "0.0.1",
+  "private": true,
+  "types": "./db.ts",
+  "devDependencies": {
+    "typescript": "^5"
+  }
+} 
