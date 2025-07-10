@@ -782,3 +782,74 @@ ALTER TABLE IF EXISTS public.quiz_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.quiz_responses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.password_reset_requests ENABLE ROW LEVEL SECURITY; 
+
+-- Create a SECURITY DEFINER function to safely check for teacher/admin privileges without causing recursion.
+-- This function runs with the privileges of the user who defined it (the owner), not the user calling it,
+-- which means its internal queries bypass RLS policies.
+CREATE OR REPLACE FUNCTION public.is_teacher_for_class(p_user_id uuid, p_class_instance_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+-- SET search_path to prevent hijacking.
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1
+    FROM public.class_instances ci
+    JOIN public.base_classes bc ON ci.base_class_id = bc.id
+    WHERE ci.id = p_class_instance_id
+      AND bc.user_id = p_user_id
+  );
+END;
+$$;
+
+-- Drop all previous policies on the affected tables to ensure a clean slate.
+DROP POLICY IF EXISTS "Allow roster members read access" ON public.rosters;
+DROP POLICY IF EXISTS "Allow class admin/teacher management of rosters" ON public.rosters;
+DROP POLICY IF EXISTS "Allow enrolled members read access to class instances" ON public.class_instances;
+DROP POLICY IF EXISTS "Allow org admin/teacher management of class instances" ON public.class_instances;
+
+-- == New Policies for class_instances ==
+
+-- Users can see class instances if they are the teacher OR they are enrolled as a student.
+CREATE POLICY "Allow enrolled members read access to class instances" ON public.class_instances
+FOR SELECT
+USING (
+    -- The user is the teacher who created the base class.
+    public.is_teacher_for_class(auth.uid(), id)
+    OR
+    -- The user is a student enrolled in the roster for this class instance.
+    EXISTS (
+        SELECT 1
+        FROM public.rosters r
+        WHERE r.class_instance_id = public.class_instances.id
+        AND r.profile_id = auth.uid()
+    )
+);
+
+-- Only teachers can manage (create, update, delete) their own class instances.
+CREATE POLICY "Allow org admin/teacher management of class instances" ON public.class_instances
+FOR ALL
+USING ( public.is_teacher_for_class(auth.uid(), id) )
+WITH CHECK ( public.is_teacher_for_class(auth.uid(), id) );
+
+-- == New Policies for rosters ==
+
+-- Users can see roster entries if they are the student in the entry OR they are the teacher of the class.
+-- This policy uses the security definer function to check teacher status, which breaks the recursion.
+CREATE POLICY "Allow roster members read access" ON public.rosters
+FOR SELECT
+USING (
+    -- The user is the student in this specific roster entry.
+    profile_id = auth.uid()
+    OR
+    -- The user is the teacher for the class this roster belongs to.
+    public.is_teacher_for_class(auth.uid(), class_instance_id)
+);
+
+-- Only the teacher of a class can manage its roster.
+CREATE POLICY "Allow class admin/teacher management of rosters" ON public.rosters
+FOR ALL
+USING ( public.is_teacher_for_class(auth.uid(), class_instance_id) )
+WITH CHECK ( public.is_teacher_for_class(auth.uid(), class_instance_id) ); 

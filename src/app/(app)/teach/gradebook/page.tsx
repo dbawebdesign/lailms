@@ -23,6 +23,12 @@ import {
 import { cn } from '@/lib/utils';
 import { Tables } from 'packages/types/db';
 
+type TeacherClass = Tables<'base_classes'> & {
+  student_count: number;
+  manage_class_url: string;
+  base_class_name: string;
+};
+
 interface ClassInstance {
   id: string;
   name: string;
@@ -67,28 +73,31 @@ export default function GradebookPage() {
       setIsLoading(true);
       setError(null);
       
-      const { data: classInstances, error: classError } = await supabase
-        .from('class_instances')
-        .select(`
-          *,
-          base_class:base_classes(
-            id,
-            name,
-            description
-          ),
-          enrollments:rosters(
-            id,
-            profile_id,
-            role,
-            status
-          )
-        `)
-        .eq('rosters.role', 'teacher')
-        .order('name');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
+      const { data: classInstances, error: classError } = await supabase.rpc('get_teacher_active_classes', { p_user_id: user.id });
 
       if (classError) throw classError;
 
-      setUserClasses(classInstances || []);
+      // The RPC function returns a different shape, so we need to adapt it.
+      // We can simplify the local 'ClassInstance' type or map the result.
+      // For now, let's map it to fit the existing component structure.
+      const mappedClasses = (classInstances || []).map((c: TeacherClass) => ({
+        id: c.id,
+        name: c.name,
+        base_class_id: '', // Not returned by RPC, may need to adjust component if needed
+        enrollment_code: 'N/A', // Not returned by RPC
+        base_class: {
+          id: '',
+          name: c.base_class_name,
+          description: ''
+        },
+        enrollments: Array(c.student_count).fill({}), // Create a dummy array for length
+      }));
+      
+      setUserClasses(mappedClasses as any);
+
     } catch (err) {
       console.error('Error loading classes:', err);
       setError(err instanceof Error ? err.message : 'Failed to load classes');

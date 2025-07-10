@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { 
   gradebookService, 
   assignmentService, 
@@ -8,12 +8,33 @@ import {
   standardsService
 } from '@/lib/services/gradebook'
 import { Database, Tables } from '../../packages/types/db'
+import { createClient } from '@/lib/supabase/client'
+import { RealtimeChannel } from '@supabase/supabase-js'
 
 // Type definitions
 type Assignment = Tables<'assignments'>
 type Grade = Tables<'grades'>
 type GradebookSettings = Tables<'gradebook_settings'>
 type Standard = Tables<'standards'>
+
+// Broadcast event types
+interface GradeUpdateEvent {
+  type: 'grade_updated' | 'grade_created' | 'grade_deleted'
+  grade: Grade
+  class_instance_id: string
+}
+
+interface AssignmentUpdateEvent {
+  type: 'assignment_updated' | 'assignment_created' | 'assignment_deleted'
+  assignment: Assignment
+  class_instance_id: string
+}
+
+interface PresenceState {
+  user_id: string
+  user_name: string
+  viewing_at: string
+}
 
 export interface GradebookData {
   students: Array<{
@@ -31,6 +52,7 @@ export interface GradebookData {
   grades: Record<string, Grade>
   standards: Standard[]
   settings: GradebookSettings | null
+  activeViewers: PresenceState[]
 }
 
 export interface UseGradebookReturn {
@@ -38,6 +60,7 @@ export interface UseGradebookReturn {
   isLoading: boolean
   error: string | null
   syncStatus: 'synced' | 'syncing' | 'error'
+  connectionStatus: 'connected' | 'connecting' | 'disconnected'
   refresh: () => Promise<void>
   updateGrade: (studentId: string, assignmentId: string, gradeData: Partial<Grade>) => Promise<void>
   createAssignment: (assignmentData: Partial<Assignment>) => Promise<void>
@@ -52,11 +75,18 @@ export function useGradebook(classInstanceId: string): UseGradebookReturn {
     assignments: [],
     grades: {},
     standards: [],
-    settings: null
+    settings: null,
+    activeViewers: []
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced')
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('disconnected')
+  
+  // Real-time subscription refs
+  const channelRef = useRef<RealtimeChannel | null>(null)
+  const supabaseRef = useRef(createClient())
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Helper function to calculate grade statistics
   const calculateGradeStatistics = useCallback((studentId: string, grades: Grade[], assignments: Assignment[]) => {
@@ -115,66 +145,215 @@ export function useGradebook(classInstanceId: string): UseGradebookReturn {
     }
   }, [])
 
+  // Helper function to recalculate student statistics
+  const recalculateStudentStats = useCallback((students: any[], grades: Grade[], assignments: Assignment[]) => {
+    return students.map(student => {
+      const stats = calculateGradeStatistics(student.id, grades, assignments)
+      return {
+        ...student,
+        ...stats
+      }
+    })
+  }, [calculateGradeStatistics])
+
   // Load gradebook data
   const loadGradebookData = useCallback(async () => {
-    if (!classInstanceId) return
+    if (!classInstanceId) return;
 
-    setIsLoading(true)
-    setSyncStatus('syncing')
-    setError(null)
+    setIsLoading(true);
+    setSyncStatus('syncing');
+    setError(null);
 
     try {
-      const result = await gradebookService.getCompleteGradebook(classInstanceId)
-      
+      const { data: result, error } = await supabaseRef.current.rpc('get_gradebook_data', {
+        p_class_instance_id: classInstanceId,
+      });
+
+      if (error) throw error;
+
       // Transform students data with calculated statistics
-      const studentsWithStats = result.students.map(student => {
-        const profile = student.profiles
-        const stats = calculateGradeStatistics(student.user_id, result.grades, result.assignments)
+      const studentsWithStats = (result.students || []).map((student: any) => {
+        const studentGrades = (result.grades || []).filter((g: any) => g.student_id === student.id);
+        const stats = calculateGradeStatistics(student.id, studentGrades, result.assignments || []);
         
         return {
-          id: student.user_id,
-          name: `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || 'Unknown Student',
-          email: profile?.email || '',
-          avatar_url: profile?.avatar_url || undefined,
+          id: student.id,
+          name: `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Unknown Student',
+          email: student.email || '',
           ...stats
-        }
-      })
+        };
+      });
 
       // Transform grades into a record for easy lookup
-      const gradesRecord = result.grades.reduce((acc, grade) => {
-        const key = `${grade.student_id}-${grade.assignment_id}`
-        acc[key] = grade
-        return acc
-      }, {} as Record<string, Grade>)
+      const gradesRecord = (result.grades || []).reduce((acc: any, grade: any) => {
+        const key = `${grade.student_id}-${grade.assignment_id}`;
+        acc[key] = grade;
+        return acc;
+      }, {} as Record<string, Grade>);
 
-      setData({
+      setData(prevData => ({
+        ...prevData,
         students: studentsWithStats,
-        assignments: result.assignments,
+        assignments: result.assignments || [],
         grades: gradesRecord,
-        standards: [], // Will be populated when standards are linked
-        settings: result.settings
-      })
+        settings: result.settings || null,
+      }));
 
-      setSyncStatus('synced')
+      setSyncStatus('synced');
     } catch (err) {
-      console.error('Error loading gradebook data:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load gradebook data')
-      setSyncStatus('error')
+      console.error('Error loading gradebook data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load gradebook data');
+      setSyncStatus('error');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [classInstanceId, calculateGradeStatistics])
+  }, [classInstanceId, calculateGradeStatistics]);
 
-  // Refresh data
-  const refresh = useCallback(async () => {
-    await loadGradebookData()
-  }, [loadGradebookData])
+  // Set up optimized real-time subscriptions using Broadcast
+  const setupRealtimeSubscriptions = useCallback(async () => {
+    // This check is critical to prevent re-subscribing if a channel already exists.
+    if (!classInstanceId) return;
+    
+    // Additional safeguard: if a channel somehow exists, clean it up first
+    if (channelRef.current) {
+      console.warn('Cleaning up existing channel before creating new subscription');
+      channelRef.current.unsubscribe();
+      supabaseRef.current.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
 
-  // Update a grade
+    try {
+      setConnectionStatus('connecting');
+      const supabase = supabaseRef.current;
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const channel = supabase
+        .channel(`gradebook:${classInstanceId}`, {
+          config: {
+            broadcast: { self: true },
+            presence: { key: user.id }
+          }
+        })
+        .on('broadcast', { event: 'grade_update' }, (payload: { payload: GradeUpdateEvent }) => {
+          const { type, grade } = payload.payload;
+          
+          setData(prevData => {
+            const key = `${grade.student_id}-${grade.assignment_id}`;
+            let updatedGrades = { ...prevData.grades };
+            if (type === 'grade_created' || type === 'grade_updated') {
+              updatedGrades[key] = grade;
+            } else if (type === 'grade_deleted') {
+              delete updatedGrades[key];
+            }
+            const gradesArray = Object.values(updatedGrades);
+            const updatedStudents = recalculateStudentStats(prevData.students, gradesArray, prevData.assignments);
+            return { ...prevData, grades: updatedGrades, students: updatedStudents };
+          });
+        })
+        .on('presence', { event: 'sync' }, () => {
+          if (channelRef.current) {
+            const newState = channelRef.current.presenceState<PresenceState>();
+            setData(prevData => ({ ...prevData, activeViewers: Object.values(newState).map((v: any) => v[0]) }));
+          }
+        });
+      
+      // Store the channel reference BEFORE subscribing to prevent race conditions
+      channelRef.current = channel;
+      
+      // Subscribe to the channel
+      channel.subscribe((status, error) => {
+        if (status === 'SUBSCRIBED') {
+          setConnectionStatus('connected');
+          // Track presence after successful subscription
+          channel.track({ 
+            user_id: user.id, 
+            user_name: user.email || 'Anonymous', 
+            viewing_at: new Date().toISOString() 
+          });
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Channel subscription error:', error);
+          setConnectionStatus('disconnected');
+          // Clear the channel reference on error
+          channelRef.current = null;
+        } else if (status === 'CLOSED') {
+          setConnectionStatus('disconnected');
+          // Don't clear the channel reference here - let cleanup handle it
+        }
+      });
+        
+    } catch (error) {
+      console.error('Error setting up real-time subscriptions:', error);
+      setConnectionStatus('disconnected');
+      // Clean up on error
+      if (channelRef.current) {
+        channelRef.current.unsubscribe();
+        channelRef.current = null;
+      }
+    }
+  }, [classInstanceId, recalculateStudentStats]);
+
+  // Load data and setup subscriptions on mount
+  useEffect(() => {
+    if (classInstanceId) {
+      loadGradebookData();
+      setupRealtimeSubscriptions();
+    }
+
+    // Cleanup function - this is critical for preventing multiple subscriptions
+    return () => {
+      if (channelRef.current) {
+        // Properly unsubscribe and remove the channel
+        channelRef.current.unsubscribe();
+        supabaseRef.current.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+    // CRITICAL: Only depend on classInstanceId, not the callback functions
+    // This prevents re-running when callbacks change due to re-renders
+  }, [classInstanceId]);
+
+  // Broadcast helper function
+  const broadcastUpdate = useCallback(async (event: string, payload: any) => {
+    if (channelRef.current) {
+      await channelRef.current.send({
+        type: 'broadcast',
+        event,
+        payload
+      });
+    }
+  }, []);
+
+  // Update a grade with optimistic updates and broadcast
   const updateGrade = useCallback(async (studentId: string, assignmentId: string, gradeData: Partial<Grade>) => {
     try {
       setSyncStatus('syncing')
       
+      // Optimistic update
+      const key = `${studentId}-${assignmentId}`
+      const existingGrade = data.grades[key]
+      const optimisticGrade = {
+        ...existingGrade,
+        student_id: studentId,
+        assignment_id: assignmentId,
+        ...gradeData,
+        updated_at: new Date().toISOString()
+      } as Grade
+
+      setData(prevData => {
+        const updatedGrades = { ...prevData.grades, [key]: optimisticGrade }
+        const gradesArray = Object.values(updatedGrades)
+        const updatedStudents = recalculateStudentStats(prevData.students, gradesArray, prevData.assignments)
+        
+        return {
+          ...prevData,
+          grades: updatedGrades,
+          students: updatedStudents
+        }
+      })
+
+      // Perform actual update
       const gradeUpdate = {
         student_id: studentId,
         assignment_id: assignmentId,
@@ -183,72 +362,160 @@ export function useGradebook(classInstanceId: string): UseGradebookReturn {
         updated_at: new Date().toISOString()
       }
 
-      await gradeService.upsertGrade(gradeUpdate)
+      const updatedGrade = await gradeService.upsertGrade(gradeUpdate)
       
-      // Refresh data to get updated statistics
-      await loadGradebookData()
+      // Broadcast the update to other clients
+      await broadcastUpdate('grade_update', {
+        type: existingGrade ? 'grade_updated' : 'grade_created',
+        grade: updatedGrade,
+        class_instance_id: classInstanceId
+      })
+      
+      setSyncStatus('synced')
+      
     } catch (err) {
       console.error('Error updating grade:', err)
       setError(err instanceof Error ? err.message : 'Failed to update grade')
       setSyncStatus('error')
+      
+      // Revert optimistic update on error
+      await loadGradebookData();
     }
-  }, [classInstanceId, loadGradebookData])
+  }, [classInstanceId, data.grades, recalculateStudentStats, loadGradebookData, broadcastUpdate])
 
-  // Create a new assignment
+  // Create a new assignment with optimistic updates and broadcast
   const createAssignment = useCallback(async (assignmentData: Partial<Assignment>) => {
     try {
       setSyncStatus('syncing')
       
+      // Optimistic update
+      const tempId = `temp_${Date.now()}`
+      const optimisticAssignment = {
+        id: tempId,
+        class_instance_id: classInstanceId,
+        name: (assignmentData as any).title || (assignmentData as any).name || 'New Assignment',
+        points_possible: assignmentData.points_possible || 100,
+        type: assignmentData.type || 'homework',
+        published: assignmentData.published || false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        ...assignmentData
+      } as Assignment
+
+      setData(prevData => ({
+        ...prevData,
+        assignments: [...prevData.assignments, optimisticAssignment]
+      }))
+
+      // Perform actual creation
       const newAssignment = {
         class_instance_id: classInstanceId,
-        name: assignmentData.name || 'New Assignment',
+        name: (assignmentData as any).title || (assignmentData as any).name || 'New Assignment',
         points_possible: assignmentData.points_possible || 100,
         type: assignmentData.type || 'homework',
         ...assignmentData
       }
 
-      await assignmentService.createAssignment(newAssignment)
+      const createdAssignment = await assignmentService.createAssignment(newAssignment)
       
-      // Refresh data
-      await loadGradebookData()
+      // Replace optimistic assignment with real one
+      setData(prevData => ({
+        ...prevData,
+        assignments: prevData.assignments.map(a => 
+          a.id === tempId ? createdAssignment : a
+        )
+      }))
+
+      // Broadcast the update to other clients
+      await broadcastUpdate('assignment_update', {
+        type: 'assignment_created',
+        assignment: createdAssignment,
+        class_instance_id: classInstanceId
+      })
+
+      setSyncStatus('synced')
     } catch (err) {
       console.error('Error creating assignment:', err)
       setError(err instanceof Error ? err.message : 'Failed to create assignment')
       setSyncStatus('error')
+      
+      // Revert optimistic update on error
+      await loadGradebookData();
     }
-  }, [classInstanceId, loadGradebookData])
+  }, [classInstanceId, loadGradebookData, broadcastUpdate])
 
-  // Update an assignment
+  // Update an assignment with optimistic updates and broadcast
   const updateAssignment = useCallback(async (assignmentId: string, updates: Partial<Assignment>) => {
     try {
       setSyncStatus('syncing')
       
-      await assignmentService.updateAssignment(assignmentId, updates)
+      // Optimistic update
+      setData(prevData => ({
+        ...prevData,
+        assignments: prevData.assignments.map(a => 
+          a.id === assignmentId ? { ...a, ...updates, updated_at: new Date().toISOString() } : a
+        )
+      }))
+
+      // Perform actual update
+      const updatedAssignment = await assignmentService.updateAssignment(assignmentId, updates)
       
-      // Refresh data
-      await loadGradebookData()
+      // Broadcast the update to other clients
+      await broadcastUpdate('assignment_update', {
+        type: 'assignment_updated',
+        assignment: updatedAssignment,
+        class_instance_id: classInstanceId
+      })
+      
+      setSyncStatus('synced')
+      
     } catch (err) {
       console.error('Error updating assignment:', err)
       setError(err instanceof Error ? err.message : 'Failed to update assignment')
       setSyncStatus('error')
+      
+      // Revert optimistic update on error
+      await loadGradebookData();
     }
-  }, [loadGradebookData])
+  }, [loadGradebookData, broadcastUpdate, classInstanceId])
 
-  // Delete an assignment
+  // Delete an assignment with optimistic updates and broadcast
   const deleteAssignment = useCallback(async (assignmentId: string) => {
     try {
       setSyncStatus('syncing')
       
+      // Store assignment for broadcast
+      const assignmentToDelete = data.assignments.find(a => a.id === assignmentId)
+      
+      // Optimistic update
+      setData(prevData => ({
+        ...prevData,
+        assignments: prevData.assignments.filter(a => a.id !== assignmentId)
+      }))
+
+      // Perform actual deletion
       await assignmentService.deleteAssignment(assignmentId)
       
-      // Refresh data
-      await loadGradebookData()
+      // Broadcast the update to other clients
+      if (assignmentToDelete) {
+        await broadcastUpdate('assignment_update', {
+          type: 'assignment_deleted',
+          assignment: assignmentToDelete,
+          class_instance_id: classInstanceId
+        })
+      }
+      
+      setSyncStatus('synced')
+      
     } catch (err) {
       console.error('Error deleting assignment:', err)
       setError(err instanceof Error ? err.message : 'Failed to delete assignment')
       setSyncStatus('error')
+      
+      // Revert optimistic update on error
+      await loadGradebookData();
     }
-  }, [loadGradebookData])
+  }, [data.assignments, loadGradebookData, broadcastUpdate, classInstanceId])
 
   // Update gradebook settings
   const updateSettings = useCallback(async (settings: any) => {
@@ -261,18 +528,11 @@ export function useGradebook(classInstanceId: string): UseGradebookReturn {
       })
       
       // Refresh data
-      await loadGradebookData()
+      await loadGradebookData();
     } catch (err) {
       console.error('Error updating settings:', err)
       setError(err instanceof Error ? err.message : 'Failed to update settings')
       setSyncStatus('error')
-    }
-  }, [classInstanceId, loadGradebookData])
-
-  // Load data on mount and when classInstanceId changes
-  useEffect(() => {
-    if (classInstanceId) {
-      loadGradebookData()
     }
   }, [classInstanceId, loadGradebookData])
 
@@ -281,7 +541,8 @@ export function useGradebook(classInstanceId: string): UseGradebookReturn {
     isLoading,
     error,
     syncStatus,
-    refresh,
+    connectionStatus,
+    refresh: loadGradebookData,
     updateGrade,
     createAssignment,
     updateAssignment,

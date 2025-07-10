@@ -52,70 +52,124 @@ export function AnalyticsDashboard({
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'semester' | 'year'>('month');
   const [viewType, setViewType] = useState<'overview' | 'trends' | 'standards' | 'predictions'>('overview');
 
-  // Mock analytics data
-  const mockAnalytics = {
-    overview: {
-      totalStudents: 24,
-      classAverage: 83.4,
-      averageTrend: 2.3,
-      completionRate: 87.5,
-      atRiskStudents: 3,
-      excellingStudents: 8,
-      gradingProgress: 92
-    },
-    gradeDistribution: [
-      { grade: 'A', count: 8, percentage: 33.3 },
-      { grade: 'B', count: 10, percentage: 41.7 },
-      { grade: 'C', count: 4, percentage: 16.7 },
-      { grade: 'D', count: 1, percentage: 4.2 },
-      { grade: 'F', count: 1, percentage: 4.2 }
-    ],
-    assignmentTypes: [
-      { type: 'Quizzes', average: 86.2, count: 12 },
-      { type: 'Homework', average: 89.1, count: 8 },
-      { type: 'Projects', average: 78.9, count: 3 },
-      { type: 'Exams', average: 81.4, count: 4 }
-    ],
-    standards: [
-      { 
-        id: 'MATH.1.A', 
-        name: 'Linear Equations', 
-        mastery: 78, 
-        students_mastered: 19, 
-        total_students: 24,
-        trend: 'up'
-      },
-      { 
-        id: 'MATH.1.B', 
-        name: 'Quadratic Functions', 
-        mastery: 65, 
-        students_mastered: 16, 
-        total_students: 24,
-        trend: 'stable'
-      },
-      { 
-        id: 'MATH.1.C', 
-        name: 'Systems of Equations', 
-        mastery: 52, 
-        students_mastered: 12, 
-        total_students: 24,
-        trend: 'down'
+  // Calculate real analytics data from the gradebook data
+  const calculateAnalytics = () => {
+    const { students, assignments, grades } = data;
+    
+    if (!students?.length || !assignments?.length) {
+      return {
+        overview: {
+          totalStudents: 0,
+          classAverage: 0,
+          averageTrend: 0,
+          completionRate: 0,
+          atRiskStudents: 0,
+          excellingStudents: 0,
+          gradingProgress: 0
+        },
+        gradeDistribution: [],
+        assignmentTypes: [],
+        standards: [],
+        recentActivity: [],
+        predictions: []
+      };
+    }
+
+    // Calculate class average
+    const allGrades = students.flatMap(student => 
+      assignments.map(assignment => grades[`${student.id}_${assignment.id}`]?.points_earned || 0)
+    );
+    const classAverage = allGrades.length > 0 ? 
+      allGrades.reduce((sum, grade) => sum + grade, 0) / allGrades.length : 0;
+
+    // Calculate completion rate
+    const totalPossibleSubmissions = students.length * assignments.length;
+    const actualSubmissions = students.flatMap(student => 
+      assignments.map(assignment => grades[`${student.id}_${assignment.id}`])
+    ).filter(grade => grade && grade.points_earned !== null).length;
+    const completionRate = totalPossibleSubmissions > 0 ? 
+      (actualSubmissions / totalPossibleSubmissions) * 100 : 0;
+
+    // Calculate grade distribution
+    const studentAverages = students.map(student => {
+      const studentGrades = assignments.map(assignment => 
+        grades[`${student.id}_${assignment.id}`]?.points_earned || 0
+      );
+      return studentGrades.length > 0 ? 
+        studentGrades.reduce((sum, grade) => sum + grade, 0) / studentGrades.length : 0;
+    });
+
+    const gradeDistribution = [
+      { grade: 'A', count: studentAverages.filter(avg => avg >= 90).length, percentage: 0 },
+      { grade: 'B', count: studentAverages.filter(avg => avg >= 80 && avg < 90).length, percentage: 0 },
+      { grade: 'C', count: studentAverages.filter(avg => avg >= 70 && avg < 80).length, percentage: 0 },
+      { grade: 'D', count: studentAverages.filter(avg => avg >= 60 && avg < 70).length, percentage: 0 },
+      { grade: 'F', count: studentAverages.filter(avg => avg < 60).length, percentage: 0 }
+    ].map((item: { grade: string; count: number; percentage: number }) => ({
+      ...item,
+      percentage: students.length > 0 ? (item.count / students.length) * 100 : 0
+    }));
+
+    // Calculate at-risk and excelling students
+    const atRiskStudents = studentAverages.filter(avg => avg < 70).length;
+    const excellingStudents = studentAverages.filter(avg => avg >= 90).length;
+
+    // Calculate assignment types averages
+    const assignmentTypes = assignments.reduce((acc, assignment) => {
+      const type = assignment.type || 'Assignment';
+      const assignmentGrades = students.map(student => 
+        grades[`${student.id}_${assignment.id}`]?.points_earned || 0
+      );
+      const average = assignmentGrades.length > 0 ? 
+        assignmentGrades.reduce((sum, grade) => sum + grade, 0) / assignmentGrades.length : 0;
+
+      const existing = acc.find((item: { type: string; average: number; count: number; total: number }) => item.type === type);
+      if (existing) {
+        existing.total += average;
+        existing.count += 1;
+        existing.average = existing.total / existing.count;
+      } else {
+        acc.push({ type, average, count: 1, total: average });
       }
-    ],
-    recentActivity: [
-      { type: 'submission', student: 'Alice Johnson', assignment: 'Chapter 3 Quiz', time: '2 hours ago' },
-      { type: 'grade', teacher: 'You', assignment: 'Homework Set 5', time: '4 hours ago' },
-      { type: 'submission', student: 'Bob Smith', assignment: 'Mid-term Project', time: '1 day ago' },
-      { type: 'late', student: 'David Brown', assignment: 'Chapter 2 Quiz', time: '2 days ago' }
-    ],
-    predictions: [
-      { student: 'Emma Davis', current_grade: 65.4, predicted_final: 68.2, confidence: 85, risk_level: 'high' },
-      { student: 'David Brown', current_grade: 76.2, predicted_final: 74.8, confidence: 78, risk_level: 'medium' },
-      { student: 'Bob Smith', current_grade: 87.3, predicted_final: 88.9, confidence: 92, risk_level: 'low' }
-    ]
+      return acc;
+    }, [] as Array<{ type: string; average: number; count: number; total: number }>);
+
+    // Calculate grading progress
+    const gradedSubmissions = students.flatMap(student => 
+      assignments.map(assignment => grades[`${student.id}_${assignment.id}`])
+    ).filter(grade => grade && grade.points_earned !== null && grade.graded_at).length;
+    const gradingProgress = totalPossibleSubmissions > 0 ? 
+      (gradedSubmissions / totalPossibleSubmissions) * 100 : 0;
+
+    return {
+      overview: {
+        totalStudents: students.length,
+        classAverage: Math.round(classAverage * 10) / 10,
+        averageTrend: 0, // Would need historical data to calculate
+        completionRate: Math.round(completionRate * 10) / 10,
+        atRiskStudents,
+        excellingStudents,
+        gradingProgress: Math.round(gradingProgress * 10) / 10
+      },
+      gradeDistribution,
+      assignmentTypes: assignmentTypes.map(({ total, ...rest }: { total: number; type: string; average: number; count: number }) => rest),
+      standards: data.standards || [],
+      recentActivity: [] as Array<{ type: string; student?: string; teacher?: string; assignment: string; time: string }>,
+      predictions: [] as Array<{ student: string; current_grade: number; predicted_final: number; confidence: number; risk_level: string }>
+    };
   };
 
-  const StatCard = ({ icon: Icon, title, value, subtitle, trend, className, color = 'primary' }: any) => (
+  const analytics = calculateAnalytics();
+
+  const StatCard = ({ icon: Icon, title, value, subtitle, trend, className, color = 'primary' }: {
+    icon: React.ComponentType<{ className?: string }>;
+    title: string;
+    value: string | number;
+    subtitle?: string;
+    trend?: number;
+    className?: string;
+    color?: 'primary' | 'success' | 'warning' | 'info';
+  }) => (
     <Card className={cn("p-4 lg:p-6 bg-surface/50 border-divider hover:shadow-lg transition-airy", className)}>
       <div className="flex items-center gap-3 lg:gap-4">
         <div className={cn(
@@ -180,29 +234,29 @@ export function AnalyticsDashboard({
         <StatCard
           icon={Users}
           title="Total Students"
-          value={mockAnalytics.overview.totalStudents}
+          value={analytics.overview.totalStudents}
           subtitle="Active enrollment"
           color="info"
         />
         <StatCard
           icon={BarChart3}
           title="Class Average"
-          value={`${mockAnalytics.overview.classAverage}%`}
-          subtitle={`+${mockAnalytics.overview.averageTrend}% this ${timeRange}`}
-          trend={mockAnalytics.overview.averageTrend}
+          value={`${analytics.overview.classAverage}%`}
+          subtitle={`+${analytics.overview.averageTrend}% this ${timeRange}`}
+          trend={analytics.overview.averageTrend}
           color="primary"
         />
         <StatCard
           icon={CheckCircle}
           title="Completion Rate"
-          value={`${mockAnalytics.overview.completionRate}%`}
+          value={`${analytics.overview.completionRate}%`}
           subtitle="Assignment submissions"
           color="success"
         />
         <StatCard
           icon={AlertTriangle}
           title="At-Risk Students"
-          value={mockAnalytics.overview.atRiskStudents}
+          value={analytics.overview.atRiskStudents}
           subtitle="Below 70% average"
           color="warning"
         />
@@ -216,11 +270,11 @@ export function AnalyticsDashboard({
             <p className="text-xs lg:text-caption text-muted-foreground mt-1">Current grade breakdown across all students</p>
           </div>
           <Badge variant="secondary" className="bg-info/10 text-info border-info/20 w-fit">
-            {mockAnalytics.overview.totalStudents} students
+            {analytics.overview.totalStudents} students
           </Badge>
         </div>
         <div className="space-y-4 lg:space-y-5">
-          {mockAnalytics.gradeDistribution.map((grade) => (
+          {analytics.gradeDistribution.map((grade) => (
             <div key={grade.grade} className="flex items-center gap-4 lg:gap-6">
               <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <span className="font-bold text-primary text-sm lg:text-base">{grade.grade}</span>
@@ -251,7 +305,7 @@ export function AnalyticsDashboard({
           </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-          {mockAnalytics.assignmentTypes.map((type) => (
+          {analytics.assignmentTypes.map((type: { type: string; average: number; count: number }) => (
             <div key={type.type} className="p-4 lg:p-6 bg-background rounded-xl border border-divider hover:shadow-md transition-airy">
               <div className="flex items-center justify-between mb-3 lg:mb-4">
                 <h4 className="text-sm lg:text-body font-semibold text-foreground">{type.type}</h4>
@@ -277,12 +331,12 @@ export function AnalyticsDashboard({
             <p className="text-xs lg:text-caption text-muted-foreground mt-1">Track student progress on learning standards</p>
           </div>
           <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 w-fit">
-            {mockAnalytics.standards.length} standards tracked
+            {analytics.standards.length} standards tracked
           </Badge>
         </div>
         
         <div className="space-y-4 lg:space-y-6">
-          {mockAnalytics.standards.map((standard) => (
+          {analytics.standards.map((standard) => (
             <div key={standard.id} className="p-4 lg:p-6 bg-background rounded-xl border border-divider">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 gap-3">
                 <div className="min-w-0 flex-1">
@@ -343,7 +397,7 @@ export function AnalyticsDashboard({
         </div>
         
         <div className="space-y-4 lg:space-y-6">
-          {mockAnalytics.predictions.map((prediction, index) => (
+          {analytics.predictions.map((prediction, index) => (
             <div key={index} className="p-4 lg:p-6 bg-background rounded-xl border border-divider">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 gap-3">
                 <div className="min-w-0 flex-1">
@@ -413,7 +467,7 @@ export function AnalyticsDashboard({
     <Card className="p-4 lg:p-6 bg-surface/50 border-divider">
       <h3 className="text-base lg:text-h3 font-semibold text-foreground mb-4">Recent Activity</h3>
       <div className="space-y-3 lg:space-y-4">
-        {mockAnalytics.recentActivity.map((activity, index) => (
+        {analytics.recentActivity.map((activity, index) => (
           <div key={index} className="flex items-center gap-3 lg:gap-4 p-3 lg:p-4 bg-background rounded-lg border border-divider">
             <div className={cn(
               "p-1.5 lg:p-2 rounded-lg flex-shrink-0",
@@ -539,22 +593,22 @@ export function AnalyticsDashboard({
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-xs lg:text-caption text-muted-foreground font-medium">Grading Progress</span>
-                      <span className="text-xs lg:text-caption font-bold text-foreground">{mockAnalytics.overview.gradingProgress}%</span>
+                      <span className="text-xs lg:text-caption font-bold text-foreground">{analytics.overview.gradingProgress}%</span>
                     </div>
-                    <Progress value={mockAnalytics.overview.gradingProgress} className="h-2 lg:h-3 bg-muted/50" />
+                    <Progress value={analytics.overview.gradingProgress} className="h-2 lg:h-3 bg-muted/50" />
                   </div>
                   
                   <div className="flex items-center justify-between pt-2 border-t border-divider">
                     <span className="text-xs lg:text-caption text-muted-foreground font-medium">Excelling Students</span>
                     <Badge className="bg-success/10 text-success border-success/20 text-xs">
-                      {mockAnalytics.overview.excellingStudents}
+                      {analytics.overview.excellingStudents}
                     </Badge>
                   </div>
                   
                   <div className="flex items-center justify-between">
                     <span className="text-xs lg:text-caption text-muted-foreground font-medium">Need Attention</span>
                     <Badge className="bg-warning/10 text-warning border-warning/20 text-xs">
-                      {mockAnalytics.overview.atRiskStudents}
+                      {analytics.overview.atRiskStudents}
                     </Badge>
                   </div>
                 </div>

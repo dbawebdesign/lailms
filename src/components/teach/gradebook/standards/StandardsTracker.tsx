@@ -69,64 +69,39 @@ export function StandardsTracker({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
 
-  // Mock standards data
-  const mockStandards: Standard[] = [
-    {
-      id: '1',
-      code: 'MATH.8.A.1',
-      title: 'Linear Equations',
-      description: 'Understand and solve linear equations with one variable',
-      category: 'Algebra',
-      grade_level: '8',
-      mastery_levels: {
-        below: 2,
-        approaching: 8,
-        proficient: 15,
-        advanced: 5
-      },
-      total_students: 30,
-      assignments_count: 4,
-      last_assessed: '2024-02-10T14:30:00Z'
-    },
-    {
-      id: '2',
-      code: 'MATH.8.G.2',
-      title: 'Congruent Triangles',
-      description: 'Understand congruence and similarity using physical models, transparencies, or geometry software',
-      category: 'Geometry',
-      grade_level: '8',
-      mastery_levels: {
-        below: 5,
-        approaching: 10,
-        proficient: 12,
-        advanced: 3
-      },
-      total_students: 30,
-      assignments_count: 2,
-      last_assessed: '2024-02-08T11:15:00Z'
-    },
-    {
-      id: '3',
-      code: 'MATH.8.SP.1',
-      title: 'Data Analysis',
-      description: 'Construct and interpret scatter plots for bivariate measurement data',
-      category: 'Statistics',
-      grade_level: '8',
-      mastery_levels: {
-        below: 1,
-        approaching: 4,
-        proficient: 18,
-        advanced: 7
-      },
-      total_students: 30,
-      assignments_count: 3,
-      last_assessed: '2024-02-12T09:45:00Z'
+  // Calculate real standards data from the gradebook data
+  const calculateStandardsData = (): Standard[] => {
+    const { standards } = data;
+    
+    if (!standards?.length) {
+      return [];
     }
-  ];
 
-  const categories = ['all', ...Array.from(new Set(mockStandards.map(s => s.category)))];
+    // Transform the real standards data into the expected format
+    return standards.map((standard: any) => ({
+      id: standard.id || 'UNKNOWN',
+      code: standard.code || standard.id || 'UNKNOWN',
+      title: standard.title || standard.name || 'Unnamed Standard',
+      description: standard.description || 'No description available',
+      category: standard.category || 'General',
+      grade_level: standard.grade_level || '8',
+      mastery_levels: {
+        below: standard.mastery_levels?.below || 0,
+        approaching: standard.mastery_levels?.approaching || 0,
+        proficient: standard.mastery_levels?.proficient || 0,
+        advanced: standard.mastery_levels?.advanced || 0
+      },
+      total_students: data.students?.length || 0,
+      assignments_count: standard.assignments_count || 0,
+      last_assessed: standard.last_assessed || new Date().toISOString()
+    }));
+  };
 
-  const filteredStandards = mockStandards.filter(standard => {
+  const realStandards = calculateStandardsData();
+
+  const categories = ['all', ...Array.from(new Set(realStandards.map(s => s.category)))];
+
+  const filteredStandards = realStandards.filter(standard => {
     if (searchTerm && !standard.code.toLowerCase().includes(searchTerm.toLowerCase()) && 
         !standard.title.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
@@ -208,26 +183,26 @@ export function StandardsTracker({
         <StatCard
           icon={Target}
           title="Total Standards"
-          value={mockStandards.length}
+          value={realStandards.length}
           color="primary"
         />
         <StatCard
-          icon={TrendingUp}
-          title="Avg Proficiency"
-          value="72%"
-          subtitle="Proficient + Advanced"
+          icon={CheckCircle}
+          title="Overall Proficiency"
+          value={`${realStandards.length > 0 ? Math.round(realStandards.reduce((sum, standard) => sum + calculateProficiencyRate(standard), 0) / realStandards.length) : 0}%`}
+          subtitle="Average across all standards"
           color="success"
         />
         <StatCard
           icon={Users}
           title="Students Tracked"
-          value={30}
+          value={data.students?.length || 0}
           color="info"
         />
         <StatCard
           icon={BookOpen}
           title="Assessments"
-          value={9}
+          value={data.assignments?.length || 0}
           color="warning"
         />
       </div>

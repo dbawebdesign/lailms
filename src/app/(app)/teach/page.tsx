@@ -44,28 +44,25 @@ interface TeachingProgressData {
 
 async function getActiveClassesData(supabase: ReturnType<typeof createSupabaseServerClient>, userId: string): Promise<ActiveClassData[]> {
   try {
-    const { data, error } = await supabase
-    .from('class_instances')
-    .select(`
-      id,
-      name,
-        base_classes!inner(name),
-        rosters(id)
-      `)
-      .eq('base_classes.user_id', userId)
-      .eq('status', 'active');
+    const { data, error } = await supabase.rpc('get_teacher_active_classes' as any, { p_user_id: userId });
 
     if (error) {
       console.error('Error fetching active classes:', error);
-    return [];
-  }
+      return [];
+    }
 
-    return (data || []).map((instance: any) => ({
-        id: instance.id,
-        name: instance.name,
-      baseClassName: instance.base_classes?.name || 'Unknown',
-      studentCount: instance.rosters?.length || 0,
-      manageClassUrl: `/teach/instances/${instance.id}`
+    // Map the database fields (snake_case) to the expected interface fields (camelCase)
+    if (!Array.isArray(data)) {
+      console.error('Expected array from get_teacher_active_classes but got:', typeof data);
+      return [];
+    }
+
+    return data.map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      baseClassName: item.base_class_name,
+      studentCount: item.student_count,
+      manageClassUrl: item.manage_class_url
     }));
   } catch (error) {
     console.error('Error in getActiveClassesData:', error);
