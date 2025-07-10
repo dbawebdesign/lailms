@@ -68,81 +68,8 @@ export function StudentsOverview({
   const [sortBy, setSortBy] = useState<'name' | 'grade' | 'progress' | 'activity'>('name');
   const [filterBy, setFilterBy] = useState<'all' | 'at-risk' | 'excelling' | 'missing-work'>('all');
 
-  // Mock data for demonstration
-  const mockStudents: Student[] = [
-    {
-      id: '1',
-      name: 'Alice Johnson',
-      email: 'alice.johnson@email.com',
-      overall_grade: 92.5,
-      grade_letter: 'A-',
-      missing_assignments: 0,
-      late_assignments: 1,
-      completed_assignments: 15,
-      total_assignments: 16,
-      mastery_level: 'advanced',
-      trend: 'up',
-      last_activity: '2024-01-10T10:30:00Z'
-    },
-    {
-      id: '2',
-      name: 'Bob Smith',
-      email: 'bob.smith@email.com',
-      overall_grade: 87.3,
-      grade_letter: 'B+',
-      missing_assignments: 1,
-      late_assignments: 0,
-      completed_assignments: 14,
-      total_assignments: 16,
-      mastery_level: 'proficient',
-      trend: 'stable',
-      last_activity: '2024-01-09T14:15:00Z'
-    },
-    {
-      id: '3',
-      name: 'Carol Williams',
-      email: 'carol.williams@email.com',
-      overall_grade: 94.8,
-      grade_letter: 'A',
-      missing_assignments: 0,
-      late_assignments: 0,
-      completed_assignments: 16,
-      total_assignments: 16,
-      mastery_level: 'advanced',
-      trend: 'up',
-      last_activity: '2024-01-10T16:45:00Z'
-    },
-    {
-      id: '4',
-      name: 'David Brown',
-      email: 'david.brown@email.com',
-      overall_grade: 76.2,
-      grade_letter: 'C+',
-      missing_assignments: 2,
-      late_assignments: 1,
-      completed_assignments: 11,
-      total_assignments: 16,
-      mastery_level: 'approaching',
-      trend: 'down',
-      last_activity: '2024-01-07T09:20:00Z'
-    },
-    {
-      id: '5',
-      name: 'Emma Davis',
-      email: 'emma.davis@email.com',
-      overall_grade: 65.4,
-      grade_letter: 'D+',
-      missing_assignments: 4,
-      late_assignments: 2,
-      completed_assignments: 9,
-      total_assignments: 16,
-      mastery_level: 'below',
-      trend: 'down',
-      last_activity: '2024-01-05T11:30:00Z'
-    }
-  ];
-
-  const students = data.students.length > 0 ? data.students : mockStudents;
+  // Use live data from props
+  const students = data.students;
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

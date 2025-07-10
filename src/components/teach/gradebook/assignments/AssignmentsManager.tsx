@@ -86,62 +86,10 @@ export function AssignmentsManager({
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
-  // Mock assignments data
-  const mockAssignments: Assignment[] = [
-    {
-      id: '1',
-      name: 'Chapter 5 Quiz',
-      description: 'Multiple choice quiz covering key concepts from Chapter 5',
-      type: 'quiz',
-      category: 'Assessments',
-      points_possible: 25,
-      due_date: '2024-02-15T23:59:00Z',
-      weight: 1.0,
-      standards: ['MATH.8.A.1', 'MATH.8.A.2'],
-      status: 'published',
-      submissions_count: 28,
-      graded_count: 25,
-      avg_score: 82.5,
-      created_at: '2024-02-01T10:00:00Z',
-      updated_at: '2024-02-01T10:00:00Z'
-    },
-    {
-      id: '2',
-      name: 'Research Project',
-      description: 'In-depth research project on renewable energy sources',
-      type: 'project',
-      category: 'Major Projects',
-      points_possible: 100,
-      due_date: '2024-02-28T23:59:00Z',
-      weight: 2.0,
-      standards: ['SCI.8.ESS.3', 'SCI.8.ESS.4'],
-      status: 'published',
-      submissions_count: 15,
-      graded_count: 8,
-      avg_score: 88.2,
-      created_at: '2024-01-15T10:00:00Z',
-      updated_at: '2024-02-10T14:30:00Z'
-    },
-    {
-      id: '3',
-      name: 'Lab Report #3',
-      description: 'Chemical reactions laboratory report',
-      type: 'lab',
-      category: 'Lab Work',
-      points_possible: 50,
-      due_date: '2024-02-20T23:59:00Z',
-      weight: 1.5,
-      standards: ['SCI.8.PS.1'],
-      status: 'draft',
-      submissions_count: 0,
-      graded_count: 0,
-      avg_score: 0,
-      created_at: '2024-02-12T09:00:00Z',
-      updated_at: '2024-02-12T09:00:00Z'
-    }
-  ];
+  // Use live data from props
+  const assignments = data.assignments;
 
-  const filteredAssignments = mockAssignments.filter(assignment => {
+  const filteredAssignments = assignments.filter(assignment => {
     if (searchTerm && !assignment.name.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
     }
@@ -369,7 +317,7 @@ export function AssignmentsManager({
                   <div className="flex items-center gap-3 pt-2">
                     <span className="text-caption text-muted-foreground font-medium flex-shrink-0">Standards:</span>
                     <div className="flex flex-wrap gap-2">
-                      {assignment.standards.map((standard) => (
+                      {assignment.standards.map((standard: string) => (
                         <Badge key={standard} variant="outline" className="text-xs border-info/20 text-info bg-info/5 hover:bg-info/10 transition-airy">
                           {standard}
                         </Badge>
@@ -438,13 +386,13 @@ export function AssignmentsManager({
         <StatCard
           icon={FileText}
           title="Total Assignments"
-          value={mockAssignments.length}
+          value={assignments.length}
           color="primary"
         />
         <StatCard
           icon={CheckCircle}
           title="Published"
-          value={mockAssignments.filter(a => a.status === 'published').length}
+          value={assignments.filter(a => a.status === 'published').length}
           color="success"
         />
         <StatCard

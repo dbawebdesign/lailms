@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +14,7 @@ import { GradebookSettings } from './settings/GradebookSettings';
 import { BulkFeedbackDrawer } from './feedback/BulkFeedbackDrawer';
 import { StudentDetailsPanel } from './details/StudentDetailsPanel';
 import { ExportDialog } from './export/ExportDialog';
+import { useGradebook } from '@/hooks/useGradebook';
 import { 
   Calculator, 
   Users, 
@@ -44,176 +45,90 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
   const [activeTab, setActiveTab] = useState('gradebook');
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
-  const [useMockData, setUseMockData] = useState(false); // Default to false now
-  const [gradebookData, setGradebookData] = useState({
-    students: [],
-    assignments: [],
-    grades: {},
-    standards: [],
-    settings: {}
-  });
-  const [isLoading, setIsLoading] = useState(false);
   const [bulkFeedbackOpen, setBulkFeedbackOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
-  // Mock data for demonstration
-  const mockGradebookData = {
-    students: [
-      {
-        id: '1',
-        name: 'Alice Johnson',
-        email: 'alice.johnson@email.com',
-        overall_grade: 92.5,
-        grade_letter: 'A-',
-        missing_assignments: 0,
-        late_assignments: 1,
-        mastery_level: 'advanced' as const
-      },
-      {
-        id: '2',
-        name: 'Bob Smith',
-        email: 'bob.smith@email.com',
-        overall_grade: 87.3,
-        grade_letter: 'B+',
-        missing_assignments: 1,
-        late_assignments: 0,
-        mastery_level: 'proficient' as const
-      },
-      {
-        id: '3',
-        name: 'Carol Williams',
-        email: 'carol.williams@email.com',
-        overall_grade: 94.8,
-        grade_letter: 'A',
-        missing_assignments: 0,
-        late_assignments: 0,
-        mastery_level: 'advanced' as const
-      },
-      {
-        id: '4',
-        name: 'David Brown',
-        email: 'david.brown@email.com',
-        overall_grade: 76.2,
-        grade_letter: 'C+',
-        missing_assignments: 2,
-        late_assignments: 1,
-        mastery_level: 'approaching' as const
-      },
-    ],
-    assignments: [
-      {
-        id: '1',
-        name: 'Chapter 1 Quiz',
-        type: 'quiz' as const,
-        points_possible: 50,
-        due_date: '2024-01-15',
-        published: true
-      },
-      {
-        id: '2',
-        name: 'Homework Set 1',
-        type: 'homework' as const,
-        points_possible: 25,
-        due_date: '2024-01-20',
-        published: true
-      },
-      {
-        id: '3',
-        name: 'Mid-term Project',
-        type: 'project' as const,
-        points_possible: 100,
-        due_date: '2024-02-01',
-        published: true
-      },
-      {
-        id: '4',
-        name: 'Final Exam',
-        type: 'exam' as const,
-        points_possible: 200,
-        due_date: '2024-02-15',
-        published: false
-      },
-    ],
-    grades: {
-      '1-1': { student_id: '1', assignment_id: '1', points_earned: 47, percentage: 94, status: 'graded' as const },
-      '1-2': { student_id: '1', assignment_id: '2', points_earned: 23, percentage: 92, status: 'graded' as const },
-      '1-3': { student_id: '1', assignment_id: '3', points_earned: 92, percentage: 92, status: 'graded' as const },
-      '2-1': { student_id: '2', assignment_id: '1', points_earned: 42, percentage: 84, status: 'graded' as const },
-      '2-2': { student_id: '2', assignment_id: '2', points_earned: 22, percentage: 88, status: 'graded' as const },
-      '2-3': { student_id: '2', assignment_id: '3', points_earned: 88, percentage: 88, status: 'graded' as const },
-      '3-1': { student_id: '3', assignment_id: '1', points_earned: 50, percentage: 100, status: 'graded' as const },
-      '3-2': { student_id: '3', assignment_id: '2', points_earned: 25, percentage: 100, status: 'graded' as const },
-      '3-3': { student_id: '3', assignment_id: '3', points_earned: 96, percentage: 96, status: 'graded' as const },
-      '4-1': { student_id: '4', assignment_id: '1', points_earned: 35, percentage: 70, status: 'graded' as const },
-      '4-2': { student_id: '4', assignment_id: '2', status: 'missing' as const },
-      '4-3': { student_id: '4', assignment_id: '3', points_earned: 75, percentage: 75, status: 'graded' as const },
-    },
-    standards: [],
-    settings: {}
+  // Use the new gradebook hook for live data
+  const { 
+    data: gradebookData, 
+    isLoading, 
+    error, 
+    syncStatus, 
+    refresh,
+    updateGrade,
+    createAssignment,
+    updateAssignment,
+    deleteAssignment,
+    updateSettings
+  } = useGradebook(classInstance.id);
+
+  // Transform data for components that expect different interfaces
+  const transformedData = {
+    students: gradebookData.students.map(student => ({
+      id: student.id,
+      name: student.name,
+      email: student.email,
+      avatar: student.avatar_url,
+      overall_grade: student.overall_grade,
+      grade_letter: student.grade_letter,
+      missing_assignments: student.missing_assignments,
+      late_assignments: student.late_assignments,
+      mastery_level: student.mastery_level
+    })),
+    assignments: gradebookData.assignments.map(assignment => {
+      // Map database assignment types to component expected types
+      let componentType: 'quiz' | 'homework' | 'project' | 'exam';
+      switch (assignment.type) {
+        case 'quiz':
+        case 'homework':
+        case 'project':
+        case 'exam':
+          componentType = assignment.type;
+          break;
+        case 'discussion':
+          componentType = 'homework';
+          break;
+        case 'lab':
+          componentType = 'project';
+          break;
+        default:
+          componentType = 'homework';
+      }
+      
+      return {
+        id: assignment.id,
+        name: assignment.name,
+        type: componentType,
+        points_possible: assignment.points_possible,
+        due_date: assignment.due_date || '',
+        published: assignment.published || false,
+        description: assignment.description || '',
+        category: assignment.category || '',
+        created_at: assignment.created_at,
+        updated_at: assignment.updated_at
+      };
+    }),
+    grades: Object.fromEntries(
+      Object.entries(gradebookData.grades).map(([key, grade]) => [
+        key,
+        {
+          student_id: grade.student_id || '',
+          assignment_id: grade.assignment_id || '',
+          points_earned: grade.points_earned ?? undefined,
+          percentage: grade.percentage ?? undefined,
+          status: grade.status as 'graded' | 'missing' | 'late' | 'excused' | 'pending',
+          feedback: grade.feedback ?? undefined,
+          submitted_at: grade.submitted_at ?? undefined,
+          graded_at: grade.graded_at ?? undefined
+        }
+      ])
+    ),
+    standards: gradebookData.standards,
+    settings: gradebookData.settings || {}
   };
 
-  // Use mock data if enabled, otherwise use real data
-  const currentData = useMockData ? mockGradebookData : gradebookData;
-
-  // Load gradebook data
-  useEffect(() => {
-    const loadGradebookData = async () => {
-      if (useMockData) {
-        // No need to load when using mock data
-        return;
-      }
-
-      setIsLoading(true);
-      setSyncStatus('syncing');
-      
-      try {
-        // Fetch real data from API
-        const response = await fetch(`/api/teach/grading/gradebook/${classInstance.id}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch gradebook data');
-        }
-        
-        const data = await response.json();
-        
-        setGradebookData(data);
-        setSyncStatus('synced');
-      } catch (error) {
-        console.error('Error loading gradebook data:', error);
-        setSyncStatus('error');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadGradebookData();
-  }, [classInstance.id, useMockData]);
-
   const handleRefresh = async () => {
-    setSyncStatus('syncing');
-    try {
-      if (useMockData) {
-        // Just simulate refresh for mock data
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setSyncStatus('synced');
-        return;
-      }
-
-      // Fetch fresh data from API
-      const response = await fetch(`/api/teach/grading/gradebook/${classInstance.id}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to refresh gradebook data');
-      }
-      
-      const data = await response.json();
-      setGradebookData(data);
-      setSyncStatus('synced');
-    } catch (error) {
-      console.error('Error refreshing gradebook data:', error);
-      setSyncStatus('error');
-    }
+    await refresh();
   };
 
   const handleBulkFeedback = () => {
@@ -226,9 +141,9 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
     setExportDialogOpen(true);
   };
 
-  const toggleMockData = () => {
-    setUseMockData(!useMockData);
-    setSelectedStudents([]); // Clear selections when switching
+  // Handle data change for components that need to refresh
+  const handleDataChange = async () => {
+    await refresh();
   };
 
   // Handle tab change and clear selected student
@@ -341,21 +256,19 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
         </div>
         
         <div className="flex items-center gap-4">
-          {/* Mock Data Toggle */}
-          <Card className="p-4 bg-info/5 border-info/20">
+          {/* Live Data Status */}
+          <Card className="p-4 bg-success/5 border-success/20">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${useMockData ? 'bg-info' : 'bg-muted-foreground/30'}`} />
-                <span className="text-caption text-info font-medium">Mock Data</span>
+                <div className="w-2 h-2 rounded-full bg-success" />
+                <span className="text-caption text-success font-medium">Live Data</span>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleMockData}
-                className="text-xs border-info/30 hover:bg-info/10 transition-airy"
-              >
-                {useMockData ? 'Switch to Real Data' : 'Switch to Mock Data'}
-              </Button>
+              {error && (
+                <div className="flex items-center gap-1 text-destructive">
+                  <AlertCircle className="w-3 h-3" />
+                  <span className="text-xs">Error</span>
+                </div>
+              )}
             </div>
           </Card>
 
@@ -463,7 +376,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
             <TabsContent value="gradebook" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
               <GradebookGrid
                 classInstance={classInstance}
-                data={currentData}
+                data={transformedData}
                 selectedStudents={selectedStudents}
                 onSelectedStudentsChange={setSelectedStudents}
                 onStudentSelect={setSelectedStudent}
@@ -474,7 +387,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
             <TabsContent value="students" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
               <StudentsOverview
                 classInstance={classInstance}
-                data={currentData}
+                data={transformedData}
                 onStudentSelect={setSelectedStudent}
                 isLoading={isLoading}
               />
@@ -483,7 +396,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
             <TabsContent value="analytics" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
               <AnalyticsDashboard
                 classInstance={classInstance}
-                data={currentData}
+                data={transformedData}
                 isLoading={isLoading}
               />
             </TabsContent>
@@ -491,8 +404,8 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
             <TabsContent value="assignments" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
               <AssignmentsManager
                 classInstance={classInstance}
-                data={currentData}
-                onDataChange={setGradebookData}
+                data={transformedData}
+                onDataChange={handleDataChange}
                 isLoading={isLoading}
               />
             </TabsContent>
@@ -500,7 +413,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
             <TabsContent value="standards" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
               <StandardsTracker
                 classInstance={classInstance}
-                data={currentData}
+                data={transformedData}
                 isLoading={isLoading}
               />
             </TabsContent>
@@ -508,8 +421,8 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
             <TabsContent value="settings" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
               <GradebookSettings
                 classInstance={classInstance}
-                data={currentData}
-                onDataChange={setGradebookData}
+                data={transformedData}
+                onDataChange={handleDataChange}
                 isLoading={isLoading}
               />
             </TabsContent>
@@ -528,7 +441,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
       <StudentDetailsPanel
         studentId={selectedStudent || ''}
         classInstance={classInstance}
-        data={currentData}
+        data={gradebookData}
         open={!!selectedStudent}
         onClose={() => setSelectedStudent(null)}
       />
@@ -537,7 +450,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
         open={exportDialogOpen}
         onOpenChange={(open) => setExportDialogOpen(open)}
         classInstance={classInstance}
-        data={currentData}
+        data={gradebookData}
       />
     </div>
   );

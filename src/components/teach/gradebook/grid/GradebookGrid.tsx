@@ -114,96 +114,10 @@ export function GradebookGrid({
     category: ''
   });
 
-  // Mock data for demo
-  const mockStudents: Student[] = [
-    {
-      id: '1',
-      name: 'Alice Johnson',
-      email: 'alice.johnson@email.com',
-      overall_grade: 92.5,
-      grade_letter: 'A-',
-      missing_assignments: 0,
-      late_assignments: 1,
-      mastery_level: 'advanced'
-    },
-    {
-      id: '2',
-      name: 'Bob Smith',
-      email: 'bob.smith@email.com',
-      overall_grade: 87.3,
-      grade_letter: 'B+',
-      missing_assignments: 1,
-      late_assignments: 0,
-      mastery_level: 'proficient'
-    },
-    {
-      id: '3',
-      name: 'Carol Williams',
-      email: 'carol.williams@email.com',
-      overall_grade: 94.8,
-      grade_letter: 'A',
-      missing_assignments: 0,
-      late_assignments: 0,
-      mastery_level: 'advanced'
-    },
-    {
-      id: '4',
-      name: 'David Brown',
-      email: 'david.brown@email.com',
-      overall_grade: 76.2,
-      grade_letter: 'C+',
-      missing_assignments: 2,
-      late_assignments: 1,
-      mastery_level: 'approaching'
-    },
-  ];
-
-  const mockAssignments: Assignment[] = [
-    {
-      id: '1',
-      name: 'Chapter 1 Quiz',
-      type: 'quiz',
-      points_possible: 50,
-      due_date: '2024-01-15',
-      published: true
-    },
-    {
-      id: '2',
-      name: 'Homework Set 1',
-      type: 'homework',
-      points_possible: 25,
-      due_date: '2024-01-20',
-      published: true
-    },
-    {
-      id: '3',
-      name: 'Mid-term Project',
-      type: 'project',
-      points_possible: 100,
-      due_date: '2024-02-01',
-      published: true
-    },
-  ];
-
-  const mockGrades: Record<string, Grade> = {
-    '1-1': { student_id: '1', assignment_id: '1', points_earned: 47, percentage: 94, status: 'graded' },
-    '1-2': { student_id: '1', assignment_id: '2', points_earned: 23, percentage: 92, status: 'graded' },
-    '1-3': { student_id: '1', assignment_id: '3', points_earned: 92, percentage: 92, status: 'graded' },
-    '2-1': { student_id: '2', assignment_id: '1', points_earned: 42, percentage: 84, status: 'graded' },
-    '2-2': { student_id: '2', assignment_id: '2', points_earned: 22, percentage: 88, status: 'graded' },
-    '2-3': { student_id: '2', assignment_id: '3', points_earned: 88, percentage: 88, status: 'graded' },
-    '3-1': { student_id: '3', assignment_id: '1', points_earned: 50, percentage: 100, status: 'graded' },
-    '3-2': { student_id: '3', assignment_id: '2', points_earned: 25, percentage: 100, status: 'graded' },
-    '3-3': { student_id: '3', assignment_id: '3', points_earned: 96, percentage: 96, status: 'graded' },
-    '4-1': { student_id: '4', assignment_id: '1', points_earned: 35, percentage: 70, status: 'graded' },
-    '4-2': { student_id: '4', assignment_id: '2', status: 'missing' },
-    '4-3': { student_id: '4', assignment_id: '3', points_earned: 75, percentage: 75, status: 'graded' },
-  };
-
-  // Use mock data if no real data
-  const students = data.students.length > 0 ? data.students : mockStudents;
-  const assignments = data.assignments.length > 0 ? data.assignments : mockAssignments;
-  const grades = Object.keys(data.grades).length > 0 ? data.grades : mockGrades;
+  // Use live data from props
+  const students = data.students;
+  const assignments = data.assignments;
+  const grades = data.grades;
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

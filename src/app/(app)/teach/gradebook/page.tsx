@@ -43,121 +43,52 @@ interface ClassInstance {
 }
 
 export default function GradebookPage() {
-  const router = useRouter();
-  const [userClasses, setUserClasses] = useState<ClassInstance[]>([]);
   const [selectedClass, setSelectedClass] = useState<ClassInstance | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [useMockData, setUseMockData] = useState(true);
+  const [userClasses, setUserClasses] = useState<ClassInstance[]>([]);
+  const router = useRouter();
+  const supabase = createClient();
 
-  const mockClasses: ClassInstance[] = [
-    {
-      id: 'mock-1',
-      name: 'Advanced Mathematics',
-      base_class_id: 'base-math-advanced',
-      enrollment_code: 'MATH2024',
-      settings: {},
-      base_class: {
-        id: 'base-math-advanced',
-        name: 'Advanced Mathematics',
-        description: 'Advanced mathematical concepts and problem-solving'
-      }
-    },
-    {
-      id: 'mock-2', 
-      name: 'Biology 101',
-      base_class_id: 'base-bio-101',
-      enrollment_code: 'BIO2024',
-      settings: {},
-      base_class: {
-        id: 'base-bio-101',
-        name: 'Biology 101',
-        description: 'Introduction to biological sciences'
-      }
-    },
-    {
-      id: 'mock-3',
-      name: 'World History',
-      base_class_id: 'base-history-world',
-      enrollment_code: 'HIST2024',
-      settings: {},
-      base_class: {
-        id: 'base-history-world',
-        name: 'World History',
-        description: 'Comprehensive world history course'
-      }
-    }
-  ];
-
+  // Load user's classes on component mount
   useEffect(() => {
-    if (!useMockData && userClasses.length === 0 && !error) {
-      loadUserClasses();
-    }
-  }, [useMockData, error, userClasses.length]);
+    loadUserClasses();
+  }, []);
 
-  const loadMockData = async () => {
-    return Promise.resolve();
-  };
+  // Auto-select class if only one exists
+  useEffect(() => {
+    if (userClasses.length === 1 && !selectedClass) {
+      setSelectedClass(userClasses[0]);
+    }
+  }, [userClasses, selectedClass]);
 
   const loadUserClasses = async () => {
-    setIsLoading(true);
-    setError(null);
-    
     try {
-      const supabase = createClient();
+      setIsLoading(true);
+      setError(null);
       
-      // Get current user from auth
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        throw new Error('User not authenticated');
-      }
-
-      // Get user profile to ensure it exists
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('user_id, role')
-        .eq('user_id', user.id)
-        .single<Tables<"profiles">>();
-
-      if (profileError || !profile) {
-        throw new Error(`Your user profile could not be found (user ID: ${user.id}). This is required to access the gradebook. Please ensure a corresponding profile exists in the 'profiles' table.`);
-      }
-
-      // Get class instances created by the current user (teacher)
-      const { data: instances, error: instancesError } = await supabase
+      const { data: classInstances, error: classError } = await supabase
         .from('class_instances')
         .select(`
-          id,
-          name,
-          base_class_id,
-          enrollment_code,
-          settings,
-          base_class:base_classes!inner(
+          *,
+          base_class:base_classes(
             id,
             name,
-            description,
-            user_id
+            description
+          ),
+          enrollments:rosters(
+            id,
+            profile_id,
+            role,
+            status
           )
         `)
-        .eq('base_classes.user_id', user.id)
+        .eq('rosters.role', 'teacher')
         .order('name');
 
-      if (instancesError) {
-        throw instancesError;
-      }
+      if (classError) throw classError;
 
-      // Transform the data to match our interface
-      const transformedInstances: ClassInstance[] = (instances || []).map(instance => ({
-        ...instance,
-        base_class: Array.isArray(instance.base_class) ? instance.base_class[0] || null : instance.base_class
-      }));
-
-      setUserClasses(transformedInstances);
-      
-      // Auto-select first class if only one exists
-      if (transformedInstances.length === 1) {
-        setSelectedClass(transformedInstances[0]);
-      }
+      setUserClasses(classInstances || []);
     } catch (err) {
       console.error('Error loading classes:', err);
       setError(err instanceof Error ? err.message : 'Failed to load classes');
@@ -167,12 +98,9 @@ export default function GradebookPage() {
   };
 
   const handleClassSelect = (classId: string) => {
-    const classToSelect = useMockData 
-      ? mockClasses.find(c => c.id === classId)
-      : userClasses.find(c => c.id === classId);
-    
-    if (classToSelect) {
-      setSelectedClass(classToSelect);
+    const classInstance = userClasses.find(c => c.id === classId);
+    if (classInstance) {
+      setSelectedClass(classInstance);
     }
   };
 
@@ -180,17 +108,8 @@ export default function GradebookPage() {
     setSelectedClass(null);
   };
 
-  const toggleMockData = () => {
-    setUseMockData(!useMockData);
-    setSelectedClass(null);
-    setError(null);
-    setIsLoading(false);
-  };
-
-  const displayClasses = useMockData ? mockClasses : userClasses;
-
   // Loading state - only show when actually loading real data
-  if (isLoading && !useMockData) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -202,7 +121,7 @@ export default function GradebookPage() {
   }
 
   // Error state - only show when there's an error AND not using mock data
-  if (error && !useMockData) {
+  if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Card className="p-8 text-center max-w-md">
@@ -211,15 +130,6 @@ export default function GradebookPage() {
           <p className="text-gray-600 mb-4">{error}</p>
           <div className="space-y-3">
             <Button onClick={loadUserClasses}>Try Again</Button>
-            <div className="text-sm text-gray-500">
-              or{' '}
-              <button 
-                onClick={() => setUseMockData(true)}
-                className="text-blue-600 hover:text-blue-800 underline"
-              >
-                use mock data to explore
-              </button>
-            </div>
           </div>
         </Card>
       </div>
@@ -227,7 +137,7 @@ export default function GradebookPage() {
   }
 
   // No classes state - only for real data when not using mock
-  if (!useMockData && userClasses.length === 0 && !isLoading && !error) {
+  if (userClasses.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Card className="p-8 text-center max-w-md">
@@ -240,15 +150,6 @@ export default function GradebookPage() {
             <Button onClick={() => router.push('/teach/instances')}>
               Create a Class
             </Button>
-            <div className="text-sm text-gray-500">
-              or{' '}
-              <button 
-                onClick={() => setUseMockData(true)}
-                className="text-blue-600 hover:text-blue-800 underline"
-              >
-                use mock data to explore
-              </button>
-            </div>
           </div>
         </Card>
       </div>
@@ -273,36 +174,6 @@ export default function GradebookPage() {
           </div>
         </div>
 
-        {/* Mock Data Toggle - Following style guide: clean controls */}
-        <div className="px-8 py-6">
-          <Card className="p-6 bg-info/5 border-info/20">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="mock-data" 
-                    checked={useMockData}
-                    onCheckedChange={toggleMockData}
-                    className="transition-airy"
-                  />
-                  <label htmlFor="mock-data" className="text-body font-medium text-foreground cursor-pointer">
-                    Use Mock Data
-                  </label>
-                </div>
-                <p className="text-caption text-muted-foreground">
-                  {useMockData 
-                    ? 'Showing demo classes with sample data' 
-                    : 'Showing your actual class instances'}
-                </p>
-              </div>
-              <Badge variant="secondary" className="bg-info/10 text-info border-info/20">
-                <Sparkles className="h-3 w-3 mr-1" />
-                {useMockData ? 'Demo Mode' : 'Live Data'}
-              </Badge>
-            </div>
-          </Card>
-        </div>
-
         {/* Class Selection Grid - Following style guide: spacious, airy layout */}
         <div className="flex-1 px-8 pb-8">
           {isLoading ? (
@@ -315,7 +186,7 @@ export default function GradebookPage() {
                 </div>
               </div>
             </div>
-          ) : displayClasses.length === 0 ? (
+          ) : userClasses.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center space-y-6 max-w-md">
                 <div className="p-4 bg-muted/50 rounded-full w-fit mx-auto">
@@ -338,7 +209,7 @@ export default function GradebookPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {displayClasses.map((classInstance) => (
+              {userClasses.map((classInstance) => (
                 <Card 
                   key={classInstance.id} 
                   className="group cursor-pointer transition-airy hover:shadow-lg hover:-translate-y-1 bg-surface border-divider"
@@ -422,7 +293,7 @@ export default function GradebookPage() {
                   onChange={(e) => handleClassSelect(e.target.value)}
                   className="appearance-none bg-background border border-input-border rounded-lg px-4 py-2 pr-10 text-foreground focus:border-ring focus:ring-2 focus:ring-ring/20 transition-airy cursor-pointer"
                 >
-                  {displayClasses.map((cls) => (
+                  {userClasses.map((cls) => (
                     <option key={cls.id} value={cls.id}>
                       {cls.name} - Period {cls.enrollment_code?.slice(-1) || '5'}
                     </option>
