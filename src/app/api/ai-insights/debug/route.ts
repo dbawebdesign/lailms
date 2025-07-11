@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
     // Step 5: Try generating insights
     try {
       console.log('🔄 Debug: Attempting to generate insights...');
-      const insights = await aiInsightsService.getUserInsights(user.id);
+      const insights = await aiInsightsService.getUserInsights(supabase, user.id);
       console.log('✅ Debug: Insights generated:', insights.length);
 
       return NextResponse.json({
