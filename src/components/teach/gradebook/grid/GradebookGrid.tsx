@@ -364,28 +364,35 @@ export function GradebookGrid({
       </div>
 
       {/* Gradebook Table */}
-      <div className="flex-1 overflow-auto bg-background">
-        <table className="w-full">
+      <div className="flex-1 overflow-auto">
+        <table className="w-full border-collapse" style={{ minWidth: 'max-content' }}>
           {/* Table Header */}
           <thead className="bg-surface/50 sticky top-0 z-10 border-b border-divider">
             <tr>
-              <th className="text-left p-4 w-12 bg-surface/50">
+              <th className="text-left p-4 w-12 bg-background sticky left-0 z-20 border-r border-divider">
                 <Checkbox
                   checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
                   onCheckedChange={handleSelectAll}
                 />
               </th>
-              <th className="text-left p-4 min-w-[200px] bg-surface/50 sticky left-16">
+              <th className="text-left p-4 w-60 bg-background sticky left-12 z-20 border-r border-divider">
                 <span className="text-caption font-semibold text-foreground uppercase tracking-wide">Student</span>
               </th>
-              <th className="text-center p-4 w-24 bg-surface/50">
+              <th className="text-center p-4 w-24 bg-background sticky left-72 z-20 border-r border-divider">
                 <span className="text-caption font-semibold text-foreground uppercase tracking-wide">Overall</span>
               </th>
               {assignments.filter(a => a.published).map((assignment) => (
-                <th key={assignment.id} className="text-center p-4 w-32 bg-surface/50">
+                <th key={assignment.id} className="text-center p-4 w-32 bg-surface/50 relative group">
                   <div className="space-y-1">
-                    <div className="text-caption font-medium text-foreground">{assignment.name}</div>
+                    <div className="text-caption font-medium text-foreground truncate max-w-[120px]">
+                      {assignment.name}
+                    </div>
                     <div className="text-xs text-muted-foreground">{assignment.points_possible}pts</div>
+                  </div>
+                  {/* Hover tooltip for full assignment name */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-popover border border-divider rounded-lg shadow-lg text-sm text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-30">
+                    {assignment.name}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-popover"></div>
                   </div>
                 </th>
               ))}
@@ -406,7 +413,7 @@ export function GradebookGrid({
                 )}
               >
                 {/* Checkbox */}
-                <td className="p-4 bg-background group-hover:bg-surface/30 transition-airy">
+                <td className="p-4 bg-background group-hover:bg-surface/30 transition-airy sticky left-0 z-10 border-r border-divider">
                   <Checkbox
                     checked={selectedStudents.includes(student.id)}
                     onCheckedChange={(checked) => handleSelectStudent(student.id, !!checked)}
@@ -414,14 +421,14 @@ export function GradebookGrid({
                 </td>
 
                 {/* Student Info */}
-                <td className="p-4 bg-background group-hover:bg-surface/30 transition-airy sticky left-16">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 bg-brand-gradient rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm">
+                <td className="p-4 bg-background group-hover:bg-surface/30 transition-airy sticky left-12 z-10 border-r border-divider">
+                  <div className="flex items-center gap-3 w-full">
+                    <div className="h-10 w-10 bg-brand-gradient rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm flex-shrink-0">
                       {student.name.split(' ').map(n => n[0]).join('')}
                     </div>
-                    <div className="space-y-1">
-                      <div className="font-medium text-foreground">{student.name}</div>
-                      <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-foreground truncate">{student.name}</div>
+                      <div className="flex items-center gap-1 mt-1">
                         {getMasteryBadge(student.mastery_level || 'approaching')}
                       </div>
                     </div>
@@ -429,7 +436,7 @@ export function GradebookGrid({
                 </td>
 
                 {/* Overall Grade */}
-                <td className="p-4 text-center">
+                <td className="p-4 text-center bg-background group-hover:bg-surface/30 transition-airy sticky left-72 z-10 border-r border-divider">
                   <div className="space-y-1">
                     <div className={cn(
                       "text-body font-semibold",

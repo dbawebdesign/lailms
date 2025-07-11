@@ -279,7 +279,7 @@ export default function GradebookPage() {
 
   // Gradebook view for selected class
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full">
       {/* Header with Back Button and Class Selector */}
       <div className="border-b border-divider bg-surface/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="px-8 py-3">
@@ -324,7 +324,7 @@ export default function GradebookPage() {
         </div>
       </div>
 
-      {/* Gradebook Shell */}
+      {/* Main Gradebook Content */}
       <div className="flex-1 min-h-0">
         <GradebookShell classInstance={selectedClass} />
       </div>

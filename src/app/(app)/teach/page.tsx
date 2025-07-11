@@ -364,51 +364,47 @@ async function getClassesNeedingAttention(supabase: any, userId: string): Promis
       }
     }
 
-    // Check for ungraded assignments
-    const { data: assignments } = await supabase
-      .from('assignments')
-      .select(`
-        id,
-        name,
-        class_instance_id,
-        class_instances (
-          name,
-          base_classes (name)
-        )
-      `)
-      .in('class_instance_id', classInstanceIds);
+    // Check for ungraded assignments efficiently
+    const { data: pendingGradesData, error: pendingGradesError } = await supabase
+      .from('grades')
+      .select('class_instance_id')
+      .in('class_instance_id', classInstanceIds)
+      .eq('status', 'pending');
 
-    if (assignments) {
-      for (const assignment of assignments) {
-        // Count pending grades for this assignment
-        const { count: pendingGrades } = await supabase
-          .from('grades')
-          .select('id', { count: 'exact' })
-          .eq('assignment_id', assignment.id)
-          .eq('status', 'pending');
+    if (pendingGradesError) {
+      console.error('Error fetching pending grades:', pendingGradesError);
+    } else if (pendingGradesData) {
+      const pendingCounts = pendingGradesData.reduce((acc: Record<string, number>, grade: { class_instance_id: string | null }) => {
+        if (grade.class_instance_id) {
+          acc[grade.class_instance_id] = (acc[grade.class_instance_id] || 0) + 1;
+        }
+        return acc;
+      }, {} as Record<string, number>);
 
-        if (pendingGrades && pendingGrades > 0) {
-          const className = assignment.class_instances?.name || assignment.class_instances?.base_classes?.name || 'Unknown Class';
-          
-          // Check if we already have an item for this class
-          const existingItem = attentionItems.find(item => item.className === className);
+      Object.entries(pendingCounts).forEach(([classId, count]) => {
+        const numericCount = count as number;
+        const classInstance = classInstances.find((ci: any) => ci.id === classId);
+        if (classInstance) {
+          const className = classInstance.name || classInstance.base_classes?.name || 'Unknown Class';
+          const issueText = `${numericCount} ungraded assignment${numericCount > 1 ? 's' : ''}`;
+
+          const existingItem = attentionItems.find((item: ClassAttentionData) => item.id === classId);
           if (existingItem) {
-            // Update existing item to include ungraded assignments
-            existingItem.issue += `, ${pendingGrades} ungraded assignment${pendingGrades > 1 ? 's' : ''}`;
-            if (pendingGrades >= 10) {
+            existingItem.issue += `, ${issueText}`;
+            if (numericCount >= 10 && existingItem.priority !== 'High') {
               existingItem.priority = 'High';
             }
           } else {
             attentionItems.push({
-              id: assignment.class_instance_id,
+              id: classId,
               className,
-              issue: `${pendingGrades} ungraded assignment${pendingGrades > 1 ? 's' : ''}`,
-              priority: pendingGrades >= 10 ? 'High' : pendingGrades >= 5 ? 'Medium' : 'Low',
+              issue: issueText,
+              priority: numericCount >= 10 ? 'High' : numericCount >= 5 ? 'Medium' : 'Low',
               actionUrl: '/teach/gradebook'
             });
           }
         }
-      }
+      });
     }
 
     // Check for students who haven't been active recently (no quiz attempts in last 7 days)

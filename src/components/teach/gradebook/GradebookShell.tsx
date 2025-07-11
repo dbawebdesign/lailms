@@ -226,9 +226,9 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
   ];
 
   return (
-    <div className="flex flex-col h-full bg-background transition-airy">
+    <div className="flex flex-col min-h-0 bg-background transition-airy">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between px-8 py-4 mb-4">
         <div>
           <h1 className="text-h1 text-foreground mb-2">Gradebook</h1>
           <p className="text-body text-muted-foreground">
@@ -306,9 +306,9 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
       </div>
 
       {/* Main Content - Following style guide: airy layout with generous spacing */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 min-w-0">
         {/* Sidebar Navigation - Following style guide: clean, spacious */}
-        <div className="w-72 border-r border-divider bg-surface/30 backdrop-blur-sm">
+        <div className="w-72 border-r border-divider bg-surface/30 backdrop-blur-sm flex-shrink-0">
           <div className="p-2">
             <Tabs value={activeTab} onValueChange={handleTabChange} orientation="vertical" className="w-full">
               <TabsList className="flex flex-col w-full bg-transparent p-0 space-y-2 h-auto">
@@ -352,9 +352,9 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
         </div>
 
         {/* Content Area - Following style guide: flowing, spacious layout */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <Tabs value={activeTab} className="flex-1 flex flex-col">
-            <TabsContent value="gradebook" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          <Tabs value={activeTab} className="flex-1 flex flex-col min-h-0">
+            <TabsContent value="gradebook" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0">
               <GradebookGrid
                 classInstance={classInstance}
                 data={transformedData}
