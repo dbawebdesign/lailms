@@ -280,72 +280,92 @@ export function AssignmentsManager({
 
   const renderAssignmentsList = () => (
     <div className="space-y-8">
-      {/* Header with Actions */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-h2 font-semibold text-foreground">Assignments</h3>
-          <p className="text-caption text-muted-foreground mt-1">
-            Create and manage assignments for your class
-          </p>
-        </div>
-        <Button 
-          onClick={handleCreateAssignment}
-          className="bg-brand-gradient hover:opacity-90 transition-airy shadow-md hover:shadow-lg"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Assignment
-        </Button>
-      </div>
-
-      {/* Filters and Search */}
+      {/* Search and Filter Bar */}
       <Card className="p-6 bg-surface/50 border-divider">
-        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-          <div className="flex gap-4 flex-1">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+          <div className="flex-1 min-w-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search assignments..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 border-divider focus:border-primary/50"
+                className="pl-10 border-divider focus:border-primary/50 bg-background"
               />
             </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-40 border-divider">
-                <SelectValue placeholder="All Types" />
+              <SelectTrigger className="w-full sm:w-[180px] border-divider">
+                <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="quiz">Quiz</SelectItem>
                 <SelectItem value="assignment">Assignment</SelectItem>
+                <SelectItem value="homework">Homework</SelectItem>
                 <SelectItem value="project">Project</SelectItem>
                 <SelectItem value="exam">Exam</SelectItem>
-                <SelectItem value="lab">Lab</SelectItem>
-                <SelectItem value="discussion">Discussion</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-40 border-divider">
-                <SelectValue placeholder="All Status" />
+              <SelectTrigger className="w-full sm:w-[180px] border-divider">
+                <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="published">Published</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
+                <SelectItem value="published">Published</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
       </Card>
 
+      {/* Bulk Actions */}
+      {selectedAssignments.length > 0 && (
+        <Card className="p-4 bg-accent/5 border-accent/20">
+          <div className="flex items-center justify-between">
+            <span className="text-body font-medium text-foreground">
+              {selectedAssignments.length} assignment{selectedAssignments.length > 1 ? 's' : ''} selected
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkAction('publish')}
+                className="hover:bg-surface/80 border-divider transition-airy"
+              >
+                Publish
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkAction('unpublish')}
+                className="hover:bg-surface/80 border-divider transition-airy"
+              >
+                Unpublish
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => handleBulkAction('delete')}
+                className="hover:bg-destructive/90 transition-airy"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Assignments List */}
       <div className="space-y-6">
         {filteredAssignments.map((assignment) => (
-          <Card key={assignment.id} className="p-8 bg-surface/50 border-divider hover:shadow-lg transition-airy">
-            <div className="flex items-start gap-6">
+          <Card key={assignment.id} className="p-6 bg-surface/50 border-divider hover:shadow-lg transition-airy">
+            <div className="flex items-start gap-4">
               {/* Checkbox */}
-              <div className="pt-1">
+              <div className="pt-1 flex-shrink-0">
                 <Checkbox
                   checked={selectedAssignments.includes(assignment.id)}
                   onCheckedChange={(checked) => {
@@ -363,47 +383,51 @@ export function AssignmentsManager({
                 {getTypeIcon(assignment.type)}
               </div>
               
-              {/* Main Content */}
-              <div className="flex-1 min-w-0 space-y-4">
+              {/* Main Content - Constrain width to prevent overflow */}
+              <div className="flex-1 min-w-0 space-y-3">
                 {/* Header Row */}
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h4 className="text-h3 font-semibold text-foreground truncate">{assignment.name}</h4>
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
+                      <h4 className="text-lg font-semibold text-foreground truncate max-w-[300px] lg:max-w-[400px] xl:max-w-[500px]" title={assignment.name}>
+                        {assignment.name}
+                      </h4>
                       {getStatusBadge(assignment)}
-                      <Badge variant="outline" className="border-primary/20 text-primary bg-primary/10 text-xs">
+                      <Badge variant="outline" className="border-primary/20 text-primary bg-primary/10 text-xs flex-shrink-0">
                         {assignment.type}
                       </Badge>
                     </div>
-                    <p className="text-body text-muted-foreground leading-relaxed">{assignment.description}</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
+                      {assignment.description}
+                    </p>
                   </div>
                 </div>
                 
                 {/* Assignment Details Grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 py-3 px-4 bg-background/50 rounded-lg border border-divider/50">
-                  <div className="flex items-center gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 py-3 px-4 bg-background/50 rounded-lg border border-divider/50">
+                  <div className="flex items-center gap-2 min-w-0">
                     <Target className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span className="text-caption text-muted-foreground">
+                    <span className="text-sm text-muted-foreground truncate">
                       <span className="font-medium text-foreground">{assignment.points_possible}</span> points
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <Calendar className="w-4 h-4 text-accent flex-shrink-0" />
-                    <span className="text-caption text-muted-foreground">
+                    <span className="text-sm text-muted-foreground truncate">
                       Due <span className="font-medium text-foreground">{formatDate(assignment.due_date)}</span>
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <Users className="w-4 h-4 text-info flex-shrink-0" />
-                    <span className="text-caption text-muted-foreground">
+                    <span className="text-sm text-muted-foreground truncate">
                       <span className="font-medium text-foreground">{assignment.submissions_count}</span>
                       /{data.students.length || 30} submitted
                     </span>
                   </div>
                   {assignment.status === 'published' && assignment.avg_score && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       <TrendingUp className="w-4 h-4 text-success flex-shrink-0" />
-                      <span className="text-caption text-muted-foreground">
+                      <span className="text-sm text-muted-foreground truncate">
                         <span className="font-medium text-foreground">{assignment.avg_score}%</span> avg
                       </span>
                     </div>
@@ -413,8 +437,8 @@ export function AssignmentsManager({
                 {/* Standards Row */}
                 {assignment.standards && assignment.standards.length > 0 && (
                   <div className="flex items-center gap-3 pt-2">
-                    <span className="text-caption text-muted-foreground font-medium flex-shrink-0">Standards:</span>
-                    <div className="flex flex-wrap gap-2">
+                    <span className="text-sm text-muted-foreground font-medium flex-shrink-0">Standards:</span>
+                    <div className="flex flex-wrap gap-2 min-w-0">
                       {assignment.standards.map((standard: string) => (
                         <Badge key={standard} variant="outline" className="text-xs border-info/20 text-info bg-info/5 hover:bg-info/10 transition-airy">
                           {standard}
@@ -426,22 +450,22 @@ export function AssignmentsManager({
               </div>
               
               {/* Action Buttons - Stacked Vertically */}
-              <div className="flex flex-col gap-3 flex-shrink-0">
+              <div className="flex flex-col gap-2 flex-shrink-0">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleEditAssignment(assignment)}
-                  className="hover:bg-surface/80 border-divider transition-airy min-w-[80px] justify-center"
+                  className="hover:bg-surface/80 border-divider transition-airy min-w-[70px] justify-center"
                 >
-                  <Edit className="w-4 h-4 mr-2" />
+                  <Edit className="w-4 h-4 mr-1" />
                   Edit
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="hover:bg-surface/80 border-divider transition-airy min-w-[80px] justify-center"
+                  className="hover:bg-surface/80 border-divider transition-airy min-w-[70px] justify-center"
                 >
-                  <Eye className="w-4 h-4 mr-2" />
+                  <Eye className="w-4 h-4 mr-1" />
                   View
                 </Button>
               </div>
@@ -535,19 +559,28 @@ export function AssignmentsManager({
   }
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background overflow-hidden">
       {/* Header */}
-      <div className="p-8 border-b border-divider bg-surface/30">
-        <div>
-          <h2 className="text-h1 font-bold text-foreground">Assignment Management</h2>
-          <p className="text-body text-muted-foreground mt-2">
-            Create, organize, and manage assignments and assessments
-          </p>
+      <div className="p-8 border-b border-divider bg-surface/30 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-h1 font-bold text-foreground">Assignment Management</h2>
+            <p className="text-body text-muted-foreground mt-2">
+              Create, organize, and manage assignments and assessments
+            </p>
+          </div>
+          <Button 
+            onClick={handleCreateAssignment}
+            className="bg-brand-gradient hover:opacity-90 transition-airy shadow-md hover:shadow-lg"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Assignment
+          </Button>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-8">
+      <div className="flex-1 p-8 overflow-y-auto min-h-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
           <div className="flex items-center gap-1 p-1 bg-background rounded-lg border border-divider w-fit mb-8">
             {[

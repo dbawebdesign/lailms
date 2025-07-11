@@ -306,7 +306,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
       </div>
 
       {/* Main Content - Following style guide: airy layout with generous spacing */}
-      <div className="flex-1 flex min-h-0 min-w-0">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Sidebar Navigation - Following style guide: clean, spacious */}
         <div className="w-72 border-r border-divider bg-surface/30 backdrop-blur-sm flex-shrink-0">
           <div className="p-2">
@@ -352,9 +352,9 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
         </div>
 
         {/* Content Area - Following style guide: flowing, spacious layout */}
-        <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          <Tabs value={activeTab} className="flex-1 flex flex-col min-h-0">
-            <TabsContent value="gradebook" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <Tabs value={activeTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <TabsContent value="gradebook" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0 overflow-hidden">
               <GradebookGrid
                 classInstance={classInstance}
                 data={transformedData}
@@ -366,7 +366,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
               />
             </TabsContent>
             
-            <TabsContent value="students" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+            <TabsContent value="students" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
               <StudentsOverview
                 classInstance={classInstance}
                 data={transformedData}
@@ -375,7 +375,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
               />
             </TabsContent>
             
-            <TabsContent value="analytics" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+            <TabsContent value="analytics" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
               <AnalyticsDashboard
                 classInstance={classInstance}
                 data={transformedData}
@@ -383,7 +383,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
               />
             </TabsContent>
             
-            <TabsContent value="assignments" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+            <TabsContent value="assignments" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
               <AssignmentsManager
                 classInstance={classInstance}
                 data={transformedData}
@@ -395,7 +395,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
               />
             </TabsContent>
             
-            <TabsContent value="standards" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+            <TabsContent value="standards" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
               <StandardsTracker
                 classInstance={classInstance}
                 data={transformedData}
@@ -403,7 +403,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
               />
             </TabsContent>
             
-            <TabsContent value="settings" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+            <TabsContent value="settings" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
               <GradebookSettings
                 classInstance={classInstance}
                 data={transformedData}
