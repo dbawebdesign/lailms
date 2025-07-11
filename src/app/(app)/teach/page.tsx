@@ -613,205 +613,226 @@ export default async function TeacherDashboardPage() {
   ]);
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6 md:space-y-8">
-      <WelcomeCard userName={userName} userRole={profile.role} />
-
-      {/* Course Generation Progress Widget */}
-      <CourseGenerationProgressWidget userId={user.id} />
-
-      {/* Bento Grid Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-        
-        {/* Card 1: Your Active Classes (Spans 2 columns on lg) */}
-        <div className="lg:col-span-2 bg-card p-4 md:p-6 rounded-lg shadow">
-          <h2 id="active-classes-heading" className="text-xl font-semibold mb-4 flex items-center">
-            <BookOpenCheck className="mr-3 h-6 w-6 text-primary" />
-            Your Active Classes
-          </h2>
-          {activeClasses.length === 0 && (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertTitle>No Active Classes</AlertTitle>
-              <AlertDescription>
-                You are not currently teaching any active classes. Create them in 'Base Classes' and 'Class Instances'.
-              </AlertDescription>
-            </Alert>
-          )}
-          {activeClasses.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {activeClasses.map((course) => (
-                <ActiveClassItem
-                  key={course.id}
-                  id={course.id}
-                  name={course.name}
-                  baseClassName={course.baseClassName}
-                  studentCount={course.studentCount}
-                  manageClassUrl={course.manageClassUrl}
-                />
-              ))}
-            </div>
-          )}
+    <div className="min-h-screen bg-background">
+      {/* Header Section */}
+      <div className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-6 py-8">
+          <WelcomeCard userName={userName} userRole={profile.role} />
         </div>
+      </div>
 
-        {/* Card 2: Quick Actions (Spans 1 column on lg) */}
-        <div className="bg-card p-4 md:p-6 rounded-lg shadow">
-          <h2 id="quick-actions-heading" className="text-xl font-semibold mb-4 flex items-center">
-            <Sparkles className="mr-3 h-6 w-6 text-primary" />
-            Quick Actions
-          </h2>
-            <div className="space-y-3">
-            <Button asChild className="w-full justify-start" variant="outline">
-              <Link href="/teach/knowledge-base/create">
-                <BookOpen className="mr-2 h-4 w-4" />
-                Create New Course
-              </Link>
-            </Button>
-            <Button asChild className="w-full justify-start" variant="outline">
-              <Link href="/teach/gradebook">
-                <ClipboardCheck className="mr-2 h-4 w-4" />
-                Grade Assignments
-              </Link>
-            </Button>
-            <Button asChild className="w-full justify-start" variant="outline">
-              <Link href="/teach/knowledge">
-                <Search className="mr-2 h-4 w-4" />
-                Search Knowledge
-              </Link>
-            </Button>
-            </div>
-        </div>
+      {/* Main Content */}
+      <div className="container mx-auto px-6 py-8 space-y-8">
+        {/* Course Generation Progress Widget */}
+        <CourseGenerationProgressWidget userId={user.id} />
 
-        {/* Card 3: Recent Student Activity (Spans 2 columns on lg) */}
-        <div className="lg:col-span-2 bg-card p-4 md:p-6 rounded-lg shadow">
-          <h2 id="recent-activity-heading" className="text-xl font-semibold mb-4 flex items-center">
-            <Activity className="mr-3 h-6 w-6 text-primary" />
-            Recent Student Activity
-          </h2>
-          {recentActivity.length === 0 && (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertTitle>No Recent Activity</AlertTitle>
-              <AlertDescription>
-                No student submissions or quiz attempts in the last 24 hours.
-              </AlertDescription>
-            </Alert>
-          )}
-          {recentActivity.length > 0 && (
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {recentActivity.map((activity, index) => (
-                <div key={index} className="flex items-center gap-3 p-3 bg-background rounded-lg border border-muted">
-                  <div className={`p-2 rounded-lg ${
-                    activity.type === 'quiz_submission' ? 'bg-success/10' :
-                    activity.type === 'lesson_completion' ? 'bg-info/10' :
-                    activity.type === 'late_submission' ? 'bg-warning/10' : 'bg-muted/50'
-                  }`}>
-                    {activity.type === 'quiz_submission' && <Target className="h-4 w-4 text-success" />}
-                    {activity.type === 'lesson_completion' && <CheckCircle className="h-4 w-4 text-info" />}
-                    {activity.type === 'late_submission' && <AlertTriangle className="h-4 w-4 text-warning" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {activity.studentName} - {activity.className}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {activity.description} • {activity.timeAgo}
-                    </p>
-                  </div>
-                  {activity.actionUrl && (
-                    <Button asChild size="sm" variant="ghost">
-                      <Link href={activity.actionUrl}>
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        
-        {/* Card 4: Classes Needing Attention (Spans 1 column on lg) */}
-        <div className="bg-card p-4 md:p-6 rounded-lg shadow">
-          <h2 id="attention-needed-heading" className="text-xl font-semibold mb-4 flex items-center">
-            <AlertTriangle className="mr-3 h-6 w-6 text-warning" />
-            Needs Attention
-          </h2>
-          {classesNeedingAttention.length === 0 && (
-            <Alert>
-              <CheckCircle className="h-4 w-4" />
-              <AlertTitle>All Caught Up!</AlertTitle>
-              <AlertDescription>
-                No classes require immediate attention.
-              </AlertDescription>
-            </Alert>
-          )}
-          {classesNeedingAttention.length > 0 && (
-            <div className="space-y-3">
-              {classesNeedingAttention.map((item) => (
-                <div key={item.id} className="p-3 bg-background rounded-lg border border-muted">
-                  <h4 className="font-medium text-foreground text-sm">{item.className}</h4>
-                  <p className="text-xs text-muted-foreground mt-1">{item.issue}</p>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs font-medium text-warning">{item.priority}</span>
-                    {item.actionUrl && (
-                      <Button asChild size="sm" variant="outline">
-                        <Link href={item.actionUrl}>Review</Link>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Card 5: Teaching Progress & Insights (Spans 3 columns on lg) */}
-        <div className="lg:col-span-3 bg-card p-4 md:p-6 rounded-lg shadow">
-          <h2 id="teaching-progress-heading" className="text-xl font-semibold mb-4 flex items-center">
-            <TrendingUp className="mr-3 h-6 w-6 text-primary" />
-            Teaching Progress & Insights
-          </h2>
+        {/* Teaching Progress & Insights - Moved to top for better hierarchy */}
+        <div className="bg-card/50 backdrop-blur-sm border border-border/40 rounded-2xl p-6">
+          <h2 className="text-lg font-medium mb-6 text-foreground">Teaching Overview</h2>
           {teachingProgress && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-4 bg-background rounded-lg border border-muted">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Total Students</span>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="group p-4 bg-background/80 rounded-xl border border-border/20 hover:border-border/40 transition-all duration-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-muted-foreground">Total Students</span>
+                  <Users className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </div>
-                <p className="text-2xl font-bold text-foreground mt-1">{teachingProgress.totalStudents}</p>
-                <p className="text-xs text-muted-foreground">Across all classes</p>
+                <p className="text-2xl font-semibold text-foreground">{teachingProgress.totalStudents}</p>
+                <p className="text-xs text-muted-foreground mt-1">Across all classes</p>
               </div>
               
-              <div className="p-4 bg-background rounded-lg border border-muted">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Lessons Created</span>
-                  <BookOpen className="h-4 w-4 text-muted-foreground" />
+              <div className="group p-4 bg-background/80 rounded-xl border border-border/20 hover:border-border/40 transition-all duration-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-muted-foreground">Lessons Created</span>
+                  <BookOpen className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </div>
-                <p className="text-2xl font-bold text-foreground mt-1">{teachingProgress.lessonsCreated}</p>
-                <p className="text-xs text-success">+{teachingProgress.lessonsThisWeek} this week</p>
+                <p className="text-2xl font-semibold text-foreground">{teachingProgress.lessonsCreated}</p>
+                <p className="text-xs text-success mt-1">+{teachingProgress.lessonsThisWeek} this week</p>
               </div>
               
-              <div className="p-4 bg-background rounded-lg border border-muted">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Avg Class Performance</span>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <div className="group p-4 bg-background/80 rounded-xl border border-border/20 hover:border-border/40 transition-all duration-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-muted-foreground">Avg Performance</span>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </div>
-                <p className="text-2xl font-bold text-foreground mt-1">{teachingProgress.averagePerformance}%</p>
-                <p className="text-xs text-muted-foreground">Based on quiz scores</p>
+                <p className="text-2xl font-semibold text-foreground">{teachingProgress.averagePerformance}%</p>
+                <p className="text-xs text-muted-foreground mt-1">Based on quiz scores</p>
               </div>
               
-              <div className="p-4 bg-background rounded-lg border border-muted">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Pending Reviews</span>
-                  <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+              <div className="group p-4 bg-background/80 rounded-xl border border-border/20 hover:border-border/40 transition-all duration-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-muted-foreground">Pending Reviews</span>
+                  <ClipboardCheck className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </div>
-                <p className="text-2xl font-bold text-foreground mt-1">{teachingProgress.pendingReviews}</p>
-                <p className="text-xs text-muted-foreground">Assignments to grade</p>
+                <p className="text-2xl font-semibold text-foreground">{teachingProgress.pendingReviews}</p>
+                <p className="text-xs text-muted-foreground mt-1">Assignments to grade</p>
               </div>
             </div>
           )}
         </div>
 
+        {/* Main Dashboard Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* Your Active Classes - Larger focus area */}
+          <div className="lg:col-span-8 bg-card/50 backdrop-blur-sm border border-border/40 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-medium text-foreground">Your Active Classes</h2>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/teach/instances">
+                  <BookOpenCheck className="mr-2 h-4 w-4" />
+                  View All
+                </Link>
+              </Button>
+            </div>
+            
+            {activeClasses.length === 0 && (
+              <div className="text-center py-12">
+                <BookOpenCheck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-sm font-medium text-foreground mb-2">No Active Classes</h3>
+                <p className="text-sm text-muted-foreground mb-4">Create your first class to get started</p>
+                <Button asChild variant="outline">
+                  <Link href="/teach/base-classes">Create Class</Link>
+                </Button>
+              </div>
+            )}
+            
+            {activeClasses.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {activeClasses.map((course) => (
+                  <ActiveClassItem
+                    key={course.id}
+                    id={course.id}
+                    name={course.name}
+                    baseClassName={course.baseClassName}
+                    studentCount={course.studentCount}
+                    manageClassUrl={course.manageClassUrl}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Right Sidebar - Quick Actions & Attention */}
+          <div className="lg:col-span-4 space-y-6">
+            
+            {/* Quick Actions */}
+            <div className="bg-card/50 backdrop-blur-sm border border-border/40 rounded-2xl p-6">
+              <h3 className="text-base font-medium mb-4 text-foreground">Quick Actions</h3>
+              <div className="space-y-3">
+                <Button asChild className="w-full justify-start h-10" variant="outline">
+                  <Link href="/teach/knowledge-base/create">
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    Create New Course
+                  </Link>
+                </Button>
+                <Button asChild className="w-full justify-start h-10" variant="outline">
+                  <Link href="/teach/gradebook">
+                    <ClipboardCheck className="mr-2 h-4 w-4" />
+                    Grade Assignments
+                  </Link>
+                </Button>
+                <Button asChild className="w-full justify-start h-10" variant="outline">
+                  <Link href="/teach/knowledge">
+                    <Search className="mr-2 h-4 w-4" />
+                    Search Knowledge
+                  </Link>
+                </Button>
+              </div>
+            </div>
+
+            {/* Classes Needing Attention */}
+            <div className="bg-card/50 backdrop-blur-sm border border-border/40 rounded-2xl p-6">
+              <h3 className="text-base font-medium mb-4 text-foreground">Needs Attention</h3>
+              
+              {classesNeedingAttention.length === 0 && (
+                <div className="text-center py-6">
+                  <CheckCircle className="h-8 w-8 text-success mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">All caught up!</p>
+                </div>
+              )}
+              
+              {classesNeedingAttention.length > 0 && (
+                <div className="space-y-3">
+                  {classesNeedingAttention.map((item) => (
+                    <div key={item.id} className="p-3 bg-background/60 rounded-lg border border-border/20">
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-medium text-foreground text-sm">{item.className}</h4>
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          item.priority === 'High' ? 'bg-destructive/10 text-destructive' :
+                          item.priority === 'Medium' ? 'bg-warning/10 text-warning' :
+                          'bg-muted/50 text-muted-foreground'
+                        }`}>
+                          {item.priority}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-3">{item.issue}</p>
+                      {item.actionUrl && (
+                        <Button asChild size="sm" variant="outline" className="w-full">
+                          <Link href={item.actionUrl}>Review</Link>
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Student Activity - Full width */}
+          <div className="lg:col-span-12 bg-card/50 backdrop-blur-sm border border-border/40 rounded-2xl p-6">
+            <h2 className="text-lg font-medium mb-6 text-foreground">Recent Student Activity</h2>
+            
+            {recentActivity.length === 0 && (
+              <div className="text-center py-12">
+                <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-sm font-medium text-foreground mb-2">No Recent Activity</h3>
+                <p className="text-sm text-muted-foreground">No student activity in the last 24 hours</p>
+              </div>
+            )}
+            
+            {recentActivity.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {recentActivity.slice(0, 6).map((activity, index) => (
+                  <div key={index} className="group p-4 bg-background/60 rounded-lg border border-border/20 hover:border-border/40 transition-all duration-200">
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg transition-colors ${
+                        activity.type === 'quiz_submission' ? 'bg-success/10 text-success' :
+                        activity.type === 'lesson_completion' ? 'bg-info/10 text-info' :
+                        activity.type === 'late_submission' ? 'bg-warning/10 text-warning' : 'bg-muted/50 text-muted-foreground'
+                      }`}>
+                        {activity.type === 'quiz_submission' && <Target className="h-4 w-4" />}
+                        {activity.type === 'lesson_completion' && <CheckCircle className="h-4 w-4" />}
+                        {activity.type === 'late_submission' && <AlertTriangle className="h-4 w-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {activity.studentName}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {activity.className}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {activity.description}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1 font-medium">
+                          {activity.timeAgo}
+                        </p>
+                      </div>
+                      {activity.actionUrl && (
+                        <Button asChild size="sm" variant="ghost" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Link href={activity.actionUrl}>
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
       </div>
     </div>
   );

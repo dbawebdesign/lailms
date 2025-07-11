@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'; // Assuming you have a cn utility
 import CommandPalette from './CommandPalette'; // Import CommandPalette
 import type { UserRole } from "@/config/navConfig"; // Import UserRole
 import { SkipLink } from '@/components/ui/skip-link';
+import { FeedbackSupportModal } from '@/components/ui/FeedbackSupportModal';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -18,7 +19,14 @@ interface AppShellProps {
 }
 
 const AppShell: React.FC<AppShellProps> = ({ children, userRole }) => {
-  const { isNavCollapsed, isPanelVisible } = useUIContext();
+  const { 
+    isNavCollapsed, 
+    isPanelVisible, 
+    isFeedbackModalOpen,
+    closeFeedbackModal,
+    feedbackModalCategory,
+    feedbackModalPriority
+  } = useUIContext();
   const [isMobile, setIsMobile] = useState(false);
 
   // Handle responsive behavior based on screen size
@@ -102,6 +110,14 @@ const AppShell: React.FC<AppShellProps> = ({ children, userRole }) => {
       )}
 
       <CommandPalette /> {/* Include CommandPalette here */}
+      
+      {/* Global Feedback Modal */}
+      <FeedbackSupportModal
+        isOpen={isFeedbackModalOpen}
+        onClose={closeFeedbackModal}
+        initialCategory={feedbackModalCategory}
+        initialPriority={feedbackModalPriority}
+      />
     </>
   );
 };

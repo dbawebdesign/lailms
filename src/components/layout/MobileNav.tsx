@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import navConfig, { NavItem, UserRole } from "@/config/navConfig";
+import { useUIContext } from "@/context/UIContext";
 import { MoreHorizontal, X } from "lucide-react";
 import {
   Sheet,
@@ -23,13 +24,22 @@ interface MobileNavProps {
 
 const MobileNav: React.FC<MobileNavProps> = ({ userRole }) => {
   const pathname = usePathname();
+  const { openFeedbackModal } = useUIContext();
 
-  // Filter nav items based on user role and exclude bottom items for mobile view
+  // Filter nav items based on user role - include bottom items for mobile
   const allUserNavItems = navConfig.filter(
-    (item) => item.roles.includes(userRole) && !item.isBottom
+    (item) => item.roles.includes(userRole)
   );
 
   const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
+
+  const handleNavItemClick = (item: NavItem, e: React.MouseEvent) => {
+    if (item.href === '/feedback') {
+      e.preventDefault();
+      openFeedbackModal({ category: 'feedback', priority: 'medium' });
+    }
+    // For other items, let the Link handle the navigation naturally
+  };
 
   const maxItemsInBar = 5; // Max 4 direct links + 1 "More" button if needed
   let itemsToShowInBar: NavItem[] = [];
@@ -49,6 +59,7 @@ const MobileNav: React.FC<MobileNavProps> = ({ userRole }) => {
           <Link
             key={item.href}
             href={item.href}
+            onClick={(e) => handleNavItemClick(item, e)}
             className={cn(
               "flex flex-col items-center justify-center py-1 px-1 rounded-md text-xs flex-1 min-w-0",
               pathname === item.href
@@ -90,7 +101,10 @@ const MobileNav: React.FC<MobileNavProps> = ({ userRole }) => {
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setIsMoreSheetOpen(false)}
+                    onClick={(e) => {
+                      handleNavItemClick(item, e);
+                      setIsMoreSheetOpen(false);
+                    }}
                     className={cn(
                       "flex items-center py-3 px-4 rounded-md text-sm",
                       pathname === item.href

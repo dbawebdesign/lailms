@@ -22,7 +22,7 @@ interface LeftNavProps {
 }
 
 const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
-  const { isNavCollapsed, toggleNavCollapsed, setNavCollapsed } = useUIContext();
+  const { isNavCollapsed, toggleNavCollapsed, setNavCollapsed, openFeedbackModal } = useUIContext();
   const pathname = usePathname();
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -56,6 +56,14 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
     ? "/Horizontal white text.png"
     : "/Horizontal black text.png";
   const iconLogoSrc = "/web-app-manifest-512x512.png";
+
+  const handleNavItemClick = (item: NavItem, e: React.MouseEvent) => {
+    if (item.href === '/feedback') {
+      e.preventDefault();
+      openFeedbackModal({ category: 'feedback', priority: 'medium' });
+    }
+    // For other items, let the Link handle the navigation naturally
+  };
 
   return (
     <aside
@@ -167,6 +175,7 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
                 <TooltipTrigger asChild>
                   <Link
                     href={item.href}
+                    onClick={(e) => handleNavItemClick(item, e)}
                     className={cn(
                       "flex items-center py-2 px-3 rounded-md text-sm font-medium transition-colors",
                       pathname === item.href

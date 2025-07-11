@@ -12,9 +12,11 @@ import {
 } from "@/components/ui/command";
 import { Button } from '@/components/ui/button';
 import { Command as CommandIcon } from 'lucide-react'; // Alias to avoid naming conflict
+import { useUIContext } from '@/context/UIContext';
 
 const CommandPalette = () => {
   const [open, setOpen] = useState(false);
+  const { openFeedbackModal } = useUIContext();
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -46,7 +48,9 @@ const CommandPalette = () => {
           <CommandSeparator />
           <CommandGroup heading="Actions">
             <CommandItem onSelect={() => { console.log("Action: Create Task"); setOpen(false); }}>Create New Task</CommandItem>
-            <CommandItem onSelect={() => { console.log("Action: Send Feedback"); setOpen(false); }}>Send Feedback</CommandItem>
+            <CommandItem onSelect={() => { openFeedbackModal({ category: 'feedback', priority: 'medium' }); setOpen(false); }}>Send Feedback</CommandItem>
+            <CommandItem onSelect={() => { openFeedbackModal({ category: 'support', priority: 'medium' }); setOpen(false); }}>Get Support</CommandItem>
+            <CommandItem onSelect={() => { openFeedbackModal({ category: 'bug_report', priority: 'high' }); setOpen(false); }}>Report Bug</CommandItem>
           </CommandGroup>
         </CommandList>
       </CommandDialog>

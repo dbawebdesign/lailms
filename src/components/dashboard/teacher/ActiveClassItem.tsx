@@ -21,35 +21,36 @@ export function ActiveClassItem({
   const displayClassName = name || baseClassName; // Prefer instance name, fallback to base class name
 
   return (
-    <Card className="flex flex-col">
-      <CardHeader>
-        <CardTitle className="text-lg truncate" title={displayClassName}>
-          {displayClassName}
-        </CardTitle>
-        {name && baseClassName && name !== baseClassName && (
-          <p className="text-xs text-muted-foreground truncate" title={baseClassName}>
-            Based on: {baseClassName}
-          </p>
-        )}
-      </CardHeader>
-      <CardContent className="flex-grow">
+    <div className="group p-4 bg-background/80 rounded-xl border border-border/20 hover:border-border/40 hover:bg-background/95 transition-all duration-200">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-foreground text-sm truncate" title={displayClassName}>
+            {displayClassName}
+          </h3>
+          {name && baseClassName && name !== baseClassName && (
+            <p className="text-xs text-muted-foreground truncate mt-1" title={baseClassName}>
+              Based on: {baseClassName}
+            </p>
+          )}
+        </div>
+      </div>
+      
+      <div className="flex items-center justify-between">
         <div className="flex items-center text-sm text-muted-foreground">
           <Users className="mr-2 h-4 w-4" />
           <span>{studentCount} Student{studentCount !== 1 ? 's' : ''}</span>
         </div>
-        {/* Add more details here if needed, e.g., next assignment, upcoming lesson */}
-      </CardContent>
-      <CardFooter>
+        
         {manageClassUrl ? (
-          <Button asChild className="w-full">
-            <Link href={manageClassUrl}>Manage Class</Link>
+          <Button asChild size="sm" variant="outline" className="opacity-0 group-hover:opacity-100 transition-opacity">
+            <Link href={manageClassUrl}>Manage</Link>
           </Button>
         ) : (
-          <Button className="w-full" disabled>
-            Manage Class
+          <Button size="sm" variant="outline" disabled className="opacity-0 group-hover:opacity-100 transition-opacity">
+            Manage
           </Button>
         )}
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 } 
