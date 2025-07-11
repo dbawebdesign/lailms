@@ -56,6 +56,45 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_insights: {
+        Row: {
+          dismissed_at: string | null
+          expires_at: string | null
+          generated_at: string | null
+          generation_prompt_version: number | null
+          id: string
+          insights: Json
+          is_dismissed: boolean | null
+          source_data_hash: string | null
+          user_id: string
+          user_role: Database["public"]["Enums"]["role"]
+        }
+        Insert: {
+          dismissed_at?: string | null
+          expires_at?: string | null
+          generated_at?: string | null
+          generation_prompt_version?: number | null
+          id?: string
+          insights: Json
+          is_dismissed?: boolean | null
+          source_data_hash?: string | null
+          user_id: string
+          user_role: Database["public"]["Enums"]["role"]
+        }
+        Update: {
+          dismissed_at?: string | null
+          expires_at?: string | null
+          generated_at?: string | null
+          generation_prompt_version?: number | null
+          id?: string
+          insights?: Json
+          is_dismissed?: boolean | null
+          source_data_hash?: string | null
+          user_id?: string
+          user_role?: Database["public"]["Enums"]["role"]
+        }
+        Relationships: []
+      }
       lessons: {
         Row: {
           banner_image: string | null
@@ -254,6 +293,10 @@ export type Database = {
           p_last_position?: string
         }
         Returns: string
+      }
+      cleanup_expired_insights: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
     }
     Enums: {

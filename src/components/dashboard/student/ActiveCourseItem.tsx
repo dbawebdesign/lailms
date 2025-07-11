@@ -38,17 +38,17 @@ const ActiveCourseItem: React.FC<ActiveCourseItemProps> = ({
       >
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 dark:from-blue-400/10 dark:to-purple-400/10 group-hover:from-blue-500/20 group-hover:to-purple-500/20 transition-all duration-300">
+          <div className="flex items-start space-x-3 flex-1 min-w-0">
+            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 dark:from-blue-400/10 dark:to-purple-400/10 group-hover:from-blue-500/20 group-hover:to-purple-500/20 transition-all duration-300 flex-shrink-0">
               <Book className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+              <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 leading-tight break-words group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
                 {title}
               </h3>
             </div>
           </div>
-          <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all duration-200 flex-shrink-0" />
+          <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all duration-200 flex-shrink-0 mt-0.5" />
         </div>
 
         {/* Progress */}
