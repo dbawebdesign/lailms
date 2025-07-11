@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
         // Generate new insights
         console.log(`📊 Generating insights for ${user.first_name} ${user.last_name}`);
-        await aiInsightsService.refreshInsights(user.user_id);
+        await aiInsightsService.refreshInsights(supabase, user.user_id);
         processed++;
 
         // Rate limiting - wait 1 second between requests
