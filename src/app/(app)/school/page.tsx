@@ -15,7 +15,7 @@ export default async function AdminDashboardPage() {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("role, first_name, last_name, user_id")
+    .select("role, active_role, additional_roles, first_name, last_name, user_id")
     .eq("user_id", user.id)
     .single<Tables<"profiles">>();
 
@@ -24,8 +24,13 @@ export default async function AdminDashboardPage() {
     redirect("/login?error=profile");
   }
 
-  if (profile.role !== 'admin') {
-    console.warn(`User with role ${profile.role} accessed admin (/school) dashboard. Redirecting.`);
+  // Get current effective role (considering role switching)
+  const currentRole = profile.active_role || profile.role;
+  const additionalRoles = Array.isArray(profile.additional_roles) ? profile.additional_roles as string[] : [];
+  const hasAdminAccess = currentRole === 'admin' || profile.role === 'admin' || additionalRoles.includes('admin');
+
+  if (!hasAdminAccess) {
+    console.warn(`User with role ${currentRole} accessed admin (/school) dashboard. Redirecting.`);
     redirect("/dashboard?error=unauthorized"); 
   }
   
@@ -33,7 +38,7 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="container mx-auto p-4 sm:p-6 md:p-8">
-      <WelcomeCard userName={userName} userRole={profile.role as UserRole} />
+      <WelcomeCard userName={userName} userRole={currentRole as UserRole} />
       <h1 className="text-3xl font-bold mb-6">Welcome, {userName}! (Admin Dashboard - /school)</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

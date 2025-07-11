@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import WelcomeCard from "@/components/dashboard/WelcomeCard";
 import { ActiveClassItem } from "@/components/dashboard/teacher/ActiveClassItem";
 import CourseGenerationProgressWidget from "@/components/dashboard/CourseGenerationProgressWidget";
+import HomeschoolDashboard from "@/components/dashboard/HomeschoolDashboard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BookOpenCheck, ClipboardCheck, AlertTriangle, Info, Users, Sparkles, Activity, TrendingUp, BookOpen, CheckCircle, Target, Eye, Lightbulb, Search } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -583,7 +584,7 @@ export default async function TeacherDashboardPage() {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('user_id, first_name, last_name, role')
+    .select('user_id, first_name, last_name, role, active_role, additional_roles, organisation_id')
     .eq('user_id', user.id)
     .single<Tables<"profiles">>();
 
@@ -592,15 +593,61 @@ export default async function TeacherDashboardPage() {
     redirect("/login?error=profile");
   }
 
-  console.log(`TeacherDashboard: User ID: ${user.id}, Fetched Profile Role: ${profile?.role}`);
+  // Get current effective role (considering role switching)
+  const currentRole = profile.active_role || profile.role;
+  const additionalRoles = Array.isArray(profile.additional_roles) ? profile.additional_roles as string[] : [];
+  const hasTeacherAccess = currentRole === 'teacher' || profile.role === 'teacher' || additionalRoles.includes('teacher');
 
-  if (profile.role !== 'teacher') {
-    console.warn(`TeacherDashboard: Role mismatch. Actual: ${profile.role}, Expected: teacher. Redirecting to /dashboard?error=unauthorized`);
+  console.log(`TeacherDashboard: User ID: ${user.id}, Current Role: ${currentRole}, Has Teacher Access: ${hasTeacherAccess}`);
+
+  if (!hasTeacherAccess) {
+    console.warn(`TeacherDashboard: No teacher access. Current Role: ${currentRole}. Redirecting to /dashboard?error=unauthorized`);
     redirect("/dashboard?error=unauthorized"); 
+  }
+
+  // Get organization information
+  let organization = null;
+  if (profile.organisation_id) {
+    const { data: orgData, error: orgError } = await supabase
+      .from('organisations')
+      .select('id, name, organisation_type, abbreviation')
+      .eq('id', profile.organisation_id)
+      .single();
+
+    if (!orgError && orgData) {
+      organization = orgData;
+    }
   }
 
   const userName = profile.first_name || 'Teacher';
 
+  // Check if this is a homeschool organization
+  const isHomeschoolOrg = organization?.organisation_type === 'individual_family' || organization?.organisation_type === 'coop_network';
+
+  // If it's a homeschool organization, show the HomeschoolDashboard
+  if (isHomeschoolOrg && organization) {
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Header Section */}
+        <div className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container mx-auto px-6 py-8">
+            <WelcomeCard userName={userName} userRole={currentRole} />
+          </div>
+        </div>
+
+        {/* Homeschool Dashboard */}
+        <div className="container mx-auto px-6 py-8">
+          <HomeschoolDashboard 
+            organizationId={organization.id}
+            organizationName={organization.name}
+            userRole={currentRole}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Regular teacher dashboard for non-homeschool organizations
   const [activeClasses, recentActivity, classesNeedingAttention, teachingProgress] = await Promise.all([
     getActiveClassesData(supabase, user.id),
     getRecentStudentActivity(supabase, user.id),
@@ -613,7 +660,7 @@ export default async function TeacherDashboardPage() {
       {/* Header Section */}
       <div className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-6 py-8">
-          <WelcomeCard userName={userName} userRole={profile.role} />
+          <WelcomeCard userName={userName} userRole={currentRole} />
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { User, Bell, Moon, Sun, MessageSquare, LogOut, Mail } from "lucide-react";
+import { User, Bell, Moon, Sun, MessageSquare, LogOut, Mail, Crown, Shield, GraduationCap, BookOpen, Users } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useUIContext } from "@/context/UIContext";
 import { Button } from "@/components/ui/button";
@@ -17,15 +17,44 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { triggerChatLogout } from "@/utils/chatPersistence";
+import { Tables } from "packages/types/db";
 
 // Custom hover class for consistent brand styling
 const buttonHoverClass = "hover:bg-gradient-to-r hover:from-[#6B5DE5]/5 hover:to-[#6B5DE5]/10";
+
+// Role icon mapping
+const roleIcons = {
+  super_admin: Crown,
+  admin: Shield,
+  teacher: GraduationCap,
+  student: BookOpen,
+  parent: Users,
+}
+
+// Role display names
+const roleDisplayNames = {
+  super_admin: "Super Admin",
+  admin: "Admin", 
+  teacher: "Teacher",
+  student: "Student",
+  parent: "Parent",
+}
+
+interface UserProfile {
+  role: string
+  active_role?: string
+  additional_roles?: string[]
+  first_name?: string
+  last_name?: string
+}
 
 const Header = () => {
   const { isPanelVisible, togglePanelVisible } = useUIContext();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isRoleSwitching, setIsRoleSwitching] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -35,6 +64,17 @@ const Header = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email) {
         setUserEmail(session.user.email);
+        
+        // Fetch user profile with roles
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, active_role, additional_roles, first_name, last_name')
+          .eq('user_id', session.user.id)
+          .single();
+          
+        if (profile) {
+          setUserProfile(profile);
+        }
       }
     };
     fetchUser();
@@ -47,6 +87,66 @@ const Header = () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
+
+  const handleRoleSwitch = async (newRole: string) => {
+    if (!userProfile || isRoleSwitching) return;
+    
+    setIsRoleSwitching(true);
+    
+    try {
+      const response = await fetch('/api/auth/switch-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newRole }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Role switch successful:', result);
+        
+        // Update local state
+        setUserProfile({
+          ...userProfile,
+          active_role: newRole
+        });
+        
+        // Redirect to appropriate dashboard based on role
+        const roleRedirects = {
+          super_admin: '/org',
+          admin: '/school', 
+          teacher: '/teach',
+          student: '/learn',
+          parent: '/dashboard'
+        };
+        
+        const redirectPath = roleRedirects[newRole as keyof typeof roleRedirects] || '/dashboard';
+        
+        // Force a full page refresh to ensure layout re-renders with new active_role
+        window.location.href = redirectPath;
+      } else {
+        const error = await response.json();
+        console.error('Role switch failed:', error);
+        // You could add a toast notification here in the future
+        alert(`Failed to switch role: ${error.message || error.error}`);
+      }
+    } catch (error) {
+      console.error('Role switch error:', error);
+    } finally {
+      setIsRoleSwitching(false);
+    }
+  };
+
+  // Get current effective role
+  const currentRole = userProfile?.active_role || userProfile?.role;
+  
+  // Get available roles
+  const availableRoles = userProfile ? [
+    userProfile.role,
+    ...(Array.isArray(userProfile.additional_roles) ? userProfile.additional_roles : [])
+  ].filter((role, index, array) => array.indexOf(role) === index) : [];
+  
+  // Check if user has multiple roles
+  const hasMultipleRoles = availableRoles.length > 1;
 
   return (
     <header className="flex items-center justify-between h-14 sm:h-16 px-4 sm:px-6 border-b border-[#E0E0E0] dark:border-[#333333] bg-background sticky top-0 z-10">
@@ -85,6 +185,52 @@ const Header = () => {
         >
           <Bell className="h-5 w-5" />
         </Button>
+        
+        {/* Role Switcher - Only show for users with multiple roles */}
+        {hasMultipleRoles && currentRole && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={cn("flex items-center space-x-2 h-8", buttonHoverClass)}
+                disabled={isRoleSwitching}
+              >
+                {(() => {
+                  const IconComponent = roleIcons[currentRole as keyof typeof roleIcons];
+                  return IconComponent ? <IconComponent className="h-4 w-4" /> : <User className="h-4 w-4" />;
+                })()}
+                <span className="text-sm font-medium">
+                  {roleDisplayNames[currentRole as keyof typeof roleDisplayNames] || currentRole}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Switch Role</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {availableRoles.map((role) => {
+                const IconComponent = roleIcons[role as keyof typeof roleIcons];
+                const isActive = role === currentRole;
+                
+                return (
+                  <DropdownMenuItem
+                    key={role}
+                    onClick={() => handleRoleSwitch(role)}
+                    disabled={isActive || isRoleSwitching}
+                    className={cn(
+                      "flex items-center space-x-2",
+                      isActive && "bg-neutral-100 dark:bg-neutral-800"
+                    )}
+                  >
+                    {IconComponent && <IconComponent className="h-4 w-4" />}
+                    <span>{roleDisplayNames[role as keyof typeof roleDisplayNames] || role}</span>
+                    {isActive && <span className="ml-auto text-xs text-muted-foreground">Active</span>}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         
         {/* User Profile Dropdown */}
         <DropdownMenu>

@@ -24,7 +24,7 @@ export default async function AppPagesLayout({
   let userRole: UserRole | null = null;
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, active_role, additional_roles')
     .eq('user_id', user.id)
     .single<Tables<'profiles'>>();
 
@@ -33,7 +33,8 @@ export default async function AppPagesLayout({
     redirect('/login?error=profile_critical');
   }
   
-  userRole = profile.role;
+  // Use current effective role (considering role switching)
+  userRole = profile.active_role || profile.role;
 
   if (!userRole) {
     console.error("User role could not be determined in layout, redirecting to login.");
