@@ -22,15 +22,43 @@ export default async function AppPagesLayout({
     redirect('/login?error=auth');
   }
 
+  console.log('Layout: Authenticated user ID:', user.id);
+  console.log('Layout: User email:', user.email);
+
   let userRole: UserRole | null = null;
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select(PROFILE_ROLE_FIELDS)
-    .eq('user_id', user.id)
-    .single<Tables<'profiles'>>();
+  
+  // Try to fetch profile with a retry mechanism for better reliability
+  let profile: Tables<'profiles'> | null = null;
+  let profileError: any = null;
+  
+  for (let attempt = 0; attempt < 3; attempt++) {
+    console.log(`Layout: Profile fetch attempt ${attempt + 1} for user_id: ${user.id}`);
+    
+    const { data, error } = await supabase
+      .from('profiles')
+      .select(PROFILE_ROLE_FIELDS)
+      .eq('user_id', user.id)
+      .single<Tables<'profiles'>>();
+    
+    if (error) {
+      profileError = error;
+      console.error(`Profile fetch attempt ${attempt + 1} failed:`, error);
+      console.error(`Query was: SELECT ${PROFILE_ROLE_FIELDS} FROM profiles WHERE user_id = '${user.id}'`);
+      
+      // Wait a bit before retrying (except on last attempt)
+      if (attempt < 2) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    } else {
+      profile = data;
+      profileError = null;
+      console.log(`Layout: Profile fetch successful on attempt ${attempt + 1}:`, data);
+      break;
+    }
+  }
 
   if (profileError || !profile) {
-    console.error("Error fetching profile for layout or profile not found:", profileError);
+    console.error("Error fetching profile for layout or profile not found after retries:", profileError);
     redirect('/login?error=profile_critical');
   }
   

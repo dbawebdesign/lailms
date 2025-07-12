@@ -47,6 +47,8 @@ export async function POST(req: NextRequest) {
       organisations: { abbr: string } | null;
     }
 
+    console.log('Login API: Looking up profile for username:', username);
+    
     // First, get the organization and role from the profile (including active_role for role switching)
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
@@ -59,6 +61,9 @@ export async function POST(req: NextRequest) {
       `)
       .eq('username', username)
       .single<ProfileWithOrgAndRole>()
+      
+    console.log('Login API: Profile lookup result:', profileData);
+    console.log('Login API: Profile lookup error:', profileError);
 
     if (profileError || !profileData) {
       console.error('Profile fetch error from profiles table:', profileError);
@@ -75,12 +80,16 @@ export async function POST(req: NextRequest) {
 
     // Construct pseudo-email
     const pseudoEmail = `${username}@${orgAbbr}.internal`
+    console.log('Login API: Constructed pseudo-email:', pseudoEmail);
 
     // Sign in with pseudo-email and password
     const { data, error } = await supabase.auth.signInWithPassword({
       email: pseudoEmail,
       password,
     })
+    
+    console.log('Login API: Auth result user ID:', data?.user?.id);
+    console.log('Login API: Auth error:', error);
 
     if (error) {
       return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 })

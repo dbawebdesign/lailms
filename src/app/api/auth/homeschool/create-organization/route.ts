@@ -52,7 +52,9 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (existingOrg) {
-      return NextResponse.json({ error: 'Organization abbreviation already exists' }, { status: 400 })
+      return NextResponse.json({ 
+        error: 'Organization abbreviation already exists. Please choose a different abbreviation.' 
+      }, { status: 400 })
     }
 
     // Start transaction-like operations
@@ -82,16 +84,19 @@ export async function POST(request: NextRequest) {
     organizationId = newOrg.id
 
     // 2. Create organization unit
-    const unitName = body.organizationType === 'individual_family' 
-      ? (body.familyName || `${body.primaryContactInfo.lastName} Family`)
-      : 'Leadership'
+    const isCoop = body.organizationType === 'coop_network';
+    const unitName = isCoop 
+      ? 'Leadership'
+      : (body.familyName || `${body.primaryContactInfo.lastName} Family`);
+
+    const unitType = isCoop ? 'leadership' : 'family';
 
     const { data: newUnit, error: unitError } = await supabase
       .from('organisation_units')
       .insert({
         organisation_id: organizationId,
         name: unitName,
-        unit_type: body.organizationType === 'individual_family' ? 'family' : 'leadership',
+        unit_type: unitType,
         settings: {
           homeschool_type: body.organizationType
         }
@@ -107,19 +112,59 @@ export async function POST(request: NextRequest) {
 
     // 3. Create primary contact user
     const primaryContact = body.primaryContactInfo
-    const pseudoEmail = `${primaryContact.username}@${body.abbreviation}.internal`
 
     // Determine roles based on organization type
     let primaryRole: 'super_admin' | 'admin' | 'teacher' = 'teacher'
     let additionalRoles: string[] = []
 
-    if (body.organizationType === 'individual_family') {
-      primaryRole = 'super_admin'
-      additionalRoles = ['admin', 'teacher']
-    } else {
+    if (isCoop) {
       primaryRole = 'super_admin'
       additionalRoles = ['admin']
+    } else { // individual_family
+      primaryRole = 'super_admin'
+      additionalRoles = ['admin', 'teacher']
     }
+
+    // Generate a unique pseudo-email
+    const generateUniquePseudoEmail = async (baseUsername: string, abbreviation: string): Promise<string> => {
+      const { data: existingUsers } = await supabase.auth.admin.listUsers()
+      // Normalize existing emails to lowercase for case-insensitive comparison
+      const existingEmails = new Set(existingUsers.users.map(user => user.email?.toLowerCase()).filter(Boolean))
+      
+      // Normalize inputs to lowercase
+      const normalizedUsername = baseUsername.toLowerCase()
+      const normalizedAbbreviation = abbreviation.toLowerCase()
+      
+      // Try the base email first
+      let candidateEmail = `${normalizedUsername}@${normalizedAbbreviation}.internal`
+      if (!existingEmails.has(candidateEmail)) {
+        return candidateEmail
+      }
+      
+      // If base email exists, try variations
+      let counter = 1
+      while (counter <= 999) { // Reasonable limit to prevent infinite loops
+        candidateEmail = `${normalizedUsername}${counter}@${normalizedAbbreviation}.internal`
+        if (!existingEmails.has(candidateEmail)) {
+          return candidateEmail
+        }
+        counter++
+      }
+      
+      // If we still can't find a unique email, try with timestamp
+      const timestamp = Date.now().toString().slice(-6) // Last 6 digits of timestamp
+      candidateEmail = `${normalizedUsername}${timestamp}@${normalizedAbbreviation}.internal`
+      if (!existingEmails.has(candidateEmail)) {
+        return candidateEmail
+      }
+      
+      // Final fallback with random string
+      const randomSuffix = Math.random().toString(36).substring(2, 8)
+      return `${normalizedUsername}${randomSuffix}@${normalizedAbbreviation}.internal`
+    }
+
+    const pseudoEmail = await generateUniquePseudoEmail(primaryContact.username, body.abbreviation)
+    console.log('Generated unique email:', pseudoEmail)
 
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
       email: pseudoEmail,
@@ -135,7 +180,13 @@ export async function POST(request: NextRequest) {
     })
 
     if (authError || !authUser) {
-      return NextResponse.json({ error: 'Failed to create primary contact user' }, { status: 500 })
+      console.error('Auth user creation error:', authError)
+      console.error('Attempted email:', pseudoEmail)
+      console.error('Password length:', primaryContact.password.length)
+      return NextResponse.json({ 
+        error: 'Failed to create primary contact user',
+        details: authError?.message || 'Unknown auth error'
+      }, { status: 500 })
     }
 
     primaryContactId = authUser.user.id
@@ -149,13 +200,28 @@ export async function POST(request: NextRequest) {
         first_name: primaryContact.firstName,
         last_name: primaryContact.lastName,
         role: primaryRole,
+        active_role: primaryRole, // Set active_role to match primary role
         additional_roles: additionalRoles,
         organisation_id: organizationId,
         organisation_unit_id: organizationUnitId
       })
 
     if (profileError) {
-      return NextResponse.json({ error: 'Failed to create user profile' }, { status: 500 })
+      console.error('Profile creation error:', profileError)
+      console.error('Profile data:', {
+        user_id: primaryContactId,
+        username: primaryContact.username,
+        first_name: primaryContact.firstName,
+        last_name: primaryContact.lastName,
+        role: primaryRole,
+        additional_roles: additionalRoles,
+        organisation_id: organizationId,
+        organisation_unit_id: organizationUnitId
+      })
+      return NextResponse.json({ 
+        error: 'Failed to create user profile', 
+        details: profileError.message 
+      }, { status: 500 })
     }
 
     // 5. Create family info record (if individual family)

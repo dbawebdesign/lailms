@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { PasswordInput } from '@/components/ui/password-input'
 
 export default function LoginForm() {
   const router = useRouter()
@@ -55,7 +56,10 @@ export default function LoginForm() {
           redirectPath = '/dashboard'; 
       }
 
-      router.push(redirectPath);
+      // Add a small delay to ensure session is fully established before redirecting
+      setTimeout(() => {
+        router.push(redirectPath);
+      }, 100);
     } catch (error: any) {
       setError(error.message || 'Failed to log in')
     } finally {
@@ -96,21 +100,16 @@ export default function LoginForm() {
           />
         </div>
         
-        <div>
-          <label htmlFor="password" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
-            required
-            disabled={isLoading}
-            placeholder="Enter your password"
-          />
-        </div>
+        <PasswordInput
+          id="password"
+          label="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
+          required={true}
+          disabled={isLoading}
+          placeholder="Enter your password"
+        />
         
         <div className="flex justify-end mt-1">
           <Link

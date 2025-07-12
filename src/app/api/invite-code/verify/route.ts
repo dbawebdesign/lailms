@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
         role: string; 
         organisation_id: string; 
         expires_at: string | null;
-        organisations: { id: string; name: string; abbr: string } | null; // Expect single object or null
+        organisations: { id: string; name: string; abbr: string; organisation_type: string; settings: any } | null; // Updated to include organisation_type and settings
     }
 
     // Query the invite code
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
         role, 
         organisation_id, 
         expires_at,
-        organisations:organisation_id (id, name, abbr)
+        organisations:organisation_id (id, name, abbr, organisation_type, settings)
       `)
       .eq('code', code)
       .single<InviteCodeWithOrg>()
@@ -75,6 +75,9 @@ export async function POST(req: NextRequest) {
       organisation: data.organisations ? {
         id: data.organisations.id,
         name: data.organisations.name,
+        type: data.organisations.organisation_type,
+        isHomeschoolCoop: data.organisations.organisation_type === 'coop_network',
+        isIndividualFamily: data.organisations.organisation_type === 'individual_family',
       } : null,
     })
   } catch (error) {

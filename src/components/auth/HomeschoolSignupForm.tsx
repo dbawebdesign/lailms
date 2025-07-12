@@ -6,10 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PasswordInput } from '@/components/ui/password-input'
+import { InviteCodeCopyButton } from '@/components/ui/copy-button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
 import { toast } from '@/components/ui/use-toast'
-import { Loader2, Users, Home, ArrowRight, CheckCircle, Copy, UserPlus, GraduationCap } from 'lucide-react'
+import { Loader2, Users, Home, ArrowRight, CheckCircle, UserPlus, GraduationCap, Building, User } from 'lucide-react'
 import { useInviteCodeClipboard } from '@/hooks/useClipboard'
 
 type HomeschoolType = 'individual_family' | 'coop_network' | ''
@@ -57,6 +59,113 @@ const steps = [
   { id: 4, title: 'Complete', description: 'Setup successful' }
 ]
 
+const CoopSuccessContent = ({ result, onCopy }: { result: OrganizationResult, onCopy: (code: string, role: string) => void }) => {
+  const adminCode = result.inviteCodes.find(c => c.role === 'admin')
+  
+  const handleCopy = async (code: string, description?: string) => {
+    onCopy(code, description || 'invite code')
+    return true
+  }
+  
+  return (
+    <div className="space-y-6">
+      <div className="bg-neutral-50 dark:bg-neutral-800 p-4 rounded-lg">
+        <div className="flex items-center space-x-2 mb-4">
+          <UserPlus className="h-5 w-5 text-neutral-600 dark:text-neutral-400" />
+          <h3 className="font-semibold">Your Co-op Admin Invite Code</h3>
+        </div>
+        <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+          Share this code with parents/teachers to allow them to join your co-op and manage their own families.
+        </p>
+        <div className="space-y-3">
+          {adminCode ? (
+            <div className="flex items-center justify-between p-3 bg-white dark:bg-neutral-700 rounded border">
+              <div className="flex items-center space-x-3">
+                <Building className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                <div>
+                  <code className="font-mono text-sm font-semibold">{adminCode.code}</code>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Co-op Admin/Parent invite code</p>
+                </div>
+              </div>
+              <InviteCodeCopyButton
+                code={adminCode.code}
+                description="Co-op Admin invite code"
+                onCopy={handleCopy}
+              />
+            </div>
+          ) : (
+             <p className="text-sm text-red-500">Admin invite code not found. Please contact support.</p>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg">
+        <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-2">Next Steps</h3>
+        <ol className="list-decimal list-inside space-y-1 text-sm text-amber-800 dark:text-amber-200">
+          <li>Share the Co-op Admin invite code with the parents/teachers in your co-op.</li>
+          <li>They will use this code to create accounts and set up their own family units.</li>
+          <li>Once joined, they will receive their own codes to invite their students (children).</li>
+          <li>Start creating shared courses and lessons in your dashboard for the co-op.</li>
+          <li>Explore the knowledge base and teaching tools.</li>
+        </ol>
+      </div>
+    </div>
+  )
+}
+
+const FamilySuccessContent = ({ result, onCopy }: { result: OrganizationResult, onCopy: (code: string, role: string) => void }) => {
+  const studentCode = result.inviteCodes.find(c => c.role === 'student')
+  
+  const handleCopy = async (code: string, description?: string) => {
+    onCopy(code, description || 'invite code')
+    return true
+  }
+  
+  return (
+    <div className="space-y-6">
+      <div className="bg-neutral-50 dark:bg-neutral-800 p-4 rounded-lg">
+        <div className="flex items-center space-x-2 mb-4">
+          <UserPlus className="h-5 w-5 text-neutral-600 dark:text-neutral-400" />
+          <h3 className="font-semibold">Your Student Invite Code</h3>
+        </div>
+        <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+          Use this code to invite students (your children) to join your homeschool:
+        </p>
+        <div className="space-y-3">
+          {studentCode ? (
+            <div className="flex items-center justify-between p-3 bg-white dark:bg-neutral-700 rounded border">
+              <div className="flex items-center space-x-3">
+                <GraduationCap className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <div>
+                  <code className="font-mono text-sm font-semibold">{studentCode.code}</code>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Student invite code</p>
+                </div>
+              </div>
+              <InviteCodeCopyButton
+                code={studentCode.code}
+                description="Student invite code"
+                onCopy={handleCopy}
+              />
+            </div>
+          ) : (
+            <p className="text-sm text-red-500">Student invite code not found. Please contact support.</p>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg">
+        <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-2">Next Steps</h3>
+        <ol className="list-decimal list-inside space-y-1 text-sm text-amber-800 dark:text-amber-200">
+          <li>Share the student invite code with your children.</li>
+          <li>Help them create their accounts using the code.</li>
+          <li>Start creating courses and lessons in your dashboard.</li>
+          <li>Explore the knowledge base and teaching tools.</li>
+        </ol>
+      </div>
+    </div>
+  )
+}
+
 export default function HomeschoolSignupForm() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
@@ -103,6 +212,10 @@ export default function HomeschoolSignupForm() {
 
 
   const handleSubmit = async () => {
+    console.log('handleSubmit called')
+    console.log('Form data:', formData)
+    console.log('canProceed():', canProceed())
+    
     setIsLoading(true)
     
     try {
@@ -113,6 +226,7 @@ export default function HomeschoolSignupForm() {
           description: "Passwords do not match",
           variant: "destructive"
         })
+        setIsLoading(false)
         return
       }
 
@@ -314,27 +428,21 @@ export default function HomeschoolSignupForm() {
                 />
               </div>
 
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.primaryContactInfo.password}
-                  onChange={(e) => updateContactInfo({ password: e.target.value })}
-                  className="mt-1"
-                />
-              </div>
+              <PasswordInput
+                id="password"
+                label="Password"
+                value={formData.primaryContactInfo.password}
+                onChange={(e) => updateContactInfo({ password: e.target.value })}
+                placeholder="Enter your password"
+              />
 
-              <div>
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={formData.primaryContactInfo.confirmPassword}
-                  onChange={(e) => updateContactInfo({ confirmPassword: e.target.value })}
-                  className="mt-1"
-                />
-              </div>
+              <PasswordInput
+                id="confirmPassword"
+                label="Confirm Password"
+                value={formData.primaryContactInfo.confirmPassword}
+                onChange={(e) => updateContactInfo({ confirmPassword: e.target.value })}
+                placeholder="Confirm your password"
+              />
             </div>
           </div>
         )
@@ -370,50 +478,11 @@ export default function HomeschoolSignupForm() {
                   </p>
                 </div>
 
-                {/* Invite Codes */}
-                <div className="bg-neutral-50 dark:bg-neutral-800 p-4 rounded-lg">
-                  <div className="flex items-center space-x-2 mb-4">
-                    <UserPlus className="h-5 w-5 text-neutral-600 dark:text-neutral-400" />
-                    <h3 className="font-semibold">Your Invite Codes</h3>
-                  </div>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-                    Use these codes to invite students (your children) to join your homeschool:
-                  </p>
-                  
-                  <div className="space-y-3">
-                    {organizationResult.inviteCodes
-                      .filter(code => code.role === 'student')
-                      .map((inviteCode, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-white dark:bg-neutral-700 rounded border">
-                        <div className="flex items-center space-x-3">
-                          <GraduationCap className="h-4 w-4 text-green-600 dark:text-green-400" />
-                          <div>
-                            <code className="font-mono text-sm font-semibold">{inviteCode.code}</code>
-                            <p className="text-xs text-neutral-500 dark:text-neutral-400">Student invite code</p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyToClipboard(inviteCode.code, 'Student invite code')}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Next Steps */}
-                <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg">
-                  <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-2">Next Steps</h3>
-                  <ol className="list-decimal list-inside space-y-1 text-sm text-amber-800 dark:text-amber-200">
-                    <li>Share student invite codes with your children</li>
-                    <li>Help them create their accounts using the codes</li>
-                    <li>Start creating courses and lessons in your dashboard</li>
-                    <li>Explore the knowledge base and teaching tools</li>
-                  </ol>
-                </div>
+                {organizationResult.organization.type === 'coop_network' ? (
+                  <CoopSuccessContent result={organizationResult} onCopy={copyToClipboard} />
+                ) : (
+                  <FamilySuccessContent result={organizationResult} onCopy={copyToClipboard} />
+                )}
 
                 <div className="flex space-x-3">
                   <Button 

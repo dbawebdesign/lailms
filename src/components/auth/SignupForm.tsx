@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 // import { Button } from '@learnologyai/ui' // Temporarily comment out
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { toast } from 'sonner'
+import CoopFamilySignupForm from './CoopFamilySignupForm'
 
 interface InviteCodeData {
   valid: boolean
@@ -12,6 +14,9 @@ interface InviteCodeData {
   organisation: {
     id: string
     name: string
+    type: string
+    isHomeschoolCoop: boolean
+    isIndividualFamily: boolean
   }
 }
 
@@ -58,7 +63,14 @@ export default function SignupForm() {
 
       console.log('[SignupForm] Verified invite code:', trimmedCode)
       setInviteCodeData(data)
-      setStep(2) // Move to next step
+      
+      // Check if this is a co-op admin code - if so, show co-op family signup
+      if (data.organisation?.isHomeschoolCoop && data.role === 'admin') {
+        setStep(3) // Co-op family signup
+      } else {
+        setStep(2) // Regular signup
+      }
+      
       setIsLoading(false) // Reset loading state for step 2
     } catch (error) {
       setIsLoading(false)
@@ -66,6 +78,13 @@ export default function SignupForm() {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
       toast.error(`Invite code verification failed: ${errorMessage}`)
     }
+  }
+
+  // Handle going back to step 1
+  const handleBack = () => {
+    setStep(1)
+    setInviteCodeData(null)
+    setError('')
   }
 
   // Step 2: Submit signup form
@@ -163,128 +182,133 @@ export default function SignupForm() {
   }
 
   // Render Step 2: Account Creation
-  return (
-    <div className="w-full max-w-md p-8 bg-white dark:bg-neutral-900 rounded-xl shadow-2xl dark:shadow-neutral-950/50">
-      <h2 className="text-3xl font-semibold mb-2 text-center text-neutral-800 dark:text-neutral-100">Create Your Account</h2>
-      
-      {inviteCodeData && (
-        <p className="text-green-600 dark:text-green-400 mb-6 text-center text-sm">
-          Welcome to {inviteCodeData.organisation.name}! You're signing up as a {inviteCodeData.role}.
-        </p>
-      )}
-      
-      {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 dark:bg-red-800/30 dark:text-red-300 rounded-md">
-          {error}
-        </div>
-      )}
-      
-      <form onSubmit={handleSignup} className="space-y-5">
-        <div className="grid grid-cols-2 gap-4">
+  if (step === 2) {
+    return (
+      <div className="w-full max-w-md p-8 bg-white dark:bg-neutral-900 rounded-xl shadow-2xl dark:shadow-neutral-950/50">
+        <h2 className="text-3xl font-semibold mb-2 text-center text-neutral-800 dark:text-neutral-100">Create Your Account</h2>
+        
+        {inviteCodeData && (
+          <p className="text-green-600 dark:text-green-400 mb-6 text-center text-sm">
+            Welcome to {inviteCodeData.organisation.name}! You're signing up as a {inviteCodeData.role}.
+          </p>
+        )}
+        
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 dark:bg-red-800/30 dark:text-red-300 rounded-md">
+            {error}
+          </div>
+        )}
+        
+        <form onSubmit={handleSignup} className="space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="firstName" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
+                First Name
+              </label>
+              <Input
+                id="firstName"
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
+                required
+                disabled={isLoading}
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="lastName" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
+                Last Name
+              </label>
+              <Input
+                id="lastName"
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
+                required
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+          
           <div>
-            <label htmlFor="firstName" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
-              First Name
+            <label htmlFor="username" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
+              Username
             </label>
             <Input
-              id="firstName"
+              id="username"
               type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
               required
               disabled={isLoading}
             />
           </div>
           
-          <div>
-            <label htmlFor="lastName" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
-              Last Name
-            </label>
-            <Input
-              id="lastName"
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
-              required
-              disabled={isLoading}
-            />
-          </div>
-        </div>
-        
-        <div>
-          <label htmlFor="username" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
-            Username
-          </label>
-          <Input
-            id="username"
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
-            required
-            disabled={isLoading}
-          />
-        </div>
-        
-        <div>
-          <label htmlFor="password" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
-            Password
-          </label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
+            label="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
-            required
+            required={true}
             disabled={isLoading}
-            minLength={8}
+            placeholder="Enter your password (min 8 characters)"
           />
-        </div>
-        
-        <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
-            Confirm Password
-          </label>
-          <Input
+          
+          <PasswordInput
             id="confirmPassword"
-            type="password"
+            label="Confirm Password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
-            required
+            required={true}
             disabled={isLoading}
-            minLength={8}
+            placeholder="Confirm your password"
           />
-        </div>
-        
-        {inviteCodeData?.role === 'student' && (
-          <div>
-            <label htmlFor="gradeLevel" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
-              Grade Level (e.g., 9, 10, 11, 12)
-            </label>
-            <Input
-              id="gradeLevel"
-              type="text" // Changed to text for flexibility, can be number if strict
-              value={gradeLevel}
-              onChange={(e) => setGradeLevel(e.target.value)}
-              className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
-              // required // Grade level might be optional depending on requirements
-              placeholder="e.g., 10"
-              disabled={isLoading}
-            />
-          </div>
-        )}
-        
-        <button
-          type="submit"
-          className="w-full mt-8 py-3 px-4 bg-neutral-800 text-neutral-100 font-semibold rounded-lg hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:focus:ring-offset-black dark:focus:ring-neutral-500 disabled:opacity-50 transition-colors duration-150"
-          disabled={isLoading}
-        >
-          {isLoading ? 'Creating Account...' : 'Sign Up'}
-        </button>
-      </form>
-    </div>
-  )
+          
+          {inviteCodeData?.role === 'student' && (
+            <div>
+              <label htmlFor="gradeLevel" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
+                Grade Level (e.g., 9, 10, 11, 12)
+              </label>
+              <Input
+                id="gradeLevel"
+                type="text" // Changed to text for flexibility, can be number if strict
+                value={gradeLevel}
+                onChange={(e) => setGradeLevel(e.target.value)}
+                className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
+                // required // Grade level might be optional depending on requirements
+                placeholder="e.g., 10"
+                disabled={isLoading}
+              />
+            </div>
+          )}
+          
+          <button
+            type="submit"
+            className="w-full mt-8 py-3 px-4 bg-neutral-800 text-neutral-100 font-semibold rounded-lg hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:focus:ring-offset-black dark:focus:ring-neutral-500 disabled:opacity-50 transition-colors duration-150"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Creating Account...' : 'Sign Up'}
+          </button>
+        </form>
+      </div>
+    )
+  }
+
+  // Render Step 3: Co-op Family Signup
+  if (step === 3) {
+    return (
+      <CoopFamilySignupForm
+        inviteCode={inviteCode}
+        organizationName={inviteCodeData?.organisation.name || 'Homeschool Co-op'}
+        onBack={handleBack}
+      />
+    )
+  }
+
+  return null; // Should not happen if steps are handled correctly
 } 
