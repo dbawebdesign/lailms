@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useLunaContext } from '@/hooks/useLunaContext';
 import { PersonaType, ChatMessage } from '@/components/LunaAIChat';
-import { UserRole } from '@/config/navConfig';
+import { UserRole } from '@/lib/utils/roleUtils';
 import { CourseOutlineMessage } from '@/components/luna/CourseOutlineMessage';
 import KBSourceCollectionMessage from '@/components/luna/KBSourceCollectionMessage';
 import EnhancedCourseGenerationMessage from '@/components/luna/EnhancedCourseGenerationMessage';

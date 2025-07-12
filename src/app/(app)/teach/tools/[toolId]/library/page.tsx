@@ -4,6 +4,7 @@ import { TeacherToolLibrary } from "@/components/teach/tools/TeacherToolLibrary"
 import { teachingTools } from "@/config/teachingTools";
 import { Tables } from "packages/types/db";
 
+import { PROFILE_ROLE_FIELDS, hasTeacherPermissions } from '@/lib/utils/roleUtils';
 interface ToolLibraryPageProps {
   params: Promise<{
     toolId: string;
@@ -24,11 +25,16 @@ export default async function ToolLibraryPage({ params }: ToolLibraryPageProps) 
   // Get user profile to verify teacher role
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role, organisation_id')
+    .select(PROFILE_ROLE_FIELDS + ', organisation_id')
     .eq('user_id', user.id)
     .single<Tables<"profiles">>();
 
-  if (profileError || !profile || profile.role !== 'teacher') {
+  if (profileError || !profile) {
+    redirect('/');
+  }
+
+  // Check if user has teacher permissions (using centralized role checking)
+  if (!hasTeacherPermissions(profile)) {
     redirect('/');
   }
 

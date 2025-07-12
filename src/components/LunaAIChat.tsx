@@ -25,7 +25,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/navigation';
 import { CourseOutlineMessage } from '@/components/luna/CourseOutlineMessage';
-import type { UserRole } from "@/config/navConfig"; // Import UserRole for the prop
+import type { UserRole } from "@/lib/utils/roleUtils"; // Import UserRole for the prop
 
 // Define a structure for the course outline from the API
 interface CourseOutlineModule {

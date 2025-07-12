@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { aiInsightsService } from '@/lib/services/ai-insights';
 import { NextRequest, NextResponse } from 'next/server';
 
+import { isTeacher, isStudent, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 export async function GET(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
     // Step 3: Test data gathering
     let userData = null;
     try {
-      if (profile.role === 'student') {
+      if (isStudent(profile)) {
         // Test student data gathering
         const { data: courses } = await supabase
           .from('rosters')
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
           upcomingAssignments: [],
           grades: []
         };
-      } else if (profile.role === 'teacher') {
+      } else if (isTeacher(profile)) {
         // Test teacher data gathering
         const { data: classes } = await supabase
           .from('rosters')

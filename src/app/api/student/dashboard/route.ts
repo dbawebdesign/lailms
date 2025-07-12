@@ -1,11 +1,10 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import type { UserRole } from "@/config/navConfig";
+import type { UserRole } from "@/lib/utils/roleUtils";
 import { ActiveCourseItemProps } from "@/components/dashboard/student/ActiveCourseItem";
 import { Tables } from "packages/types/db";
 import { calculateOverallProgress } from "@/lib/student/progress.server";
-
-
+import { isStudent, getEffectiveRole, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 
 // Helper function to fetch Active Courses data
 async function getActiveCoursesData(supabase: any, userId: string): Promise<ActiveCourseItemProps[]> {
@@ -89,7 +88,7 @@ export async function GET() {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("role, first_name, last_name, user_id")
+      .select(PROFILE_ROLE_FIELDS)
       .eq("user_id", user.id)
       .single<Tables<"profiles">>();
 
@@ -98,17 +97,19 @@ export async function GET() {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
     }
     
-    if (profile.role !== 'student') {
-      console.warn(`User role mismatch: ${profile.role}, expected student`);
+    if (!isStudent(profile)) {
+      const currentRole = getEffectiveRole(profile);
+      console.warn(`User role mismatch: ${currentRole}, expected student`);
       return NextResponse.json({ error: 'Unauthorized - not a student' }, { status: 403 });
     }
     
     const userName = profile.first_name || user.email || "Learner";
     const activeCourses = await getActiveCoursesData(supabase, user.id);
+    const currentRole = getEffectiveRole(profile);
 
     return NextResponse.json({
       userName,
-      userRole: profile.role as UserRole,
+      userRole: currentRole as UserRole,
       activeCourses,
     });
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import type { UserRole } from "@/config/navConfig";
+import type { UserRole } from "@/lib/utils/roleUtils";
 import { cn } from '@/lib/utils';
 import { Sparkles, RefreshCw, X, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';

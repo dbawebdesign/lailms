@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useLunaContext } from '@/hooks/useLunaContext';
 import { useRealTimeUpdates } from '@/hooks/useRealTimeUpdates';
 import { PersonaType, ChatMessage } from '@/components/LunaAIChat';
-import { UserRole } from '@/config/navConfig';
+import { UserRole } from '@/lib/utils/roleUtils';
 import { createClient } from '@/lib/supabase/client';
 import { 
   Menu, 

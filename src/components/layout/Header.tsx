@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { triggerChatLogout } from "@/utils/chatPersistence";
 import { Tables } from "packages/types/db";
+import { PROFILE_ROLE_FIELDS, UserProfile } from "@/lib/utils/roleUtils";
 
 // Custom hover class for consistent brand styling
 const buttonHoverClass = "hover:bg-gradient-to-r hover:from-[#6B5DE5]/5 hover:to-[#6B5DE5]/10";
@@ -40,13 +41,7 @@ const roleDisplayNames = {
   parent: "Parent",
 }
 
-interface UserProfile {
-  role: string
-  active_role?: string
-  additional_roles?: string[]
-  first_name?: string
-  last_name?: string
-}
+// UserProfile type is now imported from roleUtils above
 
 const Header = () => {
   const { isPanelVisible, togglePanelVisible } = useUIContext();
@@ -66,13 +61,13 @@ const Header = () => {
         setUserEmail(session.user.email);
         
         // Fetch user profile with roles
-        const { data: profile } = await supabase
+        const { data: profile, error } = await supabase
           .from('profiles')
-          .select('role, active_role, additional_roles, first_name, last_name')
+          .select(PROFILE_ROLE_FIELDS + ', first_name, last_name')
           .eq('user_id', session.user.id)
-          .single();
+          .single<UserProfile>();
           
-        if (profile) {
+        if (profile && !error) {
           setUserProfile(profile);
         }
       }
@@ -88,7 +83,7 @@ const Header = () => {
     router.push("/login");
   };
 
-  const handleRoleSwitch = async (newRole: string) => {
+  const handleRoleSwitch = async (newRole: UserProfile['role']) => {
     if (!userProfile || isRoleSwitching) return;
     
     setIsRoleSwitching(true);
@@ -140,9 +135,12 @@ const Header = () => {
   const currentRole = userProfile?.active_role || userProfile?.role;
   
   // Get available roles
+  const additionalRoles = userProfile?.additional_roles 
+    ? (Array.isArray(userProfile.additional_roles) ? userProfile.additional_roles as string[] : [])
+    : [];
   const availableRoles = userProfile ? [
     userProfile.role,
-    ...(Array.isArray(userProfile.additional_roles) ? userProfile.additional_roles : [])
+    ...additionalRoles
   ].filter((role, index, array) => array.indexOf(role) === index) : [];
   
   // Check if user has multiple roles
@@ -215,7 +213,7 @@ const Header = () => {
                 return (
                   <DropdownMenuItem
                     key={role}
-                    onClick={() => handleRoleSwitch(role)}
+                    onClick={() => handleRoleSwitch(role as UserProfile['role'])}
                     disabled={isActive || isRoleSwitching}
                     className={cn(
                       "flex items-center space-x-2",

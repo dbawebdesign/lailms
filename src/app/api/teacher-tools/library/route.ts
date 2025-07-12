@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { TeacherToolCreationInput, ToolLibraryFilters, ToolLibrarySort } from '@/types/teachingTools';
 import { Tables, Json } from 'packages/types/db';
+import { isTeacher, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,11 +17,11 @@ export async function GET(request: NextRequest) {
     // Get user profile to verify teacher role
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('role')
+      .select(PROFILE_ROLE_FIELDS)
       .eq('user_id', user.id)
       .single<Tables<'profiles'>>();
 
-    if (profileError || !profile || (profile as any).role !== 'teacher') {
+    if (profileError || !profile || !isTeacher(profile)) {
       return NextResponse.json({ error: 'Access denied. Teacher role required.' }, { status: 403 });
     }
 
@@ -123,11 +124,11 @@ export async function POST(request: NextRequest) {
     // Get user profile to verify teacher role
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('role')
+      .select(PROFILE_ROLE_FIELDS)
       .eq('user_id', user.id)
       .single<Tables<'profiles'>>();
 
-    if (profileError || !profile || (profile as any).role !== 'teacher') {
+    if (profileError || !profile || !isTeacher(profile)) {
       return NextResponse.json({ error: 'Access denied. Teacher role required.' }, { status: 403 });
     }
 

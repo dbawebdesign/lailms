@@ -29,6 +29,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ClassInstanceHeader } from "@/components/teach/ClassInstanceHeader";
 import { Tables } from "packages/types/db";
+import { PROFILE_ROLE_FIELDS, hasTeacherPermissions } from "@/lib/utils/roleUtils";
 
 interface ClassInstanceData {
   id: string;
@@ -367,11 +368,16 @@ export default async function ClassInstancePage({
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('user_id, first_name, last_name, role')
+    .select(`${PROFILE_ROLE_FIELDS}, user_id, first_name, last_name`)
     .eq('user_id', user.id)
     .single<Tables<"profiles">>();
 
-  if (profileError || !profile || profile.role !== 'teacher') {
+  if (profileError || !profile) {
+    redirect("/dashboard?error=unauthorized");
+  }
+
+  // Check if user has teacher permissions using centralized role checking
+  if (!hasTeacherPermissions(profile)) {
     redirect("/dashboard?error=unauthorized");
   }
 

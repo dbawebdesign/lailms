@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 
+import { PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 // Validation schema for the API
 const feedbackSupportSchema = z.object({
   category: z.enum(['feedback', 'support', 'bug_report']),
@@ -114,7 +115,7 @@ export async function GET(request: NextRequest) {
     // Get user's profile to check if they're an admin
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('user_id, organisation_id, role')
+      .select(PROFILE_ROLE_FIELDS + ', user_id, organisation_id')
       .eq('user_id', user.id)
       .single();
 

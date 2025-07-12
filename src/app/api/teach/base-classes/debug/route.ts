@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Tables } from 'packages/types/db';
 import { createClient } from '@supabase/supabase-js';
 
+import { PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 export async function GET(request: Request) {
   const supabase = createSupabaseServerClient();
   
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
     // 2. Try to get the user's profile
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('user_id, organisation_id, role, created_at')
+      .select(PROFILE_ROLE_FIELDS + ', user_id, organisation_id, created_at')
       .eq('user_id', userId)
       .single<Tables<'profiles'>>();
     

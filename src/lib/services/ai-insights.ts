@@ -1,6 +1,7 @@
 import { Tables } from 'packages/types/db';
 import OpenAI from 'openai';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { isStudent, isTeacher, getEffectiveRole } from '@/lib/utils/roleUtils';
 
 export interface AIInsight {
   id: string;
@@ -104,12 +105,12 @@ class AIInsightsService {
 
     const data: UserInsightsData = { profile };
 
-    if (profile.role === 'student') {
+    if (isStudent(profile)) {
       data.activeCourses = await this.getStudentActiveCourses(supabase, userId);
       data.recentProgress = await this.getStudentProgress(supabase, userId);
       data.upcomingAssignments = await this.getUpcomingAssignments(supabase, userId);
       data.grades = await this.getRecentGrades(supabase, userId);
-    } else if (profile.role === 'teacher') {
+    } else if (isTeacher(profile)) {
       data.activeClasses = await this.getTeacherActiveClasses(supabase, userId);
       data.studentPerformance = await this.getStudentPerformanceData(supabase, userId);
       data.gradingQueue = await this.getGradingQueue(supabase, userId);
@@ -172,9 +173,10 @@ class AIInsightsService {
 
   private buildInsightPrompt(userData: UserInsightsData): string {
     const { profile } = userData;
-    let prompt = `User Profile: ${profile.role} - ${profile.first_name} ${profile.last_name}\n\n`;
+    const effectiveRole = getEffectiveRole(profile);
+    let prompt = `User Profile: ${effectiveRole} - ${profile.first_name} ${profile.last_name}\n\n`;
 
-    if (profile.role === 'student') {
+    if (isStudent(profile)) {
       prompt += `Student Data:\n`;
       prompt += `- Active Courses: ${userData.activeCourses?.length || 0}\n`;
       if (userData.activeCourses && userData.activeCourses.length > 0) {
@@ -183,7 +185,7 @@ class AIInsightsService {
       prompt += `- Recent Progress: ${userData.recentProgress?.length || 0} recent activities\n`;
       prompt += `- Upcoming Assignments: ${userData.upcomingAssignments?.length || 0}\n`;
       prompt += `- Recent Grades: ${userData.grades?.length || 0} recent grades\n`;
-    } else if (profile.role === 'teacher') {
+    } else if (isTeacher(profile)) {
       prompt += `Teacher Data:\n`;
       prompt += `- Active Class Instances: ${userData.activeClasses?.length || 0}\n`;
       if (userData.activeClasses && userData.activeClasses.length > 0) {

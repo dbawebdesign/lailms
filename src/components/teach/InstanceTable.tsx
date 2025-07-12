@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { MoreHorizontal, Copy, Eye, Edit2, ArchiveIcon, Users } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
+import { useEnrollmentCodeClipboard } from "@/hooks/useClipboard";
 
 interface InstanceTableProps {
   instances: ClassInstance[];
@@ -40,22 +41,7 @@ export const InstanceTable: React.FC<InstanceTableProps> = ({
   onViewStudents,
 }) => {
   const { toast } = useToast();
-
-  const copyToClipboard = (text: string, fieldName: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast({
-        title: `${fieldName} Copied!`,
-        description: `${text} copied to clipboard.`,
-      });
-    }).catch(err => {
-      console.error("Failed to copy:", err);
-      toast({
-        title: "Copy Failed",
-        description: "Could not copy text to clipboard.",
-        variant: "destructive",
-      });
-    });
-  };
+  const { copy: copyToClipboard } = useEnrollmentCodeClipboard();
 
   if (!instances || instances.length === 0) {
     return (

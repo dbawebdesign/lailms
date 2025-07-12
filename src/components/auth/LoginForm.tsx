@@ -32,7 +32,7 @@ export default function LoginForm() {
         throw new Error(data.error || 'Invalid username or password')
       }
 
-      // Redirect based on role
+      // Redirect based on effective role (API returns active_role || role to handle role switching)
       const userRole = data.role?.toUpperCase(); // Ensure role is uppercase for consistent matching
       let redirectPath = '/dashboard'; // Default redirect
 

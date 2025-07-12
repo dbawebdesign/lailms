@@ -33,6 +33,7 @@ import {
 import { MoreHorizontal, Copy, Edit2, ArchiveIcon, Users, ExternalLink, Filter } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
+import { useEnrollmentCodeClipboard } from "@/hooks/useClipboard";
 
 interface AllInstancesTableProps {
   instances: EnrichedClassInstance[];
@@ -56,18 +57,7 @@ export const AllInstancesTable: React.FC<AllInstancesTableProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortColumn, setSortColumn] = useState<SortableColumn>("created_at");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-
-  const copyToClipboard = (text: string, fieldName: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast({
-        title: `${fieldName} Copied!`,
-        description: `${text} copied to clipboard.`,
-      });
-    }).catch(err => {
-      console.error("Failed to copy:", err);
-      toast({ title: "Copy Failed", description: "Could not copy text to clipboard.", variant: "destructive" });
-    });
-  };
+  const { copy: copyToClipboard } = useEnrollmentCodeClipboard();
 
   const filteredAndSortedInstances = useMemo(() => {
     let filtered = [...instances];

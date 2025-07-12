@@ -1,8 +1,9 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import type { UserRole } from "@/config/navConfig";
+import type { UserRole } from "@/lib/utils/roleUtils";
 import WelcomeCard from "@/components/dashboard/WelcomeCard";
 import { Tables } from "packages/types/db";
+import { getEffectiveRole, isAdmin, PROFILE_ROLE_FIELDS } from "@/lib/utils/roleUtils";
 
 export default async function AdminDashboardPage() {
   const supabase = createSupabaseServerClient();
@@ -15,7 +16,7 @@ export default async function AdminDashboardPage() {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("role, active_role, additional_roles, first_name, last_name, user_id")
+    .select(PROFILE_ROLE_FIELDS + ", first_name, last_name, user_id")
     .eq("user_id", user.id)
     .single<Tables<"profiles">>();
 
@@ -24,17 +25,17 @@ export default async function AdminDashboardPage() {
     redirect("/login?error=profile");
   }
 
-  // Get current effective role (considering role switching)
-  const currentRole = profile.active_role || profile.role;
-  const additionalRoles = Array.isArray(profile.additional_roles) ? profile.additional_roles as string[] : [];
-  const hasAdminAccess = currentRole === 'admin' || profile.role === 'admin' || additionalRoles.includes('admin');
+  // Check if user has admin access
+  const hasAdminAccess = isAdmin(profile);
 
   if (!hasAdminAccess) {
+    const currentRole = getEffectiveRole(profile);
     console.warn(`User with role ${currentRole} accessed admin (/school) dashboard. Redirecting.`);
     redirect("/dashboard?error=unauthorized"); 
   }
   
   const userName = profile.first_name || user.email || "Administrator";
+  const currentRole = getEffectiveRole(profile);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 md:p-8">

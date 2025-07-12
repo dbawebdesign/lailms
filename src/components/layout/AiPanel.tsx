@@ -6,7 +6,7 @@ import { X } from 'lucide-react';
 import { useUIContext } from '@/context/UIContext';
 import { LunaIntegration } from '@/components/luna/LunaIntegration';
 import { cn } from '@/lib/utils';
-import type { UserRole } from "@/config/navConfig"; // Import UserRole
+import type { UserRole } from "@/lib/utils/roleUtils"; // Import UserRole
 
 // Reuse the same hover class for consistency across components
 const buttonHoverClass = "hover:bg-gradient-to-r hover:from-[#6B5DE5]/5 hover:to-[#6B5DE5]/10";

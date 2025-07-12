@@ -24,6 +24,7 @@ import {
   MessageCircle,
   Wrench,
 } from "lucide-react";
+import { UserRole } from "@/lib/utils/roleUtils";
 
 export type NavItem = {
   title: string;
@@ -33,8 +34,6 @@ export type NavItem = {
   children?: NavItem[]; // For collapsible groups
   isBottom?: boolean; // To group items at the bottom
 };
-
-export type UserRole = "admin" | "teacher" | "student" | "parent" | "super_admin";
 
 // Helper function to create common bottom items
 const createBottomNavItems = (roles: UserRole[]): NavItem[] => [

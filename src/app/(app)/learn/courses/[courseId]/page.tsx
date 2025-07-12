@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { notFound, redirect } from 'next/navigation';
-import { UserRole } from '@/config/navConfig';
+import { UserRole } from '@/lib/utils/roleUtils';
 import WelcomeCard from '@/components/dashboard/WelcomeCard';
 import StudentCourseNavigationTree from '@/components/student/StudentCourseNavigationTree';
 import { Tables } from 'packages/types/db';

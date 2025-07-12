@@ -90,7 +90,7 @@ export function useClassInstance(classInstanceId: string): UseClassInstanceRetur
           email: profile?.email || '',
           avatar_url: profile?.avatar_url || undefined,
           enrolled_at: student.enrolled_at,
-          role: profile?.role || 'student'
+          role: (profile?.active_role || profile?.role) as 'teacher' | 'student' | 'admin' || 'student'
         }
       })
 

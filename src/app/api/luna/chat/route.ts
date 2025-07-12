@@ -3,6 +3,7 @@ import { SerializedUIContext } from '@/context/LunaContextProvider';
 import OpenAI from 'openai';
 import { z } from 'zod';
 
+import { isTeacher, isStudent, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 // Add a helper function to get the base URL from request headers
 function getBaseURL(request?: Request): string {
   console.log('[getBaseURL] Starting URL resolution...');
@@ -1552,7 +1553,7 @@ You are Luna, an advanced AI assistant integrated into the LearnologyAI educatio
 - Use bullet points or numbered lists when explaining multiple concepts
 
 ${userProfile?.first_name ? `# 👋 Personal Context
-You are helping ${userProfile.first_name}${userProfile.role === 'student' ? ', a student,' : userProfile.role === 'teacher' ? ', a teacher,' : ''} who is currently working on the LearnologyAI platform.` : ''}
+You are helping ${userProfile.first_name}${isStudent(userProfile) ? ', a student,' : isTeacher(userProfile) ? ', a teacher,' : ''} who is currently working on the LearnologyAI platform.` : ''}
 
 ${chatHistory && chatHistory.length > 0 ? `
 # 🚨 CONVERSATION CONTINUITY ALERT
@@ -2703,7 +2704,7 @@ export async function POST(request: Request) {
         // Get user's profile including first name
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('user_id, first_name, last_name, role')
+          .select(`${PROFILE_ROLE_FIELDS}, user_id, first_name, last_name`)
           .eq('user_id', user.id)
           .single();
           

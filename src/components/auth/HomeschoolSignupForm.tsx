@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
 import { toast } from '@/components/ui/use-toast'
 import { Loader2, Users, Home, ArrowRight, CheckCircle, Copy, UserPlus, GraduationCap } from 'lucide-react'
+import { useInviteCodeClipboard } from '@/hooks/useClipboard'
 
 type HomeschoolType = 'individual_family' | 'coop_network' | ''
 
@@ -61,6 +62,7 @@ export default function HomeschoolSignupForm() {
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [organizationResult, setOrganizationResult] = useState<OrganizationResult | null>(null)
+  const { copy: copyToClipboard } = useInviteCodeClipboard()
   const [formData, setFormData] = useState<SignupFormData>({
     organizationType: '',
     organizationName: '',
@@ -98,21 +100,7 @@ export default function HomeschoolSignupForm() {
     }
   }
 
-  const copyToClipboard = async (text: string, description: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      toast({
-        title: "Copied!",
-        description: `${description} copied to clipboard`,
-      })
-    } catch (error) {
-      toast({
-        title: "Copy failed",
-        description: "Please select and copy the code manually",
-        variant: "destructive"
-      })
-    }
-  }
+
 
   const handleSubmit = async () => {
     setIsLoading(true)

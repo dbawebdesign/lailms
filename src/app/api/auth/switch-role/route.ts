@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { Tables } from 'packages/types/db'
+import { PROFILE_ROLE_FIELDS, UserRole } from '@/lib/utils/roleUtils'
 
 interface SwitchRoleRequest {
-  newRole: 'super_admin' | 'admin' | 'teacher' | 'student' | 'parent'
+  newRole: UserRole
 }
 
 export async function POST(request: NextRequest) {
@@ -25,9 +26,9 @@ export async function POST(request: NextRequest) {
     // Get current user profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('user_id, role, additional_roles, active_role, organisation_id, first_name, last_name')
+      .select(PROFILE_ROLE_FIELDS + ', user_id, organisation_id, first_name, last_name')
       .eq('user_id', user.id)
-      .single()
+      .single<Tables<'profiles'>>()
 
     if (profileError || !profile) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
@@ -108,7 +109,7 @@ export async function GET() {
     // Get current user profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('user_id, role, additional_roles, active_role, organisation_id, first_name, last_name')
+      .select(PROFILE_ROLE_FIELDS + ', user_id, organisation_id, first_name, last_name')
       .eq('user_id', user.id)
       .single<Tables<'profiles'>>()
 

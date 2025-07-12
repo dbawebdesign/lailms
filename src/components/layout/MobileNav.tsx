@@ -4,7 +4,8 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import navConfig, { NavItem, UserRole } from "@/config/navConfig";
+import navConfig, { NavItem } from "@/config/navConfig";
+import { UserRole } from "@/lib/utils/roleUtils";
 import { useUIContext } from "@/context/UIContext";
 import { MoreHorizontal, X } from "lucide-react";
 import {

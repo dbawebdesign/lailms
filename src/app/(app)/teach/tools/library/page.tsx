@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { TeacherToolLibrary } from "@/components/teach/tools/TeacherToolLibrary";
 import { Tables } from "packages/types/db";
 
+import { PROFILE_ROLE_FIELDS, hasTeacherPermissions } from '@/lib/utils/roleUtils';
 export default async function TeacherToolLibraryPage() {
   const supabase = createSupabaseServerClient();
 
@@ -16,11 +17,16 @@ export default async function TeacherToolLibraryPage() {
   // Get user profile to verify teacher role
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role, organisation_id')
+    .select(PROFILE_ROLE_FIELDS + ', organisation_id')
     .eq('user_id', user.id)
     .single<Tables<"profiles">>();
 
-  if (profileError || !profile || profile.role !== 'teacher') {
+  if (profileError || !profile) {
+    redirect('/');
+  }
+
+  // Check if user has teacher permissions (using centralized role checking)
+  if (!hasTeacherPermissions(profile)) {
     redirect('/');
   }
 

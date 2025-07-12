@@ -6,6 +6,7 @@ import { BookOpen } from "lucide-react";
 import Link from "next/link";
 import { Tables } from "packages/types/db";
 
+import { PROFILE_ROLE_FIELDS, hasTeacherPermissions } from '@/lib/utils/roleUtils';
 export default async function TeacherToolsPage() {
   const supabase = createSupabaseServerClient();
 
@@ -16,14 +17,19 @@ export default async function TeacherToolsPage() {
     redirect('/login');
   }
 
-  // Get user profile to verify teacher role
+  // Get user profile to verify teacher role (check active role for role switching)
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role, organisation_id')
+    .select(PROFILE_ROLE_FIELDS + ', organisation_id')
     .eq('user_id', user.id)
     .single<Tables<"profiles">>();
 
-  if (profileError || !profile || (profile as any).role !== 'teacher') {
+  if (profileError || !profile) {
+    redirect('/');
+  }
+
+  // Check if user has teacher permissions (using centralized role checking)
+  if (!hasTeacherPermissions(profile)) {
     redirect('/');
   }
 

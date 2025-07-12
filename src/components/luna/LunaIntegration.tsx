@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { SupabaseEnhancedLunaChat } from './SupabaseEnhancedLunaChat';
-import { UserRole } from '@/config/navConfig';
+import { UserRole } from '@/lib/utils/roleUtils';
 
 interface LunaIntegrationProps {
   userRole: UserRole;

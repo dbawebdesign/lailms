@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { UserRole } from '@/config/navConfig';
+import { UserRole } from '@/lib/utils/roleUtils';
 
 // This is a temporary placeholder implementation
 // In a real app, this would fetch the user's role from authentication/session

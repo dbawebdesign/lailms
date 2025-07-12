@@ -9,6 +9,7 @@ import { BookOpenCheck, ClipboardCheck, AlertTriangle, Info, Users, Sparkles, Ac
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Tables } from "packages/types/db";
+import { getEffectiveRole, hasTeacherPermissions, PROFILE_ROLE_FIELDS } from "@/lib/utils/roleUtils";
 
 interface ActiveClassData {
   id: string;
@@ -584,7 +585,7 @@ export default async function TeacherDashboardPage() {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('user_id, first_name, last_name, role, active_role, additional_roles, organisation_id')
+    .select(PROFILE_ROLE_FIELDS + ', user_id, first_name, last_name, organisation_id')
     .eq('user_id', user.id)
     .single<Tables<"profiles">>();
 
@@ -593,10 +594,9 @@ export default async function TeacherDashboardPage() {
     redirect("/login?error=profile");
   }
 
-  // Get current effective role (considering role switching)
-  const currentRole = profile.active_role || profile.role;
-  const additionalRoles = Array.isArray(profile.additional_roles) ? profile.additional_roles as string[] : [];
-  const hasTeacherAccess = currentRole === 'teacher' || profile.role === 'teacher' || additionalRoles.includes('teacher');
+  // Check if user has teacher access using centralized role checking
+  const hasTeacherAccess = hasTeacherPermissions(profile);
+  const currentRole = getEffectiveRole(profile) || 'student'; // fallback to student if null
 
   console.log(`TeacherDashboard: User ID: ${user.id}, Current Role: ${currentRole}, Has Teacher Access: ${hasTeacherAccess}`);
 
@@ -636,7 +636,10 @@ export default async function TeacherDashboardPage() {
         </div>
 
         {/* Homeschool Dashboard */}
-        <div className="container mx-auto px-6 py-8">
+        <div className="container mx-auto px-6 py-8 space-y-8">
+          {/* Course Generation Progress Widget */}
+          <CourseGenerationProgressWidget userId={user.id} />
+          
           <HomeschoolDashboard 
             organizationId={organization.id}
             organizationName={organization.name}

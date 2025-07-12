@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,6 +24,7 @@ import {
 } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import { createClient } from '@/lib/supabase/client'
+import { useInviteCodeClipboard } from '@/hooks/useClipboard'
 
 interface InviteCode {
   id: string
@@ -61,6 +63,7 @@ export default function HomeschoolDashboard({
   const [isGenerating, setIsGenerating] = useState(false)
   const [showAllCodes, setShowAllCodes] = useState(false)
   const supabase = createClient()
+  const { copy: copyToClipboard } = useInviteCodeClipboard()
 
   useEffect(() => {
     fetchDashboardData()
@@ -144,21 +147,7 @@ export default function HomeschoolDashboard({
     }
   }
 
-  const copyToClipboard = async (text: string, description: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      toast({
-        title: "Copied!",
-        description: `${description} copied to clipboard`,
-      })
-    } catch (error) {
-      toast({
-        title: "Copy failed",
-        description: "Please select and copy the code manually",
-        variant: "destructive"
-      })
-    }
-  }
+
 
   const getCodeStatus = (code: InviteCode) => {
     if (code.used_at) {
@@ -200,36 +189,36 @@ export default function HomeschoolDashboard({
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="hover-card cursor-pointer hover-bg-light">
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
-              <GraduationCap className="h-5 w-5 text-blue-600" />
+              <GraduationCap className="h-5 w-5 text-blue-600 hover-icon" />
               <div>
-                <p className="text-2xl font-bold">{students.length}</p>
+                <p className="text-2xl font-bold hover-text-highlight">{students.length}</p>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">Students</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="hover-card cursor-pointer hover-bg-light">
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
-              <UserPlus className="h-5 w-5 text-green-600" />
+              <UserPlus className="h-5 w-5 text-green-600 hover-icon" />
               <div>
-                <p className="text-2xl font-bold">{activeStudentCodes.length}</p>
+                <p className="text-2xl font-bold hover-text-highlight">{activeStudentCodes.length}</p>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">Active Codes</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="hover-card cursor-pointer hover-bg-light">
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
-              <BookOpen className="h-5 w-5 text-purple-600" />
+              <BookOpen className="h-5 w-5 text-purple-600 hover-icon" />
               <div>
-                <p className="text-2xl font-bold">0</p>
+                <p className="text-2xl font-bold hover-text-highlight">0</p>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">Active Courses</p>
               </div>
             </div>
@@ -378,17 +367,23 @@ export default function HomeschoolDashboard({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
-              <BookOpen className="h-6 w-6" />
-              <span className="text-sm">Create Course</span>
+            <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+              <Link href="/teach/knowledge-base/create">
+                <BookOpen className="h-6 w-6 hover-icon" />
+                <span className="text-sm">Create Course</span>
+              </Link>
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
-              <GraduationCap className="h-6 w-6" />
-              <span className="text-sm">View Gradebook</span>
+            <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+              <Link href="/teach/gradebook">
+                <GraduationCap className="h-6 w-6 hover-icon" />
+                <span className="text-sm">View Gradebook</span>
+              </Link>
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
-              <Settings className="h-6 w-6" />
-              <span className="text-sm">Settings</span>
+            <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+              <Link href="/teach/tools">
+                <Settings className="h-6 w-6 hover-icon" />
+                <span className="text-sm">Teacher Tools</span>
+              </Link>
             </Button>
           </div>
         </CardContent>

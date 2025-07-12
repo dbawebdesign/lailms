@@ -43,16 +43,18 @@ export async function POST(req: NextRequest) {
       user_id: string;
       organisation_id: string | null;
       role: string;
+      active_role: string | null;
       organisations: { abbr: string } | null;
     }
 
-    // First, get the organization and role from the profile
+    // First, get the organization and role from the profile (including active_role for role switching)
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select(`
         user_id,
         organisation_id,
         role,
+        active_role,
         organisations (abbr)
       `)
       .eq('username', username)
@@ -84,11 +86,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 })
     }
 
-    // Return success with user data and role
+    // Calculate effective role (active_role if set, otherwise base role)
+    const effectiveRole = profileData.active_role || profileData.role;
+
+    // Return success with user data and effective role
     return NextResponse.json({
       user: data.user,
       session: data.session,
-      role: profileData.role,
+      role: effectiveRole,
     })
   } catch (error) {
     console.error('Error in login API route:', error)

@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { aiInsightsService } from '@/lib/services/ai-insights';
 import { NextRequest, NextResponse } from 'next/server';
+import { PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,11 +18,21 @@ export async function POST(request: NextRequest) {
     // Get all users who need fresh insights (no insights or expired)
     const { data: usersNeedingInsights, error } = await supabase
       .from('profiles')
-      .select('user_id, first_name, last_name, role')
+      .select(`${PROFILE_ROLE_FIELDS}, user_id, first_name, last_name`)
       .not('user_id', 'is', null);
 
     if (error) {
       throw error;
+    }
+
+    if (!usersNeedingInsights || usersNeedingInsights.length === 0) {
+      console.log('✅ No users need insights generation');
+      return NextResponse.json({ 
+        success: true, 
+        processed: 0, 
+        errors: 0,
+        total: 0 
+      });
     }
 
     let processed = 0;
@@ -33,7 +44,7 @@ export async function POST(request: NextRequest) {
         const { data: existingInsights } = await supabase
           .from('ai_insights')
           .select('*')
-          .eq('user_id', user.user_id)
+          .eq('user_id', (user as any).user_id)
           .eq('is_dismissed', false)
           .gte('expires_at', new Date().toISOString())
           .single();
@@ -44,15 +55,15 @@ export async function POST(request: NextRequest) {
         }
 
         // Generate new insights
-        console.log(`📊 Generating insights for ${user.first_name} ${user.last_name}`);
-        await aiInsightsService.refreshInsights(supabase, user.user_id);
+        console.log(`📊 Generating insights for ${(user as any).first_name} ${(user as any).last_name}`);
+        await aiInsightsService.refreshInsights(supabase, (user as any).user_id);
         processed++;
 
         // Rate limiting - wait 1 second between requests
         await new Promise(resolve => setTimeout(resolve, 1000));
 
       } catch (userError) {
-        console.error(`❌ Error processing user ${user.user_id}:`, userError);
+        console.error(`❌ Error processing user ${(user as any).user_id}:`, userError);
         errors++;
       }
     }
@@ -63,7 +74,7 @@ export async function POST(request: NextRequest) {
       success: true, 
       processed, 
       errors,
-      total: usersNeedingInsights.length 
+      total: usersNeedingInsights?.length || 0 
     });
 
   } catch (error: any) {

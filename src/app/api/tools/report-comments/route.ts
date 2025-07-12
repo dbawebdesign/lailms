@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Tables } from "packages/types/db";
 
+import { isTeacher, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 export async function POST(request: NextRequest) {
@@ -29,11 +30,11 @@ export async function POST(request: NextRequest) {
     // Get user profile
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select(PROFILE_ROLE_FIELDS)
       .eq('id', user.id)
       .single<Tables<"profiles">>();
 
-    if (!profile || profile.role !== 'teacher') {
+    if (!profile || !isTeacher(profile)) {
       return NextResponse.json(
         { error: 'Teacher access required' },
         { status: 403 }

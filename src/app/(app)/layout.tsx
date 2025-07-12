@@ -4,8 +4,9 @@ import { UIContextProvider } from "@/context/UIContext";
 import { LunaContextRegistration } from "@/components/providers/LunaContextRegistration";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from 'next/navigation';
-import type { UserRole } from "@/config/navConfig";
+import type { UserRole } from "@/lib/utils/roleUtils";
 import { Tables } from 'packages/types/db';
+import { PROFILE_ROLE_FIELDS } from "@/lib/utils/roleUtils";
 
 export default async function AppPagesLayout({
   children,
@@ -24,7 +25,7 @@ export default async function AppPagesLayout({
   let userRole: UserRole | null = null;
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role, active_role, additional_roles')
+    .select(PROFILE_ROLE_FIELDS)
     .eq('user_id', user.id)
     .single<Tables<'profiles'>>();
 

@@ -99,6 +99,29 @@
   100% { background-position: 468px 0; }
 }
 
+/* Removed gentle-lift animations - cards now stay in place */
+
+/* Glow effect for dark mode */
+@keyframes glow-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 5px rgba(107, 93, 229, 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 20px rgba(107, 93, 229, 0.6);
+  }
+}
+
+/* Subtle background highlight */
+@keyframes background-highlight {
+  0% { background-color: transparent; }
+  100% { background-color: var(--accent); }
+}
+
+@keyframes background-highlight-dark {
+  0% { background-color: transparent; }
+  100% { background-color: rgba(107, 93, 229, 0.1); }
+}
+
 .word {
   display: inline-block;
   opacity: 0;
@@ -107,8 +130,15 @@
 }
 
 .word:hover {
-  color: #E45DE5;
+  color: var(--accent);
   transform: translateY(-2px);
+  text-shadow: 0 0 10px rgba(107, 93, 229, 0.3);
+}
+
+/* Dark mode word hover effect */
+.dark .word:hover {
+  color: var(--accent);
+  text-shadow: 0 0 15px rgba(107, 93, 229, 0.5);
 }
 
 .grid-line {
@@ -200,202 +230,227 @@
 
 @keyframes loadingRotate {
   0% { 
-    transform: rotate(0deg);
+    transform: rotate(0deg); 
   }
   100% { 
-    transform: rotate(360deg);
+    transform: rotate(360deg); 
   }
 }
 
 @keyframes loadingPulse {
-  0%, 100% { 
-    opacity: 0.2;
+  0%, 100% {
+    opacity: 0.4;
     transform: scale(1);
   }
-  50% { 
-    opacity: 0.6;
-    transform: scale(1.05);
-  }
-}
-
-@keyframes premiumGlow {
-  0%, 100% { 
-    stroke-opacity: 0.3;
-  }
-  50% { 
-    stroke-opacity: 1;
-  }
-}
-
-@keyframes actionsAppear {
-  0% { 
-    opacity: 0; 
-  }
-  100% { 
-    opacity: 1; 
-  }
-}
-
-@keyframes nodeHover {
-  0% { 
-    filter: brightness(1);
-  }
-  100% { 
-    filter: brightness(1.05);
-  }
-}
-
-@keyframes buttonHover {
-  0% { 
-    transform: scale(1);
-  }
-  100% { 
-    transform: scale(1.02);
-  }
-}
-
-/* Legacy Mind Map Animations (for backward compatibility) */
-@keyframes mindMapNodeHover {
-  0% { 
-    transform: scale(1);
-  }
-  100% { 
-    transform: scale(1.05);
-  }
-}
-
-@keyframes mindMapNodeSelect {
-  0% { 
-    stroke-width: 2;
-    stroke-opacity: 0.5;
-  }
-  100% { 
-    stroke-width: 3;
-    stroke-opacity: 1;
-  }
-}
-
-@keyframes mindMapLoadingPulse {
-  0%, 100% { 
-    stroke-opacity: 0.3;
-    transform: scale(1);
-  }
-  50% { 
-    stroke-opacity: 0.8;
+  50% {
+    opacity: 0.8;
     transform: scale(1.1);
   }
 }
 
-@keyframes mindMapExpandButton {
-  0% { 
+@keyframes premiumGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 3px rgba(107, 93, 229, 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(107, 93, 229, 0.6));
+  }
+}
+
+@keyframes actionsAppear {
+  0% {
     opacity: 0;
-    transform: scale(0.5);
+    transform: translateY(10px);
   }
-  50% { 
-    opacity: 0.8;
-    transform: scale(1.2);
-  }
-  100% { 
+  100% {
     opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes nodeHover {
+  0% {
     transform: scale(1);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  }
+  100% {
+    transform: scale(1.05);
+    filter: drop-shadow(0 4px 12px rgba(107, 93, 229, 0.2));
+  }
+}
+
+@keyframes buttonHover {
+  0% {
+    background-color: rgba(107, 93, 229, 0.1);
+    transform: scale(1);
+  }
+  100% {
+    background-color: rgba(107, 93, 229, 0.2);
+    transform: scale(1.05);
+  }
+}
+
+@keyframes mindMapNodeHover {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  100% {
+    transform: scale(1.1);
+    filter: brightness(1.1);
+  }
+}
+
+@keyframes mindMapNodeSelect {
+  0% {
+    stroke-width: 1;
+    stroke-opacity: 0.3;
+  }
+  100% {
+    stroke-width: 2;
+    stroke-opacity: 0.8;
+  }
+}
+
+@keyframes mindMapLoadingPulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes mindMapExpandButton {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) rotate(0deg);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1) rotate(180deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(360deg);
   }
 }
 
 @keyframes mindMapZoomIn {
-  0% { transform: scale(1); }
-  100% { transform: scale(1.2); }
+  from { transform: scale(0.9); opacity: 0.7; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 @keyframes mindMapZoomOut {
-  0% { transform: scale(1); }
-  100% { transform: scale(0.8); }
+  from { transform: scale(1.1); opacity: 0.7; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 @keyframes mindMapPanLeft {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50px); }
+  from { transform: translateX(20px); opacity: 0.7; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes mindMapPanRight {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(50px); }
+  from { transform: translateX(-20px); opacity: 0.7; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes mindMapBranchGlow {
-  0%, 100% { 
-    stroke-opacity: 0.4;
-    filter: drop-shadow(0 0 0 transparent);
+  0%, 100% {
+    stroke-opacity: 0.2;
+    filter: drop-shadow(0 0 2px rgba(107, 93, 229, 0.2));
   }
-  50% { 
-    stroke-opacity: 0.8;
-    filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.3));
+  50% {
+    stroke-opacity: 0.6;
+    filter: drop-shadow(0 0 6px rgba(107, 93, 229, 0.4));
   }
 }
 
-/* Animation classes for easy application */
 .mindmap-node-appear {
-  animation: nodeAppear 0.15s ease-out forwards;
+  animation: nodeAppear 0.5s ease-out forwards;
 }
 
 .mindmap-connection-draw {
-  animation: connectionDraw 0.2s ease-out forwards;
+  animation: connectionDraw 0.8s ease-out forwards;
 }
 
 .mindmap-node-hover {
-  animation: nodeHover 0.1s ease-out forwards;
+  animation: mindMapNodeHover 0.2s ease-out forwards;
 }
 
 .mindmap-node-select {
-  animation: selectionPulse 3s ease-in-out infinite;
+  animation: mindMapNodeSelect 0.3s ease-out forwards;
 }
 
 .mindmap-loading-pulse {
-  animation: loadingRotate 2s linear infinite;
+  animation: mindMapLoadingPulse 2s ease-in-out infinite;
 }
 
 .mindmap-expand-button {
-  animation: actionsAppear 0.1s ease-out forwards;
+  animation: mindMapExpandButton 0.6s ease-out forwards;
 }
 
 .mindmap-branch-glow {
   animation: mindMapBranchGlow 2s ease-in-out infinite;
 }
 
-/* Transition utilities for smooth interactions */
+/* Transition classes for smooth interactions */
 .mindmap-transition {
-  transition: all 0.2s ease-out;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .mindmap-transition-slow {
-  transition: all 0.3s ease-out;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .mindmap-transition-fast {
-  transition: all 0.1s ease-out;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Glass morphism effects for premium look */
+/* Glassmorphism effect for modern UI */
 .mindmap-glass {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
 }
 
-/* Subtle shadow variations */
+.dark .mindmap-glass {
+  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Enhanced shadow system */
 .mindmap-shadow-soft {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .mindmap-shadow-medium {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .mindmap-shadow-strong {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
-/* Hover effects for interactive elements */
+/* Dark mode shadows */
+.dark .mindmap-shadow-soft {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.dark .mindmap-shadow-medium {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.dark .mindmap-shadow-strong {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+/* Button hover effects */
 .mindmap-button-hover {
   position: relative;
   overflow: hidden;
@@ -412,7 +467,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.2),
+    rgba(107, 93, 229, 0.1),
     transparent
   );
   transition: left 0.5s ease;
@@ -420,4 +475,171 @@
 
 .mindmap-button-hover:hover::before {
   left: 100%;
+}
+
+.dark .mindmap-button-hover::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(107, 93, 229, 0.2),
+    transparent
+  );
+}
+
+/* ==========================================
+   ENHANCED DARK MODE HOVER EFFECTS
+   ========================================== */
+
+.hover-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dark .hover-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.hover-button-glow {
+  transition: all 0.3s ease;
+}
+
+.hover-button-glow:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.dark .hover-button-glow:hover {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.hover-interactive {
+  transition: all 0.2s ease;
+}
+
+.hover-interactive:hover {
+  filter: brightness(1.05);
+}
+
+.dark .hover-interactive:hover {
+  filter: brightness(1.1);
+}
+
+.hover-lift {
+  transition: box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+.dark .hover-lift:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+.hover-icon {
+  transition: all 0.2s ease;
+}
+
+.hover-icon:hover {
+  transform: scale(1.1);
+  color: var(--accent);
+}
+
+.dark .hover-icon:hover {
+  filter: drop-shadow(0 0 4px rgba(107, 93, 229, 0.5));
+}
+
+.hover-bg-light {
+  transition: background-color 0.2s ease;
+}
+
+.hover-bg-light:hover {
+  background-color: rgba(107, 93, 229, 0.05);
+}
+
+.dark .hover-bg-light:hover {
+  background-color: rgba(107, 93, 229, 0.1);
+}
+
+.hover-border-glow {
+  transition: all 0.3s ease;
+}
+
+.hover-border-glow:hover {
+  border-color: rgba(107, 93, 229, 0.3);
+}
+
+.dark .hover-border-glow:hover {
+  border-color: rgba(107, 93, 229, 0.6);
+  box-shadow: 0 0 10px rgba(107, 93, 229, 0.2);
+}
+
+.hover-text-highlight {
+  transition: all 0.2s ease;
+}
+
+.hover-text-highlight:hover {
+  color: var(--accent);
+}
+
+.dark .hover-text-highlight:hover {
+  color: var(--accent);
+  text-shadow: 0 0 8px rgba(107, 93, 229, 0.4);
+}
+
+.hover-scale {
+  transition: transform 0.2s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+.hover-opacity {
+  transition: opacity 0.2s ease;
+}
+
+.hover-opacity:hover {
+  opacity: 0.8;
+}
+
+/* Focus states for accessibility */
+.focus-visible-enhanced:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dark .focus-visible-enhanced:focus-visible {
+  outline-color: rgba(107, 93, 229, 0.8);
+  box-shadow: 0 0 0 4px rgba(107, 93, 229, 0.2);
+}
+
+/* Ripple effect for clicks */
+.hover-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.hover-ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(107, 93, 229, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.3s ease, height 0.3s ease;
+}
+
+.hover-ripple:hover::after {
+  width: 100px;
+  height: 100px;
+}
+
+.dark .hover-ripple::after {
+  background: rgba(107, 93, 229, 0.5);
 } 

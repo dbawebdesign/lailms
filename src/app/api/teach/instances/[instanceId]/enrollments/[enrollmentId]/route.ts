@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { type User } from '@supabase/supabase-js';
 import { Tables } from 'packages/types/db';
 
+import { PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 // Authorization helper (can be shared or adapted)
 async function authorizeTeacherForEnrollmentAction(
     supabase: ReturnType<typeof createSupabaseServerClient>, 
@@ -12,7 +13,7 @@ async function authorizeTeacherForEnrollmentAction(
 ): Promise<{ enrollment?: any; errorResponse?: NextResponse }> {
     const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('organisation_id, role')
+        .select(PROFILE_ROLE_FIELDS + ', organisation_id')
         .eq('user_id', currentUser.id)
         .single<Tables<"profiles">>();
 

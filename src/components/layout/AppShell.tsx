@@ -9,7 +9,7 @@ import MobileNav from './MobileNav';
 import { useUIContext } from '@/context/UIContext';
 import { cn } from '@/lib/utils'; // Assuming you have a cn utility
 import CommandPalette from './CommandPalette'; // Import CommandPalette
-import type { UserRole } from "@/config/navConfig"; // Import UserRole
+import type { UserRole } from "@/lib/utils/roleUtils"; // Import UserRole
 import { SkipLink } from '@/components/ui/skip-link';
 import { FeedbackSupportModal } from '@/components/ui/FeedbackSupportModal';
 

@@ -4,6 +4,7 @@ import { BaseClassCreationData, BaseClass, GeneratedOutline } from '../../../../
 import { createClient } from '@supabase/supabase-js';
 import { Tables } from 'packages/types/db';
 
+import { PROFILE_ROLE_FIELDS, hasTeacherPermissions } from '@/lib/utils/roleUtils';
 // Database representation (subset, focusing on what we insert/select)
 interface DbBaseClass {
   id: string;
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
     // 1. Get the user's organisation_id AND role from the profiles table
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('organisation_id, role')
+      .select(PROFILE_ROLE_FIELDS + ', organisation_id')
       .eq('user_id', user.id)
       .single<Tables<"profiles">>();
 
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
     // For this specific request, we are fetching base classes created BY THIS USER,
     // so role check for viewing general org base classes might be less critical here,
     // but still good for ensuring only appropriate roles can access this endpoint.
-    if (!userRole || (userRole !== 'teacher' && userRole !== 'admin' && userRole !== 'super_admin')) {
+    if (!hasTeacherPermissions(profileData)) {
       console.error("API Error: User is not authorized to view base classes. Role:", userRole);
       return NextResponse.json({ error: 'You do not have permission to view base classes.' }, { status: 403 });
     }
@@ -116,7 +117,7 @@ export async function POST(request: Request) {
     // 2. Get the user's profile
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('user_id, organisation_id, role')
+      .select(PROFILE_ROLE_FIELDS + ', user_id, organisation_id')
       .eq('user_id', user.id)
       .single<Tables<"profiles">>();
 
@@ -137,7 +138,7 @@ export async function POST(request: Request) {
     const userRole = profileData.role;
 
     // Check if user is authorized to create base classes (must be a teacher or admin)
-    if (!userRole || (userRole !== 'teacher' && userRole !== 'admin' && userRole !== 'super_admin')) {
+    if (!hasTeacherPermissions(profileData)) {
       console.error("API Error: User is not authorized to create base classes. Role:", userRole);
       return NextResponse.json({ error: 'You do not have permission to create base classes.' }, { status: 403 });
     }

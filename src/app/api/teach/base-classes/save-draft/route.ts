@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 
+import { isTeacher, isSuperAdmin, hasTeacherPermissions, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     // Get user's profile
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('organisation_id, role')
+      .select(PROFILE_ROLE_FIELDS + ', organisation_id')
       .eq('user_id', user.id)
       .single();
 
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check authorization
-    if (!profile.role || (profile.role !== 'teacher' && profile.role !== 'admin' && profile.role !== 'super_admin')) {
+    if (!hasTeacherPermissions(profile)) {
       console.error('❌ User not authorized to save drafts. Role:', profile.role);
       return NextResponse.json({ error: 'You do not have permission to save course drafts.' }, { status: 403 });
     }

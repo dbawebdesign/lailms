@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import type { UserRole } from "@/config/navConfig";
+import type { UserRole } from "@/lib/utils/roleUtils";
 import WelcomeCard from "@/components/dashboard/WelcomeCard";
 import ActiveCourseItem, { ActiveCourseItemProps } from "@/components/dashboard/student/ActiveCourseItem";
 import { Tables } from "packages/types/db";

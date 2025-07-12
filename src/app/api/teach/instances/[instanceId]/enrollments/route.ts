@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { type User } from '@supabase/supabase-js';
 import { Tables } from 'packages/types/db';
 
+import { PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 // Define expected types for request/response payloads
 interface EnrollmentRequest {
   profile_id: string; // Changed from student_som_id to profile_id
@@ -22,7 +23,7 @@ interface EnrolledStudent {
 async function authorizeTeacher(supabase: ReturnType<typeof createSupabaseServerClient>, instanceId: string, currentUser: User): Promise<{ organisationId: string; errorResponse?: NextResponse }> {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('organisation_id, role')
+    .select(PROFILE_ROLE_FIELDS + ', organisation_id')
     .eq('user_id', currentUser.id)
     .single<Tables<"profiles">>();
 

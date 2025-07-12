@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 
+import { isTeacher, isSuperAdmin, hasTeacherPermissions, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 interface CourseOutlineModule {
   title: string;
   topics: string[];
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
     // Get user's profile using any type to avoid TS issues
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('organisation_id, role')
+      .select(PROFILE_ROLE_FIELDS + ', organisation_id')
       .eq('user_id', user.id)
       .single();
 
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is authorized to create base classes
-    if (!profile.role || (profile.role !== 'teacher' && profile.role !== 'admin' && profile.role !== 'super_admin')) {
+    if (!hasTeacherPermissions(profile)) {
       console.error('❌ User not authorized to create base classes. Role:', profile.role);
       return NextResponse.json({ error: 'You do not have permission to create base classes.' }, { status: 403 });
     }

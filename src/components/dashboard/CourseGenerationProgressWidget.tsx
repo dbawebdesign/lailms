@@ -289,9 +289,7 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
                   Course generated successfully.
                   {/* Confetti trigger button for testing - remove in production */}
                   {process.env.NODE_ENV === 'development' && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
+                    <span
                       onClick={(e) => {
                         e.stopPropagation();
                         if (jsConfettiRef.current) {
@@ -302,10 +300,10 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
                           });
                         }
                       }}
-                      className="ml-2 h-5 px-2 text-xs"
+                      className="ml-2 h-5 px-2 text-xs inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
                     >
                       🎉 Test
-                    </Button>
+                    </span>
                   )}
                 </div>
               )}

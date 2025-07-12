@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import { Database } from '../../../../../packages/types/db'
 import { Tables } from 'packages/types/db';
-
+import { isSuperAdmin, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies();
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     // Fetch user role from profiles table
     const { data: memberData, error: memberError } = await supabase
       .from('profiles')
-      .select('role')
+      .select(PROFILE_ROLE_FIELDS)
       .eq('user_id', session.user.id)
       .single<Tables<'profiles'>>()
 
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     // --- Role Check ---
     // Using the actual Enum type from Database
-    if (memberData.role !== 'super_admin') { 
+    if (!isSuperAdmin(memberData)) { 
       console.warn(`User ${session.user.id} attempted dev-admin access with role: ${memberData.role}`)
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -175,7 +175,7 @@ export async function POST(req: Request) {
   // Fetch user role from profiles table
   const { data: memberData, error: memberError } = await supabase
     .from('profiles')
-    .select('role')
+    .select(PROFILE_ROLE_FIELDS)
     .eq('user_id', session.user.id)
     .single<Tables<'profiles'>>()
 
@@ -190,7 +190,7 @@ export async function POST(req: Request) {
   }
 
   // --- Role Check ---
-  if (memberData.role !== 'super_admin') { 
+  if (!isSuperAdmin(memberData)) { 
     console.warn(`User ${session.user.id} attempted dev-admin access with role: ${memberData.role}`)
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
