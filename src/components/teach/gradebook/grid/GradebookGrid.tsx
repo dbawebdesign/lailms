@@ -332,189 +332,187 @@ export function GradebookGrid({
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-8 overflow-hidden">
-        <div className="h-full flex flex-col">
-          {/* Filters */}
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center mb-6 flex-shrink-0">
-            <div className="flex-1 min-w-0">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search students..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 border-divider focus:border-primary/50 max-w-md"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-4 flex-shrink-0">
-              <Select value={filterBy} onValueChange={(value) => setFilterBy(value as any)}>
-                <SelectTrigger className="w-48 border-divider">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Students</SelectItem>
-                  <SelectItem value="passing">Passing</SelectItem>
-                  <SelectItem value="failing">Failing</SelectItem>
-                  <SelectItem value="missing">Missing Work</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={gradeDisplay} onValueChange={(value) => setGradeDisplay(value as any)}>
-                <SelectTrigger className="w-32 border-divider">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="percentage">Percentage</SelectItem>
-                  <SelectItem value="letter">Letter Grade</SelectItem>
-                  <SelectItem value="points">Points</SelectItem>
-                </SelectContent>
-              </Select>
+      <div className="flex-1 p-8 flex flex-col overflow-hidden">
+        {/* Filters */}
+        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center mb-6 flex-shrink-0">
+          <div className="flex-1 min-w-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search students..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 border-divider focus:border-primary/50 max-w-md"
+              />
             </div>
           </div>
+          <div className="flex items-center gap-4 flex-shrink-0">
+            <Select value={filterBy} onValueChange={(value) => setFilterBy(value as any)}>
+              <SelectTrigger className="w-48 border-divider">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Students</SelectItem>
+                <SelectItem value="passing">Passing</SelectItem>
+                <SelectItem value="failing">Failing</SelectItem>
+                <SelectItem value="missing">Missing Work</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={gradeDisplay} onValueChange={(value) => setGradeDisplay(value as any)}>
+              <SelectTrigger className="w-32 border-divider">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="percentage">Percentage</SelectItem>
+                <SelectItem value="letter">Letter Grade</SelectItem>
+                <SelectItem value="points">Points</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-          {/* Gradebook Table Container */}
-          <div className="flex-1 overflow-hidden border border-divider rounded-lg">
-            <div className="overflow-x-auto h-full">
-              <table className="w-full border-collapse">
-                {/* Table Header */}
-                <thead className="bg-surface/50 sticky top-0 z-10">
-                  <tr>
-                    <th className="text-left p-3 w-16 bg-background sticky left-0 z-20 border-r border-divider">
-                      <Checkbox
-                        checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
-                        onCheckedChange={handleSelectAll}
-                      />
-                    </th>
-                    <th className="text-left p-3 w-64 bg-background sticky left-16 z-20 border-r border-divider">
-                      <span className="text-caption font-semibold text-foreground uppercase tracking-wide">Student</span>
-                    </th>
-                    <th className="text-center p-3 w-24 bg-background sticky left-80 z-20 border-r border-divider">
-                      <span className="text-caption font-semibold text-foreground uppercase tracking-wide">Overall</span>
-                    </th>
-                    {assignments.filter(a => a.published).map((assignment) => (
-                      <th key={assignment.id} className="text-center p-2 w-16 min-w-16 max-w-16 bg-surface/50 relative group border-r border-divider">
-                        <div className="space-y-1">
-                          <div className="text-xs font-medium text-foreground truncate max-w-[60px] mx-auto" title={assignment.name}>
-                            {assignment.name}
-                          </div>
-                          <div className="text-xs text-muted-foreground">{assignment.points_possible}pts</div>
+        {/* Gradebook Table Container */}
+        <div className="flex-1 relative border border-divider rounded-lg">
+          <div className="absolute inset-0 overflow-auto">
+            <table className="border-collapse w-full" style={{ minWidth: 'max-content' }}>
+              {/* Table Header */}
+              <thead className="bg-surface/50 sticky top-0 z-10">
+                <tr>
+                  <th className="text-left p-3 w-16 bg-background sticky z-20 border-r border-b border-divider" style={{ left: 0 }}>
+                    <Checkbox
+                      checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </th>
+                  <th className="text-left p-3 w-48 bg-background sticky z-20 border-r border-b border-divider" style={{ left: '64px' }}>
+                    <span className="text-caption font-semibold text-foreground uppercase tracking-wide">Student</span>
+                  </th>
+                  <th className="text-center p-3 w-24 bg-background sticky z-20 border-r border-b border-divider" style={{ left: '256px' }}>
+                    <span className="text-caption font-semibold text-foreground uppercase tracking-wide">Overall</span>
+                  </th>
+                  {assignments.filter(a => a.published).map((assignment) => (
+                    <th key={assignment.id} className="text-center p-2 w-16 min-w-16 max-w-16 bg-surface/50 relative group border-r border-b border-divider">
+                      <div className="space-y-1">
+                        <div className="text-xs font-medium text-foreground truncate max-w-[60px] mx-auto" title={assignment.name}>
+                          {assignment.name}
                         </div>
-                        {/* Hover tooltip for full assignment name */}
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-popover border border-divider rounded-lg shadow-lg text-sm text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-30 max-w-xs">
-                          <div className="break-words">{assignment.name}</div>
-                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-popover"></div>
-                        </div>
-                      </th>
-                    ))}
-                    <th className="text-center p-3 w-20 bg-surface/50 border-r border-divider">
-                      <span className="text-caption font-semibold text-foreground uppercase tracking-wide">Actions</span>
+                        <div className="text-xs text-muted-foreground">{assignment.points_possible}pts</div>
+                      </div>
+                      {/* Hover tooltip for full assignment name */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-popover border border-divider rounded-lg shadow-lg text-sm text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-30 max-w-xs">
+                        <div className="break-words">{assignment.name}</div>
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-popover"></div>
+                      </div>
                     </th>
-                  </tr>
-                </thead>
-
-                {/* Table Body */}
-                <tbody className="divide-y divide-divider">
-                  {filteredStudents.map((student) => (
-                    <tr 
-                      key={student.id} 
-                      className={cn(
-                        "hover:bg-surface/30 transition-airy group",
-                        selectedStudents.includes(student.id) && "bg-info/5"
-                      )}
-                    >
-                      {/* Checkbox */}
-                      <td className="p-3 bg-background group-hover:bg-surface/30 transition-airy sticky left-0 z-10 border-r border-divider">
-                        <Checkbox
-                          checked={selectedStudents.includes(student.id)}
-                          onCheckedChange={(checked) => handleSelectStudent(student.id, !!checked)}
-                        />
-                      </td>
-
-                      {/* Student Info */}
-                      <td className="p-3 bg-background group-hover:bg-surface/30 transition-airy sticky left-16 z-10 border-r border-divider">
-                        <div className="flex items-center gap-3 w-full">
-                          <div className="h-8 w-8 bg-brand-gradient rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm flex-shrink-0">
-                            {student.name.split(' ').map(n => n[0]).join('')}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-foreground truncate text-sm">{student.name}</div>
-                            <div className="flex items-center gap-1 mt-1">
-                              {getMasteryBadge(student.mastery_level || 'approaching')}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Overall Grade */}
-                      <td className="p-3 text-center bg-background group-hover:bg-surface/30 transition-airy sticky left-80 z-10 border-r border-divider">
-                        <div className="space-y-1">
-                          <div className={cn(
-                            "text-sm font-semibold",
-                            (student.overall_grade || 0) >= 90 ? 'text-success' :
-                            (student.overall_grade || 0) >= 80 ? 'text-info' :
-                            (student.overall_grade || 0) >= 70 ? 'text-warning' : 'text-destructive'
-                          )}>
-                            {student.overall_grade ? `${student.overall_grade}%` : '-'}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {student.grade_letter || '-'}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Assignment Grades */}
-                      {assignments.filter(a => a.published).map((assignment) => {
-                        const gradeInfo = getGradeDisplay(student, assignment);
-                        const isEditing = editingCell?.studentId === student.id && editingCell?.assignmentId === assignment.id;
-                        
-                        return (
-                          <td key={assignment.id} className="p-2 text-center w-16 min-w-16 max-w-16 border-r border-divider">
-                            {isEditing ? (
-                              <Input
-                                value={cellValue}
-                                onChange={(e) => setCellValue(e.target.value)}
-                                onBlur={() => handleCellSave(student.id, assignment.id)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    handleCellSave(student.id, assignment.id);
-                                  } else if (e.key === 'Escape') {
-                                    handleCellCancel();
-                                  }
-                                }}
-                                className="w-12 h-8 text-center text-sm border-divider focus:border-primary/50"
-                                autoFocus
-                              />
-                            ) : (
-                              <div
-                                className={cn(
-                                  "cursor-pointer hover:bg-surface/50 rounded px-2 py-1 transition-airy mx-auto w-12 text-xs",
-                                  gradeInfo.className
-                                )}
-                                onClick={() => handleCellClick(student.id, assignment.id, gradeInfo.value)}
-                              >
-                                {gradeInfo.display}
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-
-                      {/* Actions */}
-                      <td className="p-3 text-center border-r border-divider">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => handleStudentActions(student)}
-                          className="hover:bg-surface/50 transition-airy h-8 w-8 p-0"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                  <th className="text-center p-3 w-20 bg-surface/50 border-r border-b border-divider">
+                    <span className="text-caption font-semibold text-foreground uppercase tracking-wide">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+
+              {/* Table Body */}
+              <tbody className="divide-y divide-divider">
+                {filteredStudents.map((student) => (
+                  <tr
+                    key={student.id}
+                    className={cn(
+                      "hover:bg-surface/30 transition-airy group",
+                      selectedStudents.includes(student.id) && "bg-info/5"
+                    )}
+                  >
+                    {/* Checkbox */}
+                    <td className="p-3 bg-background group-hover:bg-surface/30 transition-airy sticky z-10 border-r border-divider" style={{ left: 0 }}>
+                      <Checkbox
+                        checked={selectedStudents.includes(student.id)}
+                        onCheckedChange={(checked) => handleSelectStudent(student.id, !!checked)}
+                      />
+                    </td>
+
+                    {/* Student Info */}
+                    <td className="p-3 bg-background group-hover:bg-surface/30 transition-airy sticky z-10 border-r border-divider" style={{ left: '64px' }}>
+                      <div className="flex items-center gap-3 w-full">
+                        <div className="h-8 w-8 bg-brand-gradient rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm flex-shrink-0">
+                          {student.name.split(' ').map(n => n[0]).join('')}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-foreground truncate text-sm">{student.name}</div>
+                          <div className="flex items-center gap-1 mt-1">
+                            {getMasteryBadge(student.mastery_level || 'approaching')}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Overall Grade */}
+                    <td className="p-3 text-center bg-background group-hover:bg-surface/30 transition-airy sticky z-10 border-r border-divider" style={{ left: '256px' }}>
+                      <div className="space-y-1">
+                        <div className={cn(
+                          "text-sm font-semibold",
+                          (student.overall_grade || 0) >= 90 ? 'text-success' :
+                          (student.overall_grade || 0) >= 80 ? 'text-info' :
+                          (student.overall_grade || 0) >= 70 ? 'text-warning' : 'text-destructive'
+                        )}>
+                          {student.overall_grade ? `${student.overall_grade}%` : '-'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {student.grade_letter || '-'}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Assignment Grades */}
+                    {assignments.filter(a => a.published).map((assignment) => {
+                      const gradeInfo = getGradeDisplay(student, assignment);
+                      const isEditing = editingCell?.studentId === student.id && editingCell?.assignmentId === assignment.id;
+
+                      return (
+                        <td key={assignment.id} className="p-2 text-center w-16 min-w-16 max-w-16 border-r border-divider">
+                          {isEditing ? (
+                            <Input
+                              value={cellValue}
+                              onChange={(e) => setCellValue(e.target.value)}
+                              onBlur={() => handleCellSave(student.id, assignment.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleCellSave(student.id, assignment.id);
+                                } else if (e.key === 'Escape') {
+                                  handleCellCancel();
+                                }
+                              }}
+                              className="w-12 h-8 text-center text-sm border-divider focus:border-primary/50"
+                              autoFocus
+                            />
+                          ) : (
+                            <div
+                              className={cn(
+                                "cursor-pointer hover:bg-surface/50 rounded px-2 py-1 transition-airy mx-auto w-12 text-xs",
+                                gradeInfo.className
+                              )}
+                              onClick={() => handleCellClick(student.id, assignment.id, gradeInfo.value)}
+                            >
+                              {gradeInfo.display}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+
+                    {/* Actions */}
+                    <td className="p-3 text-center border-r border-divider">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleStudentActions(student)}
+                        className="hover:bg-surface/50 transition-airy h-8 w-8 p-0"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

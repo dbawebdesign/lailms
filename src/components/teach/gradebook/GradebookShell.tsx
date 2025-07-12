@@ -354,7 +354,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
         {/* Content Area - Following style guide: flowing, spacious layout */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <Tabs value={activeTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <TabsContent value="gradebook" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0 overflow-hidden">
+            <TabsContent value="gradebook" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
               <GradebookGrid
                 classInstance={classInstance}
                 data={transformedData}
