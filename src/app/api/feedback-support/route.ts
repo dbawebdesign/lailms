@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 
-import { PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
+import { PROFILE_ROLE_FIELDS, isAdmin, isSuperAdmin, type UserProfile } from '@/lib/utils/roleUtils';
 // Validation schema for the API
 const feedbackSupportSchema = z.object({
   category: z.enum(['feedback', 'support', 'bug_report']),
@@ -113,18 +113,25 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user's profile to check if they're an admin
-    const { data: profile, error: profileError } = await supabase
+    const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select(PROFILE_ROLE_FIELDS + ', user_id, organisation_id')
+      .select(`${PROFILE_ROLE_FIELDS}`)
       .eq('user_id', user.id)
       .single();
 
-    if (profileError || !profile) {
+    if (profileError) {
+      console.error('Error fetching user profile:', profileError);
       return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 });
     }
 
+    if (!profileData) {
+      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
+    }
+
+    const profile = profileData as UserProfile;
+
     // Only admins and super_admins can retrieve feedback
-    if (!['admin', 'super_admin'].includes(profile.role)) {
+    if (!isAdmin(profile) && !isSuperAdmin(profile)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
