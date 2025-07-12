@@ -7,9 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AssignmentModal } from '../shared/AssignmentModal';
 import { 
   Search, 
   Filter, 
@@ -82,6 +81,7 @@ interface GradebookGridProps {
   onStudentSelect: (studentId: string) => void;
   onDataChange?: () => void; // Add callback for data refresh
   isLoading: boolean;
+  onCreateAssignment?: (assignmentData: Partial<Assignment>) => Promise<void>;
 }
 
 export function GradebookGrid({
@@ -91,7 +91,8 @@ export function GradebookGrid({
   onSelectedStudentsChange,
   onStudentSelect,
   onDataChange,
-  isLoading
+  isLoading,
+  onCreateAssignment
 }: GradebookGridProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [gradeDisplay, setGradeDisplay] = useState<'percentage' | 'points' | 'letter'>('percentage');
@@ -101,14 +102,7 @@ export function GradebookGrid({
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const [studentActionsOpen, setStudentActionsOpen] = useState(false);
   const [selectedStudentForActions, setSelectedStudentForActions] = useState<Student | null>(null);
-  const [newAssignment, setNewAssignment] = useState({
-    name: '',
-    description: '',
-    type: 'assignment',
-    points_possible: 100,
-    due_date: '',
-    category: ''
-  });
+  const [isSubmittingAssignment, setIsSubmittingAssignment] = useState(false);
 
   // Use live data from props
   const students = data.students;
@@ -224,18 +218,19 @@ export function GradebookGrid({
     setAssignmentDialogOpen(true);
   };
 
-  const handleSaveAssignment = () => {
-    // TODO: Save new assignment
-    console.log('Creating assignment:', newAssignment);
-    setAssignmentDialogOpen(false);
-    setNewAssignment({
-      name: '',
-      description: '',
-      type: 'assignment',
-      points_possible: 100,
-      due_date: '',
-      category: ''
-    });
+  const handleAssignmentSubmit = async (assignmentData: Partial<Assignment>) => {
+    if (!onCreateAssignment) return;
+    
+    setIsSubmittingAssignment(true);
+    try {
+      await onCreateAssignment(assignmentData);
+      onDataChange?.(); // Refresh data after creating assignment
+    } catch (error) {
+      console.error('Error creating assignment:', error);
+      throw error; // Re-throw to let the modal handle the error
+    } finally {
+      setIsSubmittingAssignment(false);
+    }
   };
 
   const handleStudentActions = (student: Student) => {
@@ -384,10 +379,10 @@ export function GradebookGrid({
                       onCheckedChange={handleSelectAll}
                     />
                   </th>
-                  <th className="text-left p-3 w-48 bg-background sticky z-20 border-r border-b border-divider" style={{ left: '64px' }}>
+                  <th className="text-left p-3 w-48 bg-background sticky z-20 border-r border-b border-divider" style={{ left: '4rem' }}>
                     <span className="text-caption font-semibold text-foreground uppercase tracking-wide">Student</span>
                   </th>
-                  <th className="text-center p-3 w-24 bg-background sticky z-20 border-r border-b border-divider" style={{ left: '256px' }}>
+                  <th className="text-center p-3 w-24 bg-background sticky z-20 border-r border-b border-divider" style={{ left: '16rem' }}>
                     <span className="text-caption font-semibold text-foreground uppercase tracking-wide">Overall</span>
                   </th>
                   {assignments.filter(a => a.published).map((assignment) => (
@@ -430,7 +425,7 @@ export function GradebookGrid({
                     </td>
 
                     {/* Student Info */}
-                    <td className="p-3 bg-background group-hover:bg-surface/30 transition-airy sticky z-10 border-r border-divider" style={{ left: '64px' }}>
+                    <td className="p-3 bg-background group-hover:bg-surface/30 transition-airy sticky z-10 border-r border-divider" style={{ left: '4rem' }}>
                       <div className="flex items-center gap-3 w-full">
                         <div className="h-8 w-8 bg-brand-gradient rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm flex-shrink-0">
                           {student.name.split(' ').map(n => n[0]).join('')}
@@ -445,7 +440,7 @@ export function GradebookGrid({
                     </td>
 
                     {/* Overall Grade */}
-                    <td className="p-3 text-center bg-background group-hover:bg-surface/30 transition-airy sticky z-10 border-r border-divider" style={{ left: '256px' }}>
+                    <td className="p-3 text-center bg-background group-hover:bg-surface/30 transition-airy sticky z-10 border-r border-divider" style={{ left: '16rem' }}>
                       <div className="space-y-1">
                         <div className={cn(
                           "text-sm font-semibold",
@@ -518,101 +513,13 @@ export function GradebookGrid({
       </div>
 
       {/* Assignment Creation Modal */}
-      <Dialog open={assignmentDialogOpen} onOpenChange={setAssignmentDialogOpen}>
-        <DialogContent className="max-w-2xl bg-background border-divider">
-          <DialogHeader>
-            <DialogTitle className="text-h2 text-foreground">Create New Assignment</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-6 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-body font-medium text-foreground">Assignment Name</Label>
-                <Input
-                  value={newAssignment.name}
-                  onChange={(e) => setNewAssignment({...newAssignment, name: e.target.value})}
-                  placeholder="Enter assignment name"
-                  className="border-divider focus:border-primary/50"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-body font-medium text-foreground">Type</Label>
-                <Select value={newAssignment.type} onValueChange={(value) => setNewAssignment({...newAssignment, type: value})}>
-                  <SelectTrigger className="border-divider">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="quiz">Quiz</SelectItem>
-                    <SelectItem value="assignment">Assignment</SelectItem>
-                    <SelectItem value="homework">Homework</SelectItem>
-                    <SelectItem value="project">Project</SelectItem>
-                    <SelectItem value="exam">Exam</SelectItem>
-                    <SelectItem value="lab">Lab</SelectItem>
-                    <SelectItem value="discussion">Discussion</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="text-body font-medium text-foreground">Description</Label>
-              <Textarea
-                value={newAssignment.description}
-                onChange={(e) => setNewAssignment({...newAssignment, description: e.target.value})}
-                placeholder="Describe the assignment"
-                rows={3}
-                className="border-divider focus:border-primary/50"
-              />
-            </div>
-            
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label className="text-body font-medium text-foreground">Points Possible</Label>
-                <Input
-                  type="number"
-                  value={newAssignment.points_possible}
-                  onChange={(e) => setNewAssignment({...newAssignment, points_possible: Number(e.target.value)})}
-                  className="border-divider focus:border-primary/50"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-body font-medium text-foreground">Due Date</Label>
-                <Input
-                  type="datetime-local"
-                  value={newAssignment.due_date}
-                  onChange={(e) => setNewAssignment({...newAssignment, due_date: e.target.value})}
-                  className="border-divider focus:border-primary/50"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-body font-medium text-foreground">Category</Label>
-                <Input
-                  value={newAssignment.category}
-                  onChange={(e) => setNewAssignment({...newAssignment, category: e.target.value})}
-                  placeholder="e.g. Assessments"
-                  className="border-divider focus:border-primary/50"
-                />
-              </div>
-            </div>
-            
-            <div className="flex justify-end gap-3 pt-4">
-              <Button 
-                variant="outline" 
-                onClick={() => setAssignmentDialogOpen(false)}
-                className="border-divider hover:bg-surface/80"
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleSaveAssignment}
-                className="bg-brand-gradient hover:opacity-90 transition-airy"
-              >
-                Create Assignment
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AssignmentModal
+        open={assignmentDialogOpen}
+        onOpenChange={setAssignmentDialogOpen}
+        classInstanceId={classInstance.id}
+        onSubmit={handleAssignmentSubmit}
+        isSubmitting={isSubmittingAssignment}
+      />
 
       {/* Student Actions Modal */}
       <Dialog open={studentActionsOpen} onOpenChange={setStudentActionsOpen}>
