@@ -24,7 +24,7 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react'
-import { supabase } from '@/utils/supabase/browser'
+
 import { SurveyAnalyticsPanel } from '@/components/survey/SurveyAnalyticsPanel'
 import { cn } from '@/lib/utils'
 
@@ -103,65 +103,16 @@ export default function SurveyAnalyticsPage() {
       setLoading(true)
       setError(null)
 
-      // Fetch survey responses with all question responses
-      const { data: surveyData, error: surveyError } = await supabase
-        .from('survey_responses')
-        .select(`
-          *,
-          survey_question_responses (
-            question_id,
-            response_value,
-            response_text,
-            survey_questions (
-              id,
-              question_text,
-              question_type,
-              options,
-              section_id,
-              survey_sections (
-                title
-              )
-            )
-          )
-        `)
-        .order('completed_at', { ascending: false })
+      // Fetch all survey data via admin API route (bypasses RLS to get ALL responses)
+      const response = await fetch('/api/dev-admin/survey-analytics')
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch survey data: ${response.statusText}`)
+      }
 
-      if (surveyError) throw surveyError
+      const { responses, questions } = await response.json()
 
-      // Fetch all questions for reference
-      const { data: questionsData, error: questionsError } = await supabase
-        .from('survey_questions')
-        .select(`
-          *,
-          survey_sections (
-            title
-          )
-        `)
-        .order('section_id', { ascending: true })
-        .order('order_index', { ascending: true })
-
-      if (questionsError) throw questionsError
-
-      // Transform the data
-      const responses: SurveyResponse[] = surveyData.map(response => ({
-        ...response,
-        question_responses: response.survey_question_responses.map((qr: any) => ({
-          question_id: qr.question_id,
-          response_value: qr.response_value,
-          response_text: qr.response_text,
-          question: {
-            ...qr.survey_questions,
-            section_title: qr.survey_questions.survey_sections.title
-          }
-        }))
-      }))
-
-      const questions: SurveyQuestion[] = questionsData.map(q => ({
-        ...q,
-        section_title: q.survey_sections.title
-      }))
-
-      // Calculate analytics
+      // Calculate analytics from ALL survey responses
       const analytics = calculateAnalytics(responses, questions)
       setData(analytics)
 

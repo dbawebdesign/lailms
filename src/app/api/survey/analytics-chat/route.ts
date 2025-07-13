@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/utils/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
+
+// Use admin client that bypasses RLS to get ALL survey data
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+)
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -14,10 +26,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
 
-    const supabase = await createSupabaseServerClient()
-
-    // Fetch all survey data for context
-    const { data: surveyData, error: surveyError } = await supabase
+    // Fetch all survey data for context using admin client
+    const { data: surveyData, error: surveyError } = await supabaseAdmin
       .from('survey_responses')
       .select(`
         *,
@@ -47,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch all questions for reference
-    const { data: questionsData, error: questionsError } = await supabase
+    const { data: questionsData, error: questionsError } = await supabaseAdmin
       .from('survey_questions')
       .select(`
         *,

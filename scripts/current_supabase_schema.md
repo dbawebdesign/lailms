@@ -49,6 +49,12 @@ This document tracks the current state of our Supabase database schema, includin
 - Users can only access their own survey responses
 - Admin users can view all responses for analytics
 
+**Admin Analytics Access**:
+- Survey analytics dashboard (`/dev-admin/survey-analytics`) uses admin API routes
+- API routes use service role key to bypass RLS and access ALL survey responses
+- This ensures complete dataset for analytics regardless of current user's role
+- Routes: `/api/dev-admin/survey-analytics` and `/api/survey/analytics-chat`
+
 **Survey Content**:
 - **Section 1**: Problem Validation (7 Likert scale questions about curriculum challenges)
 - **Section 2**: Product Test (7 importance scale questions about AI features)
