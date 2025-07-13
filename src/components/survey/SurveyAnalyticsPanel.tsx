@@ -439,7 +439,7 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
               type="submit" 
               disabled={!input.trim() || isLoading}
               size="icon"
-              className="bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {isLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -607,7 +607,7 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
               type="submit" 
               disabled={!input.trim() || isLoading}
               size="icon"
-              className="bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {isLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

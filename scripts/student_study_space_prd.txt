@@ -1,0 +1,423 @@
+# Student Study Space - Product Requirements Document
+
+## Executive Summary
+
+The Student Study Space is a comprehensive learning environment inspired by Google's NotebookLM, designed to provide students with an intelligent, interactive study companion that leverages all class content, paths, lessons, and media assets. This feature transforms passive content consumption into active, personalized learning experiences through AI-powered study tools, visual learning aids, and collaborative features.
+
+## Project Overview
+
+### Vision
+Create an autonomous study environment where students can deeply engage with their course materials through AI-assisted learning, mind mapping, note-taking, and interactive study sessions that adapt to their learning style and progress.
+
+### Goals
+- Provide students with a personalized, AI-powered study companion
+- Enable deep engagement with course content outside formal assignments
+- Implement NotebookLM-inspired features adapted for educational content
+- Integrate existing teacher tools (mind map generator) for student use
+- Create a seamless study experience across all enrolled courses
+- Support multiple learning modalities (visual, auditory, kinesthetic)
+
+### Success Metrics
+- Student engagement time in study spaces
+- Improvement in assessment scores after study space usage
+- User satisfaction scores for study tools
+- Adoption rate across student base
+- Content interaction depth metrics
+
+## Current System Integration
+
+### Existing Architecture Leverage
+- **Base Classes**: Foundation for study space content organization
+- **Learning Paths**: Structured progression through study materials
+- **Lessons & Sections**: Granular content units for focused study
+- **Media Assets**: Rich multimedia content for comprehensive learning
+- **Assessment System**: Integration with existing question banks and grading
+- **Luna AI**: Existing AI infrastructure for intelligent tutoring
+- **Teacher Tools**: Adaptation of mind mapping and content generation tools
+
+### Database Schema Extensions
+Based on current Supabase schema, we'll extend existing tables and create new ones:
+
+#### New Tables Required:
+- `student_study_spaces` - Individual study space configurations
+- `study_space_notes` - Student-generated notes and annotations
+- `study_space_bookmarks` - Saved content references
+- `study_space_mind_maps` - Generated mind maps and concept relationships
+- `study_space_sessions` - Study session tracking and analytics
+- `study_space_ai_conversations` - AI chat history and context
+- `study_space_content_interactions` - Detailed interaction tracking
+
+#### Extended Tables:
+- `profiles` - Add study preferences and learning style data
+- `enrollments` - Add study space access permissions
+- `lesson_content` - Add study space indexing and searchability
+
+## Core Features
+
+### 1. Intelligent Content Aggregation
+**Description**: Automatically aggregate and organize all course content into a searchable, navigable study environment.
+
+**Key Components**:
+- Content indexing from base_classes, learning_paths, lessons, lesson_sections
+- Media asset integration (videos, images, documents, audio)
+- Automatic content categorization and tagging
+- Cross-course content relationship mapping
+- Real-time content updates as courses evolve
+
+**Technical Implementation**:
+- Vector embeddings for content similarity and search
+- Full-text search across all content types
+- Metadata extraction and structured storage
+- Content versioning and update tracking
+
+### 2. AI-Powered Study Assistant (Luna Study Mode)
+**Description**: Extend Luna AI specifically for study space interactions with deep course content knowledge.
+
+**Key Components**:
+- Course-specific AI persona with complete content knowledge
+- Contextual question answering based on course materials
+- Personalized study recommendations
+- Learning gap identification and targeted suggestions
+- Adaptive difficulty adjustment based on student performance
+
+**Technical Implementation**:
+- Enhanced Luna context with course-specific knowledge base
+- Integration with existing AI infrastructure
+- Conversation persistence and context management
+- Performance analytics and learning pattern recognition
+
+### 3. Interactive Mind Mapping (Adapted from Teacher Tools)
+**Description**: Student-focused mind mapping tool leveraging existing teacher mind map generator.
+
+**Key Components**:
+- Auto-generated concept maps from course content
+- Interactive node exploration with linked content
+- Collaborative mind mapping for group study
+- Personal annotation and note-taking on maps
+- Visual learning path representation
+- Export capabilities (PDF, image, shareable links)
+
+**Technical Implementation**:
+- Adapt existing mind map generator for student use
+- Integration with course content database
+- Real-time collaborative editing capabilities
+- Responsive design for mobile and desktop use
+
+### 4. Advanced Note-Taking System
+**Description**: Comprehensive note-taking with AI enhancement and content linking.
+
+**Key Components**:
+- Rich text editor with multimedia support
+- Automatic content linking and citations
+- AI-suggested note improvements and organization
+- Cross-course note relationships
+- Collaborative note sharing (optional)
+- Export and synchronization capabilities
+
+**Technical Implementation**:
+- React-based rich text editor (likely Tiptap or similar)
+- Real-time synchronization with Supabase
+- AI integration for content suggestions
+- Version control and backup systems
+
+### 5. Personalized Study Guides
+**Description**: AI-generated study guides tailored to individual learning needs and upcoming assessments.
+
+**Key Components**:
+- Automatic study guide generation from course content
+- Personalized based on learning history and preferences
+- Assessment-focused preparation materials
+- Progressive difficulty adjustment
+- Multi-format output (text, visual, audio)
+
+**Technical Implementation**:
+- AI content generation pipeline
+- Learning analytics integration
+- Template-based guide generation
+- Performance tracking and optimization
+
+### 6. Interactive Content Exploration
+**Description**: NotebookLM-inspired content interaction with enhanced discovery features.
+
+**Key Components**:
+- Conversational content exploration
+- Related content suggestions
+- Cross-reference discovery
+- Timeline-based content navigation
+- Bookmark and highlight management
+- Content annotation and personal insights
+
+**Technical Implementation**:
+- Advanced search and recommendation algorithms
+- Content relationship mapping
+- User interaction tracking
+- Personalization engine
+
+### 7. Study Session Analytics
+**Description**: Comprehensive tracking and analytics for study sessions and learning progress.
+
+**Key Components**:
+- Session duration and engagement tracking
+- Content interaction heatmaps
+- Learning progress visualization
+- Study habit analysis and recommendations
+- Goal setting and achievement tracking
+- Performance correlation with assessments
+
+**Technical Implementation**:
+- Real-time analytics collection
+- Dashboard visualization components
+- Data aggregation and reporting
+- Privacy-compliant tracking
+
+### 8. Collaborative Study Features
+**Description**: Social learning tools for peer interaction and group study.
+
+**Key Components**:
+- Study group creation and management
+- Shared study spaces and resources
+- Peer note sharing and collaboration
+- Group mind mapping sessions
+- Study buddy matching
+- Discussion forums per course
+
+**Technical Implementation**:
+- Real-time collaboration infrastructure
+- Permission and privacy management
+- Group management system
+- Communication tools integration
+
+## Technical Architecture
+
+### Frontend Components
+- **StudySpaceLayout**: Main container component
+- **ContentExplorer**: Browse and search course content
+- **AIStudyAssistant**: Luna integration for study mode
+- **MindMapViewer**: Interactive mind mapping interface
+- **NoteTakingEditor**: Rich text note-taking system
+- **StudyGuideGenerator**: AI-powered guide creation
+- **AnalyticsDashboard**: Progress tracking and insights
+- **CollaborationTools**: Group study features
+
+### Backend Services
+- **Content Indexing Service**: Aggregate and index course content
+- **AI Study Service**: Enhanced Luna for study-specific interactions
+- **Mind Map Service**: Adapt existing teacher tools for students
+- **Analytics Service**: Track and analyze study patterns
+- **Collaboration Service**: Manage group study features
+- **Search Service**: Advanced content search and discovery
+
+### Database Schema Updates
+
+#### New Tables:
+```sql
+-- Student study spaces
+CREATE TABLE student_study_spaces (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID REFERENCES profiles(id),
+    course_id UUID REFERENCES base_classes(id),
+    name TEXT NOT NULL,
+    description TEXT,
+    settings JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Study space notes
+CREATE TABLE study_space_notes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    study_space_id UUID REFERENCES student_study_spaces(id),
+    title TEXT NOT NULL,
+    content JSONB NOT NULL,
+    content_references JSONB DEFAULT '[]',
+    tags TEXT[],
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Study space bookmarks
+CREATE TABLE study_space_bookmarks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    study_space_id UUID REFERENCES student_study_spaces(id),
+    content_type TEXT NOT NULL, -- 'lesson', 'section', 'media', etc.
+    content_id UUID NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Study space mind maps
+CREATE TABLE study_space_mind_maps (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    study_space_id UUID REFERENCES student_study_spaces(id),
+    title TEXT NOT NULL,
+    map_data JSONB NOT NULL,
+    is_collaborative BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Study sessions tracking
+CREATE TABLE study_space_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    study_space_id UUID REFERENCES student_study_spaces(id),
+    session_data JSONB NOT NULL,
+    duration_minutes INTEGER,
+    content_interactions JSONB DEFAULT '[]',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- AI conversation history
+CREATE TABLE study_space_ai_conversations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    study_space_id UUID REFERENCES student_study_spaces(id),
+    conversation_data JSONB NOT NULL,
+    context_data JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+### API Endpoints
+- `GET /api/study-space/{courseId}` - Get study space for course
+- `POST /api/study-space/notes` - Create/update notes
+- `GET /api/study-space/content/search` - Search course content
+- `POST /api/study-space/mind-map/generate` - Generate mind map
+- `POST /api/study-space/ai/chat` - AI study assistant
+- `GET /api/study-space/analytics` - Study session analytics
+- `POST /api/study-space/bookmarks` - Manage bookmarks
+
+## User Experience Design
+
+### Navigation Structure
+- **Study Spaces Dashboard**: Overview of all enrolled courses
+- **Course Study Space**: Individual course study environment
+- **Content Library**: Organized course materials
+- **My Notes**: Personal note collection
+- **Mind Maps**: Visual concept mapping
+- **Study Analytics**: Progress tracking
+- **Collaboration Hub**: Group study features
+
+### Key User Flows
+1. **Entering Study Space**: Course selection → Study space dashboard → Content exploration
+2. **AI-Assisted Study**: Question → AI response → Content deep-dive → Note-taking
+3. **Mind Map Creation**: Topic selection → Auto-generation → Customization → Sharing
+4. **Note Organization**: Content annotation → Note creation → Linking → Review
+5. **Study Session**: Goal setting → Content engagement → Progress tracking → Review
+
+### Responsive Design Requirements
+- Mobile-first approach for on-the-go studying
+- Tablet optimization for note-taking and mind mapping
+- Desktop full-feature experience
+- Offline capability for core features
+
+## Integration Requirements
+
+### Existing System Integration
+- **Luna AI**: Enhanced context for study-specific interactions
+- **Assessment System**: Link study activities to assessment preparation
+- **Progress Tracking**: Integration with existing progress systems
+- **Teacher Tools**: Adapt mind mapping and content generation
+- **Authentication**: Seamless SSO with existing auth system
+
+### Third-Party Integrations
+- **File Storage**: Enhanced media handling for study materials
+- **Search Engine**: Advanced content search capabilities
+- **Analytics**: Detailed learning analytics and insights
+- **Collaboration**: Real-time collaborative editing
+
+## Security and Privacy
+
+### Data Protection
+- Student study data encryption at rest and in transit
+- Granular privacy controls for shared content
+- FERPA compliance for educational data
+- Secure AI conversation storage
+- Regular security audits
+
+### Access Controls
+- Role-based permissions (student, teacher, admin)
+- Course-specific access controls
+- Collaborative feature permissions
+- Data export and deletion rights
+
+## Performance Requirements
+
+### System Performance
+- Sub-second response times for content search
+- Real-time collaboration with <100ms latency
+- Efficient content indexing and retrieval
+- Scalable AI processing for multiple concurrent users
+- Mobile-optimized performance
+
+### Content Handling
+- Support for large media files and documents
+- Efficient vector search for content similarity
+- Caching strategies for frequently accessed content
+- Progressive loading for large datasets
+
+## Implementation Timeline
+
+### Phase 1: Foundation (Weeks 1-4)
+- Database schema implementation
+- Basic study space structure
+- Content aggregation system
+- Core UI components
+
+### Phase 2: Core Features (Weeks 5-8)
+- AI study assistant integration
+- Note-taking system
+- Basic mind mapping adaptation
+- Content search and discovery
+
+### Phase 3: Advanced Features (Weeks 9-12)
+- Advanced mind mapping features
+- Study analytics implementation
+- Collaborative tools
+- Mobile optimization
+
+### Phase 4: Enhancement (Weeks 13-16)
+- Performance optimization
+- Advanced AI features
+- Additional NotebookLM-inspired tools
+- User testing and refinement
+
+## Success Criteria
+
+### Functional Requirements
+- ✅ Students can access all course content in unified study space
+- ✅ AI assistant provides contextual help and study guidance
+- ✅ Mind mapping tools create visual learning aids
+- ✅ Note-taking system links to course content
+- ✅ Study analytics track learning progress
+- ✅ Collaborative features enable group study
+
+### Performance Requirements
+- ✅ 99.9% uptime during peak study hours
+- ✅ <2 second load times for study space components
+- ✅ Support for 1000+ concurrent users
+- ✅ Real-time collaboration with minimal latency
+
+### User Experience Requirements
+- ✅ Intuitive navigation and content discovery
+- ✅ Seamless mobile and desktop experience
+- ✅ Accessibility compliance (WCAG 2.1 AA)
+- ✅ Personalized learning recommendations
+
+## Risk Assessment
+
+### Technical Risks
+- **AI Performance**: Ensure Luna AI scales for study-specific queries
+- **Content Indexing**: Efficient processing of large content volumes
+- **Real-time Collaboration**: Maintaining performance with concurrent users
+- **Mobile Performance**: Optimizing complex features for mobile devices
+
+### Mitigation Strategies
+- Comprehensive testing and performance monitoring
+- Gradual rollout with user feedback collection
+- Backup systems for critical functionality
+- Regular performance optimization cycles
+
+## Conclusion
+
+The Student Study Space represents a significant enhancement to our educational platform, providing students with powerful, AI-driven tools for deep learning engagement. By leveraging our existing infrastructure and incorporating NotebookLM-inspired features, we create a comprehensive study environment that adapts to individual learning needs while maintaining seamless integration with our current systems.
+
+This implementation will position our platform as a leader in educational technology, providing students with the tools they need for academic success while generating valuable insights into learning patterns and preferences. 

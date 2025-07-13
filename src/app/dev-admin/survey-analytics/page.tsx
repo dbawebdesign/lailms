@@ -24,9 +24,52 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react'
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  Legend
+} from 'recharts'
 
 import { SurveyAnalyticsPanel } from '@/components/survey/SurveyAnalyticsPanel'
 import { cn } from '@/lib/utils'
+import Image from 'next/image'
+
+// Color palette for charts - following Apple/Tesla design principles
+const CHART_COLORS = {
+  primary: '#3B82F6',      // Blue
+  secondary: '#10B981',    // Green
+  accent: '#F59E0B',       // Amber
+  warning: '#EF4444',      // Red
+  info: '#8B5CF6',         // Purple
+  muted: '#6B7280',        // Gray
+  success: '#059669',      // Emerald
+  gradient: ['#3B82F6', '#1D4ED8', '#1E40AF', '#1E3A8A', '#312E81']
+}
+
+// Score color mapping for intuitive understanding
+const getScoreColor = (score: number, max: number = 5) => {
+  const percentage = (score / max) * 100
+  if (percentage >= 80) return CHART_COLORS.success
+  if (percentage >= 60) return CHART_COLORS.primary
+  if (percentage >= 40) return CHART_COLORS.accent
+  return CHART_COLORS.warning
+}
+
+// Priority color mapping
+const getPriorityColor = (rank: number) => {
+  if (rank === 1) return CHART_COLORS.success
+  if (rank === 2) return CHART_COLORS.primary
+  if (rank === 3) return CHART_COLORS.accent
+  return CHART_COLORS.muted
+}
 
 interface SurveyQuestion {
   id: number
@@ -468,74 +511,124 @@ export default function SurveyAnalyticsPage() {
       {/* Key Insights Overview */}
       {insights && (
         <div className="grid gap-6 md:grid-cols-4 mb-8">
-          <Card>
+          <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Top Problem</CardTitle>
+              <CardTitle className="text-sm font-medium text-red-800 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                Top Problem
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-red-600 mt-1 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium leading-tight">
-                    {insights.topProblems[0]?.[0]?.substring(0, 50)}...
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Score: {insights.topProblems[0]?.[1]?.toFixed(1)}/5
-                  </p>
+              <div className="space-y-2">
+                <p className="text-sm font-medium leading-tight text-gray-900">
+                  {insights.topProblems[0]?.[0]?.substring(0, 50)}...
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Progress 
+                      value={(insights.topProblems[0]?.[1] || 0) / 5 * 100} 
+                      className="h-2"
+                      style={{ 
+                        background: `linear-gradient(to right, ${CHART_COLORS.warning}20, ${CHART_COLORS.warning}40)`
+                      }}
+                    />
+                  </div>
+                  <span className="text-lg font-bold text-red-600">
+                    {insights.topProblems[0]?.[1]?.toFixed(1)}/5
+                  </span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Most Wanted Feature</CardTitle>
+              <CardTitle className="text-sm font-medium text-yellow-800 flex items-center gap-2">
+                <Star className="w-4 h-4" />
+                Most Wanted Feature
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-start gap-2">
-                <Star className="w-4 h-4 text-yellow-600 mt-1 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium leading-tight">
-                    {insights.topFeatures[0]?.[0]?.substring(0, 50)}...
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Score: {insights.topFeatures[0]?.[1]?.toFixed(1)}/5
-                  </p>
+              <div className="space-y-2">
+                <p className="text-sm font-medium leading-tight text-gray-900">
+                  {insights.topFeatures[0]?.[0]?.substring(0, 50)}...
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Progress 
+                      value={(insights.topFeatures[0]?.[1] || 0) / 5 * 100} 
+                      className="h-2"
+                      style={{ 
+                        background: `linear-gradient(to right, ${CHART_COLORS.accent}20, ${CHART_COLORS.accent}40)`
+                      }}
+                    />
+                  </div>
+                  <span className="text-lg font-bold text-yellow-600">
+                    {insights.topFeatures[0]?.[1]?.toFixed(1)}/5
+                  </span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Price Expectation</CardTitle>
+              <CardTitle className="text-sm font-medium text-green-800 flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Price Expectation
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-green-600" />
-                <div>
-                  <span className="text-lg font-bold">${insights.averageExpectedPrice.toFixed(0)}</span>
-                  <p className="text-xs text-muted-foreground">
-                    Max: ${insights.averageMaxPrice.toFixed(0)}
-                  </p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl font-bold text-green-600">
+                    ${insights.averageExpectedPrice.toFixed(0)}
+                  </span>
+                  <span className="text-sm text-green-700">
+                    /month
+                  </span>
                 </div>
+                <div className="text-xs text-green-700">
+                  Max tolerance: ${insights.averageMaxPrice.toFixed(0)}
+                </div>
+                <Progress 
+                  value={(insights.averageExpectedPrice / insights.averageMaxPrice) * 100} 
+                  className="h-2"
+                  style={{ 
+                    background: `linear-gradient(to right, ${CHART_COLORS.success}20, ${CHART_COLORS.success}40)`
+                  }}
+                />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">NPS Score</CardTitle>
+              <CardTitle className="text-sm font-medium text-blue-800 flex items-center gap-2">
+                <Target className="w-4 h-4" />
+                NPS Score
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-blue-600" />
-                <div>
-                  <span className="text-lg font-bold">{insights.npsScore.toFixed(1)}</span>
-                  <p className="text-xs text-muted-foreground">
-                    {insights.npsCategory}
-                  </p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl font-bold text-blue-600">
+                    {insights.npsScore.toFixed(1)}
+                  </span>
+                  <span className="text-sm text-blue-700">
+                    /10
+                  </span>
                 </div>
+                <div className="text-xs text-blue-700">
+                  {insights.npsCategory}
+                </div>
+                <Progress 
+                  value={(insights.npsScore / 10) * 100} 
+                  className="h-2"
+                  style={{ 
+                    background: `linear-gradient(to right, ${CHART_COLORS.primary}20, ${CHART_COLORS.primary}40)`
+                  }}
+                />
               </div>
             </CardContent>
           </Card>
@@ -553,219 +646,635 @@ export default function SurveyAnalyticsPage() {
          </TabsList>
 
         <TabsContent value="problems" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Problem Validation Analysis</CardTitle>
-              <CardDescription>
-                How strongly parents agree with common homeschooling challenges (1=Strongly Disagree, 5=Strongly Agree)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(data?.problemValidationScores || {})
-                  .sort(([,a], [,b]) => b - a)
-                  .map(([problem, score]) => (
-                    <div key={problem} className="space-y-2">
-                      <div className="flex justify-between items-start">
-                        <p className="text-sm font-medium leading-tight flex-1 pr-4">
-                          {problem}
-                        </p>
-                        <div className="text-right flex-shrink-0">
-                          <span className="text-lg font-bold">{score.toFixed(1)}</span>
-                          <span className="text-sm text-muted-foreground">/5</span>
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Chart View */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-blue-600" />
+                  Problem Validation Scores
+                </CardTitle>
+                <CardDescription>
+                  Visual ranking of homeschooling challenges by agreement level
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={Object.entries(data?.problemValidationScores || {})
+                        .sort(([,a], [,b]) => b - a)
+                        .map(([problem, score], index) => ({
+                          name: problem.length > 40 ? problem.substring(0, 40) + '...' : problem,
+                          fullName: problem,
+                          score: score,
+                          fill: getScoreColor(score, 5)
+                        }))}
+                      layout="horizontal"
+                      margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                      <XAxis type="number" domain={[0, 5]} />
+                      <YAxis dataKey="name" type="category" width={120} fontSize={12} />
+                      <Tooltip 
+                        formatter={(value: number, name: string, props: any) => [
+                          `${value.toFixed(1)}/5`, 
+                          props.payload.fullName
+                        ]}
+                        labelStyle={{ color: '#374151' }}
+                        contentStyle={{ 
+                          backgroundColor: 'white', 
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Bar dataKey="score" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Detailed List View */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  Detailed Problem Analysis
+                </CardTitle>
+                <CardDescription>
+                  Ranked by agreement level (1=Strongly Disagree, 5=Strongly Agree)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4 max-h-80 overflow-y-auto">
+                  {Object.entries(data?.problemValidationScores || {})
+                    .sort(([,a], [,b]) => b - a)
+                    .map(([problem, score], index) => (
+                      <div key={problem} className="space-y-3 p-3 rounded-lg border bg-gradient-to-r from-gray-50 to-gray-100/50">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 mt-1">
+                            <div 
+                              className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                              style={{ backgroundColor: getPriorityColor(index + 1) }}
+                            >
+                              {index + 1}
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium leading-tight mb-2">
+                              {problem}
+                            </p>
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1">
+                                <Progress 
+                                  value={(score / 5) * 100} 
+                                  className="h-2"
+                                  style={{ 
+                                    background: `linear-gradient(to right, ${getScoreColor(score, 5)}20, ${getScoreColor(score, 5)}40)`
+                                  }}
+                                />
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <span 
+                                  className="text-lg font-bold"
+                                  style={{ color: getScoreColor(score, 5) }}
+                                >
+                                  {score.toFixed(1)}
+                                </span>
+                                <span className="text-sm text-muted-foreground">/5</span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                              <span>Low Agreement</span>
+                              <span>High Agreement</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <Progress value={(score / 5) * 100} className="h-2" />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Low Agreement</span>
-                        <span>High Agreement</span>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </CardContent>
-          </Card>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="features" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Feature Importance Ranking</CardTitle>
-              <CardDescription>
-                How important parents rate each potential feature (1=Very Unimportant, 5=Very Important)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(data?.featureImportanceScores || {})
-                  .sort(([,a], [,b]) => b - a)
-                  .map(([feature, score]) => (
-                    <div key={feature} className="space-y-2">
-                      <div className="flex justify-between items-start">
-                        <p className="text-sm font-medium leading-tight flex-1 pr-4">
-                          {feature}
-                        </p>
-                        <div className="text-right flex-shrink-0">
-                          <span className="text-lg font-bold">{score.toFixed(1)}</span>
-                          <span className="text-sm text-muted-foreground">/5</span>
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Chart View */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="w-5 h-5 text-yellow-600" />
+                  Feature Importance Ranking
+                </CardTitle>
+                <CardDescription>
+                  Visual ranking of feature importance by parent ratings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={Object.entries(data?.featureImportanceScores || {})
+                        .sort(([,a], [,b]) => b - a)
+                        .map(([feature, score], index) => ({
+                          name: feature.length > 40 ? feature.substring(0, 40) + '...' : feature,
+                          fullName: feature,
+                          score: score,
+                          fill: getScoreColor(score, 5)
+                        }))}
+                      layout="horizontal"
+                      margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                      <XAxis type="number" domain={[0, 5]} />
+                      <YAxis dataKey="name" type="category" width={120} fontSize={12} />
+                      <Tooltip 
+                        formatter={(value: number, name: string, props: any) => [
+                          `${value.toFixed(1)}/5`, 
+                          props.payload.fullName
+                        ]}
+                        labelStyle={{ color: '#374151' }}
+                        contentStyle={{ 
+                          backgroundColor: 'white', 
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Bar dataKey="score" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Priority Matrix */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="w-5 h-5 text-green-600" />
+                  Development Priority Matrix
+                </CardTitle>
+                <CardDescription>
+                  Feature prioritization based on importance scores
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4 max-h-80 overflow-y-auto">
+                  {Object.entries(data?.featureImportanceScores || {})
+                    .sort(([,a], [,b]) => b - a)
+                    .map(([feature, score], index) => {
+                      const priority = index < 3 ? 'High' : index < 6 ? 'Medium' : 'Low'
+                      const priorityColor = index < 3 ? 'bg-green-100 text-green-800 border-green-200' : 
+                                          index < 6 ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 
+                                          'bg-gray-100 text-gray-800 border-gray-200'
+                      
+                      return (
+                        <div key={feature} className="space-y-3 p-3 rounded-lg border bg-gradient-to-r from-blue-50 to-blue-100/50">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 mt-1">
+                              <div 
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                                style={{ backgroundColor: getPriorityColor(index + 1) }}
+                              >
+                                {index + 1}
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-start justify-between mb-2">
+                                <p className="text-sm font-medium leading-tight flex-1 pr-2">
+                                  {feature}
+                                </p>
+                                <Badge className={`text-xs ${priorityColor}`}>
+                                  {priority}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                  <Progress 
+                                    value={(score / 5) * 100} 
+                                    className="h-2"
+                                    style={{ 
+                                      background: `linear-gradient(to right, ${getScoreColor(score, 5)}20, ${getScoreColor(score, 5)}40)`
+                                    }}
+                                  />
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <span 
+                                    className="text-lg font-bold"
+                                    style={{ color: getScoreColor(score, 5) }}
+                                  >
+                                    {score.toFixed(1)}
+                                  </span>
+                                  <span className="text-sm text-muted-foreground">/5</span>
+                                </div>
+                              </div>
+                              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                <span>Unimportant</span>
+                                <span>Very Important</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <Progress value={(score / 5) * 100} className="h-2" />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Unimportant</span>
-                        <span>Very Important</span>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </CardContent>
-          </Card>
+                      )
+                    })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="concerns" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Primary Concerns About AI Adoption</CardTitle>
-              <CardDescription>
-                What parents are most worried about when considering AI-powered learning platforms
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(data?.primaryConcerns || {})
-                  .sort(([,a], [,b]) => b - a)
-                  .map(([concern, count]) => {
-                    const percentage = data?.totalResponses ? (count / data.totalResponses) * 100 : 0
-                    return (
-                      <div key={concern} className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <p className="text-sm font-medium">{concern}</p>
-                          <div className="text-right">
-                            <span className="text-lg font-bold">{count}</span>
-                            <span className="text-sm text-muted-foreground ml-2">
-                              ({percentage.toFixed(1)}%)
-                            </span>
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Pie Chart View */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PieChart className="w-5 h-5 text-purple-600" />
+                  Concern Distribution
+                </CardTitle>
+                <CardDescription>
+                  Visual breakdown of primary concerns about AI adoption
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPieChart>
+                      <Pie
+                        data={Object.entries(data?.primaryConcerns || {})
+                          .sort(([,a], [,b]) => b - a)
+                          .map(([concern, count], index) => ({
+                            name: concern.length > 30 ? concern.substring(0, 30) + '...' : concern,
+                            fullName: concern,
+                            value: count,
+                            percentage: data?.totalResponses ? (count / data.totalResponses) * 100 : 0,
+                            fill: CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]
+                          }))}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ percentage }: any) => `${percentage.toFixed(1)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {Object.entries(data?.primaryConcerns || {}).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number, name: string, props: any) => [
+                          `${value} responses (${props.payload.percentage.toFixed(1)}%)`, 
+                          props.payload.fullName
+                        ]}
+                        contentStyle={{ 
+                          backgroundColor: 'white', 
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Legend />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Detailed Concerns List */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                  Detailed Concern Analysis
+                </CardTitle>
+                <CardDescription>
+                  Ranked concerns with response counts and percentages
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4 max-h-80 overflow-y-auto">
+                  {Object.entries(data?.primaryConcerns || {})
+                    .sort(([,a], [,b]) => b - a)
+                    .map(([concern, count], index) => {
+                      const percentage = data?.totalResponses ? (count / data.totalResponses) * 100 : 0
+                      const severity = percentage >= 30 ? 'High' : percentage >= 15 ? 'Medium' : 'Low'
+                      const severityColor = percentage >= 30 ? 'bg-red-100 text-red-800 border-red-200' : 
+                                           percentage >= 15 ? 'bg-orange-100 text-orange-800 border-orange-200' : 
+                                           'bg-yellow-100 text-yellow-800 border-yellow-200'
+                      
+                      return (
+                        <div key={concern} className="space-y-3 p-3 rounded-lg border bg-gradient-to-r from-red-50 to-red-100/50">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 mt-1">
+                              <div 
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                                style={{ backgroundColor: CHART_COLORS.gradient[index % CHART_COLORS.gradient.length] }}
+                              >
+                                {index + 1}
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-start justify-between mb-2">
+                                <p className="text-sm font-medium leading-tight flex-1 pr-2">
+                                  {concern}
+                                </p>
+                                <Badge className={`text-xs ${severityColor}`}>
+                                  {severity}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                  <Progress 
+                                    value={percentage} 
+                                    className="h-2"
+                                    style={{ 
+                                      background: `linear-gradient(to right, ${CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]}20, ${CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]}40)`
+                                    }}
+                                  />
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <span 
+                                    className="text-lg font-bold"
+                                    style={{ color: CHART_COLORS.gradient[index % CHART_COLORS.gradient.length] }}
+                                  >
+                                    {count}
+                                  </span>
+                                  <span className="text-sm text-muted-foreground ml-2">
+                                    ({percentage.toFixed(1)}%)
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <Progress value={percentage} className="h-2" />
-                      </div>
-                    )
-                  })}
-              </div>
-            </CardContent>
-          </Card>
+                      )
+                    })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="demographics" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Homeschooling Approaches</CardTitle>
-                <CardDescription>Current teaching methods used by parents</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {Object.entries(data?.demographics.approaches || {})
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([approach, count]) => {
-                      const percentage = data?.totalResponses ? (count / data.totalResponses) * 100 : 0
-                      return (
-                        <div key={approach} className="flex justify-between items-center">
-                          <span className="text-sm">{approach}</span>
-                          <div className="flex items-center gap-2">
-                            <Progress value={percentage} className="w-16 h-2" />
-                            <span className="text-sm font-medium w-8">{count}</span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Income Distribution</CardTitle>
-                <CardDescription>Household income ranges of respondents</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {Object.entries(data?.demographics.incomeRanges || {})
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([range, count]) => {
-                      const percentage = data?.totalResponses ? (count / data.totalResponses) * 100 : 0
-                      return (
-                        <div key={range} className="flex justify-between items-center">
-                          <span className="text-sm">{range}</span>
-                          <div className="flex items-center gap-2">
-                            <Progress value={percentage} className="w-16 h-2" />
-                            <span className="text-sm font-medium w-8">{count}</span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Pricing Analysis</CardTitle>
-                <CardDescription>Expected vs maximum pricing tolerance</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium">Expected Price</span>
-                      <span className="text-lg font-bold">
-                        ${insights?.averageExpectedPrice.toFixed(0)}/month
-                      </span>
+          <div className="grid gap-6">
+            {/* Top Row - Key Metrics */}
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-600 rounded-lg">
+                      <Users className="w-5 h-5 text-white" />
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      Range: ${Math.min(...(data?.demographics.pricingExpectations || [0]))} - ${Math.max(...(data?.demographics.pricingExpectations || [0]))}
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Responses</p>
+                      <p className="text-2xl font-bold text-blue-600">{data?.totalResponses || 0}</p>
                     </div>
                   </div>
-                  
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium">Maximum Price</span>
-                      <span className="text-lg font-bold">
-                        ${insights?.averageMaxPrice.toFixed(0)}/month
-                      </span>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-green-50 to-green-100">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-600 rounded-lg">
+                      <DollarSign className="w-5 h-5 text-white" />
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      Range: ${Math.min(...(data?.demographics.maxPricing || [0]))} - ${Math.max(...(data?.demographics.maxPricing || [0]))}
+                    <div>
+                      <p className="text-sm text-muted-foreground">Avg Expected Price</p>
+                      <p className="text-2xl font-bold text-green-600">${insights?.averageExpectedPrice.toFixed(0)}</p>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Technology Usage</CardTitle>
-                <CardDescription>Current educational technology platforms</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {Object.entries(data?.demographics.techPlatforms || {})
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([platform, count]) => {
-                      const percentage = data?.totalResponses ? (count / data.totalResponses) * 100 : 0
-                      return (
-                        <div key={platform} className="flex justify-between items-center">
-                          <span className="text-sm">{platform}</span>
-                          <div className="flex items-center gap-2">
-                            <Progress value={percentage} className="w-16 h-2" />
-                            <span className="text-sm font-medium w-8">{count}</span>
+              <Card className="bg-gradient-to-br from-purple-50 to-purple-100">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-600 rounded-lg">
+                      <Target className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Max Price Tolerance</p>
+                      <p className="text-2xl font-bold text-purple-600">${insights?.averageMaxPrice.toFixed(0)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-amber-50 to-amber-100">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-600 rounded-lg">
+                      <TrendingUp className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">NPS Score</p>
+                      <p className="text-2xl font-bold text-amber-600">{insights?.npsScore.toFixed(1)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Middle Row - Charts */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-blue-600" />
+                    Homeschooling Approaches
+                  </CardTitle>
+                  <CardDescription>Distribution of current teaching methods</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={Object.entries(data?.demographics.approaches || {})
+                          .sort(([,a], [,b]) => b - a)
+                          .map(([approach, count], index) => ({
+                            name: approach.length > 20 ? approach.substring(0, 20) + '...' : approach,
+                            fullName: approach,
+                            value: count,
+                            percentage: data?.totalResponses ? (count / data.totalResponses) * 100 : 0,
+                            fill: CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]
+                          }))}
+                        margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                        <XAxis dataKey="name" fontSize={12} />
+                        <YAxis />
+                        <Tooltip 
+                          formatter={(value: number, name: string, props: any) => [
+                            `${value} responses (${props.payload.percentage.toFixed(1)}%)`, 
+                            props.payload.fullName
+                          ]}
+                          contentStyle={{ 
+                            backgroundColor: 'white', 
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                          }}
+                        />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-green-600" />
+                    Income Distribution
+                  </CardTitle>
+                  <CardDescription>Household income ranges of respondents</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPieChart>
+                        <Pie
+                          data={Object.entries(data?.demographics.incomeRanges || {})
+                            .sort(([,a], [,b]) => b - a)
+                            .map(([range, count], index) => ({
+                              name: range,
+                              value: count,
+                              percentage: data?.totalResponses ? (count / data.totalResponses) * 100 : 0,
+                              fill: CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]
+                            }))}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ percentage }: any) => `${percentage.toFixed(1)}%`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {Object.entries(data?.demographics.incomeRanges || {}).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: number, name: string, props: any) => [
+                            `${value} responses (${props.payload.percentage.toFixed(1)}%)`, 
+                            props.payload.name
+                          ]}
+                          contentStyle={{ 
+                            backgroundColor: 'white', 
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                          }}
+                        />
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Bottom Row - Tables */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="w-5 h-5 text-purple-600" />
+                    Pricing Analysis
+                  </CardTitle>
+                  <CardDescription>Expected vs maximum pricing tolerance</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm font-medium text-green-800">Expected Price</span>
+                        <span className="text-2xl font-bold text-green-600">
+                          ${insights?.averageExpectedPrice.toFixed(0)}/month
+                        </span>
+                      </div>
+                      <div className="text-xs text-green-700">
+                        Range: ${Math.min(...(data?.demographics.pricingExpectations || [0]))} - ${Math.max(...(data?.demographics.pricingExpectations || [0]))}
+                      </div>
+                      <div className="mt-2">
+                        <Progress 
+                          value={insights?.averageExpectedPrice ? (insights.averageExpectedPrice / 100) * 100 : 0} 
+                          className="h-2"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm font-medium text-purple-800">Maximum Price</span>
+                        <span className="text-2xl font-bold text-purple-600">
+                          ${insights?.averageMaxPrice.toFixed(0)}/month
+                        </span>
+                      </div>
+                      <div className="text-xs text-purple-700">
+                        Range: ${Math.min(...(data?.demographics.maxPricing || [0]))} - ${Math.max(...(data?.demographics.maxPricing || [0]))}
+                      </div>
+                      <div className="mt-2">
+                        <Progress 
+                          value={insights?.averageMaxPrice ? (insights.averageMaxPrice / 150) * 100 : 0} 
+                          className="h-2"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-blue-600" />
+                    Technology Usage
+                  </CardTitle>
+                  <CardDescription>Current educational technology platforms</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {Object.entries(data?.demographics.techPlatforms || {})
+                      .sort(([,a], [,b]) => b - a)
+                      .map(([platform, count], index) => {
+                        const percentage = data?.totalResponses ? (count / data.totalResponses) * 100 : 0
+                        return (
+                          <div key={platform} className="p-3 rounded-lg border bg-gradient-to-r from-blue-50 to-blue-100/50">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-sm font-medium">{platform}</span>
+                              <div className="flex items-center gap-2">
+                                <span 
+                                  className="text-lg font-bold"
+                                  style={{ color: CHART_COLORS.gradient[index % CHART_COLORS.gradient.length] }}
+                                >
+                                  {count}
+                                </span>
+                                <span className="text-sm text-muted-foreground">
+                                  ({percentage.toFixed(1)}%)
+                                </span>
+                              </div>
+                            </div>
+                            <Progress 
+                              value={percentage} 
+                              className="h-2"
+                              style={{ 
+                                background: `linear-gradient(to right, ${CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]}20, ${CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]}40)`
+                              }}
+                            />
                           </div>
-                        </div>
-                      )
-                    })}
-                </div>
-              </CardContent>
-            </Card>
+                        )
+                      })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </TabsContent>
 
@@ -1028,17 +1537,24 @@ export default function SurveyAnalyticsPage() {
          <Button 
            onClick={() => setIsPanelOpen(true)}
            className={cn(
-             "fixed z-50 rounded-full shadow-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white transition-all duration-200 hover:scale-105 hover:shadow-xl",
+             "fixed z-50 rounded-full shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl",
+             // Glassmorphism styling
+             "backdrop-blur-md bg-white/20 border border-white/30",
+             "hover:bg-white/30 hover:border-white/40",
+             "dark:bg-black/20 dark:border-white/20 dark:hover:bg-black/30",
              isMobile 
                ? 'bottom-6 right-6 h-14 w-14 p-0' 
                : 'bottom-4 right-4 h-12 w-12 p-0'
            )}
            aria-label="Open Survey Analytics Assistant"
          >
-           <div className="flex flex-col items-center">
-             <MessageSquare size={isMobile ? 20 : 16} />
-             {!isMobile && <span className="text-xs mt-0.5">AI Chat</span>}
-           </div>
+           <Image
+             src="/web-app-manifest-512x512.png"
+             alt="Survey Analytics Assistant"
+             width={isMobile ? 24 : 20}
+             height={isMobile ? 24 : 20}
+             className="object-contain"
+           />
          </Button>
        )}
 
