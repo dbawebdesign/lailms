@@ -103,25 +103,26 @@ export const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({
     ref: (node: HTMLElement) => {
       elementRef.current = node;
       // Handle existing ref if present
-      if (typeof children.ref === 'function') {
-        children.ref(node);
-      } else if (children.ref) {
-        (children.ref as React.MutableRefObject<HTMLElement>).current = node;
+      const childRef = (children as any).ref;
+      if (typeof childRef === 'function') {
+        childRef(node);
+      } else if (childRef) {
+        (childRef as React.MutableRefObject<HTMLElement>).current = node;
       }
     },
-    className: className ? `${children.props.className || ''} ${className}`.trim() : children.props.className,
+    className: className ? `${(children.props as any).className || ''} ${className}`.trim() : (children.props as any).className,
     ...(triggerOnHover ? {
       onMouseEnter: (e: React.MouseEvent) => {
-        children.props.onMouseEnter?.(e);
+        (children.props as any).onMouseEnter?.(e);
         showTooltip();
       },
       onMouseLeave: (e: React.MouseEvent) => {
-        children.props.onMouseLeave?.(e);
+        (children.props as any).onMouseLeave?.(e);
         hideTooltip();
       }
     } : {
       onClick: (e: React.MouseEvent) => {
-        children.props.onClick?.(e);
+        (children.props as any).onClick?.(e);
         showTooltip();
       }
     })
