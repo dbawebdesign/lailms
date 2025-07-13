@@ -3,9 +3,9 @@ import { Metadata } from 'next'
 import HomeschoolSignupForm from '@/components/auth/HomeschoolSignupForm'
 import { Loader2 } from 'lucide-react'
 
-export const metadata: Metadata = {
-  title: 'Homeschool Signup | Learnology',
-  description: 'Create your homeschool organization account with Learnology',
+export const metadata = {
+  title: 'Homeschool Signup | Learnology AI',
+  description: 'Create your homeschool organization account with Learnology AI',
 }
 
 function LoadingSpinner() {

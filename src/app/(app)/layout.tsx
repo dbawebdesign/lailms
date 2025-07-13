@@ -2,6 +2,7 @@ import React from 'react';
 import AppShell from "@/components/layout/AppShell";
 import { UIContextProvider } from "@/context/UIContext";
 import { LunaContextRegistration } from "@/components/providers/LunaContextRegistration";
+import { SurveyIntegration } from "@/components/onboarding/SurveyIntegration";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from 'next/navigation';
 import type { UserRole } from "@/lib/utils/roleUtils";
@@ -36,7 +37,7 @@ export default async function AppPagesLayout({
     
     const { data, error } = await supabase
       .from('profiles')
-      .select(PROFILE_ROLE_FIELDS)
+      .select(`${PROFILE_ROLE_FIELDS}, survey_completed`)
       .eq('user_id', user.id)
       .single<Tables<'profiles'>>();
     
@@ -73,7 +74,10 @@ export default async function AppPagesLayout({
   return (
     <UIContextProvider>
       <LunaContextRegistration>
-        <AppShell userRole={userRole}>{children}</AppShell>
+        <AppShell userRole={userRole}>
+          {children}
+          <SurveyIntegration userRole={userRole} profile={profile} />
+        </AppShell>
       </LunaContextRegistration>
     </UIContextProvider>
   );

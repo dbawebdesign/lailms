@@ -85,7 +85,7 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
           {!isNavCollapsed ? (
             <Image
               src={fullLogoSrc}
-              alt="LearnologyAI"
+              alt="Learnology AI"
               width={160}
               height={32}
               className="py-2"
@@ -99,7 +99,7 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
             >
               <Image
                 src={iconLogoSrc}
-                alt="LearnologyAI"
+                alt="Learnology AI"
                 width={32}
                 height={32}
                 className="py-1"

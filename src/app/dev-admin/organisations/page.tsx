@@ -40,7 +40,7 @@ export default function OrganisationsPage() {
   const checkPassword = () => {
     // This is a simple example - in reality, you should use a more secure method
     // like storing an env variable or using a proper authentication system
-    const devPassword = 'learnology-dev-2024'
+    const devPassword = 'learnology-ai-dev-2024'
     if (password === devPassword) {
       setAuthenticated(true)
       localStorage.setItem('dev-admin-auth', 'true')

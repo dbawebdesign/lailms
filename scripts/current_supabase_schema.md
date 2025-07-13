@@ -4,6 +4,64 @@ This document tracks the current state of our Supabase database schema, includin
 
 ## Recent Updates and Fixes
 
+### Survey Feature Implementation (January 2025)
+
+**Feature**: Added comprehensive survey system for new homeschool users with 4-section, 23-question survey for product validation and demographics.
+
+**Tables Added**:
+
+1. **survey_sections** - Survey section metadata
+   - `id` (serial, primary key)
+   - `title` (text, not null) - Section title
+   - `description` (text) - Optional section description
+   - `order_index` (integer, not null) - Display order
+   - `created_at`, `updated_at` (timestamps)
+
+2. **survey_questions** - Individual survey questions
+   - `id` (serial, primary key)
+   - `section_id` (integer, foreign key to survey_sections)
+   - `question_text` (text, not null) - The question content
+   - `question_type` (text, not null) - Type: 'likert', 'multiple_choice', 'text', 'numerical', 'scale'
+   - `options` (jsonb) - Question-specific options and configuration
+   - `required` (boolean, default true)
+   - `order_index` (integer, not null) - Order within section
+   - `created_at`, `updated_at` (timestamps)
+
+3. **survey_responses** - User completion records
+   - `id` (serial, primary key)
+   - `user_id` (uuid, foreign key to profiles.user_id, unique)
+   - `completed_at` (timestamp) - When survey was completed
+   - `duration_seconds` (integer) - Time spent on survey
+   - `device_info` (jsonb) - Device and browser information
+   - `created_at`, `updated_at` (timestamps)
+
+4. **survey_question_responses** - Individual question answers
+   - `id` (serial, primary key)
+   - `survey_response_id` (integer, foreign key to survey_responses)
+   - `question_id` (integer, foreign key to survey_questions)
+   - `response_value` (text) - The selected/entered value
+   - `response_text` (text) - Additional text for open-ended responses
+   - `created_at`, `updated_at` (timestamps)
+
+**Schema Updates**:
+- Added `survey_completed` (boolean, default false) to `profiles` table
+- Added Row Level Security (RLS) policies for all survey tables
+- Users can only access their own survey responses
+- Admin users can view all responses for analytics
+
+**Survey Content**:
+- **Section 1**: Problem Validation (7 Likert scale questions about curriculum challenges)
+- **Section 2**: Product Test (7 importance scale questions about AI features)
+- **Section 3**: Primary Concerns (1 multiple choice about AI adoption concerns)
+- **Section 4**: Demographics (7 mixed questions including pricing, education, approaches)
+
+**Files Added**:
+- Migration: `20250103000000_create_survey_system.sql`
+- Components: Survey modal, sections, and question type components
+- API: `/api/survey/submit` route for handling submissions
+- Types: Survey-related TypeScript interfaces
+- Hook: `useSurvey.ts` for data management
+
 ### HomeschoolDashboard Active Courses Fix (December 2024)
 
 **Issue**: The HomeschoolDashboard was showing 0 active courses for teachers who had active class instances.
@@ -592,3 +650,143 @@ The sanitization fixes the PostgreSQL error: `"unsupported Unicode escape sequen
 - Updated: `src/app/(app)/teach/instances/[instanceId]/page.tsx` - Enhanced Progress tab with live data
 
 **Result**: All four tabs (Overview, Students, Progress, Activity) now display 100% live data from Supabase with no hardcoded or mock values. The Progress tab now shows meaningful analytics calculated from actual student performance data. 
+
+## Survey System Implementation (December 2024)
+
+### New Survey Feature for Homeschool Users
+
+**Purpose**: Mandatory onboarding survey for new homeschool users to collect product validation data and demographic information for product development guidance.
+
+**Implementation Details**:
+
+1. **Survey Modal System**: Modal that appears on first login for homeschool users
+2. **Mandatory Completion**: Users cannot access the app until survey is completed
+3. **Data Collection**: 4-section survey with 22 questions total covering:
+   - Problem validation (7 Likert scale questions)
+   - Product feature importance (7 importance scale questions)
+   - Primary concerns (1 multiple choice question)
+   - Demographics (7 mixed-format questions)
+
+4. **Admin Analytics**: Comprehensive dashboard in dev-admin for data analysis and insights
+
+### Database Schema Changes
+
+**New Tables Added**:
+
+```sql
+-- Survey system tables
+CREATE TABLE survey_sections (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    order_index INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE survey_questions (
+    id SERIAL PRIMARY KEY,
+    section_id INTEGER REFERENCES survey_sections(id) ON DELETE CASCADE,
+    question_text TEXT NOT NULL,
+    question_type VARCHAR(50) NOT NULL CHECK (question_type IN ('likert', 'multiple_choice', 'numerical', 'scale', 'text')),
+    options JSONB, -- Store options for multiple choice, scale definitions, etc.
+    required BOOLEAN DEFAULT true,
+    order_index INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE survey_responses (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES profiles(user_id) ON DELETE CASCADE,
+    completed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    duration_seconds INTEGER,
+    device_info JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id) -- Each user can only complete the survey once
+);
+
+CREATE TABLE survey_question_responses (
+    id SERIAL PRIMARY KEY,
+    survey_response_id INTEGER REFERENCES survey_responses(id) ON DELETE CASCADE,
+    question_id INTEGER REFERENCES survey_questions(id) ON DELETE CASCADE,
+    response_value TEXT, -- Store the actual response value
+    response_text TEXT, -- For text responses or additional comments
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(survey_response_id, question_id) -- One response per question per survey
+);
+```
+
+**Profile Table Updates**:
+```sql
+-- Added survey completion tracking
+ALTER TABLE profiles ADD COLUMN survey_completed BOOLEAN DEFAULT false;
+```
+
+**RLS Policies**:
+- Users can only view/modify their own survey responses
+- Authenticated users can read survey questions and sections
+- Admin users can view all survey responses for analytics
+
+**Indexes Added**:
+- `idx_survey_questions_section_order` - For efficient question ordering
+- `idx_survey_responses_user_id` - For user lookup optimization
+- `idx_survey_question_responses_survey_id` - For response querying
+- `idx_profiles_survey_completed` - For survey completion status queries
+
+### Survey Question Types Supported
+
+1. **Likert Scale**: 5-point agreement scales (Strongly Disagree → Strongly Agree)
+2. **Importance Scale**: 5-point importance scales (Very Unimportant → Very Important)
+3. **Multiple Choice**: Single or multiple selection options
+4. **Numerical**: Currency inputs for pricing questions
+5. **Scale**: 1-10 rating scales with custom labels
+
+### Survey Sections
+
+1. **Problem Validation** (7 questions)
+   - Curriculum sourcing challenges
+   - Time spent on lesson planning
+   - Personalization gaps in current tools
+   - Fragmentation of education tools
+   - Progress tracking difficulties
+   - Curriculum control preferences
+   - Homeschool burnout experiences
+
+2. **Product Test** (7 questions)
+   - Feature importance ratings for LearnologyAI capabilities
+   - AI curriculum generator
+   - Source control during generation
+   - Learning style adaptation
+   - AI student tutor
+   - AI teacher tools
+   - Integrated gradebook
+   - End-to-end LMS functionality
+
+3. **Primary Concerns** (1 question)
+   - Main worry about adopting AI-powered learning platform
+   - Privacy/security, cost, complexity, dependency, integration, personal touch
+
+4. **Demographics** (7 questions)
+   - Homeschooling approach preferences
+   - Co-op/group participation
+   - Household income range
+   - Education level
+   - Expected monthly pricing
+   - Maximum willing to pay
+   - Net Promoter Score (1-10 likelihood to recommend)
+
+### Implementation Status
+
+**Database**: ✅ Complete - All tables created and populated
+**Survey Modal**: 🔄 In Progress - Component development
+**Authentication Integration**: ✅ Complete - Integrated into main app layout
+- Survey modal appears automatically for parent users with `survey_completed = false`
+- Full-screen blocking overlay prevents app interaction until survey completion
+- Integrated into `src/app/(app)/layout.tsx` for seamless enforcement
+- Automatic profile refresh and page reload after completion
+- Survey cannot be closed or dismissed - must be completed to access app
+**Admin Dashboard**: 🔄 In Progress - Analytics interface
+**UI/UX Polish**: 🔄 In Progress - Apple/Tesla/OpenAI inspired design 

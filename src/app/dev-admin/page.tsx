@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Users, GraduationCap } from 'lucide-react'
+import { Users, GraduationCap, BarChart3 } from 'lucide-react'
 
 export default function DevAdminPage() {
   return (
@@ -36,8 +36,6 @@ export default function DevAdminPage() {
           </CardContent>
         </Card>
 
-
-
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -52,6 +50,25 @@ export default function DevAdminPage() {
             <Link href="/dev-admin/ai-grading">
               <Button className="w-full">
                 Access AI Grading
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5" />
+              Survey Analytics
+            </CardTitle>
+            <CardDescription>
+              View survey responses and analytics dashboard
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/dev-admin/survey-analytics">
+              <Button className="w-full">
+                View Survey Data
               </Button>
             </Link>
           </CardContent>

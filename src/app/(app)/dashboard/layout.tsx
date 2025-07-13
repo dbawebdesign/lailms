@@ -1,7 +1,7 @@
 import React from 'react';
 
 export const metadata = {
-  title: 'Dashboard | LearnologyAI',
+  title: 'Dashboard | Learnology AI',
   description: 'Your learning dashboard and overview',
 };
 

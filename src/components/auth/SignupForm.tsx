@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 // import { Button } from '@learnologyai/ui' // Temporarily comment out
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/ui/password-input'
@@ -141,6 +142,24 @@ export default function SignupForm() {
   if (step === 1) {
     return (
       <div className="w-full max-w-md p-8 bg-white dark:bg-neutral-900 rounded-xl shadow-2xl dark:shadow-neutral-950/50">
+        <div className="flex justify-center mb-8">
+          <Image 
+            src="/Horizontal black text.png"
+            alt="Learnology AI Logo"
+            width={200}
+            height={53}
+            priority
+            className="dark:hidden"
+          />
+          <Image 
+            src="/Horizontal white text.png"
+            alt="Learnology AI Logo"
+            width={200}
+            height={53}
+            priority
+            className="hidden dark:block"
+          />
+        </div>
         <h2 className="text-3xl font-semibold mb-6 text-center text-neutral-800 dark:text-neutral-100">Create Account</h2>
         <p className="text-neutral-600 dark:text-neutral-400 mb-6 text-center">
           Enter your invite code to get started
@@ -185,6 +204,24 @@ export default function SignupForm() {
   if (step === 2) {
     return (
       <div className="w-full max-w-md p-8 bg-white dark:bg-neutral-900 rounded-xl shadow-2xl dark:shadow-neutral-950/50">
+        <div className="flex justify-center mb-6">
+          <Image 
+            src="/Horizontal black text.png"
+            alt="Learnology AI Logo"
+            width={200}
+            height={53}
+            priority
+            className="dark:hidden"
+          />
+          <Image 
+            src="/Horizontal white text.png"
+            alt="Learnology AI Logo"
+            width={200}
+            height={53}
+            priority
+            className="hidden dark:block"
+          />
+        </div>
         <h2 className="text-3xl font-semibold mb-2 text-center text-neutral-800 dark:text-neutral-100">Create Your Account</h2>
         
         {inviteCodeData && (

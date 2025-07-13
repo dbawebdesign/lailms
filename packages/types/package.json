@@ -2,7 +2,11 @@
   "name": "@learnologyai/types",
   "version": "0.0.1",
   "private": true,
-  "types": "./db.ts",
+  "main": "./dist/db.js",
+  "types": "./dist/db.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
   "devDependencies": {
     "typescript": "^5"
   }

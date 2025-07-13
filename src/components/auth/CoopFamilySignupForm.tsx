@@ -11,6 +11,7 @@ import { InviteCodeCopyButton } from '@/components/ui/copy-button'
 import { toast } from '@/components/ui/use-toast'
 import { Loader2, CheckCircle, GraduationCap, Home } from 'lucide-react'
 import { useInviteCodeClipboard } from '@/hooks/useClipboard'
+import Image from 'next/image'
 
 interface CoopFamilySignupFormProps {
   inviteCode: string
@@ -340,7 +341,25 @@ export default function CoopFamilySignupForm({
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-neutral-900 dark:to-neutral-800 flex items-center justify-center p-4">
       <Card className="w-full max-w-2xl">
         <CardHeader className="space-y-6">
-          <div className="text-center space-y-2">
+          <div className="text-center space-y-4">
+            <div className="flex justify-center mb-6">
+              <Image 
+                src="/Horizontal black text.png"
+                alt="Learnology AI Logo"
+                width={250}
+                height={67}
+                priority
+                className="dark:hidden"
+              />
+              <Image 
+                src="/Horizontal white text.png"
+                alt="Learnology AI Logo"
+                width={250}
+                height={67}
+                priority
+                className="hidden dark:block"
+              />
+            </div>
             <CardTitle className="text-3xl">Join Co-op Family</CardTitle>
             <p className="text-neutral-600 dark:text-neutral-400">
               Create your family within {organizationName}

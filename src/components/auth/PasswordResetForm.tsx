@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function PasswordResetForm() {
   const router = useRouter()
@@ -94,10 +95,28 @@ export default function PasswordResetForm() {
   // Render Step 1: Username form
   if (step === 1) {
     return (
-      <div className="w-full max-w-md p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold mb-6 text-center">Reset Password</h2>
-        <p className="text-gray-600 dark:text-gray-300 mb-4 text-center">
-          Enter your username to request a password reset code.
+      <div className="w-full max-w-md p-8 bg-white dark:bg-neutral-900 rounded-xl shadow-2xl dark:shadow-neutral-950/50">
+        <div className="flex justify-center mb-8">
+          <Image 
+            src="/Horizontal black text.png"
+            alt="Learnology AI Logo"
+            width={200}
+            height={53}
+            priority
+            className="dark:hidden"
+          />
+          <Image 
+            src="/Horizontal white text.png"
+            alt="Learnology AI Logo"
+            width={200}
+            height={53}
+            priority
+            className="hidden dark:block"
+          />
+        </div>
+        <h2 className="text-3xl font-semibold mb-6 text-center text-neutral-800 dark:text-neutral-100">Reset Password</h2>
+        <p className="text-neutral-600 dark:text-neutral-400 mb-6 text-center">
+          Enter your username to request a password reset
         </p>
         
         {error && (
@@ -145,8 +164,26 @@ export default function PasswordResetForm() {
 
   // Render Step 2: Reset code and new password form
   return (
-    <div className="w-full max-w-md p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-4 text-center">Reset Password</h2>
+    <div className="w-full max-w-md p-8 bg-white dark:bg-neutral-900 rounded-xl shadow-2xl dark:shadow-neutral-950/50">
+      <div className="flex justify-center mb-8">
+        <Image 
+          src="/Horizontal black text.png"
+          alt="Learnology AI Logo"
+          width={200}
+          height={53}
+          priority
+          className="dark:hidden"
+        />
+        <Image 
+          src="/Horizontal white text.png"
+          alt="Learnology AI Logo"
+          width={200}
+          height={53}
+          priority
+          className="hidden dark:block"
+        />
+      </div>
+      <h2 className="text-3xl font-semibold mb-6 text-center text-neutral-800 dark:text-neutral-100">Reset Password</h2>
       
       {successMessage && (
         <div className="mb-4 p-3 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200 rounded">

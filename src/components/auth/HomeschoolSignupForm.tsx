@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { toast } from '@/components/ui/use-toast'
 import { Loader2, Users, Home, ArrowRight, CheckCircle, UserPlus, GraduationCap, Building, User } from 'lucide-react'
 import { useInviteCodeClipboard } from '@/hooks/useClipboard'
+import Image from 'next/image'
 
 type HomeschoolType = 'individual_family' | 'coop_network' | ''
 
@@ -456,7 +457,7 @@ export default function HomeschoolSignupForm() {
               </div>
               
               <div className="space-y-2">
-                <h2 className="text-2xl font-semibold">🎉 Welcome to Learnology!</h2>
+                <h2 className="text-2xl font-semibold">🎉 Welcome to Learnology AI!</h2>
                 <p className="text-neutral-600 dark:text-neutral-400">
                   Your {organizationResult?.organization.type === 'individual_family' ? 'family homeschool' : 'homeschool co-op'} has been created successfully.
                 </p>
@@ -522,10 +523,28 @@ export default function HomeschoolSignupForm() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-neutral-900 dark:to-neutral-800 flex items-center justify-center p-4">
       <Card className="w-full max-w-2xl">
         <CardHeader className="space-y-6">
-          <div className="text-center space-y-2">
-            <CardTitle className="text-3xl">Welcome to Learnology</CardTitle>
+          <div className="text-center space-y-4">
+            <div className="flex justify-center mb-6">
+              <Image 
+                src="/Horizontal black text.png"
+                alt="Learnology AI Logo"
+                width={250}
+                height={67}
+                priority
+                className="dark:hidden"
+              />
+              <Image 
+                src="/Horizontal white text.png"
+                alt="Learnology AI Logo"
+                width={250}
+                height={67}
+                priority
+                className="hidden dark:block"
+              />
+            </div>
+            <CardTitle className="text-3xl">Welcome to Learnology AI</CardTitle>
             <p className="text-neutral-600 dark:text-neutral-400">
-              Set up your homeschool organization
+              Create your homeschool organization account
             </p>
           </div>
 

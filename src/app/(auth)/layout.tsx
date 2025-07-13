@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "Authentication - Learnology AI",
   description: "Sign in or sign up to Learnology AI",
-};
+}
 
 export default function AuthLayout({
   children,
