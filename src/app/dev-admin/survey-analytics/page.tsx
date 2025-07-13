@@ -42,16 +42,43 @@ import { SurveyAnalyticsPanel } from '@/components/survey/SurveyAnalyticsPanel'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
-// Color palette for charts - following Apple/Tesla design principles
+// Color palette for charts - following Apple/Tesla design principles with distinct colors
+// Enhanced with better contrast ratios for accessibility
 const CHART_COLORS = {
-  primary: '#3B82F6',      // Blue
-  secondary: '#10B981',    // Green
-  accent: '#F59E0B',       // Amber
-  warning: '#EF4444',      // Red
-  info: '#8B5CF6',         // Purple
-  muted: '#6B7280',        // Gray
-  success: '#059669',      // Emerald
-  gradient: ['#3B82F6', '#1D4ED8', '#1E40AF', '#1E3A8A', '#312E81']
+  primary: '#2563EB',      // Blue (darker for better contrast)
+  secondary: '#059669',    // Green (darker for better contrast)
+  accent: '#D97706',       // Amber (darker for better contrast)
+  warning: '#DC2626',      // Red (darker for better contrast)
+  info: '#7C3AED',         // Purple (darker for better contrast)
+  muted: '#4B5563',        // Gray (darker for better contrast)
+  success: '#047857',      // Emerald (darker for better contrast)
+  // Distinct color palette for multi-data visualizations with enhanced contrast
+  distinct: [
+    '#2563EB',  // Blue (enhanced contrast)
+    '#059669',  // Green (enhanced contrast)
+    '#D97706',  // Amber (enhanced contrast)
+    '#DC2626',  // Red (enhanced contrast)
+    '#7C3AED',  // Purple (enhanced contrast)
+    '#0891B2',  // Cyan (enhanced contrast)
+    '#65A30D',  // Lime (enhanced contrast)
+    '#EA580C',  // Orange (enhanced contrast)
+    '#DB2777',  // Pink (enhanced contrast)
+    '#4F46E5',  // Indigo (enhanced contrast)
+  ],
+  // High contrast colors specifically for pie charts and data points
+  pieChart: [
+    '#1E40AF',  // Deep Blue
+    '#166534',  // Deep Green
+    '#B45309',  // Deep Amber
+    '#B91C1C',  // Deep Red
+    '#6B21A8',  // Deep Purple
+    '#0E7490',  // Deep Cyan
+    '#4D7C0F',  // Deep Lime
+    '#C2410C',  // Deep Orange
+    '#BE185D',  // Deep Pink
+    '#3730A3',  // Deep Indigo
+  ],
+  gradient: ['#2563EB', '#059669', '#D97706', '#DC2626', '#7C3AED', '#0891B2', '#65A30D', '#EA580C', '#DB2777', '#4F46E5']
 }
 
 // Score color mapping for intuitive understanding
@@ -650,11 +677,11 @@ export default function SurveyAnalyticsPage() {
             {/* Chart View */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-gray-900 font-bold">
                   <BarChart3 className="w-5 h-5 text-blue-600" />
                   Problem Validation Scores
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-gray-700 font-medium">
                   Visual ranking of homeschooling challenges by agreement level
                 </CardDescription>
               </CardHeader>
@@ -665,31 +692,50 @@ export default function SurveyAnalyticsPage() {
                       data={Object.entries(data?.problemValidationScores || {})
                         .sort(([,a], [,b]) => b - a)
                         .map(([problem, score], index) => ({
-                          name: problem.length > 40 ? problem.substring(0, 40) + '...' : problem,
+                          name: problem.length > 25 ? problem.substring(0, 25) + '...' : problem,
                           fullName: problem,
-                          score: score,
-                          fill: getScoreColor(score, 5)
+                          score: score
                         }))}
-                      layout="horizontal"
-                      margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                      <XAxis type="number" domain={[0, 5]} />
-                      <YAxis dataKey="name" type="category" width={120} fontSize={12} />
+                      <XAxis 
+                        dataKey="name" 
+                        fontSize={12}
+                        tick={{ fill: '#1F2937', fontWeight: 600 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis 
+                        domain={[0, 5]} 
+                        fontSize={12}
+                        tick={{ fill: '#1F2937', fontWeight: 600 }}
+                      />
                       <Tooltip 
-                        formatter={(value: number, name: string, props: any) => [
-                          `${value.toFixed(1)}/5`, 
-                          props.payload.fullName
-                        ]}
-                        labelStyle={{ color: '#374151' }}
+                        formatter={(value: number) => [`${value.toFixed(1)}/5`, 'Score']}
+                        labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
+                        labelStyle={{ color: '#111827', fontWeight: 700 }}
                         contentStyle={{ 
                           backgroundColor: 'white', 
-                          border: '1px solid #E5E7EB',
+                          border: '2px solid #9CA3AF',
                           borderRadius: '8px',
-                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
+                          color: '#111827',
+                          fontSize: '14px',
+                          fontWeight: 600
                         }}
                       />
-                      <Bar dataKey="score" radius={[0, 4, 4, 0]} />
+                      <Bar 
+                        dataKey="score" 
+                        radius={[4, 4, 0, 0]}
+                      >
+                        {Object.entries(data?.problemValidationScores || {})
+                          .sort(([,a], [,b]) => b - a)
+                          .map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={getScoreColor(entry[1], 5)} />
+                          ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -699,11 +745,11 @@ export default function SurveyAnalyticsPage() {
             {/* Detailed List View */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-gray-900 font-bold">
                   <AlertTriangle className="w-5 h-5 text-amber-600" />
                   Detailed Problem Analysis
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-gray-700 font-medium">
                   Ranked by agreement level (1=Strongly Disagree, 5=Strongly Agree)
                 </CardDescription>
               </CardHeader>
@@ -712,7 +758,7 @@ export default function SurveyAnalyticsPage() {
                   {Object.entries(data?.problemValidationScores || {})
                     .sort(([,a], [,b]) => b - a)
                     .map(([problem, score], index) => (
-                      <div key={problem} className="space-y-3 p-3 rounded-lg border bg-gradient-to-r from-gray-50 to-gray-100/50">
+                      <div key={problem} className="space-y-3 p-3 rounded-lg border bg-white hover:bg-gray-50/50 transition-colors">
                         <div className="flex items-start gap-3">
                           <div className="flex-shrink-0 mt-1">
                             <div 
@@ -723,7 +769,7 @@ export default function SurveyAnalyticsPage() {
                             </div>
                           </div>
                           <div className="flex-1">
-                            <p className="text-sm font-medium leading-tight mb-2">
+                            <p className="text-sm font-semibold leading-tight mb-2 text-gray-900">
                               {problem}
                             </p>
                             <div className="flex items-center gap-3">
@@ -743,10 +789,10 @@ export default function SurveyAnalyticsPage() {
                                 >
                                   {score.toFixed(1)}
                                 </span>
-                                <span className="text-sm text-muted-foreground">/5</span>
+                                <span className="text-sm text-gray-800 font-semibold">/5</span>
                               </div>
                             </div>
-                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                            <div className="flex justify-between text-xs text-gray-700 mt-1 font-semibold">
                               <span>Low Agreement</span>
                               <span>High Agreement</span>
                             </div>
@@ -765,11 +811,11 @@ export default function SurveyAnalyticsPage() {
             {/* Chart View */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-gray-900 font-bold">
                   <Star className="w-5 h-5 text-yellow-600" />
                   Feature Importance Ranking
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-gray-700 font-medium">
                   Visual ranking of feature importance by parent ratings
                 </CardDescription>
               </CardHeader>
@@ -780,31 +826,50 @@ export default function SurveyAnalyticsPage() {
                       data={Object.entries(data?.featureImportanceScores || {})
                         .sort(([,a], [,b]) => b - a)
                         .map(([feature, score], index) => ({
-                          name: feature.length > 40 ? feature.substring(0, 40) + '...' : feature,
+                          name: feature.length > 25 ? feature.substring(0, 25) + '...' : feature,
                           fullName: feature,
-                          score: score,
-                          fill: getScoreColor(score, 5)
+                          score: score
                         }))}
-                      layout="horizontal"
-                      margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                      <XAxis type="number" domain={[0, 5]} />
-                      <YAxis dataKey="name" type="category" width={120} fontSize={12} />
+                      <XAxis 
+                        dataKey="name" 
+                        fontSize={12}
+                        tick={{ fill: '#1F2937', fontWeight: 600 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis 
+                        domain={[0, 5]} 
+                        fontSize={12}
+                        tick={{ fill: '#1F2937', fontWeight: 600 }}
+                      />
                       <Tooltip 
-                        formatter={(value: number, name: string, props: any) => [
-                          `${value.toFixed(1)}/5`, 
-                          props.payload.fullName
-                        ]}
-                        labelStyle={{ color: '#374151' }}
+                        formatter={(value: number) => [`${value.toFixed(1)}/5`, 'Score']}
+                        labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
+                        labelStyle={{ color: '#111827', fontWeight: 700 }}
                         contentStyle={{ 
                           backgroundColor: 'white', 
-                          border: '1px solid #E5E7EB',
+                          border: '2px solid #9CA3AF',
                           borderRadius: '8px',
-                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
+                          color: '#111827',
+                          fontSize: '14px',
+                          fontWeight: 600
                         }}
                       />
-                      <Bar dataKey="score" radius={[0, 4, 4, 0]} />
+                      <Bar 
+                        dataKey="score" 
+                        radius={[4, 4, 0, 0]}
+                      >
+                        {Object.entries(data?.featureImportanceScores || {})
+                          .sort(([,a], [,b]) => b - a)
+                          .map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={getScoreColor(entry[1], 5)} />
+                          ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -833,7 +898,7 @@ export default function SurveyAnalyticsPage() {
                                           'bg-gray-100 text-gray-800 border-gray-200'
                       
                       return (
-                        <div key={feature} className="space-y-3 p-3 rounded-lg border bg-gradient-to-r from-blue-50 to-blue-100/50">
+                        <div key={feature} className="space-y-3 p-3 rounded-lg border bg-white hover:bg-gray-50/50 transition-colors">
                           <div className="flex items-start gap-3">
                             <div className="flex-shrink-0 mt-1">
                               <div 
@@ -845,7 +910,7 @@ export default function SurveyAnalyticsPage() {
                             </div>
                             <div className="flex-1">
                               <div className="flex items-start justify-between mb-2">
-                                <p className="text-sm font-medium leading-tight flex-1 pr-2">
+                                <p className="text-sm font-semibold leading-tight flex-1 pr-2 text-gray-900">
                                   {feature}
                                 </p>
                                 <Badge className={`text-xs ${priorityColor}`}>
@@ -863,16 +928,16 @@ export default function SurveyAnalyticsPage() {
                                   />
                                 </div>
                                 <div className="text-right flex-shrink-0">
-                                  <span 
-                                    className="text-lg font-bold"
-                                    style={{ color: getScoreColor(score, 5) }}
-                                  >
-                                    {score.toFixed(1)}
-                                  </span>
-                                  <span className="text-sm text-muted-foreground">/5</span>
+                                                                  <span 
+                                  className="text-lg font-bold"
+                                  style={{ color: getScoreColor(score, 5) }}
+                                >
+                                  {score.toFixed(1)}
+                                </span>
+                                <span className="text-sm text-gray-800 font-semibold">/5</span>
                                 </div>
                               </div>
-                              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                              <div className="flex justify-between text-xs text-gray-600 mt-1 font-medium">
                                 <span>Unimportant</span>
                                 <span>Very Important</span>
                               </div>
@@ -912,18 +977,19 @@ export default function SurveyAnalyticsPage() {
                             fullName: concern,
                             value: count,
                             percentage: data?.totalResponses ? (count / data.totalResponses) * 100 : 0,
-                            fill: CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]
+                            fill: CHART_COLORS.pieChart[index % CHART_COLORS.pieChart.length]
                           }))}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ percentage }: any) => `${percentage.toFixed(1)}%`}
+                        label={({ percentage }: any) => percentage > 10 ? `${percentage.toFixed(1)}%` : ''}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
+                        style={{ fontSize: '14px', fontWeight: 700, fill: '#FFFFFF' }}
                       >
                         {Object.entries(data?.primaryConcerns || {}).map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]} />
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS.pieChart[index % CHART_COLORS.pieChart.length]} />
                         ))}
                       </Pie>
                       <Tooltip 
@@ -931,11 +997,15 @@ export default function SurveyAnalyticsPage() {
                           `${value} responses (${props.payload.percentage.toFixed(1)}%)`, 
                           props.payload.fullName
                         ]}
+                        labelStyle={{ color: '#111827', fontWeight: 700 }}
                         contentStyle={{ 
                           backgroundColor: 'white', 
-                          border: '1px solid #E5E7EB',
+                          border: '2px solid #9CA3AF',
                           borderRadius: '8px',
-                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
+                          color: '#111827',
+                          fontSize: '14px',
+                          fontWeight: 600
                         }}
                       />
                       <Legend />
@@ -968,19 +1038,19 @@ export default function SurveyAnalyticsPage() {
                                            'bg-yellow-100 text-yellow-800 border-yellow-200'
                       
                       return (
-                        <div key={concern} className="space-y-3 p-3 rounded-lg border bg-gradient-to-r from-red-50 to-red-100/50">
+                        <div key={concern} className="space-y-3 p-3 rounded-lg border bg-white hover:bg-gray-50/50 transition-colors">
                           <div className="flex items-start gap-3">
                             <div className="flex-shrink-0 mt-1">
                               <div 
                                 className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                                style={{ backgroundColor: CHART_COLORS.gradient[index % CHART_COLORS.gradient.length] }}
+                                style={{ backgroundColor: CHART_COLORS.distinct[index % CHART_COLORS.distinct.length] }}
                               >
                                 {index + 1}
                               </div>
                             </div>
                             <div className="flex-1">
                               <div className="flex items-start justify-between mb-2">
-                                <p className="text-sm font-medium leading-tight flex-1 pr-2">
+                                <p className="text-sm font-semibold leading-tight flex-1 pr-2 text-gray-900">
                                   {concern}
                                 </p>
                                 <Badge className={`text-xs ${severityColor}`}>
@@ -993,18 +1063,18 @@ export default function SurveyAnalyticsPage() {
                                     value={percentage} 
                                     className="h-2"
                                     style={{ 
-                                      background: `linear-gradient(to right, ${CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]}20, ${CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]}40)`
+                                      background: `linear-gradient(to right, ${CHART_COLORS.distinct[index % CHART_COLORS.distinct.length]}20, ${CHART_COLORS.distinct[index % CHART_COLORS.distinct.length]}40)`
                                     }}
                                   />
                                 </div>
                                 <div className="text-right flex-shrink-0">
                                   <span 
                                     className="text-lg font-bold"
-                                    style={{ color: CHART_COLORS.gradient[index % CHART_COLORS.gradient.length] }}
+                                    style={{ color: CHART_COLORS.distinct[index % CHART_COLORS.distinct.length] }}
                                   >
                                     {count}
                                   </span>
-                                  <span className="text-sm text-muted-foreground ml-2">
+                                  <span className="text-sm text-gray-800 font-semibold ml-2">
                                     ({percentage.toFixed(1)}%)
                                   </span>
                                 </div>
@@ -1085,11 +1155,11 @@ export default function SurveyAnalyticsPage() {
             <div className="grid gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-gray-900 font-bold">
                     <Users className="w-5 h-5 text-blue-600" />
                     Homeschooling Approaches
                   </CardTitle>
-                  <CardDescription>Distribution of current teaching methods</CardDescription>
+                  <CardDescription className="text-gray-700 font-medium">Distribution of current teaching methods</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
@@ -1102,26 +1172,43 @@ export default function SurveyAnalyticsPage() {
                             fullName: approach,
                             value: count,
                             percentage: data?.totalResponses ? (count / data.totalResponses) * 100 : 0,
-                            fill: CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]
+                            fill: CHART_COLORS.distinct[index % CHART_COLORS.distinct.length]
                           }))}
                         margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                        <XAxis dataKey="name" fontSize={12} />
-                        <YAxis />
+                        <XAxis 
+                          dataKey="name" 
+                          fontSize={12}
+                          tick={{ fill: '#1F2937', fontWeight: 600 }}
+                        />
+                        <YAxis 
+                          fontSize={12}
+                          tick={{ fill: '#1F2937', fontWeight: 600 }}
+                        />
                         <Tooltip 
                           formatter={(value: number, name: string, props: any) => [
                             `${value} responses (${props.payload.percentage.toFixed(1)}%)`, 
                             props.payload.fullName
                           ]}
+                          labelStyle={{ color: '#111827', fontWeight: 700 }}
                           contentStyle={{ 
                             backgroundColor: 'white', 
-                            border: '1px solid #E5E7EB',
+                            border: '2px solid #9CA3AF',
                             borderRadius: '8px',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
+                            color: '#111827',
+                            fontSize: '14px',
+                            fontWeight: 600
                           }}
                         />
-                        <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          {Object.entries(data?.demographics.approaches || {})
+                            .sort(([,a], [,b]) => b - a)
+                            .map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={CHART_COLORS.distinct[index % CHART_COLORS.distinct.length]} />
+                            ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -1130,11 +1217,11 @@ export default function SurveyAnalyticsPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-gray-900 font-bold">
                     <DollarSign className="w-5 h-5 text-green-600" />
                     Income Distribution
                   </CardTitle>
-                  <CardDescription>Household income ranges of respondents</CardDescription>
+                  <CardDescription className="text-gray-700 font-medium">Household income ranges of respondents</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
@@ -1147,18 +1234,19 @@ export default function SurveyAnalyticsPage() {
                               name: range,
                               value: count,
                               percentage: data?.totalResponses ? (count / data.totalResponses) * 100 : 0,
-                              fill: CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]
+                              fill: CHART_COLORS.pieChart[index % CHART_COLORS.pieChart.length]
                             }))}
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ percentage }: any) => `${percentage.toFixed(1)}%`}
+                          label={({ percentage }: any) => percentage > 10 ? `${percentage.toFixed(1)}%` : ''}
                           outerRadius={80}
                           fill="#8884d8"
                           dataKey="value"
+                          style={{ fontSize: '14px', fontWeight: 700, fill: '#FFFFFF' }}
                         >
                           {Object.entries(data?.demographics.incomeRanges || {}).map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]} />
+                            <Cell key={`cell-${index}`} fill={CHART_COLORS.pieChart[index % CHART_COLORS.pieChart.length]} />
                           ))}
                         </Pie>
                         <Tooltip 
@@ -1166,11 +1254,15 @@ export default function SurveyAnalyticsPage() {
                             `${value} responses (${props.payload.percentage.toFixed(1)}%)`, 
                             props.payload.name
                           ]}
+                          labelStyle={{ color: '#111827', fontWeight: 700 }}
                           contentStyle={{ 
                             backgroundColor: 'white', 
-                            border: '1px solid #E5E7EB',
+                            border: '2px solid #9CA3AF',
                             borderRadius: '8px',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
+                            color: '#111827',
+                            fontSize: '14px',
+                            fontWeight: 600
                           }}
                         />
                       </RechartsPieChart>
@@ -1246,17 +1338,17 @@ export default function SurveyAnalyticsPage() {
                       .map(([platform, count], index) => {
                         const percentage = data?.totalResponses ? (count / data.totalResponses) * 100 : 0
                         return (
-                          <div key={platform} className="p-3 rounded-lg border bg-gradient-to-r from-blue-50 to-blue-100/50">
+                          <div key={platform} className="p-3 rounded-lg border bg-white hover:bg-gray-50/50 transition-colors">
                             <div className="flex justify-between items-center mb-2">
-                              <span className="text-sm font-medium">{platform}</span>
+                              <span className="text-sm font-semibold text-gray-900">{platform}</span>
                               <div className="flex items-center gap-2">
                                 <span 
                                   className="text-lg font-bold"
-                                  style={{ color: CHART_COLORS.gradient[index % CHART_COLORS.gradient.length] }}
+                                  style={{ color: CHART_COLORS.distinct[index % CHART_COLORS.distinct.length] }}
                                 >
                                   {count}
                                 </span>
-                                <span className="text-sm text-muted-foreground">
+                                <span className="text-sm text-gray-800 font-semibold">
                                   ({percentage.toFixed(1)}%)
                                 </span>
                               </div>
@@ -1265,7 +1357,7 @@ export default function SurveyAnalyticsPage() {
                               value={percentage} 
                               className="h-2"
                               style={{ 
-                                background: `linear-gradient(to right, ${CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]}20, ${CHART_COLORS.gradient[index % CHART_COLORS.gradient.length]}40)`
+                                background: `linear-gradient(to right, ${CHART_COLORS.distinct[index % CHART_COLORS.distinct.length]}20, ${CHART_COLORS.distinct[index % CHART_COLORS.distinct.length]}40)`
                               }}
                             />
                           </div>
