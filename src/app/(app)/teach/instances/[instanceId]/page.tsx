@@ -9,12 +9,10 @@ import {
   BarChart3, 
   Copy, 
   ExternalLink,
-  Plus,
   AlertCircle,
   TrendingUp,
   Clock,
   CheckCircle,
-  UserPlus,
   MessageSquare,
   Target,
   Award
@@ -95,8 +93,7 @@ async function getClassInstanceData(instanceId: string, supabase: any): Promise<
           id,
           name,
           description
-        ),
-        rosters(id)
+        )
       `)
       .eq('id', instanceId)
       .single();
@@ -114,6 +111,22 @@ async function getClassInstanceData(instanceId: string, supabase: any): Promise<
     const pathsCount = paths?.length || 0;
     const lessonsCount = paths?.reduce((total: number, path: any) => total + (path.lessons?.length || 0), 0) || 0;
 
+    // Count assessments/quizzes for this base class
+    const { count: quizzesCount } = await supabase
+      .from('lesson_assessments')
+      .select('id', { count: 'exact' })
+      .in('lesson_id', paths?.flatMap((path: any) => path.lessons?.map((lesson: any) => lesson.id) || []) || []);
+
+    // Count enrolled students from rosters table
+    const { count: enrolledStudents, error: rosterError } = await supabase
+      .from('rosters')
+      .select('id', { count: 'exact' })
+      .eq('class_instance_id', instanceId);
+
+    if (rosterError) {
+      console.error('Error fetching roster count:', rosterError);
+    }
+
     return {
       id: instance.id,
       name: instance.name,
@@ -128,10 +141,10 @@ async function getClassInstanceData(instanceId: string, supabase: any): Promise<
         name: instance.base_classes.name,
         description: instance.base_classes.description,
       },
-      enrolledStudents: instance.rosters?.length || 0,
+      enrolledStudents: enrolledStudents || 0,
       pathsCount,
       lessonsCount,
-      quizzesCount: 0, // TODO: Calculate from lessons
+      quizzesCount: quizzesCount || 0,
     };
   } catch (error) {
     console.error('Error fetching class instance data:', error);
@@ -141,37 +154,30 @@ async function getClassInstanceData(instanceId: string, supabase: any): Promise<
 
 async function getStudentPerformance(instanceId: string, supabase: any): Promise<StudentPerformance[]> {
   try {
-    // Get students enrolled in this class instance
-    const { data: rosters, error: rosterError } = await supabase
-      .from('rosters')
-      .select(`
-        id,
-        joined_at,
-        profiles!inner(
-          user_id,
-          first_name,
-          last_name
-        )
-      `)
-      .eq('class_instance_id', instanceId);
+    // Get students enrolled in this class instance with email addresses using RPC
+    const { data: studentsData, error: studentsError } = await supabase
+      .rpc('get_class_instance_student_data', { p_class_instance_id: instanceId });
 
-    if (rosterError || !rosters) {
-      console.error('Error fetching rosters:', rosterError);
+    if (studentsError || !studentsData) {
+      console.error('Error fetching students:', studentsError);
       return [];
     }
+
+    // Parse the JSON response
+    const students = Array.isArray(studentsData) ? studentsData : [];
 
     // For each student, calculate their performance metrics
     const studentPerformance: StudentPerformance[] = [];
 
-    for (const roster of rosters) {
-      const user = roster.profiles;
-      const studentName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown Student';
+    for (const student of students) {
+      const studentName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Unknown Student';
+      const studentEmail = student.email || 'No email';
 
       // Get quiz attempts for this student
       const { data: quizAttempts } = await supabase
         .from('quiz_attempts')
         .select('score, max_score, created_at')
-        .eq('user_id', user.user_id)
+        .eq('user_id', student.id)
         .order('created_at', { ascending: false });
 
       // Calculate quiz average
@@ -183,7 +189,7 @@ async function getStudentPerformance(instanceId: string, supabase: any): Promise
       }
 
       // Get last activity (most recent quiz attempt or lesson progress)
-      const lastActivity = quizAttempts?.[0]?.created_at || roster.joined_at;
+      const lastActivity = quizAttempts?.[0]?.created_at || student.joined_at;
 
       // Calculate overall progress (this is a simplified calculation)
       // In a real implementation, you'd want to calculate based on completed lessons/paths
@@ -200,10 +206,10 @@ async function getStudentPerformance(instanceId: string, supabase: any): Promise
       }
 
       studentPerformance.push({
-        id: user.user_id,
+        id: student.id,
         name: studentName,
-        email: user.user_id, // Using user_id as email placeholder for now
-        enrolledAt: roster.joined_at,
+        email: studentEmail,
+        enrolledAt: student.joined_at,
         lastActivity,
         overallProgress,
         quizAverage,
@@ -295,26 +301,32 @@ async function getRecentActivity(instanceId: string, supabase: any): Promise<Rec
 
 async function getClassStats(instanceId: string, supabase: any): Promise<ClassStats> {
   try {
-    // Get total students enrolled
+    // Get total students enrolled with their user_ids
     const { data: rosters, count: totalStudents } = await supabase
       .from('rosters')
-      .select('id', { count: 'exact' })
+      .select(`
+        id,
+        profiles!inner(user_id)
+      `, { count: 'exact' })
       .eq('class_instance_id', instanceId);
+
+    // Extract user_ids from the rosters data
+    const userIds = rosters?.map((r: any) => r.profiles.user_id) || [];
 
     // Get students active today (who have quiz attempts today)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const { data: activeToday, count: activeTodayCount } = await supabase
+    const { count: activeTodayCount } = await supabase
       .from('quiz_attempts')
       .select('user_id', { count: 'exact' })
       .gte('created_at', today.toISOString())
-      .in('user_id', rosters?.map((r: any) => r.id) || []);
+      .in('user_id', userIds);
 
     // Get all quiz attempts for students in this class to calculate average progress
     const { data: allQuizAttempts } = await supabase
       .from('quiz_attempts')
       .select('score, max_score, user_id')
-      .in('user_id', rosters?.map((r: any) => r.id) || []);
+      .in('user_id', userIds);
 
     // Calculate average progress
     let averageProgress = 0;
@@ -328,7 +340,7 @@ async function getClassStats(instanceId: string, supabase: any): Promise<ClassSt
     const { count: lessonsCompleted } = await supabase
       .from('quiz_attempts')
       .select('id', { count: 'exact' })
-      .in('user_id', rosters?.map((r: any) => r.id) || []);
+      .in('user_id', userIds);
 
     // Get pending quizzes (this is a simplified calculation)
     // In a real implementation, you'd want to calculate based on assigned vs completed assessments
@@ -541,12 +553,6 @@ export default async function ClassInstancePage({
               </CardHeader>
               <CardContent className="space-y-3">
                 <Button asChild className="w-full justify-start" variant="outline">
-                  <Link href={`/teach/instances/${classInstance.id}/students/add`}>
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Add Students
-                  </Link>
-                </Button>
-                <Button asChild className="w-full justify-start" variant="outline">
                   <Link href={`/teach/gradebook?instance=${classInstance.id}`}>
                     <BarChart3 className="w-4 h-4 mr-2" />
                     View Gradebook
@@ -593,7 +599,7 @@ export default async function ClassInstancePage({
                       }`}>
                         {activity.type === 'quiz_submission' && <Target className="h-4 w-4 text-success" />}
                         {activity.type === 'lesson_completion' && <CheckCircle className="h-4 w-4 text-info" />}
-                        {activity.type === 'student_joined' && <UserPlus className="h-4 w-4 text-primary" />}
+                        {activity.type === 'student_joined' && <MessageSquare className="h-4 w-4 text-primary" />}
                         {activity.type === 'assignment_due' && <AlertCircle className="h-4 w-4 text-warning" />}
                       </div>
                       <div className="flex-1">
@@ -616,14 +622,12 @@ export default async function ClassInstancePage({
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold">Student Management</h3>
-              <p className="text-muted-foreground">Monitor and manage your enrolled students</p>
+              <p className="text-muted-foreground">Monitor your enrolled students</p>
             </div>
-            <Button asChild>
-              <Link href={`/teach/instances/${classInstance.id}/students/add`}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Student
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border">
+              <span className="text-sm text-muted-foreground">Students enroll with code:</span>
+              <code className="font-mono text-sm font-semibold">{classInstance.enrollmentCode}</code>
+            </div>
           </div>
 
           <Card>
@@ -673,18 +677,112 @@ export default async function ClassInstancePage({
         </TabsContent>
 
         <TabsContent value="progress" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Overall Class Performance */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Class Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Average Progress</span>
+                    <span className="font-medium">{classStats.averageProgress}%</span>
+                  </div>
+                  <Progress value={classStats.averageProgress} className="h-2" />
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-center">
+                  <div>
+                    <p className="text-2xl font-bold text-success">{studentPerformance.filter(s => s.status === 'active').length}</p>
+                    <p className="text-sm text-muted-foreground">Active Students</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-warning">{studentPerformance.filter(s => s.status === 'falling_behind').length}</p>
+                    <p className="text-sm text-muted-foreground">Need Support</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Activity Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Activity Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-center">
+                  <div>
+                    <p className="text-2xl font-bold text-primary">{classStats.activeToday}</p>
+                    <p className="text-sm text-muted-foreground">Active Today</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-info">{classStats.lessonsCompleted}</p>
+                    <p className="text-sm text-muted-foreground">Lessons Completed</p>
+                  </div>
+                </div>
+                <div className="pt-4 border-t">
+                  <p className="text-sm text-muted-foreground mb-2">Recent Activity</p>
+                  <div className="space-y-2">
+                    {recentActivity.slice(0, 3).map((activity) => (
+                      <div key={activity.id} className="flex items-center gap-2 text-sm">
+                        <div className="w-2 h-2 bg-primary rounded-full"></div>
+                        <span className="text-muted-foreground">{activity.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Student Progress Details */}
           <Card>
             <CardHeader>
-              <CardTitle>Class Progress Analytics</CardTitle>
+              <CardTitle>Individual Student Progress</CardTitle>
               <CardDescription>
-                Detailed insights into student performance and engagement
+                Detailed view of each student's performance and engagement
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12 text-muted-foreground">
-                <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Progress analytics coming soon</p>
-                <p className="text-sm">Detailed charts and insights will be available here</p>
+              <div className="space-y-4">
+                {studentPerformance.map((student) => (
+                  <div key={student.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium text-primary">
+                          {student.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-medium">{student.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {student.lastActivity ? `Last active: ${format(new Date(student.lastActivity), 'MMM d')}` : 'No recent activity'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Progress</p>
+                        <div className="flex items-center gap-2">
+                          <Progress value={student.overallProgress} className="w-20" />
+                          <span className="text-sm font-medium">{student.overallProgress}%</span>
+                        </div>
+                      </div>
+                      <Badge 
+                        variant="secondary" 
+                        className={`${getStudentStatusColor(student.status)}`}
+                      >
+                        {student.status.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -710,7 +808,7 @@ export default async function ClassInstancePage({
                     }`}>
                       {activity.type === 'quiz_submission' && <Target className="h-4 w-4 text-success" />}
                       {activity.type === 'lesson_completion' && <CheckCircle className="h-4 w-4 text-info" />}
-                      {activity.type === 'student_joined' && <UserPlus className="h-4 w-4 text-primary" />}
+                      {activity.type === 'student_joined' && <MessageSquare className="h-4 w-4 text-primary" />}
                       {activity.type === 'assignment_due' && <AlertCircle className="h-4 w-4 text-warning" />}
                     </div>
                     <div className="flex-1 space-y-1">

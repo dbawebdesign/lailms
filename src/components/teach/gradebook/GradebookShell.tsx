@@ -73,7 +73,9 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
       grade_letter: student.grade_letter,
       missing_assignments: student.missing_assignments,
       late_assignments: student.late_assignments,
-      mastery_level: student.mastery_level
+      mastery_level: student.mastery_level,
+      completed_assignments: student.completed_assignments,
+      total_assignments: student.total_assignments
     })),
     assignments: gradebookData.assignments.map(assignment => ({
       id: assignment.id,
@@ -237,22 +239,6 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
         </div>
         
         <div className="flex items-center gap-4">
-          {/* Live Data Status */}
-          <Card className="p-4 bg-success/5 border-success/20">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-success" />
-                <span className="text-caption text-success font-medium">Live Data</span>
-              </div>
-              {error && (
-                <div className="flex items-center gap-1 text-destructive">
-                  <AlertCircle className="w-3 h-3" />
-                  <span className="text-xs">Error</span>
-                </div>
-              )}
-            </div>
-          </Card>
-
           {/* Sync Status */}
           <div className="flex items-center gap-2">
             <Badge 
@@ -409,6 +395,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
                 classInstance={classInstance}
                 data={transformedData}
                 onDataChange={handleDataChange}
+                onUpdateSettings={updateSettings}
                 isLoading={isLoading}
               />
             </TabsContent>
@@ -422,6 +409,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
         onOpenChange={(open) => setBulkFeedbackOpen(open)}
         selectedStudents={selectedStudents}
         classInstance={classInstance}
+        data={transformedData}
       />
 
       <StudentDetailsPanel

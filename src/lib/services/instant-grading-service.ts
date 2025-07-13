@@ -104,7 +104,6 @@ export class InstantGradingService {
     console.log('  Question ID:', question.id);
     console.log('  Student Answer (type):', typeof studentAnswer, studentAnswer);
     console.log('  Correct Answer (type):', typeof correctAnswer, correctAnswer);
-    console.log('  Comparison Result:', correctAnswer === studentAnswer);
     
     // Handle both boolean and string inputs (convert string to boolean if needed)
     let normalizedStudentAnswer = studentAnswer;
@@ -113,7 +112,18 @@ export class InstantGradingService {
       console.log('  Converted string to boolean:', normalizedStudentAnswer);
     }
     
-    const isCorrect = correctAnswer === normalizedStudentAnswer;
+    // Ensure correct answer is also a boolean
+    let normalizedCorrectAnswer = correctAnswer;
+    if (typeof correctAnswer === 'string') {
+      normalizedCorrectAnswer = correctAnswer.toLowerCase() === 'true';
+      console.log('  Converted correct answer string to boolean:', normalizedCorrectAnswer);
+    }
+    
+    console.log('  Final Student Answer:', normalizedStudentAnswer);
+    console.log('  Final Correct Answer:', normalizedCorrectAnswer);
+    console.log('  Comparison Result:', normalizedCorrectAnswer === normalizedStudentAnswer);
+    
+    const isCorrect = normalizedCorrectAnswer === normalizedStudentAnswer;
     const pointsEarned = isCorrect ? maxPoints : 0;
     
     // Get feedback from answer key
@@ -121,7 +131,7 @@ export class InstantGradingService {
     if (answerKey.explanation) {
       feedback = answerKey.explanation;
     } else if (answerKey.true_explanation && answerKey.false_explanation) {
-      feedback = correctAnswer ? answerKey.true_explanation : answerKey.false_explanation;
+      feedback = normalizedCorrectAnswer ? answerKey.true_explanation : answerKey.false_explanation;
     } else {
       feedback = isCorrect ? 'Correct! Well done.' : 'Incorrect. Please review the material.';
     }
@@ -192,17 +202,24 @@ export class InstantGradingService {
     
     feedbackResults.forEach(feedback => {
       if (feedback) {
-        totalPoints += feedback.maxPoints;
-        earnedPoints += feedback.pointsEarned;
+        // Ensure values are valid numbers before adding
+        const maxPoints = isNaN(feedback.maxPoints) ? 0 : feedback.maxPoints;
+        const pointsEarned = isNaN(feedback.pointsEarned) ? 0 : feedback.pointsEarned;
+        
+        totalPoints += maxPoints;
+        earnedPoints += pointsEarned;
       }
     });
     
     const percentage = totalPoints > 0 ? (earnedPoints / totalPoints) * 100 : 0;
     
+    // Ensure percentage is a valid number
+    const safePercentage = isNaN(percentage) ? 0 : percentage;
+    
     return {
       totalPoints,
       earnedPoints,
-      percentage: Math.round(percentage * 100) / 100 // Round to 2 decimal places
+      percentage: Math.round(safePercentage * 100) / 100 // Round to 2 decimal places
     };
   }
 } 

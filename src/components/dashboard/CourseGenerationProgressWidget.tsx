@@ -287,24 +287,13 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
                  <div className='text-xs text-green-500 flex items-center gap-1'>
                   <CheckCircle className='h-3 w-3'/>
                   Course generated successfully.
-                  {/* Confetti trigger button for testing - remove in production */}
-                  {process.env.NODE_ENV === 'development' && (
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (jsConfettiRef.current) {
-                          jsConfettiRef.current.addConfetti({
-                            emojis: ['🎉', '📚', '✨', '🎓', '📖'],
-                            emojiSize: 50,
-                            confettiNumber: 100,
-                          });
-                        }
-                      }}
-                      className="ml-2 h-5 px-2 text-xs inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
-                    >
-                      🎉 Test
-                    </span>
-                  )}
+                  <Link 
+                    href={`/teach/base-classes/${job.baseClassId}`}
+                    className="ml-2 inline-flex items-center gap-1 text-xs bg-primary text-primary-foreground hover:bg-primary/90 px-2 py-1 rounded-md transition-colors"
+                  >
+                    <BookOpen className="h-3 w-3" />
+                    View Course
+                  </Link>
                 </div>
               )}
             </div>

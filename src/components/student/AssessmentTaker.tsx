@@ -882,7 +882,7 @@ const AssessmentTaker = () => {
                           /{currentScore.total}
                         </span>
                         <span className="text-xs text-blue-600 ml-1">
-                          ({currentScore.percentage.toFixed(0)}%)
+                          ({isNaN(currentScore.percentage) ? '0' : currentScore.percentage.toFixed(0)}%)
                         </span>
                       </div>
                     </div>

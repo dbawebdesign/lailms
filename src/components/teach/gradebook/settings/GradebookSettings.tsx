@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +52,7 @@ interface GradebookSettingsProps {
     settings: any;
   };
   onDataChange: (data: any) => void;
+  onUpdateSettings?: (settings: any) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -59,6 +60,7 @@ export function GradebookSettings({
   classInstance,
   data,
   onDataChange,
+  onUpdateSettings,
   isLoading
 }: GradebookSettingsProps) {
   const [activeTab, setActiveTab] = useState('general');
@@ -80,8 +82,8 @@ export function GradebookSettings({
     { letter: 'F', min_percentage: 0, max_percentage: 64, points: 0.0 }
   ]);
 
-  // Settings state
-  const [settings, setSettings] = useState({
+  // Default settings fallback
+  const defaultSettings = {
     // General Settings
     gradingPeriod: 'semester',
     calculateFinalGrade: true,
@@ -122,10 +124,24 @@ export function GradebookSettings({
     hideGradeHistory: false,
     requirePasswordForChanges: true,
     auditTrail: true
+  };
+
+  // Initialize settings from live data or defaults
+  const [settings, setSettings] = useState({
+    ...defaultSettings,
+    ...(data.settings || {})
   });
 
+  // Update settings when data changes
+  useEffect(() => {
+    setSettings({
+      ...defaultSettings,
+      ...(data.settings || {})
+    });
+  }, [data.settings]);
+
   const handleSettingChange = (key: string, value: any) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
+    setSettings((prev: any) => ({ ...prev, [key]: value }));
     setHasUnsavedChanges(true);
   };
 
@@ -138,11 +154,25 @@ export function GradebookSettings({
 
   const handleSaveSettings = async () => {
     try {
-      // TODO: Implement actual save functionality
-      console.log('Saving settings:', { settings, gradeScale });
+      // Use the updateSettings function from the useGradebook hook
+      const settingsToSave = {
+        ...settings,
+        gradeScale: gradeScale
+      };
+      
+      // Call the updateSettings function if available
+      if (onUpdateSettings) {
+        await onUpdateSettings(settingsToSave);
+      } else {
+        // Fallback to onDataChange if onUpdateSettings is not available
+        await onDataChange(settingsToSave);
+      }
+      
+      console.log('Settings saved successfully:', settingsToSave);
       setHasUnsavedChanges(false);
     } catch (error) {
       console.error('Failed to save settings:', error);
+      alert('Failed to save settings. Please try again.');
     }
   };
 

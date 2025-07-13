@@ -119,7 +119,7 @@ export function NewSchemaQuestionMatching({
           const selectedMatch = value[leftItemKey];
           const correctMatch = correctPairs[leftItemKey];
           const isCorrectMatch = selectedMatch && selectedMatch === correctMatch;
-          const isIncorrectMatch = selectedMatch && selectedMatch !== correctMatch && instantFeedback;
+          const isIncorrectMatch = selectedMatch && selectedMatch !== correctMatch && instantFeedback && !instantFeedback.isCorrect;
           const showCorrectAnswer = instantFeedback && !instantFeedback.isCorrect && selectedMatch;
           
           return (

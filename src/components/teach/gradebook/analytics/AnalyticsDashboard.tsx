@@ -22,7 +22,8 @@ import {
   Eye,
   Brain,
   FileText,
-  Monitor
+  Monitor,
+  BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -75,53 +76,54 @@ export function AnalyticsDashboard({
       };
     }
 
-    // Calculate class average
-    const allGrades = students.flatMap(student => 
-      assignments.map(assignment => grades[`${student.id}_${assignment.id}`]?.points_earned || 0)
-    );
-    const classAverage = allGrades.length > 0 ? 
-      allGrades.reduce((sum, grade) => sum + grade, 0) / allGrades.length : 0;
+    // Calculate class average using the overall_grade from students (already calculated in useGradebook)
+    const studentGrades = students.map(student => student.overall_grade || 0);
+    const classAverage = studentGrades.length > 0 ? 
+      studentGrades.reduce((sum, grade) => sum + grade, 0) / studentGrades.length : 0;
 
-    // Calculate completion rate
+    // Calculate completion rate using the correct key format (student_id-assignment_id)
     const totalPossibleSubmissions = students.length * assignments.length;
     const actualSubmissions = students.flatMap(student => 
-      assignments.map(assignment => grades[`${student.id}_${assignment.id}`])
-    ).filter(grade => grade && grade.points_earned !== null).length;
+      assignments.map(assignment => grades[`${student.id}-${assignment.id}`])
+    ).filter(grade => grade && grade.points_earned !== null && grade.status !== 'missing').length;
     const completionRate = totalPossibleSubmissions > 0 ? 
       (actualSubmissions / totalPossibleSubmissions) * 100 : 0;
 
-    // Calculate grade distribution
-    const studentAverages = students.map(student => {
-      const studentGrades = assignments.map(assignment => 
-        grades[`${student.id}_${assignment.id}`]?.points_earned || 0
-      );
-      return studentGrades.length > 0 ? 
-        studentGrades.reduce((sum, grade) => sum + grade, 0) / studentGrades.length : 0;
-    });
-
+    // Use the already calculated student overall grades for distribution
     const gradeDistribution = [
-      { grade: 'A', count: studentAverages.filter(avg => avg >= 90).length, percentage: 0 },
-      { grade: 'B', count: studentAverages.filter(avg => avg >= 80 && avg < 90).length, percentage: 0 },
-      { grade: 'C', count: studentAverages.filter(avg => avg >= 70 && avg < 80).length, percentage: 0 },
-      { grade: 'D', count: studentAverages.filter(avg => avg >= 60 && avg < 70).length, percentage: 0 },
-      { grade: 'F', count: studentAverages.filter(avg => avg < 60).length, percentage: 0 }
+      { grade: 'A', count: studentGrades.filter(avg => avg >= 90).length, percentage: 0 },
+      { grade: 'B', count: studentGrades.filter(avg => avg >= 80 && avg < 90).length, percentage: 0 },
+      { grade: 'C', count: studentGrades.filter(avg => avg >= 70 && avg < 80).length, percentage: 0 },
+      { grade: 'D', count: studentGrades.filter(avg => avg >= 60 && avg < 70).length, percentage: 0 },
+      { grade: 'F', count: studentGrades.filter(avg => avg < 60).length, percentage: 0 }
     ].map((item: { grade: string; count: number; percentage: number }) => ({
       ...item,
       percentage: students.length > 0 ? (item.count / students.length) * 100 : 0
     }));
 
-    // Calculate at-risk and excelling students
-    const atRiskStudents = studentAverages.filter(avg => avg < 70).length;
-    const excellingStudents = studentAverages.filter(avg => avg >= 90).length;
+    // Calculate at-risk and excelling students using overall grades
+    const atRiskStudents = studentGrades.filter(avg => avg < 70).length;
+    const excellingStudents = studentGrades.filter(avg => avg >= 90).length;
 
-    // Calculate assignment types averages
+    // Calculate assignment types averages using correct key format
     const assignmentTypes = assignments.reduce((acc, assignment) => {
       const type = assignment.type || 'Assignment';
-      const assignmentGrades = students.map(student => 
-        grades[`${student.id}_${assignment.id}`]?.points_earned || 0
-      );
-      const average = assignmentGrades.length > 0 ? 
-        assignmentGrades.reduce((sum, grade) => sum + grade, 0) / assignmentGrades.length : 0;
+      const assignmentGrades = students.map(student => {
+        const grade = grades[`${student.id}-${assignment.id}`];
+        if (!grade || grade.points_earned === null || grade.status === 'missing') return null;
+        // Calculate percentage for this assignment
+        const percentage = assignment.points_possible > 0 ? 
+          (grade.points_earned / assignment.points_possible) * 100 : 0;
+        return percentage;
+      }).filter(grade => grade !== null);
+      
+      // Skip if no valid grades for this assignment
+      if (assignmentGrades.length === 0) return acc;
+      
+      const average = assignmentGrades.reduce((sum, grade) => sum + grade, 0) / assignmentGrades.length;
+      
+      // Ensure average is a valid number
+      if (isNaN(average) || !isFinite(average)) return acc;
 
       const existing = acc.find((item: { type: string; average: number; count: number; total: number }) => item.type === type);
       if (existing) {
@@ -134,9 +136,9 @@ export function AnalyticsDashboard({
       return acc;
     }, [] as Array<{ type: string; average: number; count: number; total: number }>);
 
-    // Calculate grading progress
+    // Calculate grading progress using correct key format
     const gradedSubmissions = students.flatMap(student => 
-      assignments.map(assignment => grades[`${student.id}_${assignment.id}`])
+      assignments.map(assignment => grades[`${student.id}-${assignment.id}`])
     ).filter(grade => grade && grade.points_earned !== null && grade.graded_at).length;
     const gradingProgress = totalPossibleSubmissions > 0 ? 
       (gradedSubmissions / totalPossibleSubmissions) * 100 : 0;
@@ -152,7 +154,10 @@ export function AnalyticsDashboard({
         gradingProgress: Math.round(gradingProgress * 10) / 10
       },
       gradeDistribution,
-      assignmentTypes: assignmentTypes.map(({ total, ...rest }: { total: number; type: string; average: number; count: number }) => rest),
+      assignmentTypes: assignmentTypes.map(({ total, ...rest }: { total: number; type: string; average: number; count: number }) => ({
+        ...rest,
+        average: isNaN(rest.average) || !isFinite(rest.average) ? 0 : Math.round(rest.average * 10) / 10
+      })),
       standards: data.standards || [],
       recentActivity: [] as Array<{ type: string; student?: string; teacher?: string; assignment: string; time: string }>,
       predictions: [] as Array<{ student: string; current_grade: number; predicted_final: number; confidence: number; risk_level: string }>
@@ -304,20 +309,30 @@ export function AnalyticsDashboard({
             <p className="text-xs lg:text-caption text-muted-foreground mt-1">Average scores across different assignment categories</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-          {analytics.assignmentTypes.map((type: { type: string; average: number; count: number }) => (
-            <div key={type.type} className="p-4 lg:p-6 bg-background rounded-xl border border-divider hover:shadow-md transition-airy">
-              <div className="flex items-center justify-between mb-3 lg:mb-4">
-                <h4 className="text-sm lg:text-body font-semibold text-foreground">{type.type}</h4>
-                <Badge variant="outline" className="border-divider text-xs">
-                  {type.count} assignments
-                </Badge>
+        {analytics.assignmentTypes.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+            {analytics.assignmentTypes.map((type: { type: string; average: number; count: number }) => (
+              <div key={type.type} className="p-4 lg:p-6 bg-background rounded-xl border border-divider hover:shadow-md transition-airy">
+                <div className="flex items-center justify-between mb-3 lg:mb-4">
+                  <h4 className="text-sm lg:text-body font-semibold text-foreground">{type.type}</h4>
+                  <Badge variant="outline" className="border-divider text-xs">
+                    {type.count} assignments
+                  </Badge>
+                </div>
+                <div className="text-xl lg:text-h2 font-bold text-primary mb-1 lg:mb-2">{type.average}%</div>
+                <div className="text-xs lg:text-caption text-muted-foreground">Average score</div>
               </div>
-              <div className="text-xl lg:text-h2 font-bold text-primary mb-1 lg:mb-2">{type.average}%</div>
-              <div className="text-xs lg:text-caption text-muted-foreground">Average score</div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h4 className="text-body font-medium text-foreground mb-2">No Graded Assignments Yet</h4>
+            <p className="text-caption text-muted-foreground">
+              Assignment type performance will appear here once students complete and receive grades on assignments.
+            </p>
+          </div>
+        )}
       </Card>
     </div>
   );

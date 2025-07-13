@@ -81,8 +81,8 @@ export const AllInstancesTable: React.FC<AllInstancesTableProps> = ({
       let valB_raw: any = b[sortColumn as keyof EnrichedClassInstance];
 
       if (sortColumn === 'enrolledStudents') {
-        valA_raw = 0; 
-        valB_raw = 0;
+        valA_raw = a.student_count || 0; 
+        valB_raw = b.student_count || 0;
       }
       
       if (sortColumn === "created_at" || sortColumn === "start_date" || sortColumn === "end_date") {
@@ -278,7 +278,11 @@ export const AllInstancesTable: React.FC<AllInstancesTableProps> = ({
                       <div className="whitespace-nowrap">N/A</div>
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground py-3 w-[8%]">
-                      <div className="whitespace-nowrap">0 / ∞</div>
+                      <div className="whitespace-nowrap">
+                        {instance.student_count || 0} / {
+                          (instance.settings as any)?.capacity || '∞'
+                        }
+                      </div>
                     </TableCell>
                     <TableCell className="text-right py-3 w-[60px]">
                       <DropdownMenu>

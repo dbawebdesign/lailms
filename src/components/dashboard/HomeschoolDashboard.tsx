@@ -11,7 +11,6 @@ import {
   UserPlus, 
   GraduationCap, 
   Copy, 
-  Plus, 
   BookOpen, 
   Users,
   Settings,
@@ -59,8 +58,8 @@ export default function HomeschoolDashboard({
 }: HomeschoolDashboardProps) {
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([])
   const [students, setStudents] = useState<Student[]>([])
+  const [activeCourses, setActiveCourses] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
-  const [isGenerating, setIsGenerating] = useState(false)
   const [showAllCodes, setShowAllCodes] = useState(false)
   const supabase = createClient()
   const { copy: copyToClipboard } = useInviteCodeClipboard()
@@ -72,82 +71,108 @@ export default function HomeschoolDashboard({
   const fetchDashboardData = async () => {
     setIsLoading(true)
     try {
+      // Get current user
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) {
+        console.error('Auth error:', authError)
+        return
+      }
+
       // Fetch invite codes
-      const { data: codes } = await supabase
+      const { data: codes, error: codesError } = await supabase
         .from('invite_codes')
         .select('*')
         .eq('organisation_id', organizationId)
         .order('created_at', { ascending: false })
 
-      if (codes) {
-        setInviteCodes(codes)
+      if (codesError) {
+        console.error('Error fetching invite codes:', codesError)
+      } else {
+        setInviteCodes(codes || [])
       }
 
-      // Fetch students
-      const { data: studentProfiles } = await supabase
+      // Fetch students (profiles with student role in this organization)
+      const { data: studentProfiles, error: studentsError } = await supabase
         .from('profiles')
-        .select('user_id, username, first_name, last_name, grade_level, created_at')
+        .select('*')
         .eq('organisation_id', organizationId)
         .eq('role', 'student')
         .order('created_at', { ascending: false })
 
-      if (studentProfiles) {
-        setStudents(studentProfiles.map(profile => ({
+      if (studentsError) {
+        console.error('Error fetching students:', studentsError)
+      } else {
+        const mappedStudents = studentProfiles?.map(profile => ({
           id: profile.user_id,
-          username: profile.username,
+          username: profile.username || `${profile.first_name} ${profile.last_name}`,
           first_name: profile.first_name || '',
           last_name: profile.last_name || '',
           grade_level: profile.grade_level,
-          created_at: profile.created_at
-        })))
+          created_at: profile.created_at,
+          last_activity: profile.last_activity
+        })) || []
+        setStudents(mappedStudents)
       }
+
+      // Fetch active courses (class instances where the current user is the teacher)
+      const { data: activeClassInstances, error: coursesError } = await supabase
+        .from('class_instances')
+        .select(`
+          id,
+          name,
+          status,
+          base_classes!inner (
+            user_id,
+            organisation_id
+          )
+        `)
+        .eq('base_classes.user_id', user.id)
+        .eq('status', 'active')
+        .eq('base_classes.organisation_id', organizationId)
+
+      if (coursesError) {
+        console.error('Error fetching active courses:', coursesError)
+        setActiveCourses(0)
+      } else {
+        console.log('Active class instances found:', activeClassInstances?.length || 0)
+        console.log('Active class instances data:', activeClassInstances)
+        setActiveCourses(activeClassInstances?.length || 0)
+      }
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
-      toast({
-        title: "Error",
-        description: "Failed to load dashboard data",
-        variant: "destructive"
-      })
     } finally {
       setIsLoading(false)
     }
   }
 
-  const generateInviteCode = async (role: string) => {
-    setIsGenerating(true)
-    try {
-      const { data, error } = await supabase
-        .from('invite_codes')
-        .insert([{
-          organisation_id: organizationId,
-          role: role,
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-        }])
-        .select()
-        .single()
+  // Remove the generateInviteCode function
+  // const generateInviteCode = async (role: string) => {
+  //   setIsGenerating(true)
+  //   try {
+  //     const response = await fetch('/api/invite-code/generate', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({
+  //         role,
+  //         organizationId,
+  //       }),
+  //     })
 
-      if (error) throw error
+  //     if (!response.ok) {
+  //       throw new Error('Failed to generate invite code')
+  //     }
 
-      if (data) {
-        setInviteCodes(prev => [data, ...prev])
-        toast({
-          title: "Success",
-          description: `New ${role} invite code generated`,
-        })
-      }
-    } catch (error) {
-      console.error('Error generating invite code:', error)
-      toast({
-        title: "Error",
-        description: "Failed to generate invite code",
-        variant: "destructive"
-      })
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
-
+  //     const data = await response.json()
+  //     setInviteCodes(prev => [data.inviteCode, ...prev])
+  //   } catch (error) {
+  //     console.error('Error generating invite code:', error)
+  //   } finally {
+  //     setIsGenerating(false)
+  //   }
+  // }
 
   const getCodeStatus = (code: InviteCode) => {
     if (code.used_at) {
@@ -218,7 +243,7 @@ export default function HomeschoolDashboard({
             <div className="flex items-center space-x-2">
               <BookOpen className="h-5 w-5 text-purple-600 hover-icon" />
               <div>
-                <p className="text-2xl font-bold hover-text-highlight">0</p>
+                <p className="text-2xl font-bold hover-text-highlight">{activeCourses}</p>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">Active Courses</p>
               </div>
             </div>
@@ -243,14 +268,6 @@ export default function HomeschoolDashboard({
                 {showAllCodes ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
                 {showAllCodes ? 'Hide Used' : 'Show All'}
               </Button>
-              <Button
-                size="sm"
-                onClick={() => generateInviteCode('student')}
-                disabled={isGenerating}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Generate Code
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -262,12 +279,8 @@ export default function HomeschoolDashboard({
                 No {showAllCodes ? '' : 'active '}invite codes
               </h3>
               <p className="text-neutral-500 dark:text-neutral-400 mb-4">
-                Generate invite codes to add your children as students
+                Invite codes are automatically generated by the system when needed
               </p>
-              <Button onClick={() => generateInviteCode('student')} disabled={isGenerating}>
-                <Plus className="h-4 w-4 mr-2" />
-                Generate First Code
-              </Button>
             </div>
           ) : (
             <div className="space-y-3">

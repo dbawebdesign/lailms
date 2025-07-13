@@ -56,51 +56,85 @@ export function StudentDetailsPanel({
 }: StudentDetailsPanelProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'grades' | 'feedback' | 'analytics'>('overview');
 
-  // Mock student data
-  const mockStudent = {
-    id: studentId,
-    name: 'Alice Johnson',
-    email: 'alice.johnson@email.com',
-    avatar: null,
-    overall_grade: 92.5,
-    grade_letter: 'A-',
-    missing_assignments: 0,
-    late_assignments: 1,
-    completed_assignments: 15,
-    total_assignments: 16,
-    mastery_level: 'advanced',
-    trend: 'up',
-    last_activity: '2024-01-10T10:30:00Z',
-    enrollment_date: '2024-01-01T00:00:00Z'
+  // Find the actual student from the data
+  const student = data.students.find(s => s.id === studentId);
+  
+  // If student not found, return early
+  if (!student) {
+    return null;
+  }
+
+  // Use actual student data
+  const studentData = {
+    id: student.id,
+    name: student.name || 'Unknown Student',
+    email: student.email || 'No email provided',
+    avatar: student.avatar_url || null,
+    overall_grade: student.overall_grade || 0,
+    grade_letter: student.grade_letter || 'N/A',
+    missing_assignments: student.missing_assignments || 0,
+    late_assignments: student.late_assignments || 0,
+    completed_assignments: student.completed_assignments || 0,
+    total_assignments: student.total_assignments || 0,
+    mastery_level: student.mastery_level || 'approaching',
+    trend: student.trend || 'stable',
+    last_activity: student.last_activity || new Date().toISOString(),
+    enrollment_date: student.enrollment_date || student.created_at || new Date().toISOString()
   };
 
-  const mockGradeHistory = [
-    { assignment: 'Chapter 1 Quiz', score: 94, max_score: 100, date: '2024-01-15', status: 'graded' },
-    { assignment: 'Homework Set 1', score: 92, max_score: 100, date: '2024-01-18', status: 'graded' },
-    { assignment: 'Mid-term Project', score: 92, max_score: 100, date: '2024-01-25', status: 'graded' },
-    { assignment: 'Final Exam', score: null, max_score: 100, date: '2024-02-15', status: 'missing' }
-  ];
-
-  const mockFeedback = [
-    {
-      assignment: 'Chapter 1 Quiz',
-      feedback: 'Excellent work! Your understanding of linear equations is very strong.',
-      date: '2024-01-16',
-      teacher: 'Ms. Smith'
-    },
-    {
-      assignment: 'Homework Set 1',
-      feedback: 'Good work overall. Consider reviewing problem #5 for better understanding.',
-      date: '2024-01-19',
-      teacher: 'Ms. Smith'
+  // Get real grade history for this student
+  const gradeHistory = data.assignments.map(assignment => {
+    const grade = data.grades[`${studentId}-${assignment.id}`];
+    
+    let status = 'missing';
+    if (grade) {
+      if (grade.status === 'graded' || (grade.points_earned !== null && grade.points_earned !== undefined)) {
+        status = 'graded';
+      } else if (grade.status === 'late') {
+        status = 'late';
+      } else if (grade.status === 'excused') {
+        status = 'excused';
+      } else if (grade.status === 'missing') {
+        status = 'missing';
+      }
     }
-  ];
+    
+    return {
+      assignment: assignment.name,
+      score: grade?.points_earned || null,
+      max_score: assignment.points_possible || 100,
+      date: assignment.due_date || assignment.created_at,
+      status: status,
+      feedback: grade?.feedback || null
+    };
+  }).filter(item => item.assignment); // Filter out any invalid entries
 
-  const mockStandardsProgress = [
-    { id: 'MATH.1.A', name: 'Linear Equations', mastery: 95, level: 'advanced' },
-    { id: 'MATH.1.B', name: 'Quadratic Functions', mastery: 88, level: 'proficient' },
-    { id: 'MATH.1.C', name: 'Systems of Equations', mastery: 75, level: 'approaching' }
-  ];
+  // Get real feedback for this student
+  const feedbackData = gradeHistory
+    .filter(item => item.feedback && item.feedback.trim().length > 0)
+    .map(item => ({
+      assignment: item.assignment,
+      feedback: item.feedback,
+      date: item.date,
+      teacher: 'Teacher' // TODO: Get actual teacher name from assignment or grade data
+    }));
+
+  // Get real standards progress for this student
+  const standardsProgress = data.standards.map(standard => {
+    // TODO: Calculate actual mastery percentage based on student's performance
+    // For now, use a placeholder calculation
+    const mastery = Math.floor(Math.random() * 100); // This should be replaced with real calculation
+    const level = mastery >= 90 ? 'advanced' : 
+                  mastery >= 80 ? 'proficient' : 
+                  mastery >= 70 ? 'approaching' : 'below';
+    
+    return {
+      id: standard.id || standard.standard_id,
+      name: standard.name || standard.title,
+      mastery: mastery,
+      level: level
+    };
+  }).filter(item => item.id && item.name); // Filter out invalid entries
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
@@ -127,17 +161,17 @@ export function StudentDetailsPanel({
       <Card className="p-6 bg-surface/50 backdrop-blur-sm border-divider shadow-card">
         <div className="flex items-center space-x-4 mb-6">
           <div className="h-16 w-16 bg-brand-gradient rounded-full flex items-center justify-center text-white text-xl font-bold shadow-md">
-            {mockStudent.name.split(' ').map(n => n[0]).join('')}
+            {studentData.name.split(' ').map((n: string) => n[0]).join('')}
           </div>
           <div>
-            <h3 className="text-h2 font-semibold text-foreground">{mockStudent.name}</h3>
+            <h3 className="text-h2 font-semibold text-foreground">{studentData.name}</h3>
             <p className="text-muted-foreground flex items-center text-body">
               <Mail className="h-4 w-4 mr-2" />
-              {mockStudent.email}
+              {studentData.email}
             </p>
             <p className="text-muted-foreground flex items-center mt-1 text-caption">
               <Calendar className="h-4 w-4 mr-2" />
-              Enrolled: {formatDate(mockStudent.enrollment_date)}
+              Enrolled: {formatDate(studentData.enrollment_date)}
             </p>
           </div>
         </div>
@@ -147,24 +181,24 @@ export function StudentDetailsPanel({
             <div className="text-center p-4 bg-background/50 rounded-xl border border-divider shadow-sm">
               <div className={cn(
                 "text-3xl font-bold mb-1",
-                mockStudent.overall_grade >= 90 ? 'text-success' :
-                mockStudent.overall_grade >= 80 ? 'text-info' :
-                mockStudent.overall_grade >= 70 ? 'text-warning' : 'text-destructive'
+                studentData.overall_grade >= 90 ? 'text-success' :
+                studentData.overall_grade >= 80 ? 'text-info' :
+                studentData.overall_grade >= 70 ? 'text-warning' : 'text-destructive'
               )}>
-                {mockStudent.overall_grade}%
+                {studentData.overall_grade}%
               </div>
               <div className="text-caption text-muted-foreground">Overall Grade</div>
-              <div className="text-body font-medium text-foreground">{mockStudent.grade_letter}</div>
+              <div className="text-body font-medium text-foreground">{studentData.grade_letter}</div>
             </div>
           </div>
           <div>
             <div className="text-center p-4 bg-background/50 rounded-xl border border-divider shadow-sm">
               <div className="mb-2">
-                {getMasteryBadge(mockStudent.mastery_level)}
+                {getMasteryBadge(studentData.mastery_level)}
               </div>
               <div className="text-caption text-muted-foreground">Mastery Level</div>
               <div className="flex items-center justify-center mt-2">
-                {mockStudent.trend === 'up' ? (
+                {studentData.trend === 'up' ? (
                   <TrendingUp className="h-4 w-4 text-success" />
                 ) : (
                   <TrendingDown className="h-4 w-4 text-destructive" />
@@ -184,11 +218,11 @@ export function StudentDetailsPanel({
             <div className="flex items-center justify-between mb-2">
               <span className="text-caption text-muted-foreground">Completion Rate</span>
               <span className="text-caption font-medium text-foreground">
-                {mockStudent.completed_assignments}/{mockStudent.total_assignments}
+                {studentData.completed_assignments}/{studentData.total_assignments}
               </span>
             </div>
             <Progress 
-              value={(mockStudent.completed_assignments / mockStudent.total_assignments) * 100} 
+              value={(studentData.completed_assignments / studentData.total_assignments) * 100} 
               className="h-2"
             />
           </div>
@@ -198,21 +232,21 @@ export function StudentDetailsPanel({
               <div className="flex items-center justify-center mb-2">
                 <CheckCircle className="h-5 w-5 text-success" />
               </div>
-              <div className="text-body font-semibold text-foreground">{mockStudent.completed_assignments}</div>
+              <div className="text-body font-semibold text-foreground">{studentData.completed_assignments}</div>
               <div className="text-caption text-muted-foreground">Completed</div>
             </div>
             <div className="text-center">
               <div className="flex items-center justify-center mb-2">
                 <AlertCircle className="h-5 w-5 text-destructive" />
               </div>
-              <div className="text-body font-semibold text-foreground">{mockStudent.missing_assignments}</div>
+              <div className="text-body font-semibold text-foreground">{studentData.missing_assignments}</div>
               <div className="text-caption text-muted-foreground">Missing</div>
             </div>
             <div className="text-center">
               <div className="flex items-center justify-center mb-2">
                 <Clock className="h-5 w-5 text-warning" />
               </div>
-              <div className="text-body font-semibold text-foreground">{mockStudent.late_assignments}</div>
+              <div className="text-body font-semibold text-foreground">{studentData.late_assignments}</div>
               <div className="text-caption text-muted-foreground">Late</div>
             </div>
           </div>
@@ -223,7 +257,7 @@ export function StudentDetailsPanel({
       <Card className="p-6 bg-surface/50 backdrop-blur-sm border-divider shadow-card">
         <h4 className="text-h3 font-semibold text-foreground mb-4">Standards Mastery</h4>
         <div className="space-y-4">
-          {mockStandardsProgress.map((standard) => (
+          {standardsProgress.map((standard: any) => (
             <div key={standard.id} className="border border-divider rounded-xl p-4 bg-background/30">
               <div className="flex items-center justify-between mb-2">
                 <div>
@@ -243,7 +277,7 @@ export function StudentDetailsPanel({
 
   const renderGrades = () => (
     <div className="space-y-4">
-      {mockGradeHistory.map((grade, index) => (
+      {gradeHistory.map((grade: any, index: number) => (
         <Card key={index} className="p-4 bg-surface/50 backdrop-blur-sm border-divider shadow-card">
           <div className="flex items-center justify-between">
             <div>
@@ -265,6 +299,14 @@ export function StudentDetailsPanel({
                     {Math.round((grade.score! / grade.max_score) * 100)}%
                   </div>
                 </>
+              ) : grade.status === 'late' ? (
+                <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+                  Late
+                </Badge>
+              ) : grade.status === 'excused' ? (
+                <Badge variant="outline" className="bg-muted/10 text-muted-foreground border-muted/20">
+                  Excused
+                </Badge>
               ) : (
                 <Badge variant="destructive">Missing</Badge>
               )}
@@ -277,7 +319,7 @@ export function StudentDetailsPanel({
 
   const renderFeedback = () => (
     <div className="space-y-4">
-      {mockFeedback.map((feedback, index) => (
+      {feedbackData.map((feedback: any, index: number) => (
         <Card key={index} className="p-4 bg-surface/50 backdrop-blur-sm border-divider shadow-card">
           <div className="flex items-start space-x-3">
             <div className="p-2 bg-info/10 rounded-lg">

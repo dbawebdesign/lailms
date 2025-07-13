@@ -64,15 +64,8 @@ BEGIN
             ELSE 'quiz'::assignment_type
         END;
 
-        -- Build assignment name
-        v_assignment_name := CASE 
-            WHEN v_assessment.assessment_type = 'lesson' THEN 
-                COALESCE(v_assessment.lesson_title, 'Lesson') || ' - ' || v_assessment.title
-            WHEN v_assessment.assessment_type = 'path' THEN 
-                COALESCE(v_assessment.path_title, 'Path') || ' - ' || v_assessment.title
-            ELSE 
-                v_assessment.title
-        END;
+        -- Build assignment name - use only assessment title
+        v_assignment_name := v_assessment.title;
 
         -- Build assignment description
         v_assignment_description := COALESCE(v_assessment.description, '');
@@ -194,15 +187,8 @@ BEGIN
         RETURN; -- Attempt not found or not completed
     END IF;
 
-    -- Build assignment name to match what was created
-    v_assignment_name := CASE 
-        WHEN v_attempt.assessment_type = 'lesson' THEN 
-            COALESCE(v_attempt.lesson_title, 'Lesson') || ' - ' || v_attempt.assessment_title
-        WHEN v_attempt.assessment_type = 'path' THEN 
-            COALESCE(v_attempt.path_title, 'Path') || ' - ' || v_attempt.assessment_title
-        ELSE 
-            v_attempt.assessment_title
-    END;
+    -- Build assignment name to match what was created - use only assessment title
+    v_assignment_name := v_attempt.assessment_title;
 
     -- Find the corresponding assignment and class instance
     SELECT 

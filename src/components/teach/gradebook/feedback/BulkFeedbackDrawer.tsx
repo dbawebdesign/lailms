@@ -24,33 +24,31 @@ interface BulkFeedbackDrawerProps {
     enrollment_code: string;
     settings?: any;
   };
+  data?: {
+    students: any[];
+    assignments: any[];
+    grades: Record<string, any>;
+    standards: any[];
+    settings: any;
+  };
 }
 
 export function BulkFeedbackDrawer({
   open,
   onOpenChange,
   selectedStudents,
-  classInstance
+  classInstance,
+  data
 }: BulkFeedbackDrawerProps) {
   const [feedbackText, setFeedbackText] = useState('');
   const [assignmentId, setAssignmentId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const mockStudents = [
-    { id: '1', name: 'Alice Johnson' },
-    { id: '2', name: 'Bob Smith' },
-    { id: '3', name: 'Carol Williams' },
-    { id: '4', name: 'David Brown' }
-  ];
+  // Use real data from props
+  const students = data?.students || [];
+  const assignments = data?.assignments || [];
 
-  const mockAssignments = [
-    { id: '1', name: 'Chapter 1 Quiz' },
-    { id: '2', name: 'Homework Set 1' },
-    { id: '3', name: 'Mid-term Project' },
-    { id: '4', name: 'Final Exam' }
-  ];
-
-  const selectedStudentNames = mockStudents
+  const selectedStudentNames = students
     .filter(student => selectedStudents.includes(student.id))
     .map(student => student.name);
 
@@ -142,7 +140,7 @@ export function BulkFeedbackDrawer({
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select an assignment...</option>
-              {mockAssignments.map((assignment) => (
+              {assignments.map((assignment: any) => (
                 <option key={assignment.id} value={assignment.id}>
                   {assignment.name}
                 </option>

@@ -449,9 +449,22 @@ export function NewSchemaAssessmentTaker({
 
   // Update current score based on all feedback
   const updateCurrentScore = () => {
+    if (questions.length === 0) {
+      setCurrentScore({ totalPoints: 0, earnedPoints: 0, percentage: 0 });
+      return;
+    }
+    
     const feedbackArray = questions.map(q => questionFeedback[q.id] || null);
     const score = InstantGradingService.calculateTotalScore(feedbackArray);
-    setCurrentScore(score);
+    
+    // Ensure all values are valid numbers
+    const safeScore = {
+      totalPoints: isNaN(score.totalPoints) ? 0 : score.totalPoints,
+      earnedPoints: isNaN(score.earnedPoints) ? 0 : score.earnedPoints,
+      percentage: isNaN(score.percentage) ? 0 : score.percentage
+    };
+    
+    setCurrentScore(safeScore);
   };
 
   // Update score when feedback changes
@@ -850,7 +863,7 @@ export function NewSchemaAssessmentTaker({
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Current Score</p>
                     <p className="text-xl font-bold text-primary">
-                      {currentScore.percentage.toFixed(1)}%
+                      {isNaN(currentScore.percentage) ? '0.0' : currentScore.percentage.toFixed(1)}%
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {currentScore.earnedPoints}/{currentScore.totalPoints} pts

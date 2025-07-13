@@ -47,6 +47,8 @@ export interface GradebookData {
     missing_assignments: number
     late_assignments: number
     mastery_level: 'below' | 'approaching' | 'proficient' | 'advanced'
+    completed_assignments: number
+    total_assignments: number
   }>
   assignments: Assignment[]
   grades: Record<string, Grade>
@@ -98,7 +100,9 @@ export function useGradebook(classInstanceId: string): UseGradebookReturn {
         grade_letter: 'N/A',
         missing_assignments: assignments.length,
         late_assignments: 0,
-        mastery_level: 'below' as const
+        mastery_level: 'below' as const,
+        completed_assignments: 0,
+        total_assignments: assignments.length
       }
     }
 
@@ -136,12 +140,18 @@ export function useGradebook(classInstanceId: string): UseGradebookReturn {
     else if (overallPercentage >= 80) masteryLevel = 'proficient'
     else if (overallPercentage >= 70) masteryLevel = 'approaching'
 
+    // Calculate completed and total assignments
+    const completedAssignments = grades.filter(g => g.student_id === studentId && g.status === 'graded').length;
+    const totalAssignments = assignments.length;
+
     return {
       overall_grade: Math.round(overallPercentage * 100) / 100,
       grade_letter: gradeLetter,
       missing_assignments: missingAssignments,
       late_assignments: lateAssignments,
-      mastery_level: masteryLevel
+      mastery_level: masteryLevel,
+      completed_assignments: completedAssignments,
+      total_assignments: totalAssignments
     }
   }, [])
 

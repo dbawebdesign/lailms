@@ -63,6 +63,20 @@ async function updateDocumentStatus(
   }
 }
 
+// Utility function to sanitize text for database insertion
+function sanitizeTextForDatabase(text: string): string {
+  if (!text) return text;
+  
+  // Remove null characters and other problematic Unicode sequences
+  return text
+    .replace(/\u0000/g, '') // Remove null characters
+    .replace(/\uFFFD/g, '') // Remove replacement characters
+    .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '') // Remove other control characters except \t, \n, \r
+    .replace(/\r\n/g, '\n') // Normalize line endings
+    .replace(/\r/g, '\n') // Convert remaining \r to \n
+    .trim(); // Remove leading/trailing whitespace
+}
+
 // --- Text Extraction Functions ---
 async function extractTextFromPdf(filePath: string, supabase: SupabaseClient, bucketName: string): Promise<string> {
   console.log(`Attempting to extract text from PDF: ${filePath} in bucket ${bucketName}`);
@@ -88,6 +102,9 @@ async function extractTextFromPdf(filePath: string, supabase: SupabaseClient, bu
       const pageStrings = textContent.items.map((itm: any) => itm.str || '').join(' ');
       allText += pageStrings + '\n\n';
     }
+
+    // Sanitize the extracted text to remove null characters and other problematic Unicode sequences
+    allText = sanitizeTextForDatabase(allText);
 
     console.log(`Successfully extracted ~${allText.length} characters from PDF ${filePath}.`);
     return allText;
@@ -209,6 +226,10 @@ async function extractTextFromUrl(url: string): Promise<string> {
       
       console.log(`Successfully scraped ~${text.length} characters from ${url} using strategy: ${strategy.name}`);
       console.log(`First 200 characters: ${text.substring(0, 200)}...`);
+      
+      // Sanitize the extracted text to remove null characters and other problematic Unicode sequences
+      text = sanitizeTextForDatabase(text);
+      
       return text;
       
     } catch (error) {
@@ -802,6 +823,7 @@ serve(async (req: Request) => {
         });
       } else {
         extractedText = transcriptResult.transcript || '';
+        extractedText = sanitizeTextForDatabase(extractedText);
         
         // Update metadata with success information
         const successMetadata = {
@@ -821,6 +843,7 @@ serve(async (req: Request) => {
       docMetadata.source_type = 'url_scrape';
     } else if (fileType.startsWith('audio/')) {
       extractedText = await transcribeAudio(storagePath, supabaseClient, bucketName, openaiApiKey);
+      extractedText = sanitizeTextForDatabase(extractedText);
       docMetadata.source_type = 'audio_transcript';
     } else if (fileType === 'application/pdf') {
       extractedText = await extractTextFromPdf(storagePath, supabaseClient, bucketName);
@@ -833,6 +856,7 @@ serve(async (req: Request) => {
         .download(storagePath);
       if (downloadError || !fileData) throw new Error(`Storage download failed for ${storagePath}: ${downloadError?.message}`);
       extractedText = await fileData.text();
+      extractedText = sanitizeTextForDatabase(extractedText);
       docMetadata.source_type = 'text_file';
     } else {
       throw new Error(`Unsupported file type: ${fileType} or missing source URL for document ${documentId}`);
@@ -844,9 +868,43 @@ serve(async (req: Request) => {
       processing_stage: 'chunking'
     });
 
-    const processedChunks: Chunk[] = await chunkText(extractedText, fileType as DocumentType, { chunkSize: 1500, overlap: 200 });
+    console.log(`Starting chunking process for ${extractedText.length} characters of text...`);
+    
+    // Map file types to document types for chunking
+    let documentType: DocumentType;
+    if (fileType === 'application/pdf') {
+      documentType = 'pdf';
+    } else if (sourceUrl && (sourceUrl.includes('youtube.com') || sourceUrl.includes('youtu.be'))) {
+      documentType = 'youtube';
+    } else if (sourceUrl && !sourceUrl.includes('youtube.com') && !sourceUrl.includes('youtu.be')) {
+      documentType = 'url';
+    } else if (fileType === 'text/plain') {
+      documentType = 'txt';
+    } else if (fileType?.startsWith('audio/')) {
+      documentType = 'audio';
+    } else {
+      documentType = 'txt'; // Default fallback
+    }
+    
+    console.log(`File type: ${fileType}, Document type for chunking: ${documentType}`);
+    
+    const processedChunks: Chunk[] = await chunkText(extractedText, documentType, { chunkSize: 1500, overlap: 200 });
+    console.log(`Created ${processedChunks.length} chunks from the text.`);
 
+    if (processedChunks.length === 0) {
+      throw new Error('No chunks were created from the extracted text');
+    }
+
+    // Log sample chunk for debugging
+    console.log('Sample chunk:', {
+      index: processedChunks[0]?.chunk_index,
+      contentLength: processedChunks[0]?.content?.length,
+      contentPreview: processedChunks[0]?.content?.substring(0, 100) + '...'
+    });
+
+    console.log(`Generating embeddings for ${processedChunks.length} chunks...`);
     const embeddings = await Promise.all(processedChunks.map(chunk => getEmbedding(chunk.content, openaiApiKey)));
+    console.log(`Generated ${embeddings.length} embeddings.`);
 
     // Store chunks in Supabase
     const chunkUpserts = processedChunks.map((chunk, index) => {
@@ -865,13 +923,24 @@ serve(async (req: Request) => {
       };
     });
 
+    console.log(`Attempting to insert ${chunkUpserts.length} chunks for document ${documentId}...`);
+    
     const { error: insertChunkError } = await supabaseClient
       .from('document_chunks')
       .insert(chunkUpserts);
+    
     if (insertChunkError) {
       console.error(`Failed to insert chunks for document ${documentId}:`, insertChunkError);
-      // Decide on error handling: continue, mark doc as completed_with_errors?
+      console.error('Chunk insertion error details:', JSON.stringify(insertChunkError, null, 2));
+      
+      // Log a sample of the data being inserted for debugging
+      console.log('Sample chunk data (first chunk):', JSON.stringify(chunkUpserts[0], null, 2));
+      
+      // This is a critical error - we should not continue processing
+      throw new Error(`Failed to insert chunks: ${insertChunkError.message}`);
     }
+    
+    console.log(`Successfully inserted ${chunkUpserts.length} chunks for document ${documentId}.`);
     
     console.log(`Successfully chunked and embedded ${processedChunks.length} chunks for document ${documentId}.`);
     

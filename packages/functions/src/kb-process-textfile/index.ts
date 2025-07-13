@@ -11,6 +11,20 @@ const corsHeaders = {
 
 console.log(`New function "kb-process-textfile" is running.`);
 
+// Utility function to sanitize text for database insertion
+function sanitizeTextForDatabase(text: string): string {
+  if (!text) return text;
+  
+  // Remove null characters and other problematic Unicode sequences
+  return text
+    .replace(/\u0000/g, '') // Remove null characters
+    .replace(/\uFFFD/g, '') // Remove replacement characters
+    .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '') // Remove other control characters except \t, \n, \r
+    .replace(/\r\n/g, '\n') // Normalize line endings
+    .replace(/\r/g, '\n') // Convert remaining \r to \n
+    .trim(); // Remove leading/trailing whitespace
+}
+
 interface DocumentRecord {
   id: string;
   organisation_id: string;
@@ -147,9 +161,13 @@ serve(async (req: Request) => {
     if (!fileData) throw new Error('Downloaded file data is null.');
 
     const textContent = await fileData.text();
-    console.log(`kb-process-textfile: Content of ${document.file_name || documentId} (first 200 chars):\n${textContent.substring(0, 200)}...`);
+    
+    // Sanitize the text content to remove null characters and other problematic Unicode sequences
+    const sanitizedContent = sanitizeTextForDatabase(textContent);
+    
+    console.log(`kb-process-textfile: Content of ${document.file_name || documentId} (first 200 chars):\n${sanitizedContent.substring(0, 200)}...`);
 
-    const chunks = chunkText(textContent);
+    const chunks = chunkText(sanitizedContent);
     let chunksProcessedCount = 0;
 
     for (let i = 0; i < chunks.length; i++) {
@@ -181,7 +199,7 @@ serve(async (req: Request) => {
     }
     console.log(`kb-process-textfile: Successfully processed and stored ${chunksProcessedCount} of ${chunks.length} chunks for document ${documentId}.`);
 
-    const updatedDocMetadata = {
+    const updatedDocMetadata: Record<string, any> = {
         ...(document.metadata || {}),
         processed_by_function: 'kb-process-textfile',
         text_content_length: textContent.length,

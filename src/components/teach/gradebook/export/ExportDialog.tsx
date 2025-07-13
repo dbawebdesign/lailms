@@ -139,23 +139,62 @@ export function ExportDialog({
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      // TODO: Implement actual export functionality
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Create export data based on selected options
+      const exportData = {
+        classInstance: classInstance.name,
+        exportDate: new Date().toISOString(),
+        dateRange,
+        students: selectedData.students ? data.students : [],
+        assignments: selectedData.assignments ? data.assignments : [],
+        grades: selectedData.grades ? data.grades : {},
+        analytics: selectedData.analytics ? {
+          classAverage: data.students.reduce((sum, s) => sum + (s.overall_grade || 0), 0) / data.students.length,
+          totalStudents: data.students.length,
+          totalAssignments: data.assignments.length
+        } : null,
+        standards: selectedData.standards ? data.standards : [],
+        feedback: selectedData.feedback ? Object.values(data.grades).filter(g => g.feedback) : []
+      };
       
-      // Create and download file (mock)
+      // Create filename
       const filename = `${classInstance.name.replace(/\s+/g, '_')}_gradebook_${new Date().toISOString().split('T')[0]}.${selectedFormat}`;
       
-      // Mock file download
-      console.log('Exporting:', {
-        format: selectedFormat,
-        data: selectedData,
-        dateRange,
-        filename
-      });
+      // Create and download file
+      let content: string;
+      if (selectedFormat === 'json') {
+        content = JSON.stringify(exportData, null, 2);
+      } else if (selectedFormat === 'csv') {
+        // Simple CSV export for grades
+        const headers = ['Student', 'Email', ...data.assignments.map(a => a.name), 'Overall Grade'];
+        const rows = data.students.map(student => [
+          student.name,
+          student.email,
+          ...data.assignments.map(assignment => {
+            const grade = data.grades[`${student.id}_${assignment.id}`];
+            return grade?.points_earned || 'N/A';
+          }),
+          student.overall_grade || 'N/A'
+        ]);
+        content = [headers, ...rows].map(row => row.join(',')).join('\n');
+      } else {
+        content = JSON.stringify(exportData, null, 2);
+      }
+      
+      // Create and trigger download
+      const blob = new Blob([content], { type: selectedFormat === 'csv' ? 'text/csv' : 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
       
       onOpenChange(false);
     } catch (error) {
       console.error('Export failed:', error);
+      alert('Export failed. Please try again.');
     } finally {
       setIsExporting(false);
     }

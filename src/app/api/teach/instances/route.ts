@@ -108,13 +108,28 @@ export async function GET(request: Request) {
 
     if (error) throw error;
 
-    // Filter instances to ensure they belong to the user's organisation via the joined base_class
-    // This is an application-level filter if the join RLS isn't sufficient or direct org_id on instance is missing.
-    // const filteredData = data?.filter(inst => inst.base_classes?.organisation_id === organisationId); // Requires organisation_id in base_classes select
-    // For now, assuming RLS correctly filters or that all instances fetched are relevant.
+    // For each instance, get the student count from rosters table
+    const enrichedInstances: EnrichedClassInstance[] = [];
+    
+    for (const instance of data || []) {
+      // Get student count for this instance
+      const { count: studentCount, error: rosterError } = await supabase
+        .from('rosters')
+        .select('id', { count: 'exact' })
+        .eq('class_instance_id', instance.id);
 
-    const uiInstances: EnrichedClassInstance[] = data ? data.map(inst => mapDbToEnrichedUi(inst as unknown as DbClassInstance)) : [];
-    return NextResponse.json(uiInstances);
+      if (rosterError) {
+        console.error('Error fetching roster count for instance', instance.id, rosterError);
+      }
+
+      const enrichedInstance = mapDbToEnrichedUi(instance as unknown as DbClassInstance);
+      enrichedInstance.student_count = studentCount || 0;
+      enrichedInstance.instructor_count = 1; // Assuming 1 instructor per class for now
+
+      enrichedInstances.push(enrichedInstance);
+    }
+
+    return NextResponse.json(enrichedInstances);
 
   } catch (error) {
     console.error("API Error GET all instances:", error);
