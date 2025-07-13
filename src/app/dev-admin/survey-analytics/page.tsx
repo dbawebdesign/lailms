@@ -677,11 +677,11 @@ export default function SurveyAnalyticsPage() {
             {/* Chart View */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-900 font-bold">
-                  <BarChart3 className="w-5 h-5 text-blue-600" />
+                <CardTitle className="flex items-center gap-2 text-gray-300 font-semibold">
+                  <BarChart3 className="w-5 h-5 text-blue-400" />
                   Problem Validation Scores
                 </CardTitle>
-                <CardDescription className="text-gray-700 font-medium">
+                <CardDescription className="text-gray-400 font-normal">
                   Visual ranking of homeschooling challenges by agreement level
                 </CardDescription>
               </CardHeader>
@@ -702,7 +702,7 @@ export default function SurveyAnalyticsPage() {
                       <XAxis 
                         dataKey="name" 
                         fontSize={12}
-                        tick={{ fill: '#1F2937', fontWeight: 600 }}
+                        tick={{ fill: '#9CA3AF', fontWeight: 500 }}
                         angle={-45}
                         textAnchor="end"
                         height={60}
@@ -710,20 +710,20 @@ export default function SurveyAnalyticsPage() {
                       <YAxis 
                         domain={[0, 5]} 
                         fontSize={12}
-                        tick={{ fill: '#1F2937', fontWeight: 600 }}
+                        tick={{ fill: '#9CA3AF', fontWeight: 500 }}
                       />
                       <Tooltip 
                         formatter={(value: number) => [`${value.toFixed(1)}/5`, 'Score']}
                         labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
-                        labelStyle={{ color: '#111827', fontWeight: 700 }}
+                        labelStyle={{ color: '#374151', fontWeight: 600 }}
                         contentStyle={{ 
                           backgroundColor: 'white', 
-                          border: '2px solid #9CA3AF',
+                          border: '1px solid #D1D5DB',
                           borderRadius: '8px',
-                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
-                          color: '#111827',
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                          color: '#374151',
                           fontSize: '14px',
-                          fontWeight: 600
+                          fontWeight: 500
                         }}
                       />
                       <Bar 
@@ -745,11 +745,11 @@ export default function SurveyAnalyticsPage() {
             {/* Detailed List View */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-900 font-bold">
-                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                <CardTitle className="flex items-center gap-2 text-gray-300 font-semibold">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
                   Detailed Problem Analysis
                 </CardTitle>
-                <CardDescription className="text-gray-700 font-medium">
+                <CardDescription className="text-gray-400 font-normal">
                   Ranked by agreement level (1=Strongly Disagree, 5=Strongly Agree)
                 </CardDescription>
               </CardHeader>
@@ -811,11 +811,11 @@ export default function SurveyAnalyticsPage() {
             {/* Chart View */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-900 font-bold">
-                  <Star className="w-5 h-5 text-yellow-600" />
+                <CardTitle className="flex items-center gap-2 text-gray-300 font-semibold">
+                  <Star className="w-5 h-5 text-yellow-400" />
                   Feature Importance Ranking
                 </CardTitle>
-                <CardDescription className="text-gray-700 font-medium">
+                <CardDescription className="text-gray-400 font-normal">
                   Visual ranking of feature importance by parent ratings
                 </CardDescription>
               </CardHeader>
@@ -836,7 +836,7 @@ export default function SurveyAnalyticsPage() {
                       <XAxis 
                         dataKey="name" 
                         fontSize={12}
-                        tick={{ fill: '#1F2937', fontWeight: 600 }}
+                        tick={{ fill: '#9CA3AF', fontWeight: 500 }}
                         angle={-45}
                         textAnchor="end"
                         height={60}
@@ -844,20 +844,20 @@ export default function SurveyAnalyticsPage() {
                       <YAxis 
                         domain={[0, 5]} 
                         fontSize={12}
-                        tick={{ fill: '#1F2937', fontWeight: 600 }}
+                        tick={{ fill: '#9CA3AF', fontWeight: 500 }}
                       />
                       <Tooltip 
                         formatter={(value: number) => [`${value.toFixed(1)}/5`, 'Score']}
                         labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
-                        labelStyle={{ color: '#111827', fontWeight: 700 }}
+                        labelStyle={{ color: '#374151', fontWeight: 600 }}
                         contentStyle={{ 
                           backgroundColor: 'white', 
-                          border: '2px solid #9CA3AF',
+                          border: '1px solid #D1D5DB',
                           borderRadius: '8px',
-                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
-                          color: '#111827',
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                          color: '#374151',
                           fontSize: '14px',
-                          fontWeight: 600
+                          fontWeight: 500
                         }}
                       />
                       <Bar 
@@ -957,11 +957,11 @@ export default function SurveyAnalyticsPage() {
             {/* Pie Chart View */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <PieChart className="w-5 h-5 text-purple-600" />
+                <CardTitle className="flex items-center gap-2 text-gray-300 font-semibold">
+                  <PieChart className="w-5 h-5 text-purple-400" />
                   Concern Distribution
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-gray-400 font-normal">
                   Visual breakdown of primary concerns about AI adoption
                 </CardDescription>
               </CardHeader>
@@ -976,36 +976,36 @@ export default function SurveyAnalyticsPage() {
                             name: concern.length > 30 ? concern.substring(0, 30) + '...' : concern,
                             fullName: concern,
                             value: count,
-                            percentage: data?.totalResponses ? (count / data.totalResponses) * 100 : 0,
-                            fill: CHART_COLORS.pieChart[index % CHART_COLORS.pieChart.length]
+                            percentage: data?.totalResponses ? (count / data.totalResponses) * 100 : 0
                           }))}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
                         label={({ percentage }: any) => percentage > 10 ? `${percentage.toFixed(1)}%` : ''}
                         outerRadius={80}
-                        fill="#8884d8"
                         dataKey="value"
-                        style={{ fontSize: '14px', fontWeight: 700, fill: '#FFFFFF' }}
+                        style={{ fontSize: '14px', fontWeight: 700 }}
                       >
-                        {Object.entries(data?.primaryConcerns || {}).map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS.pieChart[index % CHART_COLORS.pieChart.length]} />
-                        ))}
+                        {Object.entries(data?.primaryConcerns || {})
+                          .sort(([,a], [,b]) => b - a)
+                          .map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={CHART_COLORS.pieChart[index % CHART_COLORS.pieChart.length]} />
+                          ))}
                       </Pie>
                       <Tooltip 
                         formatter={(value: number, name: string, props: any) => [
                           `${value} responses (${props.payload.percentage.toFixed(1)}%)`, 
                           props.payload.fullName
                         ]}
-                        labelStyle={{ color: '#111827', fontWeight: 700 }}
+                        labelStyle={{ color: '#374151', fontWeight: 600 }}
                         contentStyle={{ 
                           backgroundColor: 'white', 
-                          border: '2px solid #9CA3AF',
+                          border: '1px solid #D1D5DB',
                           borderRadius: '8px',
-                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
-                          color: '#111827',
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                          color: '#374151',
                           fontSize: '14px',
-                          fontWeight: 600
+                          fontWeight: 500
                         }}
                       />
                       <Legend />
@@ -1155,11 +1155,11 @@ export default function SurveyAnalyticsPage() {
             <div className="grid gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-gray-900 font-bold">
-                    <Users className="w-5 h-5 text-blue-600" />
+                  <CardTitle className="flex items-center gap-2 text-gray-300 font-semibold">
+                    <Users className="w-5 h-5 text-blue-400" />
                     Homeschooling Approaches
                   </CardTitle>
-                  <CardDescription className="text-gray-700 font-medium">Distribution of current teaching methods</CardDescription>
+                  <CardDescription className="text-gray-400 font-normal">Distribution of current teaching methods</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
@@ -1180,26 +1180,26 @@ export default function SurveyAnalyticsPage() {
                         <XAxis 
                           dataKey="name" 
                           fontSize={12}
-                          tick={{ fill: '#1F2937', fontWeight: 600 }}
+                          tick={{ fill: '#9CA3AF', fontWeight: 500 }}
                         />
                         <YAxis 
                           fontSize={12}
-                          tick={{ fill: '#1F2937', fontWeight: 600 }}
+                          tick={{ fill: '#9CA3AF', fontWeight: 500 }}
                         />
                         <Tooltip 
                           formatter={(value: number, name: string, props: any) => [
                             `${value} responses (${props.payload.percentage.toFixed(1)}%)`, 
                             props.payload.fullName
                           ]}
-                          labelStyle={{ color: '#111827', fontWeight: 700 }}
+                          labelStyle={{ color: '#374151', fontWeight: 600 }}
                           contentStyle={{ 
                             backgroundColor: 'white', 
-                            border: '2px solid #9CA3AF',
+                            border: '1px solid #D1D5DB',
                             borderRadius: '8px',
-                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
-                            color: '#111827',
+                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                            color: '#374151',
                             fontSize: '14px',
-                            fontWeight: 600
+                            fontWeight: 500
                           }}
                         />
                         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
@@ -1217,11 +1217,11 @@ export default function SurveyAnalyticsPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-gray-900 font-bold">
-                    <DollarSign className="w-5 h-5 text-green-600" />
+                  <CardTitle className="flex items-center gap-2 text-gray-300 font-semibold">
+                    <DollarSign className="w-5 h-5 text-green-400" />
                     Income Distribution
                   </CardTitle>
-                  <CardDescription className="text-gray-700 font-medium">Household income ranges of respondents</CardDescription>
+                  <CardDescription className="text-gray-400 font-normal">Household income ranges of respondents</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
@@ -1233,36 +1233,36 @@ export default function SurveyAnalyticsPage() {
                             .map(([range, count], index) => ({
                               name: range,
                               value: count,
-                              percentage: data?.totalResponses ? (count / data.totalResponses) * 100 : 0,
-                              fill: CHART_COLORS.pieChart[index % CHART_COLORS.pieChart.length]
+                              percentage: data?.totalResponses ? (count / data.totalResponses) * 100 : 0
                             }))}
                           cx="50%"
                           cy="50%"
                           labelLine={false}
                           label={({ percentage }: any) => percentage > 10 ? `${percentage.toFixed(1)}%` : ''}
                           outerRadius={80}
-                          fill="#8884d8"
                           dataKey="value"
-                          style={{ fontSize: '14px', fontWeight: 700, fill: '#FFFFFF' }}
+                          style={{ fontSize: '14px', fontWeight: 700 }}
                         >
-                          {Object.entries(data?.demographics.incomeRanges || {}).map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={CHART_COLORS.pieChart[index % CHART_COLORS.pieChart.length]} />
-                          ))}
+                          {Object.entries(data?.demographics.incomeRanges || {})
+                            .sort(([,a], [,b]) => b - a)
+                            .map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={CHART_COLORS.pieChart[index % CHART_COLORS.pieChart.length]} />
+                            ))}
                         </Pie>
                         <Tooltip 
                           formatter={(value: number, name: string, props: any) => [
                             `${value} responses (${props.payload.percentage.toFixed(1)}%)`, 
                             props.payload.name
                           ]}
-                          labelStyle={{ color: '#111827', fontWeight: 700 }}
+                          labelStyle={{ color: '#374151', fontWeight: 600 }}
                           contentStyle={{ 
                             backgroundColor: 'white', 
-                            border: '2px solid #9CA3AF',
+                            border: '1px solid #D1D5DB',
                             borderRadius: '8px',
-                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
-                            color: '#111827',
+                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                            color: '#374151',
                             fontSize: '14px',
-                            fontWeight: 600
+                            fontWeight: 500
                           }}
                         />
                       </RechartsPieChart>
