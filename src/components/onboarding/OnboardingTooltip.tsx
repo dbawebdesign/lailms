@@ -28,7 +28,7 @@ interface OnboardingTooltipProps {
 interface TooltipPosition {
   top: number;
   left: number;
-  placement: 'top' | 'bottom' | 'left' | 'right' | 'center';
+  placement: 'top' | 'bottom' | 'left' | 'right' | 'center' | 'auto';
   arrowPosition?: {
     top?: number;
     left?: number;
@@ -424,7 +424,7 @@ export const OnboardingTooltip: React.FC<OnboardingTooltipProps> = ({
                         key={i}
                         className={cn(
                           "w-1.5 h-1.5 rounded-full transition-colors",
-                          i < step.currentStep 
+                          i < (step.currentStep || 0) 
                             ? "bg-blue-500" 
                             : "bg-gray-300 dark:bg-gray-600"
                         )}
