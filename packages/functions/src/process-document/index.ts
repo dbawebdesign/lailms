@@ -92,30 +92,201 @@ async function extractTextFromPdf(filePath: string, supabase: SupabaseClient, bu
     const pdfBuffer = await pdfFileData.arrayBuffer();
     const uint8 = new Uint8Array(pdfBuffer);
 
-    const loadingTask = getDocument({ data: uint8 });
-    const pdfDoc = await loadingTask.promise;
-
-    let allText = '';
-    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-      const page = await pdfDoc.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      const pageStrings = textContent.items.map((itm: any) => itm.str || '').join(' ');
-      allText += pageStrings + '\n\n';
-    }
-
-    // Sanitize the extracted text to remove null characters and other problematic Unicode sequences
-    allText = sanitizeTextForDatabase(allText);
-
-    console.log(`Successfully extracted ~${allText.length} characters from PDF ${filePath}.`);
-    return allText;
+    // Enhanced PDF text extraction with validation
+    const extractedText = await extractAndValidatePdfText(uint8, filePath);
+    
+    console.log(`Successfully extracted ~${extractedText.length} characters from PDF ${filePath}.`);
+    return extractedText;
   } catch (error) {
     console.error(`Error extracting text from PDF ${filePath}:`, error instanceof Error ? error.message : String(error));
     throw new Error(`Failed to extract text from PDF ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
+async function extractAndValidatePdfText(uint8: Uint8Array, filePath: string): Promise<string> {
+  console.log(`Processing PDF with enhanced text extraction and validation`);
+  
+  try {
+    const loadingTask = getDocument({ data: uint8 });
+    const pdfDoc = await loadingTask.promise;
+    
+    let allText = '';
+    let readablePages = 0;
+    let totalTextLength = 0;
+    
+    console.log(`PDF has ${pdfDoc.numPages} pages`);
+    
+    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+      try {
+        const page = await pdfDoc.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        
+        // Extract text with better processing
+        let pageText = '';
+        for (const item of textContent.items) {
+          if ('str' in item && item.str) {
+            // Validate that the text item contains readable content
+            const cleanedStr = item.str.trim();
+            if (isReadableText(cleanedStr)) {
+              pageText += cleanedStr + ' ';
+            }
+          }
+        }
+        
+        pageText = pageText.trim();
+        
+        // Validate page content quality
+        if (pageText.length > 10 && isPageContentValid(pageText)) {
+          allText += pageText + '\n\n';
+          readablePages++;
+          totalTextLength += pageText.length;
+          console.log(`Page ${pageNum}: extracted ${pageText.length} chars (readable)`);
+        } else {
+          console.warn(`Page ${pageNum}: skipped - low quality or unreadable content (${pageText.length} chars)`);
+          // Log first 100 chars for debugging
+          console.warn(`Page ${pageNum} preview: "${pageText.substring(0, 100)}..."`);
+        }
+      } catch (pageError) {
+        console.warn(`Failed to extract text from page ${pageNum}:`, pageError instanceof Error ? pageError.message : String(pageError));
+        continue;
+      }
+    }
+    
+    console.log(`PDF processing complete: ${readablePages}/${pdfDoc.numPages} pages readable, ${totalTextLength} total characters`);
+    
+    // Final validation of extracted content
+    if (allText.length < 50) {
+      throw new Error(`PDF appears to contain no readable text content. This may be a scanned PDF, password-protected, or contain only images. Extracted: "${allText.substring(0, 100)}..."`);
+    }
+    
+    if (readablePages === 0) {
+      throw new Error(`No readable pages found in PDF. This may be a scanned document or contain only images/graphics.`);
+    }
+    
+    // Check for signs of encoding issues or PDF structure leakage
+    if (isPdfStructureText(allText)) {
+      throw new Error(`PDF text extraction returned PDF structure data instead of readable content. This PDF may be encrypted, corrupted, or require OCR processing.`);
+    }
+    
+    // Sanitize the extracted text
+    const sanitizedText = sanitizeTextForDatabase(allText);
+    
+    return sanitizedText;
+    
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('PDF appears to contain no readable text')) {
+      throw error; // Re-throw our custom validation errors
+    }
+    
+    console.error(`PDF parsing failed:`, error instanceof Error ? error.message : String(error));
+    throw new Error(`PDF text extraction failed: ${error instanceof Error ? error.message : String(error)}. This PDF may be password-protected, corrupted, or require OCR processing.`);
+  }
+}
+
+function isReadableText(text: string): boolean {
+  if (!text || text.length < 1) return false;
+  
+  // Check for PDF structure markers
+  if (text.includes('%PDF') || 
+      text.includes('obj') || 
+      text.includes('endobj') || 
+      text.includes('stream') || 
+      text.includes('endstream') ||
+      text.match(/^\d+\s+\d+\s+obj/) ||
+      text.match(/^<</)) {
+    return false;
+  }
+  
+  // Check for excessive non-printable characters
+  const printableChars = text.replace(/[^\x20-\x7E\s]/g, '').length;
+  const printableRatio = printableChars / text.length;
+  if (printableRatio < 0.7) {
+    return false; // Less than 70% printable characters
+  }
+  
+  // Check for reasonable word patterns
+  const words = text.split(/\s+/).filter(word => word.length > 0);
+  if (words.length === 0) return false;
+  
+  // Check for excessive single characters or gibberish
+  const singleCharWords = words.filter(word => word.length === 1).length;
+  if (words.length > 5 && (singleCharWords / words.length) > 0.5) {
+    return false; // More than 50% single character "words"
+  }
+  
+  return true;
+}
+
+function isPageContentValid(pageText: string): boolean {
+  if (!pageText || pageText.length < 10) return false;
+  
+  // Check for reasonable word count
+  const words = pageText.split(/\s+/).filter(word => word.length > 0);
+  if (words.length < 3) return false;
+  
+  // Check for excessive punctuation or symbols
+  const alphanumeric = pageText.replace(/[^a-zA-Z0-9\s]/g, '');
+  const alphanumericRatio = alphanumeric.length / pageText.length;
+  if (alphanumericRatio < 0.5) {
+    return false; // Less than 50% alphanumeric content
+  }
+  
+  // Check for reasonable sentence structure
+  const sentences = pageText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  if (sentences.length === 0) return false;
+  
+  // Check average word length (typical English: 4-5 characters)
+  const avgWordLength = words.reduce((sum, word) => sum + word.length, 0) / words.length;
+  if (avgWordLength < 1 || avgWordLength > 20) {
+    return false; // Unusual word length pattern
+  }
+  
+  return true;
+}
+
+function isPdfStructureText(text: string): boolean {
+  // Check for common PDF structure indicators
+  const structureMarkers = [
+    '%PDF-',
+    '/Type/Catalog',
+    '/Type/Page',
+    'obj <<',
+    'endobj',
+    'stream',
+    'endstream',
+    '/Filter',
+    '/Length',
+    '/Contents',
+    'xref',
+    'trailer'
+  ];
+  
+  const markerCount = structureMarkers.reduce((count, marker) => {
+    return count + (text.includes(marker) ? 1 : 0);
+  }, 0);
+  
+  // If we find multiple PDF structure markers, it's likely structure data
+  if (markerCount >= 3) {
+    return true;
+  }
+  
+  // Check for excessive byte sequences or hex patterns
+  const hexPatterns = text.match(/[0-9a-fA-F]{8,}/g) || [];
+  if (hexPatterns.length > 10) {
+    return true;
+  }
+  
+  // Check for excessive object references
+  const objReferences = text.match(/\d+\s+\d+\s+R/g) || [];
+  if (objReferences.length > 5) {
+    return true;
+  }
+  
+  return false;
+}
+
 async function extractTextFromUrl(url: string): Promise<string> {
-  console.log(`Attempting to scrape content from URL: ${url}`);
+  console.log(`Attempting to scrape main content from URL: ${url}`);
   
   // Try multiple strategies to fetch the URL
   interface FetchStrategy {
@@ -191,46 +362,23 @@ async function extractTextFromUrl(url: string): Promise<string> {
       const html = await response.text();
       console.log(`Successfully fetched ${html.length} characters of HTML from ${url}`);
 
-      // Enhanced HTML to text conversion
-      let text = html;
-      
-      // Remove script and style blocks
-      text = text.replace(/<script[^>]*>.*?<\/script>/gi, '');
-      text = text.replace(/<style[^>]*>.*?<\/style>/gi, '');
-      text = text.replace(/<noscript[^>]*>.*?<\/noscript>/gi, '');
-      
-      // Remove comments
-      text = text.replace(/<!--.*?-->/g, '');
-      
-      // Convert common HTML entities
-      text = text.replace(/&nbsp;/g, ' ');
-      text = text.replace(/&amp;/g, '&');
-      text = text.replace(/&lt;/g, '<');
-      text = text.replace(/&gt;/g, '>');
-      text = text.replace(/&quot;/g, '"');
-      text = text.replace(/&#39;/g, "'");
-      
-      // Remove all HTML tags, replacing with space
-      text = text.replace(/<[^>]+>/g, ' ');
-      
-      // Clean up whitespace
-      text = text.replace(/\s+/g, ' ');
-      text = text.trim();
+      // **ENHANCED INTELLIGENT CONTENT EXTRACTION**
+      const mainContent = extractMainContentFromHtml(html, url);
 
-      if (!text || text.length < 50) {
-        console.warn(`Extracted very little text from URL: ${url}. Text length: ${text.length}. HTML length was ${html.length}.`);
-        if (text.length === 0) {
-          throw new Error('No readable text content found on the page');
+      if (!mainContent || mainContent.length < 50) {
+        console.warn(`Extracted very little main content from URL: ${url}. Content length: ${mainContent.length}. HTML length was ${html.length}.`);
+        if (mainContent.length === 0) {
+          throw new Error('No readable main content found on the page');
         }
       }
       
-      console.log(`Successfully scraped ~${text.length} characters from ${url} using strategy: ${strategy.name}`);
-      console.log(`First 200 characters: ${text.substring(0, 200)}...`);
+      console.log(`Successfully extracted ~${mainContent.length} characters of main content from ${url} using strategy: ${strategy.name}`);
+      console.log(`First 200 characters: ${mainContent.substring(0, 200)}...`);
       
       // Sanitize the extracted text to remove null characters and other problematic Unicode sequences
-      text = sanitizeTextForDatabase(text);
+      const sanitizedContent = sanitizeTextForDatabase(mainContent);
       
-      return text;
+      return sanitizedContent;
       
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
@@ -272,6 +420,290 @@ async function extractTextFromUrl(url: string): Promise<string> {
   userFriendlyMessage += '\n\nSuggestions:\n• Verify the URL is correct and publicly accessible\n• Try again in a few minutes\n• Contact the website owner if the issue persists\n• Consider copying and pasting the content manually as a text file';
   
   throw new Error(userFriendlyMessage);
+}
+
+// **NEW INTELLIGENT HTML CONTENT EXTRACTION FUNCTION**
+function extractMainContentFromHtml(html: string, url: string): string {
+  console.log(`Extracting main content from HTML (${html.length} chars) for URL: ${url}`);
+  
+  // Strategy 1: Look for structured data and meta information first
+  let structuredContent = extractStructuredData(html);
+  
+  // Strategy 2: Try to find main content areas using semantic selectors
+  let mainContent = extractSemanticContent(html);
+  
+  // Strategy 3: Use content scoring algorithm as fallback
+  if (!mainContent || mainContent.length < 200) {
+    mainContent = extractContentByScoring(html);
+  }
+  
+  // Strategy 4: If all else fails, use basic extraction with better filtering
+  if (!mainContent || mainContent.length < 100) {
+    mainContent = extractBasicContent(html);
+  }
+  
+  // Combine structured data with main content if available
+  let finalContent = '';
+  if (structuredContent && structuredContent.length > 50) {
+    finalContent += structuredContent + '\n\n';
+  }
+  if (mainContent && mainContent.length > 50) {
+    finalContent += mainContent;
+  } else {
+    finalContent = mainContent || structuredContent || '';
+  }
+  
+  console.log(`Final content extraction result: ${finalContent.length} characters`);
+  return finalContent;
+}
+
+function extractStructuredData(html: string): string {
+  let structuredContent = '';
+  
+  // Extract JSON-LD structured data
+  const jsonLdMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+  if (jsonLdMatches) {
+    for (const match of jsonLdMatches) {
+      try {
+        const jsonContent = match.replace(/<script[^>]*>/gi, '').replace(/<\/script>/gi, '');
+        const data = JSON.parse(jsonContent);
+        
+        // Extract article content from structured data
+        if (data['@type'] === 'Article' || data['@type'] === 'BlogPosting' || data['@type'] === 'NewsArticle') {
+          if (data.articleBody) {
+            structuredContent += data.articleBody + '\n';
+          }
+          if (data.description) {
+            structuredContent += data.description + '\n';
+          }
+        }
+      } catch (e) {
+        // Invalid JSON, skip
+      }
+    }
+  }
+  
+  // Extract Open Graph description
+  const ogDescriptionMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']*?)["']/i);
+  if (ogDescriptionMatch && ogDescriptionMatch[1]) {
+    structuredContent += ogDescriptionMatch[1] + '\n';
+  }
+  
+  // Extract meta description
+  const metaDescriptionMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*?)["']/i);
+  if (metaDescriptionMatch && metaDescriptionMatch[1]) {
+    structuredContent += metaDescriptionMatch[1] + '\n';
+  }
+  
+  return structuredContent.trim();
+}
+
+function extractSemanticContent(html: string): string {
+  // Remove scripts, styles, and other non-content elements
+  let cleanHtml = html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '');
+  
+  // Define content selectors in order of preference (most specific to least specific)
+  const contentSelectors = [
+    // Article-specific selectors
+    'article[role="main"]',
+    'article',
+    '[role="article"]',
+    'main article',
+    '.article-content',
+    '.article-body',
+    '.post-content',
+    '.entry-content',
+    '.content-body',
+    
+    // Main content selectors
+    'main',
+    '[role="main"]',
+    '#main-content',
+    '#content',
+    '.main-content',
+    '.content',
+    '.post',
+    '.entry',
+    
+    // Generic content areas
+    '#article',
+    '.article',
+    '#post',
+    '.story-body',
+    '.text-content',
+    '#story',
+    '.story'
+  ];
+  
+  for (const selector of contentSelectors) {
+    const contentMatch = extractBySelector(cleanHtml, selector);
+    if (contentMatch && contentMatch.length > 200) {
+      console.log(`Found content using selector: ${selector} (${contentMatch.length} chars)`);
+      return contentMatch;
+    }
+  }
+  
+  return '';
+}
+
+function extractBySelector(html: string, selector: string): string {
+  // Simple regex-based selector extraction for common patterns
+  let pattern: RegExp;
+  
+  if (selector.startsWith('#')) {
+    // ID selector
+    const id = selector.slice(1);
+    pattern = new RegExp(`<[^>]*id=["']${id}["'][^>]*>(.*?)<\/[^>]*>`, 'gis');
+  } else if (selector.startsWith('.')) {
+    // Class selector
+    const className = selector.slice(1);
+    pattern = new RegExp(`<[^>]*class=["'][^"']*${className}[^"']*["'][^>]*>(.*?)<\/[^>]*>`, 'gis');
+  } else if (selector === 'article') {
+    pattern = new RegExp(`<article[^>]*>(.*?)<\/article>`, 'gis');
+  } else if (selector === 'main') {
+    pattern = new RegExp(`<main[^>]*>(.*?)<\/main>`, 'gis');
+  } else if (selector.includes('[role=')) {
+    const role = selector.match(/\[role=["']([^"']*?)["']\]/)?.[1];
+    if (role) {
+      pattern = new RegExp(`<[^>]*role=["']${role}["'][^>]*>(.*?)<\/[^>]*>`, 'gis');
+    } else {
+      return '';
+    }
+  } else {
+    return '';
+  }
+  
+  const match = pattern.exec(html);
+  if (match && match[1]) {
+    return htmlToText(match[1]);
+  }
+  
+  return '';
+}
+
+function extractContentByScoring(html: string): string {
+  // Remove scripts, styles, and other non-content elements
+  let cleanHtml = html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '');
+  
+  // Split into paragraphs and score each one
+  const paragraphMatches = cleanHtml.match(/<p[^>]*>[\s\S]*?<\/p>/gi) || [];
+  const divMatches = cleanHtml.match(/<div[^>]*>[\s\S]*?<\/div>/gi) || [];
+  
+  const allBlocks = [...paragraphMatches, ...divMatches];
+  const scoredBlocks: Array<{content: string, score: number}> = [];
+  
+  for (const block of allBlocks) {
+    const text = htmlToText(block);
+    if (text.length < 30) continue; // Skip very short blocks
+    
+    let score = 0;
+    
+    // Positive scoring factors
+    score += text.length * 0.1; // Longer content gets higher score
+    score += (text.match(/\./g) || []).length * 5; // Sentences
+    score += (text.match(/[A-Z][a-z]+/g) || []).length * 0.5; // Words starting with capital
+    
+    // Negative scoring factors
+    if (block.toLowerCase().includes('menu') || 
+        block.toLowerCase().includes('navigation') ||
+        block.toLowerCase().includes('sidebar') ||
+        block.toLowerCase().includes('footer') ||
+        block.toLowerCase().includes('header') ||
+        block.toLowerCase().includes('advertisement') ||
+        block.toLowerCase().includes('cookie') ||
+        block.toLowerCase().includes('subscribe') ||
+        block.toLowerCase().includes('login') ||
+        block.toLowerCase().includes('signup')) {
+      score -= 20;
+    }
+    
+    // Check for excessive links (likely navigation)
+    const linkCount = (block.match(/<a[^>]*>/gi) || []).length;
+    const textLength = text.length;
+    if (linkCount > 0 && (linkCount / textLength) > 0.02) { // More than 2% links
+      score -= 15;
+    }
+    
+    if (score > 0) {
+      scoredBlocks.push({content: text, score});
+    }
+  }
+  
+  // Sort by score and take the best content
+  scoredBlocks.sort((a, b) => b.score - a.score);
+  
+  // Combine top-scoring blocks
+  let result = '';
+  let totalScore = 0;
+  for (const block of scoredBlocks.slice(0, 10)) { // Top 10 blocks
+    if (totalScore + block.score > 100 || result.length > 5000) break; // Prevent too much content
+    result += block.content + '\n\n';
+    totalScore += block.score;
+  }
+  
+  return result.trim();
+}
+
+function extractBasicContent(html: string): string {
+  // Fallback: basic extraction with better filtering
+  let text = html;
+  
+  // Remove unwanted elements with more precision
+  text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  text = text.replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '');
+  text = text.replace(/<!--[\s\S]*?-->/g, '');
+  
+  // Remove common non-content elements
+  text = text.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
+  text = text.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
+  text = text.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
+  text = text.replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
+  text = text.replace(/<form[^>]*>[\s\S]*?<\/form>/gi, '');
+  
+  // Remove elements with navigation-related classes/ids
+  text = text.replace(/<[^>]*(?:class|id)=["'][^"']*(?:nav|menu|sidebar|widget|advertisement|ad-|banner|social|share|comment|related|footer|header)[^"']*["'][^>]*>[\s\S]*?<\/[^>]*>/gi, '');
+  
+  return htmlToText(text);
+}
+
+function htmlToText(html: string): string {
+  // Convert HTML to text with better formatting preservation
+  let text = html;
+  
+  // Convert block elements to line breaks
+  text = text.replace(/<\/?(div|p|h[1-6]|li|article|section|br)[^>]*>/gi, '\n');
+  text = text.replace(/<\/?(ul|ol|blockquote)[^>]*>/gi, '\n\n');
+  
+  // Convert common HTML entities
+  text = text.replace(/&nbsp;/g, ' ');
+  text = text.replace(/&amp;/g, '&');
+  text = text.replace(/&lt;/g, '<');
+  text = text.replace(/&gt;/g, '>');
+  text = text.replace(/&quot;/g, '"');
+  text = text.replace(/&#39;/g, "'");
+  text = text.replace(/&hellip;/g, '...');
+  text = text.replace(/&mdash;/g, '—');
+  text = text.replace(/&ndash;/g, '–');
+  
+  // Remove all remaining HTML tags
+  text = text.replace(/<[^>]+>/g, ' ');
+  
+  // Clean up whitespace
+  text = text.replace(/\n\s*\n\s*\n/g, '\n\n'); // Multiple newlines to double newlines
+  text = text.replace(/[ \t]+/g, ' '); // Multiple spaces/tabs to single space
+  text = text.replace(/\n /g, '\n'); // Remove spaces at start of lines
+  text = text.trim();
+  
+  return text;
 }
 
 async function extractTranscriptFromYouTube(url: string): Promise<{ transcript?: string; error?: boolean; message?: string }> {
