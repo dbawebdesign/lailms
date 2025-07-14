@@ -1204,6 +1204,14 @@ serve(async (req: Request) => {
     if (fetchError) throw new Error(`DB fetch error for ${documentId}: ${fetchError.message}`);
     if (!document) throw new Error(`Document not found: ${documentId}`);
 
+    // Validate organisation_id to prevent database constraint errors
+    if (!document.organisation_id) {
+      console.error(`PROCESS-DOCUMENT: Document ${documentId} has null/undefined organisation_id:`, JSON.stringify(document, null, 2));
+      throw new Error(`Document ${documentId} is missing required organisation_id. This document may be corrupted or improperly created.`);
+    }
+
+    console.log(`PROCESS-DOCUMENT: Processing document ${documentId} for organisation ${document.organisation_id}`);
+
     let extractedText = "";
     const docMetadata = document.metadata || {};
     const fileType = document.file_type || '';
@@ -1377,6 +1385,55 @@ serve(async (req: Request) => {
       extractedText = await fileData.text();
       extractedText = sanitizeTextForDatabase(extractedText);
       docMetadata.source_type = 'text_file';
+    } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileType === 'application/msword') {
+      // Handle Word documents (.docx and .doc files)
+      console.log(`PROCESS-DOCUMENT: Processing Word document: ${document.file_name}`);
+      
+      const { data: fileData, error: downloadError } = await supabaseClient.storage
+        .from(bucketName)
+        .download(storagePath);
+      
+      if (downloadError || !fileData) {
+        throw new Error(`Storage download failed for Word document ${storagePath}: ${downloadError?.message}`);
+      }
+      
+      // For now, we'll extract plain text content if possible
+      // Note: This is a basic implementation - for full Word document parsing,
+      // we'd need additional libraries like mammoth.js or similar
+      try {
+        const arrayBuffer = await fileData.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        
+        // Try to extract readable text content
+        // This is a basic approach - Word documents are complex binary formats
+        const decoder = new TextDecoder('utf-8', { fatal: false });
+        let rawText = decoder.decode(uint8Array);
+        
+        // Clean up the extracted text - remove non-printable characters and Word formatting artifacts
+        extractedText = rawText
+          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters
+          .replace(/[^\x20-\x7E\s\n\r\t]/g, ' ') // Replace non-ASCII with spaces
+          .replace(/\s+/g, ' ') // Collapse multiple spaces
+          .replace(/\n\s*\n/g, '\n') // Remove empty lines
+          .trim();
+        
+        // Validate extracted text quality
+        if (extractedText.length < 50 || !/[a-zA-Z]/.test(extractedText)) {
+          throw new Error('Extracted text appears to be invalid or too short');
+        }
+        
+        extractedText = sanitizeTextForDatabase(extractedText);
+        docMetadata.source_type = 'word_document';
+        
+        console.log(`PROCESS-DOCUMENT: Successfully extracted ${extractedText.length} characters from Word document ${documentId}`);
+        
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`PROCESS-DOCUMENT: Failed to extract text from Word document ${documentId}:`, errorMessage);
+        
+        // Provide user-friendly error message
+        throw new Error(`Unable to extract text from Word document "${document.file_name}". ${errorMessage.includes('invalid') ? 'The document may be corrupted or password-protected.' : 'Please try converting to PDF or plain text format for better compatibility.'}`);
+      }
     } else {
       throw new Error(`Unsupported file type: ${fileType} or missing source URL for document ${documentId}`);
     }
@@ -1401,6 +1458,8 @@ serve(async (req: Request) => {
       documentType = 'txt';
     } else if (fileType?.startsWith('audio/')) {
       documentType = 'audio';
+    } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileType === 'application/msword') {
+      documentType = 'txt'; // Treat Word documents as text for chunking purposes
     } else {
       documentType = 'txt'; // Default fallback
     }
@@ -1452,9 +1511,22 @@ serve(async (req: Request) => {
     
     console.log(`Generated ${embeddings.length} embeddings.`);
 
+    // Final validation before chunk insertion
+    if (!document.organisation_id) {
+      console.error(`PROCESS-DOCUMENT: Critical error - organisation_id is null/undefined at chunk insertion stage for document ${documentId}`);
+      console.error('Document object at this stage:', JSON.stringify(document, null, 2));
+      throw new Error(`Document ${documentId} organisation_id became null during processing. This is a critical error.`);
+    }
+
     // Store chunks in Supabase
     const chunkUpserts = processedChunks.map((chunk, index) => {
       const citationKey = generateCitationKey(document.id, chunk.section_identifier, chunk.chunk_index);
+      
+      // Validate chunk data before insertion
+      if (!document.organisation_id) {
+        throw new Error(`organisation_id is null for chunk ${index} of document ${documentId}`);
+      }
+      
       return {
         document_id: document.id,
         organisation_id: document.organisation_id,
@@ -1468,6 +1540,8 @@ serve(async (req: Request) => {
         // section_summary and section_summary_status will be populated by summarize-chunks later
       };
     });
+
+    console.log(`PROCESS-DOCUMENT: Created ${chunkUpserts.length} chunk upserts for document ${documentId} with organisation_id ${document.organisation_id}`);
 
     console.log(`Attempting to insert ${chunkUpserts.length} chunks for document ${documentId}...`);
     
@@ -1510,15 +1584,36 @@ serve(async (req: Request) => {
             console.warn(`Batch ${batchIndex + 1} failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms:`, errorMessage);
             await new Promise(resolve => setTimeout(resolve, delay));
           } else {
-            console.error(`Failed to insert batch ${batchIndex + 1} for document ${documentId} after ${maxRetries} retries:`, error);
+            console.error(`PROCESS-DOCUMENT: Failed to insert batch ${batchIndex + 1} for document ${documentId} after ${maxRetries} retries:`, error);
             console.error('Batch insertion error details:', JSON.stringify(error, null, 2));
             
             // Log a sample of the data being inserted for debugging
             if (batch.length > 0) {
-              console.log('Sample chunk data from failed batch (first chunk):', JSON.stringify(batch[0], null, 2));
+              console.error('Sample chunk data from failed batch (first chunk):');
+              console.error(`- document_id: ${batch[0].document_id}`);
+              console.error(`- organisation_id: ${batch[0].organisation_id}`);
+              console.error(`- chunk_index: ${batch[0].chunk_index}`);
+              console.error(`- content length: ${batch[0].content?.length || 'undefined'}`);
+              console.error(`- token_count: ${batch[0].token_count}`);
+              console.error(`- embedding present: ${!!batch[0].embedding}`);
+              console.error('Full chunk object:', JSON.stringify(batch[0], null, 2));
             }
             
-            throw new Error(`Failed to insert chunks (batch ${batchIndex + 1}/${batches.length}): ${errorMessage}`);
+            // Check if this is the organisation_id constraint error specifically
+            if (errorMessage.includes('organisation_id') && errorMessage.includes('not-null constraint')) {
+              console.error(`PROCESS-DOCUMENT: organisation_id constraint violation detected!`);
+              console.error(`Document organisation_id at time of error: ${document.organisation_id}`);
+              console.error(`Batch contains ${batch.length} chunks`);
+              
+              // Check each chunk in the failed batch
+              batch.forEach((chunk, idx) => {
+                if (!chunk.organisation_id) {
+                  console.error(`PROCESS-DOCUMENT: Chunk ${idx} in failed batch has null organisation_id!`);
+                }
+              });
+            }
+            
+            throw new Error(`Failed to insert chunk batch after ${maxRetries} attempts: ${errorMessage}`);
           }
         }
       }
