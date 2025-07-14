@@ -657,23 +657,60 @@ const chunkText = async (
 // --- Embedding Function ---
 async function getEmbedding(text: string, apiKey: string): Promise<number[]> {
   console.log(`Generating embedding for text snippet: ${text.substring(0,30)}...`);
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({ input: text, model: 'text-embedding-3-small' }),
-  });
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`OpenAI Embedding API error (${response.status}): ${errorBody}`);
+  
+  const maxRetries = 3;
+  const baseDelay = 1000; // 1 second
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ input: text, model: 'text-embedding-3-small' }),
+      });
+      
+      if (response.ok) {
+        const { data } = await response.json();
+        if (!data || !data[0] || !data[0].embedding) {
+          throw new Error('Invalid response structure from OpenAI Embedding API');
+        }
+        return data[0].embedding;
+      }
+      
+      // Handle rate limiting (429) with exponential backoff
+      if (response.status === 429) {
+        if (attempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000; // Add jitter
+          console.warn(`OpenAI rate limit hit, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        const errorBody = await response.text();
+        throw new Error(`OpenAI embedding failed: 429 Too Many Requests (after ${maxRetries} retries): ${errorBody}`);
+      }
+      
+      // Handle other errors
+      const errorBody = await response.text();
+      throw new Error(`OpenAI Embedding API error (${response.status}): ${errorBody}`);
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (attempt < maxRetries && (errorMessage.includes('fetch') || errorMessage.includes('network'))) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.warn(`Network error, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1}):`, errorMessage);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      console.error('Error generating embedding:', error);
+      throw error;
+    }
   }
-  const { data } = await response.json();
-  if (!data || !data[0] || !data[0].embedding) {
-    throw new Error('Invalid response structure from OpenAI Embedding API');
-  }
-  return data[0].embedding;
+  
+  throw new Error('Max retries exceeded for embedding generation');
 }
 
 serve(async (req: Request) => {
@@ -838,9 +875,59 @@ serve(async (req: Request) => {
         docMetadata.source_type = 'youtube_transcript';
         console.log(`PROCESS-DOCUMENT: Successfully extracted ${extractedText.length} characters from YouTube video ${documentId}`);
       }
-    } else if (sourceUrl) {
-      extractedText = await extractTextFromUrl(sourceUrl);
+    } else if (sourceUrl || fileType === 'text/html') {
+      // Handle URL processing - either from sourceUrl or when file_type is text/html
+      let urlToProcess = sourceUrl;
+      
+      // If no sourceUrl but file_type is text/html, try to extract from file_name or storage_path
+      if (!urlToProcess && fileType === 'text/html') {
+        console.log(`PROCESS-DOCUMENT: No sourceUrl found but file_type is text/html. Checking file_name and storage_path...`);
+        
+        // Try to extract URL from file_name (format: "URL - domain.com/path")
+        if (document.file_name && document.file_name.startsWith('URL - ')) {
+          const extractedUrl = document.file_name.substring(6); // Remove "URL - " prefix
+          if (extractedUrl.startsWith('http://') || extractedUrl.startsWith('https://')) {
+            urlToProcess = extractedUrl;
+          } else {
+            // Add https:// prefix if missing
+            urlToProcess = `https://${extractedUrl}`;
+          }
+          console.log(`PROCESS-DOCUMENT: Extracted URL from file_name: ${urlToProcess}`);
+        }
+        
+        // If still no URL, try to read from storage file
+        if (!urlToProcess) {
+          try {
+            const { data: urlFileData, error: downloadError } = await supabaseClient.storage
+              .from(bucketName)
+              .download(storagePath);
+            
+            if (!downloadError && urlFileData) {
+              const urlContent = await urlFileData.text();
+              const lines = urlContent.split('\n');
+              // Look for URL line in the file
+              for (const line of lines) {
+                if (line.trim().startsWith('URL=') || line.trim().startsWith('http')) {
+                  urlToProcess = line.replace('URL=', '').trim();
+                  console.log(`PROCESS-DOCUMENT: Extracted URL from storage file: ${urlToProcess}`);
+                  break;
+                }
+              }
+            }
+          } catch (error) {
+            console.warn(`PROCESS-DOCUMENT: Failed to read URL from storage file: ${error}`);
+          }
+        }
+      }
+      
+      if (!urlToProcess) {
+        throw new Error(`No URL found for text/html document ${documentId}. sourceUrl: ${sourceUrl}, file_name: ${document.file_name}`);
+      }
+      
+      console.log(`PROCESS-DOCUMENT: Processing URL: ${urlToProcess}`);
+      extractedText = await extractTextFromUrl(urlToProcess);
       docMetadata.source_type = 'url_scrape';
+      docMetadata.originalUrl = urlToProcess; // Store the processed URL
     } else if (fileType.startsWith('audio/')) {
       extractedText = await transcribeAudio(storagePath, supabaseClient, bucketName, openaiApiKey);
       extractedText = sanitizeTextForDatabase(extractedText);
@@ -903,7 +990,34 @@ serve(async (req: Request) => {
     });
 
     console.log(`Generating embeddings for ${processedChunks.length} chunks...`);
-    const embeddings = await Promise.all(processedChunks.map(chunk => getEmbedding(chunk.content, openaiApiKey)));
+    
+    // Process embeddings with rate limiting to avoid hitting OpenAI limits
+    const embeddings: number[][] = [];
+    const concurrentLimit = 5; // Process 5 embeddings at a time
+    const delayBetweenBatches = 1000; // 1 second delay between batches
+    
+    for (let i = 0; i < processedChunks.length; i += concurrentLimit) {
+      const batch = processedChunks.slice(i, i + concurrentLimit);
+      console.log(`Processing embedding batch ${Math.floor(i / concurrentLimit) + 1}/${Math.ceil(processedChunks.length / concurrentLimit)} (${batch.length} chunks)...`);
+      
+      try {
+        const batchEmbeddings = await Promise.all(
+          batch.map(chunk => getEmbedding(chunk.content, openaiApiKey))
+        );
+        embeddings.push(...batchEmbeddings);
+        
+        // Add delay between batches to respect rate limits
+        if (i + concurrentLimit < processedChunks.length) {
+          console.log(`Waiting ${delayBetweenBatches}ms before next embedding batch...`);
+          await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
+        }
+        
+      } catch (error) {
+        console.error(`Failed to generate embeddings for batch starting at index ${i}:`, error);
+        throw error;
+      }
+    }
+    
     console.log(`Generated ${embeddings.length} embeddings.`);
 
     // Store chunks in Supabase
@@ -925,22 +1039,60 @@ serve(async (req: Request) => {
 
     console.log(`Attempting to insert ${chunkUpserts.length} chunks for document ${documentId}...`);
     
-    const { error: insertChunkError } = await supabaseClient
-      .from('document_chunks')
-      .insert(chunkUpserts);
+    // Process chunks in batches to prevent database timeouts
+    const batchSize = 50; // Process 50 chunks at a time
+    const batches = [];
     
-    if (insertChunkError) {
-      console.error(`Failed to insert chunks for document ${documentId}:`, insertChunkError);
-      console.error('Chunk insertion error details:', JSON.stringify(insertChunkError, null, 2));
-      
-      // Log a sample of the data being inserted for debugging
-      console.log('Sample chunk data (first chunk):', JSON.stringify(chunkUpserts[0], null, 2));
-      
-      // This is a critical error - we should not continue processing
-      throw new Error(`Failed to insert chunks: ${insertChunkError.message}`);
+    for (let i = 0; i < chunkUpserts.length; i += batchSize) {
+      batches.push(chunkUpserts.slice(i, i + batchSize));
     }
     
-    console.log(`Successfully inserted ${chunkUpserts.length} chunks for document ${documentId}.`);
+    console.log(`Processing ${batches.length} batches of chunks for document ${documentId}...`);
+    
+    // Process batches with retry logic
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      const maxRetries = 3;
+      let success = false;
+      
+      for (let attempt = 0; attempt <= maxRetries && !success; attempt++) {
+        try {
+          console.log(`Inserting batch ${batchIndex + 1}/${batches.length} (${batch.length} chunks) for document ${documentId}...`);
+          
+          const { error: insertChunkError } = await supabaseClient
+            .from('document_chunks')
+            .insert(batch);
+          
+          if (insertChunkError) {
+            throw insertChunkError;
+          }
+          
+          success = true;
+          console.log(`Successfully inserted batch ${batchIndex + 1}/${batches.length} for document ${documentId}`);
+          
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          
+          if (attempt < maxRetries) {
+            const delay = 2000 * Math.pow(2, attempt); // Exponential backoff: 2s, 4s, 8s
+            console.warn(`Batch ${batchIndex + 1} failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms:`, errorMessage);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          } else {
+            console.error(`Failed to insert batch ${batchIndex + 1} for document ${documentId} after ${maxRetries} retries:`, error);
+            console.error('Batch insertion error details:', JSON.stringify(error, null, 2));
+            
+            // Log a sample of the data being inserted for debugging
+            if (batch.length > 0) {
+              console.log('Sample chunk data from failed batch (first chunk):', JSON.stringify(batch[0], null, 2));
+            }
+            
+            throw new Error(`Failed to insert chunks (batch ${batchIndex + 1}/${batches.length}): ${errorMessage}`);
+          }
+        }
+      }
+    }
+    
+    console.log(`Successfully inserted all ${chunkUpserts.length} chunks for document ${documentId} in ${batches.length} batches.`);
     
     console.log(`Successfully chunked and embedded ${processedChunks.length} chunks for document ${documentId}.`);
     
@@ -949,24 +1101,56 @@ serve(async (req: Request) => {
       chunks_created: processedChunks.length,
       processing_stage: 'summarizing_chunks'
     });
-    const { error: summarizeChunksError } = await supabaseClient.functions.invoke('summarize-chunks', {
-      body: { documentId: document.id, summarizeLevel: 'chunk' }
-    });
-    if (summarizeChunksError) {
-      console.error(`Error invoking summarize-chunks (chunk level) for ${documentId}:`, summarizeChunksError);
-      // Potentially update status to error or completed_with_errors
-    } else {
-      console.log(`Invoked summarize-chunks (chunk level) for ${documentId}.`);
+    
+    // Add retry logic for summarize-chunks function call
+    const maxSummarizeRetries = 2;
+    let summarizeSuccess = false;
+    
+    for (let attempt = 0; attempt <= maxSummarizeRetries && !summarizeSuccess; attempt++) {
+      try {
+        console.log(`Invoking summarize-chunks for ${documentId} (attempt ${attempt + 1}/${maxSummarizeRetries + 1})...`);
+        
+        const { error: summarizeChunksError } = await supabaseClient.functions.invoke('summarize-chunks', {
+          body: { documentId: document.id, summarizeLevel: 'chunk' }
+        });
+        
+        if (summarizeChunksError) {
+          throw summarizeChunksError;
+        }
+        
+        summarizeSuccess = true;
+        console.log(`Successfully invoked summarize-chunks for ${documentId}.`);
+        
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        if (attempt < maxSummarizeRetries) {
+          const delay = 5000 * (attempt + 1); // 5s, 10s delays
+          console.warn(`Summarize-chunks failed (attempt ${attempt + 1}/${maxSummarizeRetries + 1}), retrying in ${delay}ms:`, errorMessage);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          console.error(`Error invoking summarize-chunks (chunk level) for ${documentId} after ${maxSummarizeRetries} retries:`, error);
+          
+          // Don't fail the entire document processing if summarization fails
+          // Just log the error and continue with marking as completed
+          await updateDocumentStatus(supabaseClient, documentId, 'processing', { 
+            chunks_created: processedChunks.length,
+            processing_stage: 'completed_with_summarization_error',
+            summarization_error: errorMessage
+          });
+        }
+      }
     }
 
     // TODO: Add step to wait or check for chunk summarization completion, then trigger document-level summary
     // This might involve polling or a more sophisticated orchestration if summarize-chunks is long-running.
     // For now, let's assume it's relatively quick or we proceed without waiting for full doc summary here.
     
-    // Tentatively mark as completed, actual "completed" might be after document summary
-    await updateDocumentStatus(supabaseClient, documentId, 'completed', { 
+    // Mark as completed
+    const finalStatus = summarizeSuccess ? 'completed' : 'completed'; // Still mark as completed even if summarization failed
+    await updateDocumentStatus(supabaseClient, documentId, finalStatus, { 
       processing_completed_at: new Date().toISOString(),
-      processing_stage: 'completed'
+      processing_stage: summarizeSuccess ? 'completed' : 'completed_with_summarization_error'
     });
     console.log(`PROCESS-DOCUMENT: Successfully processed document ID: ${documentId}`);
 

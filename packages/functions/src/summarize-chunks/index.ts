@@ -34,7 +34,7 @@ interface ChunkRecord {
 }
 
 /**
- * Summarizes a single text chunk using OpenAI's GPT-4.1-nano model
+ * Summarizes a single text chunk using OpenAI's GPT-4.1-mini model
  */
 async function summarizeChunk(content: string, apiKey: string): Promise<string> {
   try {
@@ -47,7 +47,7 @@ async function summarizeChunk(content: string, apiKey: string): Promise<string> 
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-nano',
+        model: 'gpt-4.1-mini',
         messages: [
           {
             role: 'system',
@@ -92,7 +92,7 @@ async function summarizeSection(chunkContents: string[], sectionIdentifier: stri
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-nano',
+        model: 'gpt-4.1-mini',
         messages: [
           {
             role: 'system',
@@ -137,7 +137,7 @@ async function summarizeDocument(sectionSummaries: { section: string, summary: s
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-nano',
+        model: 'gpt-4.1-mini',
         messages: [
           {
             role: 'system',
@@ -183,10 +183,20 @@ serve(async (req: Request) => {
       throw new Error('Missing documentId in request payload');
     }
     
-    // Initialize environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    // Safe environment variable access for both Deno and Node.js
+    const getEnvVar = (key: string): string | undefined => {
+      if (typeof globalThis.Deno !== 'undefined' && globalThis.Deno?.env) {
+        return globalThis.Deno.env.get(key);
+      }
+      if (typeof process !== 'undefined' && process.env) {
+        return process.env[key];
+      }
+      return undefined;
+    };
+
+    const supabaseUrl = getEnvVar('SUPABASE_URL');
+    const supabaseServiceRoleKey = getEnvVar('SUPABASE_SERVICE_ROLE_KEY');
+    const openaiApiKey = getEnvVar('OPENAI_API_KEY');
 
     if (!supabaseUrl || !supabaseServiceRoleKey) {
       throw new Error('Missing Supabase environment variables');
@@ -477,7 +487,7 @@ async function finalizeDocumentProcessing(
         summary: documentSummaryText,
         summary_level: 'document',
         status: 'completed',
-        model_used: 'gpt-4.1-nano', // Assuming this model is used by summarizeDocument
+        model_used: 'gpt-4.1-mini', // Assuming this model is used by summarizeDocument
         updated_at: new Date().toISOString(), 
       }, { onConflict: 'document_id, summary_level' });
 

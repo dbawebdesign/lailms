@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     
     // Generate title using AI
     const titleResponse = await openaiClient.chat.completions.create({
-      model: "gpt-4.1-nano",
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
