@@ -1,7 +1,9 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { YoutubeTranscript } from 'npm:youtube-transcript'; // Added for YouTube
-import { getDocument } from 'https://esm.sh/pdf.mjs'; // PDF text extraction compatible with edge runtime
+// Use pdfjs-serverless - specifically built for Deno edge functions and serverless environments
+// @ts-ignore
+import { getDocument } from 'https://esm.sh/pdfjs-serverless@1.0.1';
 // import { corsHeaders } from '../_shared/cors.ts'; // Path issue, define locally for now
 
 // Consistent, robust CORS headers (copied from kb-process-textfile)
@@ -15,6 +17,7 @@ const corsHeaders = {
 // Import specific parsers/libraries as we add them, e.g.:
 // import { pdf } from 'https://deno.land/x/pdf@v0.4.0/mod.ts'; // Example for PDF
 
+// pdfjs-serverless doesn't require worker configuration - it's self-contained for serverless environments
 console.log(`Function "process-document" booting up!`);
 
 interface ProcessRequest {
@@ -144,6 +147,7 @@ async function extractAndValidatePdfText(uint8: Uint8Array, filePath: string): P
   console.log(`Processing PDF with enhanced text extraction and validation`);
   
   try {
+    // @ts-ignore - PDF.js types may not be available but the functionality works
     const loadingTask = getDocument({ data: uint8 });
     const pdfDoc = await loadingTask.promise;
     
