@@ -68,7 +68,7 @@ async function getEmbedding(text: string, apiKey: string): Promise<number[]> {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ input: text, model: 'text-embedding-ada-002' }),
+    body: JSON.stringify({ input: text, model: 'text-embedding-3-small' }),
   });
   if (!response.ok) {
     const errorBody = await response.text();

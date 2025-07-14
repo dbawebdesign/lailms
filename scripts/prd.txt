@@ -238,7 +238,7 @@ This integrated suite provides students with powerful AI tools for deeper learni
 | **backend api**     | Next.js API Routes + Edge Functions                                  |
 | **storage**         | Supabase Storage                                                     |
 | **database**        | Supabase Postgres + **pgvector** extension                           |
-| **embeddings**      | OpenAI `text-embedding-ada-002`                                      |
+| **embeddings**      | OpenAI `text-embedding-3-small`                                     |
 | **summarisation**   | OpenAI GPT‑4o                                                        |
 | **file parsing**    | `pdf-parse`, `mammoth`, `youtube-transcript`, Playwright/Readability |
 | **background jobs** | Supabase Edge Jobs *or* Next.js Cron                                 |
