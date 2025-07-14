@@ -1,0 +1,11 @@
+# Task ID: 3
+# Title: Develop Content Indexing Service
+# Status: pending
+# Dependencies: 2
+# Priority: high
+# Description: Build a backend service to aggregate and index course content for study spaces.
+# Details:
+Create a service that pulls content from base_classes, learning_paths, lessons, lesson_sections, and media assets. Index content using vector embeddings and full-text search. Implement metadata extraction and structured storage.
+
+# Test Strategy:
+Test indexing accuracy, search performance, and metadata extraction with sample content.

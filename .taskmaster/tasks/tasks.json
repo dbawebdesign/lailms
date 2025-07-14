@@ -1,0 +1,1399 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 2,
+        "title": "Implement Database Schema Extensions",
+        "description": "Extend the existing Supabase schema to support new study space features by integrating with current tables and relationships.",
+        "status": "in-progress",
+        "dependencies": [],
+        "priority": "high",
+        "details": "Update and extend the existing Supabase schema to enable study space features, ensuring integration with current tables such as profiles, base_classes, lessons, lesson_sections, and related entities. Instead of creating isolated new tables, design extensions that build on and relate to the existing database structure. This may include adding new columns, foreign keys, or join tables to support features like study space notes, bookmarks, mind maps, sessions, AI conversations, and content interactions. Use declarative schema management and migrations to ensure consistency and maintainability across environments[2][3]. Avoid creating redundant or siloed tables; all extensions should enhance and connect with the current schema.",
+        "testStrategy": "Run schema validation scripts and test CRUD operations on each new and extended table, ensuring all new relationships and integrations with existing tables function as intended. Validate that migrations apply cleanly and that data integrity is maintained.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Gather Requirements for New Features",
+            "description": "Collect and document detailed requirements for each new feature (notes, bookmarks, mind maps, sessions, AI conversations, content interactions) to ensure all business and technical needs are understood.",
+            "dependencies": [],
+            "details": "Engage stakeholders, product managers, and developers to clarify feature scope, data needs, and integration points with existing systems.\n<info added on 2025-07-13T15:58:43.591Z>\nBased on the comprehensive analysis of the Student Study Space PRD and the current Supabase schema, the following detailed requirements have been gathered for all new features necessitating database schema extensions:\n\nNEW TABLES REQUIRED:\n\n1. student_study_spaces: Individual study space configurations per student per course, with key fields including student_id (→profiles), base_class_id (→base_classes), name, description, settings (JSONB), and timestamps. Establish many-to-one relationships with profiles and base_classes.\n\n2. study_space_notes: Student-generated notes supporting rich content and content linking, with fields for study_space_id, title, content (JSONB for rich text), content_references (JSONB for linked content), tags (TEXT[]), and timestamps. Features include multimedia support, automatic content linking, and AI-enhanced organization.\n\n3. study_space_bookmarks: Saved content references across lessons, sections, and media assets, with fields for study_space_id, content_type (lesson/section/media/etc), content_id (UUID), notes, and timestamps. Supports polymorphic relationships to various content types.\n\n4. study_space_mind_maps: Generated and custom mind maps adapted from teacher tools, with fields for study_space_id, title, map_data (JSONB), is_collaborative (BOOLEAN), and timestamps. Integrates with the existing teacher mind map generator.\n\n5. study_space_sessions: Tracks study sessions and analytics, with fields for study_space_id, session_data (JSONB), duration_minutes, content_interactions (JSONB), and timestamps. Enables analytics for learning patterns and engagement.\n\n6. study_space_ai_conversations: Stores AI chat history and context for Luna Study Mode, with fields for study_space_id, conversation_data (JSONB), context_data (JSONB), and timestamps. Enhances Luna AI with course-specific knowledge.\n\n7. study_space_content_interactions: Provides detailed interaction tracking for analytics, with fields for study_space_id, content_type, content_id, interaction_type, interaction_data (JSONB), and timestamps. Enables granular tracking for learning analytics.\n\n8. study_space_collaborations (Optional for Phase 3): Supports group study features and shared spaces, with fields for study_space_id, participant_ids (UUID[]), collaboration_type, permissions (JSONB), and timestamps.\n\nEXISTING TABLE EXTENSIONS:\n\nprofiles table additions:\n- study_preferences (JSONB): Stores learning style preferences and AI interaction settings.\n- study_analytics_enabled (BOOLEAN): Controls privacy for analytics.\n- default_study_settings (JSONB): Default configurations for new study spaces.\n\nlesson_sections table additions:\n- study_space_indexed (BOOLEAN): Indicates if content is indexed for study space search.\n- content_embedding (vector): Supports similarity search and content recommendations.\n\nINTEGRATION REQUIREMENTS:\n\nContent Aggregation:\n- Ensure all course content (base_classes, paths, lessons, lesson_sections, media assets) is accessible.\n- Implement vector embeddings for content similarity and search.\n- Enable cross-course content relationship mapping.\n\nAI Integration:\n- Enhance Luna context with a course-specific knowledge base.\n- Integrate with existing AI infrastructure (agent_sessions, agent_messages).\n- Support conversation persistence and context management.\n\nTeacher Tools Adaptation:\n- Leverage the existing mind map generator from teacher tools.\n- Adapt for student use with course content integration.\n- Maintain compatibility with the existing teacher_tool_creations table.\n\nAssessment Integration:\n- Link study activities to assessment preparation.\n- Integrate with the existing assessment system (assessments, assessment_questions).\n- Correlate study analytics with performance.\n\nTECHNICAL CONSIDERATIONS:\n\nPerformance:\n- Implement efficient indexing for large content volumes.\n- Enable vector search capabilities for content similarity.\n- Apply caching strategies for frequently accessed content.\n\nSecurity:\n- Enforce RLS policies for student data privacy.\n- Apply course-specific access controls.\n- Define collaborative feature permissions.\n\nScalability:\n- Support 1000+ concurrent users.\n- Provide real-time collaboration infrastructure.\n- Optimize performance for mobile devices.\n\nRequirements gathering is complete and the project is ready to proceed to the schema design phase.\n</info added on 2025-07-13T15:58:43.591Z>",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Analyze Existing Schema and Relationships",
+            "description": "Perform a comprehensive analysis of the current database schema, focusing on table structures, relationships, normalization, and existing integration points.",
+            "dependencies": [
+              1
+            ],
+            "details": "Map out current tables, foreign keys, and data flows. Identify potential areas for extension and integration, ensuring compatibility and minimal redundancy.\n<info added on 2025-07-13T16:00:43.502Z>\nCompleted comprehensive analysis of the existing Supabase schema and identified key relationships and integration points for Study Space features:\n\nCORE CONTENT HIERARCHY ANALYSIS:\n\nPrimary Content Flow:\norganisations → base_classes → paths → lessons → lesson_sections\n                    ↓\n              lesson_media_assets\n\nUser & Access Management:\nprofiles → rosters → class_instances ← base_classes\n    ↓\nprogress, grades, assessments\n\nKEY EXISTING TABLES FOR INTEGRATION:\n\n1. Content Tables (Primary Integration Points):\n- base_classes: Foundation for study spaces (id, name, description, settings, assessment_config)\n- paths: Learning progression (id, base_class_id, title, description, order_index)  \n- lessons: Individual lessons (id, path_id, base_class_id, title, description, order_index)\n- lesson_sections: Granular content (id, lesson_id, title, content JSONB, content_embedding vector)\n- lesson_media_assets: Rich media (id, lesson_id, asset_type, content JSONB, svg_content, file_url)\n\n2. User Management Tables:\n- profiles: Student info (user_id, username, role, organisation_id, settings JSONB, additional_roles)\n- rosters: Class enrollment (id, class_instance_id, profile_id, role, joined_at)\n- class_instances: Active classes (id, base_class_id, name, enrollment_code, start_date, end_date)\n\n3. Assessment Integration Tables:\n- assessments: Existing assessments (id, base_class_id, lesson_id, path_id, assessment_type)\n- assessment_questions: Question bank (id, assessment_id, question_text, question_type, answer_key JSONB)\n- student_attempts: Assessment attempts (id, assessment_id, student_id, status, scores)\n- student_responses: Individual responses (id, attempt_id, question_id, response_data JSONB)\n\n4. AI & Analytics Tables:\n- luna_conversations: Existing AI chats (id, title, persona, user_id, metadata JSONB)\n- luna_messages: Chat messages (id, conversation_id, role, content, citations JSONB)\n- agent_sessions: AI session tracking (id, user_id, agent_type, context JSONB)\n- progress: Learning progress tracking (id, user_id, item_type, item_id, status, progress_percentage)\n\n5. Document & Content Management:\n- documents: File storage (id, file_name, storage_path, organisation_id, base_class_id)\n- document_chunks: Content indexing (id, document_id, content, embedding vector, metadata JSONB)\n- generations: Content generation tracking (id, user_id, asset_type, status, query, response)\n\nEXISTING RELATIONSHIP PATTERNS:\n\n1. Organization Hierarchy:\n- All content tied to organisations via organisation_id\n- Users belong to organisations via profiles.organisation_id\n- RLS policies enforce organization-level data isolation\n\n2. Content Relationships:\n- Hierarchical: base_classes → paths → lessons → lesson_sections\n- Media assets linked directly to lessons\n- Cross-references via JSONB fields in content tables\n\n3. User-Content Relationships:\n- Enrollment via rosters table (many-to-many: users ↔ class_instances)\n- Progress tracking via progress table (user_id + item_type + item_id)\n- Direct ownership via created_by fields\n\n4. AI Integration Patterns:\n- Conversation persistence in luna_conversations/luna_messages\n- Session tracking in agent_sessions\n- Generation tracking in generations table\n\nINTEGRATION OPPORTUNITIES IDENTIFIED:\n\n1. Content Aggregation:\n- lesson_sections.content_embedding: Already supports vector search\n- documents + document_chunks: Existing content indexing infrastructure\n- lesson_media_assets: Rich media already structured in JSONB\n\n2. User Relationship Leverage:\n- rosters: Existing enrollment mechanism for study space access\n- profiles.settings: Can extend for study preferences\n- class_instances: Natural boundary for study space organization\n\n3. AI Infrastructure Reuse:\n- luna_conversations: Pattern for study space AI conversations\n- agent_sessions: Session management for study activities\n- generations: Track AI-generated study content\n\n4. Assessment Integration:\n- assessments: Link study activities to assessment preparation\n- student_attempts/responses: Correlation with study space usage\n- progress: Extend for study space progress tracking\n\nPOTENTIAL EXTENSION POINTS:\n\n1. Existing JSONB Fields to Extend:\n- profiles.settings: Add study_preferences, default_study_settings\n- lesson_sections.content: Already rich content structure\n- base_classes.settings: Course-level study space configurations\n- class_instances.settings: Instance-specific study settings\n\n2. Existing Vector Fields:\n- lesson_sections.content_embedding: Content similarity search\n- document_chunks.embedding: Document content search\n\n3. Existing Metadata Fields:\n- luna_messages.metadata: Study context information\n- progress.last_position: Study session continuation\n- generations.query/response: Study-related content generation\n\nNORMALIZATION & PERFORMANCE CONSIDERATIONS:\n\n1. Well-Normalized Structure:\n- Clear separation of concerns (users, content, relationships)\n- Consistent UUID primary keys\n- Proper foreign key relationships\n- JSONB for flexible metadata\n\n2. Performance Optimizations Needed:\n- Indexes on frequently queried relationships\n- Vector search optimization for content_embedding\n- Efficient JSONB querying for study data\n\n3. RLS Policy Patterns:\n- Organization-level isolation already implemented\n- User-specific data access patterns established\n- Course enrollment-based access control\n\nRECOMMENDED INTEGRATION STRATEGY:\n\n1. Leverage Existing Patterns:\n- Follow established organization → base_class → user relationship model\n- Use existing JSONB patterns for flexible study data\n- Extend current AI conversation infrastructure\n\n2. Minimal Schema Disruption:\n- Add new study space tables without modifying core content tables\n- Extend existing tables only with optional columns\n- Maintain backward compatibility\n\n3. Consistent Naming & Structure:\n- Follow existing naming conventions (snake_case, timestamps)\n- Use established patterns for foreign keys and relationships\n- Maintain consistent JSONB structure patterns\n\nAnalysis complete - schema is well-structured for Study Space integration with minimal disruption to existing functionality.\n</info added on 2025-07-13T16:00:43.502Z>",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Design Schema Extensions for Each Feature",
+            "description": "Design normalized schema changes for each new feature, ensuring proper foreign key relationships and integration with existing tables.",
+            "dependencies": [
+              2
+            ],
+            "details": "For each feature, define new tables, columns, and relationships. Ensure adherence to best practices such as normalization, naming conventions, and minimal redundancy.\n<info added on 2025-07-13T16:11:34.346Z>\nCompleted comprehensive schema design for all Study Space features. Detailed schema extensions include new tables for student study spaces, notes, bookmarks, mind maps, sessions, AI conversations, content interactions, and collaborations, as well as extensions to existing profiles and lesson_sections tables. All tables follow normalization, naming conventions, and minimal redundancy, with explicit foreign key relationships and RLS policies for security. JSONB structures are defined for flexible data storage, and performance optimizations include strategic indexing, partitioning considerations, and materialized views for analytics. Schema integrates with existing system tables and supports future collaborative features.\n</info added on 2025-07-13T16:11:34.346Z>",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Draft Migration Scripts",
+            "description": "Write migration scripts to implement the designed schema changes, including table creation, column additions, and relationship definitions.",
+            "dependencies": [
+              3
+            ],
+            "details": "Use migration tools compatible with Supabase. Ensure scripts are idempotent and reversible, and include data backfill or transformation steps if needed.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Peer Review and Documentation",
+            "description": "Conduct peer reviews of schema designs and migration scripts, and document all changes for future maintenance and onboarding.",
+            "dependencies": [
+              4
+            ],
+            "details": "Share migration scripts and schema diagrams with team members for feedback. Update schema documentation, ER diagrams, and change logs.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Apply and Test Migrations in Staging",
+            "description": "Apply migration scripts to a staging environment and perform comprehensive testing of all new and updated schema elements.",
+            "dependencies": [
+              5
+            ],
+            "details": "Test CRUD operations, foreign key constraints, and integration with existing features. Monitor performance metrics before and after changes.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Validate Data Integrity and Rollback Procedures",
+            "description": "Verify data integrity post-migration and test rollback procedures to ensure safe recovery from potential issues.",
+            "dependencies": [],
+            "details": "Run data validation scripts, check for orphaned records, and simulate rollback scenarios to confirm that migrations are reversible and data remains consistent.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Develop Content Indexing Service",
+        "description": "Build a backend service to aggregate and index course content for study spaces within the existing app structure.",
+        "status": "pending",
+        "dependencies": [
+          2
+        ],
+        "priority": "high",
+        "details": "Create a service that pulls content from base_classes, learning_paths, lessons, lesson_sections, and media assets using the current Next.js app and Supabase setup. Index content using vector embeddings and full-text search. Implement metadata extraction and structured storage compatible with existing components.",
+        "testStrategy": "Test indexing accuracy, search performance, and metadata extraction with sample content using the integrated app and Supabase environment.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Requirements and Data Source Analysis",
+            "description": "Identify and document all functional and non-functional requirements for the content indexing service. Analyze and catalog all relevant data sources, including base_classes, learning_paths, lessons, lesson_sections, and media assets within the current Next.js and Supabase setup.",
+            "dependencies": [],
+            "details": "Gather requirements from stakeholders, review existing app structure, and create a comprehensive data source inventory.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Design of Aggregation Logic",
+            "description": "Design the logic for aggregating content from multiple sources, ensuring efficient data retrieval and consolidation. Define how data from different tables and assets will be combined and normalized.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create data flow diagrams and specify aggregation rules, considering scalability and maintainability.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implementation of Content Extraction from Each Source",
+            "description": "Develop modules or scripts to extract content from each identified data source, handling various data formats and structures.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement connectors or queries for base_classes, learning_paths, lessons, lesson_sections, and media assets.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Vector Embedding Integration",
+            "description": "Integrate vector embedding generation for extracted content to enable semantic search capabilities.",
+            "dependencies": [
+              3
+            ],
+            "details": "Select or implement embedding models, process content, and store embeddings in a compatible format.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Full-Text Search Setup",
+            "description": "Configure and implement full-text search indexing for all aggregated and extracted content.",
+            "dependencies": [
+              3
+            ],
+            "details": "Set up search infrastructure (e.g., Supabase full-text search or external engine), define indexing strategies, and ensure efficient query performance.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Metadata Extraction and Storage",
+            "description": "Extract relevant metadata from all content sources and design a structured storage schema compatible with existing app components.",
+            "dependencies": [
+              3
+            ],
+            "details": "Define metadata fields, implement extraction logic, and update storage models to support efficient retrieval.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "API/Service Interface Design",
+            "description": "Design and implement the API or service interface for accessing indexed content, search, and metadata.",
+            "dependencies": [
+              4,
+              5,
+              6
+            ],
+            "details": "Define endpoints, request/response formats, authentication, and integration points with the existing app.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "End-to-End Testing and Performance Validation",
+            "description": "Conduct comprehensive testing of the entire content indexing pipeline, including extraction, aggregation, search, and API functionality. Validate performance and scalability.",
+            "dependencies": [],
+            "details": "Develop test cases, simulate real-world usage, measure indexing accuracy, search relevance, and system responsiveness.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Build Study Space Layout and Navigation",
+        "description": "Develop the Study Space page/component as a new route within the existing Next.js app, integrated with the current student dashboard.",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "details": "Implement the Study Space as a new page/route (e.g., /study-space) within the Next.js app structure, accessible via the existing 'Study Space' link in the student dashboard. Use the existing app and dashboard layouts—do not create a separate layout. Build the Study Space React component to display relevant study content and navigation. Ensure the page is responsive across devices and integrates with authentication for course access. All implementation should leverage the current app structure and components.",
+        "testStrategy": "Manual and automated UI testing for Study Space page navigation from the dashboard, responsiveness, and authentication integration. Verify the page appears at the correct route and uses the existing layout.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Route Creation and Integration",
+            "description": "Create a new route for the Study Space page within the existing Next.js app structure.",
+            "dependencies": [],
+            "details": "Implement the Study Space as a new page/route (e.g., /study-space) accessible via the existing 'Study Space' link in the student dashboard.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Layout and Navigation Wiring",
+            "description": "Integrate the Study Space page with the existing app and dashboard layouts.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use the existing app and dashboard layouts without creating a separate layout. Ensure navigation from the dashboard to the Study Space page is functional.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Study Space Component Development",
+            "description": "Develop the Study Space React component to display relevant study content and navigation.",
+            "dependencies": [
+              2
+            ],
+            "details": "Build the component to handle study content display and navigation within the Study Space page.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Authentication and Access Control Integration",
+            "description": "Integrate authentication for course access within the Study Space page.",
+            "dependencies": [
+              3
+            ],
+            "details": "Implement authentication checks to ensure only authorized users can access the Study Space page and its content.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Responsive Design Implementation",
+            "description": "Ensure the Study Space page is responsive across different devices.",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement responsive design principles to ensure the Study Space page adapts well to various screen sizes and devices.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "UI/UX and Navigation Testing",
+            "description": "Conduct manual and automated UI testing for the Study Space page.",
+            "dependencies": [
+              5
+            ],
+            "details": "Test navigation from the dashboard, responsiveness, and authentication integration to ensure a seamless user experience.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Implement Core Note-Taking System",
+        "description": "Develop a rich text note-taking system with AI enhancements, integrated into the existing Next.js app and Supabase backend.",
+        "status": "pending",
+        "dependencies": [
+          2,
+          4
+        ],
+        "priority": "medium",
+        "details": "Integrate Tiptap or similar React-based rich text editor within the current app structure. Implement real-time sync with Supabase. Add AI integration for content suggestions and note organization. Support multimedia embedding and version control, leveraging existing components where possible.",
+        "testStrategy": "Test note creation, editing, syncing, AI suggestions, and multimedia support within the integrated app environment.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Gather Requirements and Design User Experience",
+            "description": "Define functional and non-functional requirements for the note-taking system. Design user flows, wireframes, and UX/UI for seamless integration within the existing Next.js app.",
+            "dependencies": [],
+            "details": "Collaborate with stakeholders to capture all desired features (rich text, AI, sync, media, versioning). Create wireframes and user journey maps to guide development.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Integrate Rich Text Editor (Tiptap)",
+            "description": "Set up and configure Tiptap or a similar rich text editor within the Next.js app, ensuring support for core editing features.",
+            "dependencies": [
+              1
+            ],
+            "details": "Install Tiptap and required extensions. Implement a React component for the editor, supporting formatting, mentions, and extensibility for future features.[1][2][3][5]",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement Real-Time Sync with Supabase",
+            "description": "Enable real-time synchronization of note content between the frontend editor and Supabase backend.",
+            "dependencies": [
+              2
+            ],
+            "details": "Use Supabase's real-time APIs to sync note changes instantly across clients. Handle conflict resolution and offline scenarios.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Integrate AI Suggestion and Organization Features",
+            "description": "Add AI-powered content suggestions and note organization capabilities to enhance user productivity.",
+            "dependencies": [
+              3
+            ],
+            "details": "Connect to AI services for generating suggestions, summarizing notes, and organizing content. Integrate UI components for displaying and accepting AI recommendations.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Add Multimedia Embedding Support",
+            "description": "Enable embedding and display of multimedia content (images, audio, video) within notes.",
+            "dependencies": [
+              2
+            ],
+            "details": "Extend the editor with Tiptap's image and media extensions. Implement upload, preview, and storage of media assets, ensuring compatibility with Supabase storage.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Implement Version Control for Notes",
+            "description": "Develop a versioning system to track changes and allow users to revert to previous note states.",
+            "dependencies": [
+              3
+            ],
+            "details": "Design and implement version history storage in Supabase. Provide UI for viewing and restoring previous versions of notes.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Conduct Comprehensive Testing",
+            "description": "Test all aspects of the note-taking system, including creation, editing, real-time sync, AI features, multimedia embedding, and version control.",
+            "dependencies": [
+              4,
+              5,
+              6
+            ],
+            "details": "Develop and execute test cases covering all user scenarios and edge cases. Perform integration, usability, and regression testing to ensure reliability and a seamless user experience.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Integrate AI Study Assistant (Luna Study Mode)",
+        "description": "Extend Luna AI for study-specific interactions and contextual help, integrated with the current app and backend.",
+        "status": "pending",
+        "dependencies": [
+          2,
+          3
+        ],
+        "priority": "high",
+        "details": "Enhance Luna AI context with course-specific knowledge base. Implement contextual question answering, personalized recommendations, and learning gap identification. Integrate with existing AI infrastructure and manage conversation persistence, ensuring compatibility with the current app structure.",
+        "testStrategy": "Test AI responses, context management, and integration with course content in the existing app environment.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Requirements and Context Modeling",
+            "description": "Define and document the functional and technical requirements for the AI study assistant, including user roles, privacy considerations, and integration points with course data. Model the context objects and data flows needed for contextual understanding.",
+            "dependencies": [],
+            "details": "Gather input from stakeholders, analyze current app architecture, and create detailed context models (e.g., user, course, session, and conversation context). Ensure requirements address scalability, interpretability, and quality control.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "AI Context Enrichment with Course Data",
+            "description": "Design and implement mechanisms to ingest, structure, and update course-specific data for AI context enrichment. Ensure the AI assistant can access authoritative knowledge bases and retrieve relevant course content.",
+            "dependencies": [
+              1
+            ],
+            "details": "Integrate with existing course databases, define data schemas for course materials, and establish pipelines for real-time or scheduled data updates. Ensure data privacy and access controls are enforced.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Contextual Q&A Implementation",
+            "description": "Develop the AI assistant's ability to answer user questions using enriched context from course data. Implement natural language understanding and retrieval-augmented generation for accurate, context-aware responses.",
+            "dependencies": [
+              2
+            ],
+            "details": "Fine-tune or configure the AI model for educational Q&A, implement context retrieval logic, and handle ambiguous or out-of-scope queries gracefully.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Personalized Recommendation Logic",
+            "description": "Implement logic for generating personalized study recommendations based on user profile, learning history, and identified knowledge gaps.",
+            "dependencies": [
+              3
+            ],
+            "details": "Design algorithms to analyze user interactions, progress, and preferences. Integrate recommendation outputs into the AI assistant's response flow.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Conversation Persistence and Integration",
+            "description": "Develop systems for persisting conversation history and integrating the AI assistant with the existing app and backend infrastructure.",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement secure storage for conversation data, ensure session continuity, and integrate with authentication and user management systems. Maintain compatibility with current app structure.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Testing AI Responses and Context Management",
+            "description": "Design and execute comprehensive tests for AI response accuracy, context management, and integration with course content. Include simulated user testing and feedback loops.",
+            "dependencies": [
+              5
+            ],
+            "details": "Develop test cases for edge scenarios, validate context retention across sessions, and incorporate user feedback to iteratively improve the assistant's performance.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Adapt Mind Mapping Tool for Student Use",
+        "description": "Adapt existing teacher mind map generator for student study spaces, integrated into the current app.",
+        "status": "pending",
+        "dependencies": [
+          2,
+          4
+        ],
+        "priority": "medium",
+        "details": "Modify mind map generator to work with student content. Add interactive node exploration, collaborative editing, and export capabilities. Ensure responsive design for all devices, using the existing app structure and components.",
+        "testStrategy": "Test mind map generation, editing, collaboration, and export features within the integrated app.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Requirements Gathering and UX Adaptation",
+            "description": "Identify and document the specific requirements for adapting the mind mapping tool for student use, focusing on user experience adjustments to suit student workflows and accessibility needs.",
+            "dependencies": [],
+            "details": "Conduct user research with students, review existing teacher tool UX, and define necessary changes for student engagement, accessibility, and ease of use.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Integration with Student Content",
+            "description": "Modify the mind mapping tool to allow students to import, link, and organize their own study materials and course content within the mind map interface.",
+            "dependencies": [
+              1
+            ],
+            "details": "Ensure seamless access to student notes, lessons, and resources from the current app. Implement content selection and linking features within the mind map.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Interactive Node Exploration",
+            "description": "Implement interactive features for exploring, expanding, and collapsing nodes, as well as attaching multimedia or notes to each node.",
+            "dependencies": [
+              2
+            ],
+            "details": "Enable click/tap actions for node expansion, support for multimedia attachments, and intuitive navigation for complex maps.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Collaborative Editing Implementation",
+            "description": "Develop real-time collaborative editing capabilities, allowing multiple students to co-create and edit mind maps simultaneously.",
+            "dependencies": [
+              3
+            ],
+            "details": "Integrate collaborative features such as live cursors, change tracking, and user presence indicators using existing backend infrastructure.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Export Functionality",
+            "description": "Add export options for mind maps, enabling students to save or share their maps in formats such as PDF, image, or structured data.",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement export to PDF, PNG/JPEG, and possibly JSON or other structured formats. Ensure exported maps retain structure and visual clarity.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Responsive Design and Testing",
+            "description": "Ensure the adapted mind mapping tool is fully responsive and rigorously tested across devices and browsers for usability and performance.",
+            "dependencies": [
+              5
+            ],
+            "details": "Apply responsive design principles, conduct manual and automated testing, and address any UI/UX issues identified during QA.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Develop Study Session Analytics",
+        "description": "Implement tracking and analytics for study sessions and learning progress, integrated with the current app and Supabase.",
+        "status": "pending",
+        "dependencies": [
+          2,
+          4
+        ],
+        "priority": "medium",
+        "details": "Collect session duration, content interactions, and learning progress. Build dashboard visualization components. Aggregate and report data for analytics, leveraging the existing app structure.",
+        "testStrategy": "Test data collection, visualization, and reporting accuracy within the integrated app environment.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Requirements and Analytics Metrics",
+            "description": "Identify and document the specific requirements for study session analytics, including which metrics to track (e.g., session duration, content interactions, learning progress) and how these metrics align with learning objectives and equity-focused outcomes.",
+            "dependencies": [],
+            "details": "Consult stakeholders to ensure metrics are actionable and support personalized learning. Reference guiding principles for learning analytics implementation to ensure scalability and equity.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Session and Interaction Tracking",
+            "description": "Develop and integrate backend and frontend mechanisms to capture study session events, user interactions, and progress data within the app and Supabase.",
+            "dependencies": [
+              1
+            ],
+            "details": "Ensure tracking covers all defined metrics and respects user privacy. Use best practices for session recording and interaction logging to enable both quantitative and qualitative analysis.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Develop Data Aggregation Logic",
+            "description": "Design and implement logic to aggregate raw tracking data into meaningful analytics, such as summarizing session durations, calculating engagement rates, and compiling learning progress statistics.",
+            "dependencies": [
+              2
+            ],
+            "details": "Ensure aggregation supports segmentation (e.g., by user, content, time period) and prepares data for visualization and reporting.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Build Dashboard Visualization Components",
+            "description": "Create frontend components to visualize aggregated analytics data, including charts, tables, and progress indicators, integrated into the existing app dashboard.",
+            "dependencies": [
+              3
+            ],
+            "details": "Design visualizations to be actionable and user-friendly, supporting different user roles and access permissions.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Implement Analytics Reporting Features",
+            "description": "Develop reporting functionality to generate and export analytics summaries, trends, and insights for stakeholders, supporting both scheduled and on-demand reports.",
+            "dependencies": [
+              4
+            ],
+            "details": "Ensure reports are customizable and align with organizational goals, providing actionable recommendations where possible.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Test Data Collection and Visualization",
+            "description": "Conduct comprehensive testing of the entire analytics pipeline, including data collection accuracy, aggregation correctness, dashboard rendering, and report generation.",
+            "dependencies": [
+              5
+            ],
+            "details": "Use sample and real user data to validate metrics, ensure privacy compliance, and confirm that visualizations and reports reflect actual user activity and learning progress.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Build Collaborative Study Features",
+        "description": "Develop tools for group study, peer interaction, and shared resources, integrated into the current app.",
+        "status": "pending",
+        "dependencies": [
+          2,
+          4,
+          5,
+          7
+        ],
+        "priority": "medium",
+        "details": "Implement study group creation, shared study spaces, peer note sharing, group mind mapping, and discussion forums. Add permission and privacy management, using the existing app structure and components.",
+        "testStrategy": "Test group creation, collaboration, permission controls, and privacy features within the integrated app.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Requirements and Permission Modeling",
+            "description": "Define and document the requirements for collaborative study features, including detailed permission and privacy models for group creation, resource sharing, and user roles.",
+            "dependencies": [],
+            "details": "Identify user roles (e.g., group owner, member, guest), access levels, and privacy settings. Specify how permissions are granted, modified, and revoked for study groups, shared spaces, and resources.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Study Group Creation Logic",
+            "description": "Design and implement the backend and frontend logic for creating, joining, and managing study groups within the app.",
+            "dependencies": [
+              1
+            ],
+            "details": "Develop APIs and UI components for group creation, invitations, membership management, and group discovery. Ensure group creation respects defined permission models.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Shared Study Space Implementation",
+            "description": "Build the shared study space feature, allowing group members to collaborate in real-time and access shared resources.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement real-time collaboration using appropriate technologies (e.g., WebSockets, Firebase, or Supabase). Integrate document editing, resource sharing, and live updates for group members.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Peer Note Sharing",
+            "description": "Enable users to share notes and study materials with peers within their study groups, with appropriate permission controls.",
+            "dependencies": [
+              3
+            ],
+            "details": "Develop note sharing UI and backend logic. Implement version control, commenting, and privacy settings for shared notes.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Group Mind Mapping",
+            "description": "Integrate collaborative mind mapping tools for group brainstorming and visual organization of study topics.",
+            "dependencies": [
+              3
+            ],
+            "details": "Select or build a mind mapping component supporting real-time collaboration, editing, and saving within the shared study space.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Discussion Forum Integration",
+            "description": "Add discussion forum capabilities to study groups for asynchronous communication and topic-based discussions.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement threaded discussions, moderation tools, and notification systems. Ensure forums respect group membership and privacy settings.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Permission and Privacy Controls",
+            "description": "Develop comprehensive permission and privacy management interfaces and backend logic for all collaborative features.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "details": "Allow users and group admins to manage access, visibility, and sharing settings for groups, notes, mind maps, and forums. Ensure compliance with privacy requirements.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Collaboration and Privacy Testing",
+            "description": "Test all collaborative features for correct permission enforcement, privacy compliance, and real-time functionality.",
+            "dependencies": [],
+            "details": "Develop and execute test cases covering group creation, resource sharing, permission changes, privacy settings, and real-time collaboration. Address security and data integrity issues.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Implement API Endpoints for Study Space Features",
+        "description": "Develop backend API endpoints for study space functionality, integrated with the current app and Supabase backend.",
+        "status": "pending",
+        "dependencies": [
+          2,
+          3
+        ],
+        "priority": "medium",
+        "details": "Create endpoints: GET /api/study-space/{courseId}, POST /api/study-space/notes, GET /api/study-space/content/search, POST /api/study-space/mind-map/generate, POST /api/study-space/ai/chat, GET /api/study-space/analytics, POST /api/study-space/bookmarks. Ensure endpoints are compatible with the existing app structure and authentication.",
+        "testStrategy": "Test each endpoint for functionality, security, and performance within the integrated app environment.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Endpoint Requirements and Design",
+            "description": "Gather requirements for each study space feature endpoint, determine data structures, HTTP methods, and path/query parameters. Design the API contract and ensure alignment with business use cases and existing app architecture.",
+            "dependencies": [],
+            "details": "Collaborate with stakeholders to clarify endpoint purposes, expected inputs/outputs, and relationships. Document endpoint specifications using OpenAPI or similar standards.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Notes Endpoint",
+            "description": "Develop the backend logic for the notes endpoint, enabling creation, retrieval, updating, and deletion of study notes.",
+            "dependencies": [
+              1
+            ],
+            "details": "Integrate with Supabase for data storage. Ensure endpoint supports required operations and adheres to the designed contract.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement Content Search, Mind Map, AI Chat, Analytics, and Bookmarks Endpoints",
+            "description": "Develop backend logic for content search, mind map generation, AI chat, analytics retrieval, and bookmarks management endpoints.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement each endpoint according to the design, ensuring compatibility with Supabase and the existing app structure.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Integrate Authentication and Authorization",
+            "description": "Add authentication and authorization checks to all endpoints, ensuring only authorized users can access or modify resources.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Leverage existing authentication mechanisms and implement role-based access controls as needed.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Implement Input Validation and Error Handling",
+            "description": "Add robust input validation and error handling to all endpoints, returning informative and actionable error messages.",
+            "dependencies": [
+              4
+            ],
+            "details": "Validate request payloads, handle missing or invalid data, and return appropriate HTTP status codes and error messages.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Conduct Integration Testing",
+            "description": "Test all endpoints within the integrated app environment to ensure correct functionality, security, and interoperability.",
+            "dependencies": [
+              5
+            ],
+            "details": "Write and execute integration tests covering all endpoints, including edge cases and error scenarios.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Optimize Performance and Document API",
+            "description": "Optimize endpoint performance and create comprehensive API documentation for developers and stakeholders.",
+            "dependencies": [],
+            "details": "Profile and improve endpoint response times, implement pagination/filtering where needed, and generate up-to-date API docs using OpenAPI or similar tools.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Develop Personalized Study Guide Generator",
+        "description": "Build AI-powered study guide generation tailored to individual needs, integrated with the current app and analytics.",
+        "status": "pending",
+        "dependencies": [
+          6,
+          8
+        ],
+        "priority": "medium",
+        "details": "Implement AI content generation pipeline. Integrate learning analytics and template-based guide generation. Support multi-format output (text, visual, audio), ensuring compatibility with the existing app structure.",
+        "testStrategy": "Test guide generation, personalization, and output formats within the integrated app.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Requirements and Personalization Logic",
+            "description": "Gather and document requirements for the personalized study guide generator, including user input types, personalization criteria, and logic for tailoring content to individual needs.",
+            "dependencies": [],
+            "details": "Specify what user data (e.g., performance, preferences, uploaded materials) will drive personalization. Define rules and algorithms for customizing study guides based on this data.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Design and Implement AI Content Generation Pipeline",
+            "description": "Develop the AI-driven pipeline that analyzes input materials and generates personalized study guide content.",
+            "dependencies": [
+              1
+            ],
+            "details": "Set up AI models to extract key concepts, generate questions, and structure content. Ensure the pipeline supports dynamic adaptation based on personalization logic.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Integrate Analytics for Personalization and Progress Tracking",
+            "description": "Incorporate analytics to track user interactions, learning progress, and guide effectiveness, feeding data back into personalization logic.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Connect to existing analytics infrastructure. Collect and analyze data such as session duration, quiz results, and content engagement to refine personalization.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Develop Template-Based Guide Formatting",
+            "description": "Create and implement templates for structuring study guides, ensuring consistency and adaptability for different subjects and formats.",
+            "dependencies": [
+              2
+            ],
+            "details": "Design templates for sections like key concepts, MCQs, scenario questions, and answer keys. Enable dynamic population of templates by the AI pipeline.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Implement Multi-Format Output Support",
+            "description": "Enable the study guide generator to output content in multiple formats, such as text, visual, and audio.",
+            "dependencies": [
+              4
+            ],
+            "details": "Develop conversion logic and rendering components for each supported format. Ensure templates and AI-generated content are compatible with all output types.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Integrate Study Guide Generator with App Structure",
+            "description": "Embed the personalized study guide generator into the existing app, ensuring seamless user experience and compatibility with current components.",
+            "dependencies": [
+              3,
+              5
+            ],
+            "details": "Connect generator interfaces, data flows, and analytics with the app’s backend and frontend. Ensure user authentication, data privacy, and smooth navigation.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Test Personalization Logic and Output Formats",
+            "description": "Conduct comprehensive testing of the personalization logic and all supported output formats within the integrated app environment.",
+            "dependencies": [],
+            "details": "Validate that study guides are correctly personalized, formatted, and rendered in all output types. Gather user feedback and iterate as needed.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Implement Interactive Content Exploration",
+        "description": "Develop NotebookLM-inspired content interaction and discovery features, integrated into the current app.",
+        "status": "pending",
+        "dependencies": [
+          3,
+          10
+        ],
+        "priority": "medium",
+        "details": "Build advanced search and recommendation algorithms. Implement content relationship mapping, user interaction tracking, and personalization engine, leveraging the existing app structure and components.",
+        "testStrategy": "Test search, recommendations, content relationships, and personalization within the integrated app.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Gather Requirements and Design User Experience",
+            "description": "Define detailed requirements for interactive content exploration features and design intuitive user flows, wireframes, and UI components inspired by NotebookLM.",
+            "dependencies": [],
+            "details": "Engage stakeholders to clarify needs, analyze NotebookLM's interface (sources, chat, studio panels), and create UX prototypes that support seamless switching between managing, reading, and generating content.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Advanced Search Algorithm",
+            "description": "Develop and integrate advanced search algorithms to enable efficient, context-aware retrieval of content across multiple sources.",
+            "dependencies": [
+              1
+            ],
+            "details": "Leverage vector embeddings and full-text search to support large context windows and multimodal content, ensuring fast and relevant results for user queries.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Develop Recommendation Engine",
+            "description": "Build a recommendation system that suggests relevant content, sources, and study materials based on user activity and content relationships.",
+            "dependencies": [
+              2
+            ],
+            "details": "Utilize collaborative filtering, content-based filtering, and user interaction data to generate personalized recommendations within the app.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Map Content Relationships",
+            "description": "Implement algorithms and data models to identify and visualize relationships between content items, enabling features like interactive mind maps.",
+            "dependencies": [
+              2
+            ],
+            "details": "Extract key concepts and connections from uploaded and discovered sources, and generate interactive diagrams to help users explore conceptual links.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Track User Interactions",
+            "description": "Develop mechanisms to log and analyze user interactions with content, search, recommendations, and relationship maps.",
+            "dependencies": [
+              1
+            ],
+            "details": "Capture events such as searches, clicks, note-taking, and navigation to inform personalization and improve system performance.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Build Personalization Engine",
+            "description": "Create a personalization engine that adapts content exploration, recommendations, and UI elements based on user preferences and behavior.",
+            "dependencies": [
+              3,
+              5
+            ],
+            "details": "Leverage tracked user data and recommendation outputs to tailor the experience, including dynamic content suggestions and adaptive UI components.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Integrate Features with App Components",
+            "description": "Seamlessly integrate search, recommendations, relationship mapping, interaction tracking, and personalization into the existing app architecture.",
+            "dependencies": [
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "details": "Ensure all new modules work cohesively with current app components, maintaining performance and a unified user experience.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Conduct Comprehensive Testing",
+            "description": "Test all interactive exploration features, including search, recommendations, relationship mapping, tracking, and personalization, within the integrated app.",
+            "dependencies": [],
+            "details": "Develop and execute test cases for functionality, usability, performance, and edge cases to ensure robust and reliable user experiences.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Optimize Performance and Scalability",
+        "description": "Ensure system performance meets requirements for speed, concurrency, and mobile optimization within the current app.",
+        "status": "pending",
+        "dependencies": [
+          3,
+          10
+        ],
+        "priority": "high",
+        "details": "Implement caching, efficient content retrieval, and scalable AI processing. Optimize for sub-second search, real-time collaboration, and mobile performance, using the existing app structure.",
+        "testStrategy": "Load test for concurrent users, measure response times, and test mobile performance within the integrated app.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Conduct Performance Benchmarking",
+            "description": "Establish baseline metrics for system speed, concurrency, and mobile responsiveness by measuring current app performance under various conditions.",
+            "dependencies": [],
+            "details": "Define key performance indicators (KPIs) such as response time, throughput, and resource utilization. Use profiling and monitoring tools to gather data on current system performance across desktop and mobile platforms.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Caching Strategy",
+            "description": "Design and integrate a caching mechanism to reduce redundant data processing and improve response times.",
+            "dependencies": [
+              1
+            ],
+            "details": "Select appropriate caching layers (client, server, or CDN). Implement cache invalidation and update policies. Measure impact on performance using benchmarks from subtask 1.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Optimize Efficient Content Retrieval",
+            "description": "Refactor data access patterns and queries to minimize latency and maximize throughput for content delivery.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Analyze current data retrieval flows. Implement query optimizations, indexing, and pagination. Leverage caching where possible and validate improvements with updated benchmarks.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Set Up Scalable AI Processing",
+            "description": "Architect and deploy AI processing infrastructure that scales with user demand and supports concurrent requests efficiently.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Evaluate current AI workload patterns. Implement horizontal scaling, batching, or asynchronous processing as needed. Integrate with existing backend and monitor resource utilization.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Optimize Real-Time Collaboration",
+            "description": "Enhance real-time collaboration features for low latency, high concurrency, and seamless user experience.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Implement efficient data synchronization, conflict resolution algorithms (e.g., OT or CRDTs), and minimize network payloads. Ensure robust offline support and test with multiple concurrent users.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Tune Mobile Performance",
+            "description": "Identify and address mobile-specific performance bottlenecks to ensure smooth operation on various devices.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "details": "Profile mobile app performance, optimize resource usage, and implement responsive design improvements. Test on a range of devices and network conditions.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Perform Load and Stress Testing",
+            "description": "Simulate high user loads and stress scenarios to validate system stability, scalability, and performance under peak conditions.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "details": "Develop and execute automated test scripts for concurrent users, spike traffic, and long-duration sessions. Analyze results to identify and address bottlenecks or failure points.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Implement Security and Privacy Controls",
+        "description": "Add data protection, access controls, and compliance features, integrated with the current app and Supabase backend.",
+        "status": "pending",
+        "dependencies": [
+          2,
+          10
+        ],
+        "priority": "high",
+        "details": "Encrypt student data at rest and in transit. Implement granular privacy controls, role-based permissions, and FERPA compliance. Conduct security audits, ensuring all features are compatible with the existing app structure.",
+        "testStrategy": "Test encryption, access controls, and compliance features within the integrated app.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Requirements and Compliance Analysis (FERPA, etc.)",
+            "description": "Analyze all relevant legal, regulatory, and institutional requirements for student data protection, focusing on FERPA and any other applicable privacy laws. Identify protected data types, consent protocols, and compliance obligations for the app and Supabase integration.",
+            "dependencies": [],
+            "details": "Review FERPA guidelines, institutional policies, and third-party vendor obligations. Document all compliance requirements and map them to system features.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Data Encryption at Rest and in Transit",
+            "description": "Design and implement encryption mechanisms for all sensitive student data, ensuring protection both when stored (at rest) and during transmission (in transit) between the app and Supabase.",
+            "dependencies": [
+              1
+            ],
+            "details": "Select appropriate encryption algorithms and key management strategies. Ensure Supabase and app communication uses secure protocols (e.g., TLS).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Granular Privacy Control Implementation",
+            "description": "Develop privacy controls that allow users (students, parents, admins) to manage access to their data at a granular level, including opt-in/opt-out features and consent management.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Implement user interfaces and backend logic for privacy settings, consent tracking, and data access requests.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Role-Based Permission System",
+            "description": "Implement a robust role-based access control (RBAC) system to restrict data access based on user roles (e.g., student, teacher, admin), ensuring only authorized users can view or modify protected records.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Define roles and permissions, integrate with Supabase authentication, and enforce access policies throughout the app.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Security Audit and Penetration Testing",
+            "description": "Conduct comprehensive security audits and penetration tests to identify vulnerabilities in encryption, access controls, and privacy features, ensuring compliance with FERPA and institutional standards.",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Engage internal or external security experts to perform audits, document findings, and remediate any issues discovered.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Integration with App and Supabase",
+            "description": "Integrate all security and privacy controls with the existing app frontend and Supabase backend, ensuring seamless operation and compatibility with current features.",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Update API endpoints, database schemas, and client logic to support new controls. Test integration points for data flow and access enforcement.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Documentation and Training",
+            "description": "Develop comprehensive documentation and training materials for staff, users, and third-party vendors on new security and privacy features, FERPA obligations, and proper data handling procedures.",
+            "dependencies": [
+              1,
+              3,
+              4,
+              6
+            ],
+            "details": "Create user guides, technical documentation, and training modules. Schedule and deliver training sessions as required.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Compliance Validation",
+            "description": "Validate that all implemented controls and processes meet FERPA and institutional compliance requirements through formal review and, if necessary, external certification.",
+            "dependencies": [
+              5,
+              6,
+              7
+            ],
+            "details": "Conduct compliance checks, gather evidence, and prepare reports for institutional review or external auditors.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "title": "User Testing and Refinement",
+        "description": "Conduct user testing, collect feedback, and refine features within the integrated app.",
+        "status": "pending",
+        "dependencies": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14
+        ],
+        "priority": "medium",
+        "details": "Organize user testing sessions with students. Collect feedback on usability, performance, and feature completeness. Iterate based on findings, ensuring all refinements are made within the current app structure.",
+        "testStrategy": "Gather user feedback, analyze metrics, and validate improvements within the integrated app.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "User Testing Session Planning",
+            "description": "Develop a structured plan for user testing sessions, including defining objectives, selecting representative users, choosing testing methods (remote or in-person), preparing test scenarios, and scheduling sessions.",
+            "dependencies": [],
+            "details": "Establish clear goals, recruit diverse participants, prepare consent forms, and ensure all logistical aspects (venue, tools, moderators) are arranged. Conduct a pilot test to validate the session plan before full rollout.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Feedback Collection and Analysis",
+            "description": "Collect user feedback during and after testing sessions using surveys, interviews, and observation notes. Analyze the data to extract actionable insights on usability, performance, and feature completeness.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use structured forms and recording tools to capture feedback. Categorize and synthesize responses to identify common themes and prioritize issues.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Usability and Performance Issue Identification",
+            "description": "Review collected feedback and session recordings to identify specific usability and performance issues encountered by users.",
+            "dependencies": [
+              2
+            ],
+            "details": "Document all observed problems, categorize them by severity and frequency, and map them to relevant app features or workflows.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Iterative Refinement and Bug Fixing",
+            "description": "Address identified issues through iterative design and development cycles, implementing refinements and bug fixes within the app.",
+            "dependencies": [
+              3
+            ],
+            "details": "Prioritize fixes based on impact and feasibility. Coordinate with development teams to implement changes, and track progress for each identified issue.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Validation of Improvements",
+            "description": "Conduct follow-up testing to validate that refinements and bug fixes have resolved the original issues and improved the user experience.",
+            "dependencies": [
+              4
+            ],
+            "details": "Repeat targeted user tests or deploy surveys to confirm that changes meet user needs and no new issues have been introduced.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 16,
+        "title": "Create Basic Study Space Page at /app/(app)/study-space/page.tsx",
+        "description": "Develop an initial Study Space page within the existing Next.js app structure, accessible from the student dashboard via the 'Study Space' link.",
+        "status": "pending",
+        "dependencies": [
+          4
+        ],
+        "priority": "high",
+        "details": "Create a new folder 'study-space' under /app/(app)/ and add a page.tsx file. Implement a simple React component that displays a placeholder or welcome message for the Study Space. Ensure the page uses the existing app and dashboard layouts by leveraging Next.js layout conventions. Integrate navigation so that the page is accessible from the 'Study Space' link in the student dashboard. Confirm that authentication and access control are consistent with other student dashboard pages. Prepare the component for future integration with Study Space features (e.g., notes, mind maps, analytics) by structuring the code for easy extension. Follow Next.js best practices for page creation and layout integration.",
+        "testStrategy": "Verify that navigating to the 'Study Space' link in the student dashboard routes to /study-space and displays the new page. Confirm the page uses the correct layout and is only accessible to authenticated students. Check responsiveness across devices and ensure no layout or navigation regressions. Review code structure for maintainability and readiness for future feature integration.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create study-space folder and page.tsx",
+            "description": "Set up the new 'study-space' folder under /app/(app)/ and add a page.tsx file. Ensure the file exports a basic React component as required by Next.js routing conventions.",
+            "dependencies": [],
+            "details": "Follow Next.js file-system routing by creating the folder structure /app/(app)/study-space/ and adding a page.tsx file that exports a default React component. This will establish the /study-space route in the app.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement placeholder component with correct layout and navigation",
+            "description": "Develop a placeholder or welcome message component for the Study Space page. Ensure it uses the existing app and dashboard layouts, and integrate navigation so the page is accessible from the student dashboard.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement a simple UI in page.tsx, such as a welcome message. Use Next.js layout conventions to ensure the page inherits the correct layout. Update dashboard navigation to include a link to /study-space, verifying the route is accessible.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Integrate authentication and test accessibility from dashboard",
+            "description": "Ensure the Study Space page is protected by authentication and only accessible to authenticated students. Test navigation from the dashboard and verify layout, responsiveness, and access control.",
+            "dependencies": [
+              2
+            ],
+            "details": "Apply the same authentication and access control logic as other student dashboard pages. Test that unauthenticated users are redirected or denied access, and that authenticated students can access the page from the dashboard navigation. Check for layout consistency and responsiveness.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 17,
+        "title": "Develop Student-Customized Brainbytes Generator for Study Space",
+        "description": "Adapt the existing teacher Brainbytes podcast generation system to allow students to request personalized 3-minute educational audio podcasts based on their class content and prompts within the Study Space.",
+        "details": "Extend the current /api/teach/media/generate/podcast endpoint to support student-initiated requests, ensuring it can process prompts such as 'explain photosynthesis in simple terms' or 'help me understand the Civil War battles' using the student's enrolled course materials. Integrate with the Study Space content indexing and retrieval system to source relevant information for each request. Implement prompt handling and context assembly logic to generate concise, age-appropriate scripts tailored to the student's query. Use the Luna AI voice for audio synthesis, leveraging existing TTS infrastructure, and ensure podcasts are hosted and accessible within the Study Space UI. Provide options for students to review, replay, and bookmark generated podcasts. Ensure robust authentication and access control so students only access content from their own courses. Consider adding support for script preview and editing before audio generation, and log podcast requests for analytics and improvement.",
+        "testStrategy": "Verify that students can submit topic or question prompts from the Study Space and receive a Luna-hosted 3-minute podcast generated from their class materials. Test with a variety of prompt types and course content to ensure relevance, clarity, and age-appropriateness of generated audio. Confirm that only enrolled course materials are used for each student. Check that podcasts are accessible, replayable, and bookmarkable within the Study Space UI. Validate authentication, access control, and error handling for unsupported prompts or missing content. Conduct usability testing with students to ensure the feature meets educational needs and is easy to use.",
+        "status": "pending",
+        "dependencies": [
+          3,
+          6,
+          10,
+          16
+        ],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Extend Podcast Generation Endpoint",
+            "description": "Modify the existing /api/teach/media/generate/podcast endpoint to support student-initiated requests.",
+            "dependencies": [],
+            "details": "Ensure the endpoint can process custom prompts and integrate with the Study Space content indexing system.",
+            "status": "pending",
+            "testStrategy": "Verify endpoint functionality with various prompts and course materials."
+          },
+          {
+            "id": 2,
+            "title": "Integrate with Content Indexing Service",
+            "description": "Connect the podcast generation system with the Study Space content indexing service.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use indexed content to source relevant information for student requests.",
+            "status": "pending",
+            "testStrategy": "Test integration with sample content and verify accuracy."
+          },
+          {
+            "id": 3,
+            "title": "Implement Prompt Handling and Script Generation",
+            "description": "Develop logic to handle student prompts and generate concise, age-appropriate scripts.",
+            "dependencies": [
+              2
+            ],
+            "details": "Ensure scripts are tailored to the student's query and course materials.",
+            "status": "pending",
+            "testStrategy": "Test script generation with diverse prompts and evaluate clarity."
+          },
+          {
+            "id": 4,
+            "title": "Audio Synthesis and Hosting",
+            "description": "Use the Luna AI voice for audio synthesis and host podcasts within the Study Space UI.",
+            "dependencies": [
+              3
+            ],
+            "details": "Ensure podcasts are accessible and playable within the Study Space.",
+            "status": "pending",
+            "testStrategy": "Verify audio quality and accessibility."
+          },
+          {
+            "id": 5,
+            "title": "Implement Review, Replay, and Bookmark Features",
+            "description": "Add features for students to review, replay, and bookmark generated podcasts.",
+            "dependencies": [
+              4
+            ],
+            "details": "Ensure robust authentication and access control for student content.",
+            "status": "pending",
+            "testStrategy": "Test user interaction features and verify access control."
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-07-13T15:20:45.461Z",
+      "updated": "2025-07-13T16:11:44.424Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

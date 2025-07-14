@@ -1,0 +1,11 @@
+# Task ID: 5
+# Title: Implement Core Note-Taking System
+# Status: pending
+# Dependencies: 2, 4
+# Priority: medium
+# Description: Develop a rich text note-taking system with AI enhancements.
+# Details:
+Integrate Tiptap or similar React-based rich text editor. Implement real-time sync with Supabase. Add AI integration for content suggestions and note organization. Support multimedia embedding and version control.
+
+# Test Strategy:
+Test note creation, editing, syncing, AI suggestions, and multimedia support.

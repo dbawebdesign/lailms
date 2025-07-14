@@ -1,0 +1,11 @@
+# Task ID: 6
+# Title: Integrate AI Study Assistant (Luna Study Mode)
+# Status: pending
+# Dependencies: 2, 3
+# Priority: high
+# Description: Extend Luna AI for study-specific interactions and contextual help.
+# Details:
+Enhance Luna AI context with course-specific knowledge base. Implement contextual question answering, personalized recommendations, and learning gap identification. Integrate with existing AI infrastructure and manage conversation persistence.
+
+# Test Strategy:
+Test AI responses, context management, and integration with course content.
