@@ -40,26 +40,63 @@ async function updateDocumentStatus(
   status: DocumentStatus,
   metadataUpdate: Record<string, any> = {}
 ) {
-  const { data: currentDoc, error: fetchErr } = await supabase
-    .from('documents')
-    .select('metadata')
-    .eq('id', documentId)
-    .single();
+  try {
+    const { data: currentDoc, error: fetchErr } = await supabase
+      .from('documents')
+      .select('metadata')
+      .eq('id', documentId)
+      .single();
 
-  if (fetchErr) {
-    console.error(`Error fetching current metadata for ${documentId}:`, fetchErr);
-    // Decide if we should throw or continue with empty initial metadata
-  }
-  
-  const newMetadata = { ...(currentDoc?.metadata || {}), ...metadataUpdate };
+    if (fetchErr) {
+      console.error(`PROCESS-DOCUMENT: Error fetching current metadata for ${documentId}:`, fetchErr);
+      // Continue with empty metadata if fetch fails - don't block the update
+    }
+    
+    const existingMetadata = currentDoc?.metadata || {};
+    
+    // Sanitize metadataUpdate to prevent JSON serialization issues
+    const sanitizedUpdate = JSON.parse(JSON.stringify(metadataUpdate, (key, value) => {
+      // Handle circular references and functions
+      if (typeof value === 'function') return '[Function]';
+      if (value instanceof Error) return { message: value.message, name: value.name };
+      return value;
+    }));
+    
+    const newMetadata = { ...existingMetadata, ...sanitizedUpdate };
+    
+    // Add status tracking to metadata
+    newMetadata.last_status_update = new Date().toISOString();
+    newMetadata.status_history = newMetadata.status_history || [];
+    newMetadata.status_history.push({
+      status,
+      timestamp: new Date().toISOString(),
+      metadata_keys: Object.keys(sanitizedUpdate)
+    });
 
-  const { error } = await supabase
-    .from('documents')
-    .update({ status, metadata: newMetadata })
-    .eq('id', documentId);
-  if (error) {
-    console.error(`Error updating document ${documentId} to status ${status}:`, error);
-    // Potentially throw this error to be caught by the main handler
+    const updateData = { 
+      status, 
+      metadata: newMetadata,
+      updated_at: new Date().toISOString()
+    };
+
+    console.log(`PROCESS-DOCUMENT: Updating document ${documentId} to status '${status}' with metadata keys: [${Object.keys(metadataUpdate).join(', ')}]`);
+
+    const { error } = await supabase
+      .from('documents')
+      .update(updateData)
+      .eq('id', documentId);
+      
+    if (error) {
+      console.error(`PROCESS-DOCUMENT: Failed to update document ${documentId} to status ${status}:`, error);
+      console.error('PROCESS-DOCUMENT: Update data that failed:', JSON.stringify(updateData, null, 2));
+      throw new Error(`Database update failed: ${error.message}`);
+    } else {
+      console.log(`PROCESS-DOCUMENT: Successfully updated document ${documentId} to status '${status}'`);
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`PROCESS-DOCUMENT: updateDocumentStatus failed for ${documentId}:`, errorMessage);
+    throw error; // Re-throw to let caller handle
   }
 }
 
@@ -1687,18 +1724,35 @@ serve(async (req: Request) => {
     });
 
   } catch (error) {
-    console.error(`PROCESS-DOCUMENT: Main error for doc ID ${documentId}:`, error instanceof Error ? error.message : String(error), error instanceof Error ? error.stack : '');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    console.error(`PROCESS-DOCUMENT: Main error for doc ID ${documentId}:`, errorMessage);
+    if (errorStack) {
+      console.error(`PROCESS-DOCUMENT: Error stack:`, errorStack);
+    }
+    
+    // Try to update document status to error, but don't let it cause another error
     if (documentId && supabaseClient) {
       try {
+        console.log(`PROCESS-DOCUMENT: Attempting to mark document ${documentId} as error...`);
         await updateDocumentStatus(supabaseClient, documentId, 'error', { 
-          processing_error: error instanceof Error ? error.message : String(error),
-          error_stack_trace: error instanceof Error ? error.stack : undefined
+          processing_error: errorMessage,
+          error_timestamp: new Date().toISOString(),
+          error_stack_trace: errorStack ? errorStack.substring(0, 2000) : undefined // Limit stack trace length
         });
       } catch (dbUpdateError) {
-        console.error(`PROCESS-DOCUMENT: Failed to update document status to error:`, dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError));
+        const dbErrorMessage = dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError);
+        console.error(`PROCESS-DOCUMENT: Failed to update document status to error:`, dbErrorMessage);
+        // Don't throw here - we want to return the original error, not the status update error
       }
     }
-    return new Response(JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }), {
+    
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: errorMessage,
+      documentId: documentId || 'unknown'
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
