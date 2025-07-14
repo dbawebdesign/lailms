@@ -115,9 +115,11 @@ export default function LandingPage() {
         </div>
         <div className="flex items-center space-x-4">
           <Link href="/login" className="text-sm text-gray-300 hover:text-white transition-colors">Sign In</Link>
-          <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white text-sm px-6 py-2 rounded-lg hover:opacity-90 transition-opacity">
-            Get Started
-          </Button>
+          <Link href="/signup">
+            <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white text-sm px-6 py-2 rounded-lg hover:opacity-90 transition-opacity">
+              Get Started
+            </Button>
+          </Link>
         </div>
       </nav>
 
@@ -216,10 +218,12 @@ export default function LandingPage() {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 mb-16">
-          <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.2s'}}>
-            Book a Consultation
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+          <Link href="/signup">
+            <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.2s'}}>
+              Book a Consultation
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
           <ShinyButton className="px-8 py-3 flex items-center opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.4s'}}>
             <Play className="mr-2 h-4 w-4" />
             Watch Demo
@@ -586,9 +590,11 @@ export default function LandingPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-12 py-4 text-lg rounded-lg hover:opacity-90 transition-opacity">
-              Start Free Trial
-            </Button>
+            <Link href="/signup">
+              <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-12 py-4 text-lg rounded-lg hover:opacity-90 transition-opacity">
+                Start Free Trial
+              </Button>
+            </Link>
             <Button variant="outline" className="border-gray-600 text-white px-12 py-4 text-lg rounded-lg hover:bg-gray-800 transition-colors">
               Schedule Demo
             </Button>
