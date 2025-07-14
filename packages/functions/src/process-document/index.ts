@@ -1579,6 +1579,7 @@ serve(async (req: Request) => {
         section_identifier: chunk.section_identifier,
         citation_key: citationKey, // Added citation_key
         // section_summary and section_summary_status will be populated by summarize-chunks later
+        // Note: base_class_id is NOT included as it doesn't exist in document_chunks table
       };
     });
 
