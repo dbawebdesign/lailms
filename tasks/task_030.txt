@@ -1,0 +1,79 @@
+# Task ID: 30
+# Title: Test Luna Lesson Creation After Database Trigger Fix
+# Status: done
+# Dependencies: 29, 10, 23
+# Priority: high
+# Description: Verify that Luna lesson creation functionality works correctly after fixing the database trigger stack depth issue, ensuring the system can properly create and store lessons without errors.
+# Details:
+This task involves comprehensive testing of the Luna lesson creation functionality after resolving the database trigger stack depth issue that was previously causing errors. The testing should cover all aspects of lesson creation to ensure the fix has resolved the underlying problem without introducing new issues.
+
+Implementation steps:
+
+1. Set up a testing environment that mirrors the production environment, including the database with the fixed triggers.
+
+2. Create a test plan covering the following scenarios:
+   - Creating a basic lesson with minimal required fields
+   - Creating a complex lesson with all available fields populated
+   - Creating lessons through the UI interface
+   - Creating lessons through direct API calls
+   - Creating lessons as part of a BaseClass generation
+   - Updating existing lessons with new content
+   - Deleting lessons and verifying database integrity
+
+3. For each test scenario, document:
+   - Test inputs (lesson data)
+   - Expected outcomes
+   - Actual results
+   - Any errors or warnings encountered
+
+4. Pay special attention to:
+   - Database trigger execution (monitor logs to ensure triggers fire correctly)
+   - Performance metrics (response times, server load during lesson creation)
+   - Edge cases (extremely large content, special characters, etc.)
+   - Integration with related systems (BaseClass, Paths, etc.)
+
+5. Create automated tests where possible to ensure regression testing can be performed in the future.
+
+6. Document any remaining issues or potential improvements identified during testing.
+
+7. Verify that the objectives field is correctly being combined into the description field as implemented in Task #29.
+
+8. Test the system under load to ensure the trigger stack depth issue doesn't resurface with concurrent operations.
+
+# Test Strategy:
+1. **Unit Testing**:
+   - Create unit tests for the lesson creation API endpoints
+   - Verify correct handling of the objectives field (should be combined with description)
+   - Test error handling for invalid inputs
+   - Ensure database triggers execute without exceeding stack depth limits
+
+2. **Integration Testing**:
+   - Test the full lesson creation flow from UI to database
+   - Verify that lessons created through BaseClass generation work correctly
+   - Test integration with the RichTextEditor component
+   - Ensure media assets are properly linked to lessons
+
+3. **Performance Testing**:
+   - Measure response times for lesson creation operations
+   - Test concurrent lesson creation to ensure no trigger stack issues occur
+   - Monitor database performance during high-volume operations
+
+4. **Regression Testing**:
+   - Verify that all previously working functionality still operates correctly
+   - Ensure no new bugs were introduced by the trigger fix
+
+5. **User Acceptance Testing**:
+   - Have content creators test the lesson creation process end-to-end
+   - Gather feedback on any issues or unexpected behavior
+
+6. **Documentation**:
+   - Create a detailed test report documenting all test cases, results, and any issues found
+   - Update system documentation if any behavior changes were made during the fix
+
+7. **Verification Checklist**:
+   - Lesson creation succeeds without errors
+   - Lesson content is stored correctly in the database
+   - Triggers execute properly without stack depth errors
+   - Performance meets acceptable thresholds
+   - UI displays created lessons correctly
+   - Lesson updates and deletions work as expected

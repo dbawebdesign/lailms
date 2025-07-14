@@ -1,0 +1,114 @@
+# Task ID: 8
+# Title: Base Class and Instance Management
+# Status: done
+# Dependencies: 3, 4
+# Priority: high
+# Description: Implement the core class management system for teachers
+# Details:
+Create the BaseClassCardGrid component for /teach/base-classes route. Implement CreateBaseClassModal with form validation. Build the BaseClassDetail view with StructureTabs (Paths, Lessons, Quizzes) and InstanceTable. Create the InstanceListTable for /teach/instances route with enrollment code display and management. Implement the class instance creation, editing, and archiving functionality. Build the enrollment code generation system with the join_class_by_code RPC function. Create API routes for base class and instance management with proper RLS enforcement.
+
+**PRD Context**
+
+*Base Class Management*
+- Teachers can create Base Classes from blank or using a wizard
+- Teachers can edit Base Class metadata (name, description, etc.)
+- Teachers can delete or archive Base Classes
+- Teachers can clone existing Base Classes
+
+*Class Instance Management*
+- Teachers can create Class Instances from any Base Class
+- System automatically generates unique enrollment codes for each Class Instance
+- Teachers can set dates, period, and capacity for Class Instances
+- Teachers can archive Class Instances
+- Teachers can bulk-copy content between Class Instances
+
+# Test Strategy:
+Test creating, editing, and archiving base classes and instances. Verify enrollment codes are generated correctly. Test the join_class_by_code function with valid and invalid codes. Ensure RLS policies correctly restrict access to base classes and instances.
+
+# Subtasks:
+## 1. Implement BaseClassCardGrid and CreateBaseClassModal [done]
+### Dependencies: None
+### Description: Create the BaseClassCardGrid component for displaying base classes and implement the CreateBaseClassModal with form validation for creating new base classes.
+### Details:
+1. Create a BaseClassCardGrid component that displays base classes in a grid layout on the /teach/base-classes route.
+2. Implement card components that show base class name, description, creation date, and action buttons (edit, delete, archive, clone).
+3. Add filtering and sorting capabilities to the grid.
+4. Create a CreateBaseClassModal component with a form that includes fields for name, description, subject, grade level, etc.
+5. Implement form validation using a library like Formik or React Hook Form.
+6. Connect the modal to API endpoints for creating base classes with proper RLS enforcement.
+7. Add success/error notifications for user feedback.
+8. Test the grid rendering with various data states (empty, few items, many items).
+9. Test form validation with valid and invalid inputs.
+10. Test API integration with mock data.
+<info added on 2025-05-07T00:37:47.306Z>
+1. Create a BaseClassCardGrid component that displays base classes in a grid layout on the /teach/base-classes route.
+2. Implement card components that show base class name, description, creation date, and action buttons (edit, delete, archive, clone).
+3. Add filtering and sorting capabilities to the grid.
+4. Create a CreateBaseClassModal component with a form that includes fields for name, description, subject, grade level, etc.
+5. Implement form validation using a library like Formik or React Hook Form.
+6. Connect the modal to API endpoints for creating base classes with proper RLS enforcement.
+7. Add success/error notifications for user feedback.
+8. Test the grid rendering with various data states (empty, few items, many items).
+9. Test form validation with valid and invalid inputs.
+10. Test API integration with mock data.
+11. Add a 'Length of Base Class' field to the CreateBaseClassModal that includes:
+   - A range slider component for selecting duration in weeks (range: 1-52 weeks)
+   - Preset buttons/options for common durations:
+     * 'Quarter' (sets slider to 10 weeks)
+     * 'Semester' (sets slider to 16 weeks)
+     * 'Full Year' (sets slider to 38 weeks)
+   - Store the selected number of weeks as the underlying data value
+   - Ensure the form validation includes this field
+   - Update API integration to include this new field when creating base classes
+</info added on 2025-05-07T00:37:47.306Z>
+
+## 2. Build BaseClassDetail view with StructureTabs and Instance Management [done]
+### Dependencies: 8.1
+### Description: Implement the BaseClassDetail view with StructureTabs for organizing content (Paths, Lessons, Quizzes) and add instance management functionality.
+### Details:
+1. Create a BaseClassDetail component that displays detailed information about a selected base class.
+2. Implement StructureTabs component with tabs for Paths, Lessons, and Quizzes.
+3. Build the content area for each tab that displays relevant items and allows for management.
+4. Create an InstanceTable component within the BaseClassDetail to show all instances of the base class.
+5. Implement instance creation functionality with a modal that includes fields for dates, period, capacity, etc.
+6. Add instance editing and archiving capabilities.
+7. Implement the enrollment code generation system that automatically creates unique codes for new instances.
+8. Connect all components to appropriate API endpoints with proper error handling.
+9. Test tab navigation and content display.
+10. Test instance creation, editing, and archiving workflows.
+11. Test enrollment code generation to ensure uniqueness.
+
+## 3. Create InstanceListTable and API Routes for Class Management [done]
+### Dependencies: 8.1, 8.2
+### Description: Implement the InstanceListTable for the /teach/instances route and create all necessary API routes for base class and instance management with proper RLS enforcement.
+### Details:
+1. Build the InstanceListTable component for the /teach/instances route that displays all class instances across all base classes.
+2. Include columns for instance name, base class, dates, period, enrollment code, capacity, and actions.
+3. Implement enrollment code display and management features, including code regeneration and copying.
+4. Add filtering and sorting capabilities to the table.
+5. Create API routes for all base class operations (create, read, update, delete, archive, clone).
+6. Implement API routes for instance management (create, read, update, archive).
+7. Create the join_class_by_code RPC function for student enrollment.
+8. Implement proper RLS (Row-Level Security) enforcement to ensure teachers can only access their own classes.
+9. Add bulk-copy functionality to transfer content between class instances.
+10. Test the instance table with various data scenarios.
+11. Test all API routes with appropriate authentication and authorization scenarios.
+12. Verify RLS enforcement by attempting to access unauthorized resources.
+
+## 4. Implement join_class_by_code RPC and Student Enrollment via Code [done]
+### Dependencies: 8.3
+### Description: Create the Supabase RPC function for students to join a class instance using an enrollment code. Implement the necessary API route and UI for students to use this feature.
+### Details:
+1. Define and create the `join_class_by_code(p_enrollment_code TEXT)` Supabase RPC function.
+    - Input: `enrollment_code`.
+    - Authenticates the calling student user.
+    - Validates the `enrollment_code` (exists, corresponds to an 'active' or 'upcoming' class instance).
+    - Checks if the student is already enrolled in that class instance.
+    - Checks if the student is part of the same organisation as the class instance.
+    - Checks class capacity.
+    - If all checks pass, creates an enrollment record in `student_enrollments`.
+    - Returns success (with class instance details) or an appropriate error message.
+2. Create an API route (e.g., `POST /api/teach/enrollments/join-by-code`) that students can call. This route will invoke the RPC function.
+3. (Optional - for later UI task) Design and implement a UI component where students can enter an enrollment code.
+4. Ensure RLS policies on `student_enrollments` and `class_instances` correctly interact with the RPC function (RPCs can be set to run with definer's rights or invoker's rights).
+

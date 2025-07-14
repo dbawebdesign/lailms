@@ -1,0 +1,91 @@
+# Task ID: 32
+# Title: Implement Luna's Dynamic Action Button Components
+# Status: done
+# Dependencies: 1, 4, 21
+# Priority: high
+# Description: Develop reusable UI components for Luna's dynamic action buttons that handle confirmations, choices, and workflow navigation to create friction-free user interactions throughout the application.
+# Details:
+This task involves creating a comprehensive set of reusable button components that Luna can dynamically generate to guide users through various workflows:
+
+1. **Button Component Library**:
+   - Create a base ActionButton component with consistent styling and behavior
+   - Implement ButtonVariants: primary, secondary, tertiary, danger, success
+   - Add support for different sizes: small, medium, large
+   - Ensure all buttons are fully accessible with proper ARIA attributes
+   - Implement loading states with appropriate spinners/indicators
+
+2. **Confirmation Button Components**:
+   - Create a ConfirmationButton that shows a confirmation dialog before action execution
+   - Implement a TwoStepButton that changes state/text after first click (e.g., "Delete" → "Confirm Delete")
+   - Add support for custom confirmation messages and action callbacks
+
+3. **Choice Button Components**:
+   - Develop a ButtonGroup component for presenting multiple options
+   - Create a ChoiceButtonSet for mutually exclusive options (radio button equivalent)
+   - Implement MultiSelectButtonSet for multiple selections (checkbox equivalent)
+   - Add support for dynamic option generation based on Luna's context
+
+4. **Workflow Navigation Components**:
+   - Create NextStepButton and PreviousStepButton components for multi-step workflows
+   - Implement a StepProgressIndicator to show position in workflow
+   - Develop a WorkflowButtonBar component to contain navigation buttons with consistent positioning
+   - Add support for conditional button enabling/disabling based on form validation state
+
+5. **Integration with Luna's AI Context**:
+   - Create a LunaActionProvider context to manage button state and callbacks
+   - Implement hooks for button components to access Luna's context
+   - Add support for dynamic button generation based on Luna's suggested actions
+   - Ensure buttons can report usage analytics back to Luna for learning
+
+6. **Animation and Feedback**:
+   - Add subtle animations for button state changes
+   - Implement haptic feedback for mobile devices
+   - Create toast notifications for action confirmations
+   - Add visual cues for recommended actions
+
+7. **Documentation and Examples**:
+   - Create a storybook page documenting all button variants
+   - Add usage examples for common scenarios
+   - Document the API for each button component
+   - Create integration examples with Luna's AI system
+
+# Test Strategy:
+1. **Unit Testing**:
+   - Write Jest tests for each button component to verify rendering and basic functionality
+   - Test all button variants, sizes, and states
+   - Verify accessibility attributes are correctly applied
+   - Test that callbacks are properly triggered
+
+2. **Integration Testing**:
+   - Create tests that verify buttons work correctly within forms and workflows
+   - Test integration with Luna's context provider
+   - Verify that buttons correctly enable/disable based on validation state
+   - Test that confirmation dialogs appear and function as expected
+
+3. **User Flow Testing**:
+   - Create test scenarios for common user workflows (e.g., creating a lesson, uploading documents)
+   - Verify that workflow navigation buttons correctly guide users through multi-step processes
+   - Test that choice buttons correctly capture and store user selections
+   - Verify that confirmation buttons prevent accidental actions
+
+4. **Accessibility Testing**:
+   - Run automated accessibility tests using tools like Axe or Lighthouse
+   - Perform keyboard navigation testing to ensure all buttons are accessible without a mouse
+   - Test with screen readers to verify proper ARIA attributes and announcements
+   - Verify color contrast meets WCAG 2.1 AA standards
+
+5. **Visual Regression Testing**:
+   - Create snapshots of all button states and variants
+   - Verify consistent styling across the application
+   - Test responsive behavior on different screen sizes
+   - Verify animations and transitions work as expected
+
+6. **Performance Testing**:
+   - Measure render time for pages with many dynamic buttons
+   - Verify that button animations don't cause layout shifts
+   - Test performance on lower-end devices
+
+7. **User Acceptance Testing**:
+   - Create a test plan for stakeholders to verify button functionality meets requirements
+   - Collect feedback on button placement, sizing, and labeling
+   - Verify that the buttons enhance rather than complicate user workflows

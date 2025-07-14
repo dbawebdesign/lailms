@@ -1,0 +1,61 @@
+# Task ID: 25
+# Title: Knowledge Base Source Management
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Implement comprehensive knowledge base source management functionality, allowing users to add content to their knowledge base through multiple methods: file uploads, URL submissions, text pasting, and audio recordings. This includes client-side handling of various input types, backend processing with the 'process-document' Edge Function, and real-time status updates in the UI.
+# Details:
+This task encompasses the full lifecycle of knowledge base content: from initial user input through various channels, to storage in Supabase, processing via Edge Functions (including specialized handling for different content types like audio transcription), and finally displaying the content with real-time status updates in the UI.
+
+# Test Strategy:
+Test each input method (files, URLs, text, audio) individually to ensure proper handling. Verify correct storage paths and document record creation. Test the processing pipeline end-to-end, including specialized handlers like audio transcription. Ensure the UI correctly displays processing status and updates in real-time. Test error handling for various failure scenarios.
+
+# Subtasks:
+## 1. KB: Client-Side File Upload & Document Record Creation [done]
+### Dependencies: None
+### Description: In KnowledgeBaseEditor.tsx, implement logic for the 'Upload Files' tab to upload files to Supabase Storage, create a corresponding record in the 'documents' table, and then trigger the 'process-document' Edge Function.
+### Details:
+Ensure correct bucket naming (org-${orgId}-uploads), file path conventions (e.g., base_class_documents/${baseClassId}/${fileName}), and invocation of process-document with the new documentId. Update UI with pending status.
+
+## 2. KB: Client-Side URL (Web & YouTube) Submission [done]
+### Dependencies: None
+### Description: In KnowledgeBaseEditor.tsx, for the 'Paste Link/Text' tab, implement logic to handle URL submissions (both general web and YouTube). Create a 'documents' record (file_type: 'application/json', metadata: {originalUrl: ...}) and trigger 'process-document'.
+### Details:
+Determine appropriate storage_path convention for URL types. Update UI with pending status.
+
+## 3. KB: Client-Side Pasted Text Submission (as File) [done]
+### Dependencies: None
+### Description: In KnowledgeBaseEditor.tsx, for the 'Paste Link/Text' tab, implement logic to handle direct text paste. Convert pasted text into a File object (e.g., pasted_text.txt) and use the file upload mechanism (Subtask 25.1 logic).
+### Details:
+This approach reuses existing file processing pipeline, avoiding immediate changes to the 'process-document' function for raw text input. Update UI.
+
+## 4. KB: Client-Side Audio Recording Upload [done]
+### Dependencies: None
+### Description: In KnowledgeBaseEditor.tsx, for the 'Record Audio' tab, after recording, upload the audio blob to Supabase Storage. Create a 'documents' record and trigger 'process-document'.
+### Details:
+Define file naming and storage path for recorded audio. Update UI.
+
+## 5. KB: Backend Audio Transcription in Edge Function [done]
+### Dependencies: None
+### Description: Modify the 'process-document' Edge Function to add support for audio file types. Integrate an audio transcription service (e.g., OpenAI Whisper).
+### Details:
+The transcribed text should then be passed to the existing chunking and embedding pipeline. Manage API keys for the transcription service via environment variables. Handle errors gracefully.
+
+## 6. KB: Fetch & Display Existing KB Items in UI [done]
+### Dependencies: None
+### Description: In KnowledgeBaseEditor.tsx, fetch documents from the 'documents' table associated with the current baseClass.id.
+### Details:
+Populate the 'knowledgeBaseItems' state with the fetched data, mapping fields correctly and displaying their current processing status. Implement loading states.
+
+## 7. KB: Real-time/Polling for KB Item Status Updates [done]
+### Dependencies: None
+### Description: In KnowledgeBaseEditor.tsx, implement a mechanism (Supabase Realtime or polling) to update the status of knowledge base items in the UI as they change in the database.
+### Details:
+This will provide users with live feedback on the processing of their uploaded content.
+
+## 8. KB: End-to-End Testing & Refinement [done]
+### Dependencies: None
+### Description: Conduct end-to-end testing for all knowledge base source types (files, URLs, text, audio). Verify data flow, processing, status updates, and UI feedback.
+### Details:
+Identify and fix any bugs. Refine UI/UX based on testing. Ensure error handling is robust.
+

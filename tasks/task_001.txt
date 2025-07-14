@@ -1,0 +1,103 @@
+# Task ID: 1
+# Title: Project Setup and Environment Configuration
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Set up the Next.js 14 project with TypeScript, Tailwind CSS, and configure Supabase integration
+# Details:
+Initialize a Next.js 14 project with App Router using `create-next-app`. Configure TypeScript, Tailwind CSS, and shadcn/ui. Set up Turborepo structure with packages for UI components, utilities, types, and functions. Create styleGuide.ts in packages/ui to define design tokens. Configure ESLint with no-literal-style rule to enforce usage of design tokens. Set up Supabase project and generate types with `supabase gen types typescript --local > packages/types/db.ts`.
+
+**PRD Context**
+- Core Technology Stack: Next.js 14 with App Router, React 18, TypeScript, Tailwind CSS
+- Supabase Integration: Configure Auth, Postgres database with pgvector extensions, Storage, and Realtime features
+- Compliance Considerations: Ensure project structure and data handling align with FERPA/GDPR requirements as mentioned in 'Assumptions and Constraints'
+- Initial Configuration: Set up project with proper type safety and component architecture to support the educational platform requirements
+
+# Test Strategy:
+Verify project structure matches requirements. Run `npm run dev` to ensure the application starts without errors. Check that Supabase connection works by testing a simple query. Verify that all Supabase features (Auth, Postgres with pgvector, Storage, Realtime) are properly configured and accessible.
+
+# Subtasks:
+## 1. Initialize Next.js 14 Project with TypeScript and Tailwind CSS [done]
+### Dependencies: None
+### Description: Set up the base Next.js 14 project with TypeScript and Tailwind CSS configuration, including shadcn/ui integration
+### Details:
+Implementation details:
+1. Create a new Next.js 14 project using `npx create-next-app@latest` with the following options:
+   - Use TypeScript: Yes
+   - Use ESLint: Yes
+   - Use Tailwind CSS: Yes
+   - Use App Router: Yes
+   - Set up import aliases: Yes (use '@/' as the import alias)
+2. Install shadcn/ui using `npx shadcn-ui@latest init` with the following configuration:
+   - Style: Default
+   - Base color: Slate
+   - Global CSS file: app/globals.css
+   - CSS variables: Yes
+   - React Server Components: Yes
+   - Components directory: components/ui
+   - Utility directory: lib/utils
+3. Install essential dependencies: `npm install clsx tailwindcss-animate class-variance-authority lucide-react`
+4. Configure the Tailwind CSS theme in tailwind.config.js to include proper breakpoints and initial color schemes
+5. Set up a basic layout structure with app/layout.tsx
+6. Test the setup by running `npm run dev` and verifying the application loads correctly
+7. Commit the initial project setup
+
+## 2. Configure Turborepo Structure with Design System [done]
+### Dependencies: 1.1
+### Description: Set up Turborepo monorepo structure with packages for UI components, utilities, types, and functions, including design token configuration
+### Details:
+Implementation details:
+1. Install Turborepo: `npm install turbo --save-dev`
+2. Create a Turborepo configuration by adding turbo.json to the root with initial pipeline configuration
+3. Create the following package directories:
+   - packages/ui: For shared UI components
+   - packages/utils: For utility functions
+   - packages/types: For TypeScript type definitions
+   - packages/functions: For shared business logic
+4. Set up package.json files in each package directory with appropriate dependencies
+5. Create styleGuide.ts in packages/ui with design tokens for:
+   - Colors (primary, secondary, accent, neutral, error, warning, success)
+   - Typography (font families, sizes, weights, line heights)
+   - Spacing (consistent spacing scale)
+   - Breakpoints (mobile, tablet, desktop, etc.)
+   - Shadows and elevations
+   - Border radiuses
+6. Configure ESLint with a custom no-literal-style rule to enforce usage of design tokens:
+   - Install required ESLint plugins: `npm install eslint-plugin-custom --save-dev`
+   - Create a custom ESLint rule in .eslintrc.js that checks for hardcoded style values
+7. Set up tsconfig.json files for proper path resolution between packages
+8. Create example components in packages/ui that use the design tokens
+9. Test the monorepo setup by importing components and tokens in the main app
+10. Document the design system usage in a README.md file
+
+## 3. Set up Supabase Integration with Type Generation [done]
+### Dependencies: 1.1, 1.2
+### Description: Configure Supabase project with authentication, database, and storage, including TypeScript type generation for database schema
+### Details:
+Implementation details:
+1. Create a new Supabase project through the Supabase dashboard
+2. Install Supabase client libraries: `npm install @supabase/supabase-js @supabase/auth-helpers-nextjs`
+3. Set up environment variables in .env.local:
+   - NEXT_PUBLIC_SUPABASE_URL=your-project-url
+   - NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   - SUPABASE_SERVICE_ROLE_KEY=your-service-role-key (for secure server operations)
+4. Create a lib/supabase/client.ts file to initialize the Supabase client
+5. Set up server-side Supabase client in lib/supabase/server.ts using createServerComponentClient
+6. Configure Supabase Auth with initial settings:
+   - Enable email/password authentication
+   - Set up OAuth providers if needed
+   - Configure email templates
+7. Enable pgvector extension in the Supabase database:
+   - Run SQL command: `CREATE EXTENSION IF NOT EXISTS vector;`
+8. Install Supabase CLI for local development: `npm install supabase --save-dev`
+9. Initialize Supabase locally: `npx supabase init`
+10. Generate TypeScript types from the database schema:
+    - Run `npx supabase gen types typescript --local > packages/types/db.ts`
+11. Create a basic database migration script for initial schema
+12. Set up Supabase Storage buckets for file uploads with appropriate security rules
+13. Configure Supabase Realtime features for required tables
+14. Create helper functions in packages/functions for common Supabase operations
+15. Test the Supabase integration with a simple authentication flow
+16. Document the Supabase setup and usage patterns in a README.md file
+17. Ensure all configurations align with FERPA/GDPR requirements by implementing proper data access controls
+

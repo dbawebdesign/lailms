@@ -1,0 +1,140 @@
+# Task ID: 3
+# Title: Core Database Schema Implementation
+# Status: done
+# Dependencies: 2
+# Priority: high
+# Description: Design and implement the core database schema with proper relationships and RLS policies
+# Details:
+Create the following tables: organisations, members, base_classes, class_instances, rosters, paths, lessons, lesson_sections, quizzes, questions, submissions, notebooks, mind_maps, achievements, certificates, audit_logs, ui_contexts. Configure pgvector extension for embeddings. Set up foreign key relationships and indexes. Implement RLS policies for each table based on user roles. Create triggers for timestamps, enrollment codes, and audit logging. Set up materialized views for frequently accessed data like enrollment_code_lookup.
+
+**PRD Context**
+
+**Database Technology**:
+- Implement using Supabase Postgres database
+- Configure pgvector extension for vector embeddings storage and similarity search
+
+**Core Schema Requirements**:
+
+1. **Multi-tenancy Structure**:
+   - Organizations (top-level tenants)
+   - Schools (sub-organizations)
+   - Classes (learning groups)
+
+2. **Authentication & Users**:
+   - User accounts with role-based permissions
+   - Member profiles with organization affiliations
+   - Role definitions (admin, teacher, student, etc.)
+
+3. **Knowledge Base**:
+   - Files storage and metadata
+   - Content chunks for granular access
+   - Vector embeddings for semantic search
+   - Tagging and categorization system
+
+4. **Course Structure**:
+   - Base Classes (templates)
+   - Class Instances (actual classes)
+   - Learning Paths
+   - Modules and Units
+   - Lessons and Sections
+
+5. **Assessment System**:
+   - Quizzes and Tests
+   - Question banks with various formats
+   - Grading and feedback mechanisms
+
+6. **Progress Tracking**:
+   - Mastery levels
+   - Grade records
+   - Completion status
+
+7. **Study Space Components**:
+   - Notebooks
+   - Mind Maps
+   - Interactive elements
+
+8. **Interoperability**:
+   - LTI integration support
+   - OneRoster compatibility
+   - Caliper analytics framework
+
+9. **Security & Auditing**:
+   - Row-Level Security (RLS) policies
+   - Audit logging
+   - Data access controls
+
+# Test Strategy:
+Verify all tables are created with correct columns and relationships. Test RLS policies by attempting to access data with different user roles. Ensure triggers work correctly by inserting test data and checking the results. Validate that the schema supports all requirements outlined in the PRD Context, including multi-tenancy, knowledge base with vector embeddings, course structures, and interoperability standards. Test performance of common queries across related tables and verify that RLS policies correctly restrict data access based on organizational boundaries and user roles.
+
+# Subtasks:
+## 1. Create Foundational Tables and Extensions [done]
+### Dependencies: None
+### Description: Set up the pgvector extension and implement the core organizational and user-related tables with their relationships
+### Details:
+1. Enable the pgvector extension in the Supabase Postgres database
+2. Create the following tables with appropriate columns and constraints:
+   - organisations (id, name, domain, settings, created_at, updated_at)
+   - members (id, auth_id, email, first_name, last_name, organisation_id, role, settings, created_at, updated_at)
+   - base_classes (id, name, description, organisation_id, settings, created_at, updated_at)
+   - class_instances (id, base_class_id, name, enrollment_code, start_date, end_date, settings, created_at, updated_at)
+   - rosters (id, class_instance_id, member_id, role, joined_at, settings, created_at, updated_at)
+   - audit_logs (id, table_name, record_id, action, old_data, new_data, performed_by, created_at)
+3. Set up foreign key relationships between these tables
+4. Create indexes for frequently queried columns
+5. Implement triggers for:
+   - Automatic timestamps (created_at, updated_at)
+   - Generating enrollment codes for class_instances
+   - Audit logging for all tables
+6. Create a materialized view for enrollment_code_lookup
+7. Test table creation with sample data insertion
+8. Verify foreign key constraints are working properly
+9. Test the audit logging functionality
+
+## 2. Implement Content and Learning Structure Tables [done]
+### Dependencies: 3.1
+### Description: Create tables for learning content, paths, and assessment components with their relationships
+### Details:
+1. Create the following tables with appropriate columns and constraints:
+   - paths (id, name, description, organisation_id, settings, created_at, updated_at)
+   - lessons (id, path_id, title, description, order_index, settings, created_at, updated_at)
+   - lesson_sections (id, lesson_id, title, content, order_index, settings, created_at, updated_at)
+   - quizzes (id, lesson_id, title, description, settings, created_at, updated_at)
+   - questions (id, quiz_id, question_text, question_type, options, correct_answer, points, settings, created_at, updated_at)
+   - submissions (id, quiz_id, member_id, answers, score, submitted_at, graded_at, settings, created_at, updated_at)
+2. Set up foreign key relationships between these tables and with the foundational tables
+3. Create indexes for performance optimization
+4. Configure vector columns in relevant tables for content embeddings
+5. Set up triggers for:
+   - Automatic timestamps
+   - Audit logging for all tables
+   - Maintaining order_index values when items are reordered
+6. Test table creation with sample learning content
+7. Verify relationships between paths, lessons, and assessments
+8. Test vector storage and retrieval functionality
+
+## 3. Implement RLS Policies and Study Tools Tables [done]
+### Dependencies: 3.1, 3.2
+### Description: Create study tool tables and implement Row-Level Security policies for all tables based on user roles
+### Details:
+1. Create the following tables with appropriate columns and constraints:
+   - notebooks (id, member_id, class_instance_id, title, content, settings, created_at, updated_at)
+   - mind_maps (id, member_id, class_instance_id, title, nodes, edges, settings, created_at, updated_at)
+   - achievements (id, name, description, criteria, organisation_id, settings, created_at, updated_at)
+   - certificates (id, member_id, achievement_id, issued_at, settings, created_at, updated_at)
+   - ui_contexts (id, member_id, context_type, context_data, settings, created_at, updated_at)
+2. Set up foreign key relationships for these tables
+3. Create indexes for performance optimization
+4. Implement RLS policies for each table based on user roles:
+   - Organisation admins can access all data within their organisation
+   - Teachers can access data for their classes and students
+   - Students can access their own data and shared class resources
+   - System admins can access all data
+5. Create helper functions for permission checking
+6. Set up triggers for:
+   - Automatic timestamps
+   - Audit logging
+7. Test RLS policies with different user roles
+8. Verify study tool tables with sample data
+9. Create comprehensive test cases to ensure proper data isolation between organizations and users
+10. Document all tables, relationships, and security policies
+

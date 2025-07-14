@@ -1,0 +1,86 @@
+# Task ID: 9
+# Title: Generative Course Designer
+# Status: done
+# Dependencies: 5, 8
+# Priority: medium
+# Description: Build the AI-powered course generation and pathway designer
+# Details:
+Implement the Course Designer UI with SmartCanvas for visualizing course structure. Create the ChatGenerateSidebar for natural language course generation. Build the AI prompt engineering for generating syllabi, learning objectives, and course structure based on knowledge base content. Implement the adaptive sequence generation for creating branching paths. Create the API for storing generated course content in base_classes, paths, and related tables. Build the course editing and iteration functionality through chat interface.
+
+**PRD Context**
+
+- **Natural Language Prompt Interface**: Implement the ChatGenerateSidebar that allows teachers to describe their course needs in natural language, serving as the primary interaction point for course generation.
+
+- **AI Capabilities**: Build systems to generate comprehensive course components including syllabus, learning objectives, learning paths, educational resources, learning activities, timelines, and competency alignments based on the Knowledge Base content.
+
+- **Adaptive Sequence Generation**: Develop functionality for creating branching paths in learning sequences that adapt to different student needs and learning styles.
+
+- **Smart Canvas Auto-arrangement**: Implement the SmartCanvas feature that automatically arranges course elements visually based on natural language prompts, providing an intuitive visualization of course structure.
+
+- **Teacher Interaction Model**: Create a system allowing teachers to accept/reject AI suggestions and iterate on course design through a conversational chat interface, enabling refinement of generated content.
+
+# Test Strategy:
+Test course generation with different prompts and knowledge base content. Verify generated courses have appropriate structure, objectives, and content. Test editing and iteration through the chat interface. Ensure generated content is properly stored in the database. Validate that the SmartCanvas correctly visualizes course structures. Test the adaptive sequence generation for creating appropriate branching paths. Verify that teachers can effectively accept/reject and iterate on AI suggestions.
+
+# Subtasks:
+## 1. Implement ChatGenerateSidebar with Natural Language Processing Interface [done]
+### Dependencies: None
+### Description: Create the chat-based sidebar interface that allows teachers to describe course needs in natural language and processes these inputs for course generation
+### Details:
+Implementation steps:
+1. Design and build the ChatGenerateSidebar UI component with a chat input field, message history display, and suggestion buttons
+2. Implement the chat message handling system to capture teacher inputs
+3. Create the prompt engineering system to process natural language inputs into structured course generation requests
+4. Build the API service to send processed requests to the AI backend
+5. Implement response handling to display AI suggestions and generation results
+6. Add accept/reject functionality for teachers to provide feedback on suggestions
+7. Create conversation state management to maintain context during iterative design
+
+Testing approach:
+- Unit test the prompt processing functions
+- Test API integration with mock responses
+- Conduct UI testing for chat interactions and state management
+- Verify that user inputs are properly transformed into structured generation requests
+
+## 2. Build AI Course Generation Engine and Database Integration [done]
+### Dependencies: 9.1
+### Description: Develop the core AI functionality to generate course components and implement database storage for generated content
+### Details:
+Implementation steps:
+1. Create AI prompt templates for generating different course components (syllabus, objectives, activities, etc.)
+2. Implement the course structure generation algorithm that produces comprehensive course outlines
+3. Build the branching path generation system for adaptive learning sequences
+4. Develop competency alignment functionality to map course content to learning standards
+5. Create database models and schemas for storing generated course components
+6. Implement API endpoints for saving, retrieving, and updating generated course content
+7. Build the integration between the generation engine and the Knowledge Base to incorporate existing content
+8. Develop validation systems to ensure generated content meets educational standards
+
+Testing approach:
+- Test generation quality with various input prompts
+- Verify database operations for storing and retrieving course components
+- Test integration with Knowledge Base content
+- Validate branching path logic and adaptive sequence generation
+- Benchmark generation performance and optimize as needed
+
+## 3. Implement SmartCanvas for Course Visualization and Editing [done]
+### Dependencies: 9.1, 9.2
+### Description: Create the visual course structure editor with auto-arrangement capabilities and integrate it with the chat-based iteration system
+### Details:
+Implementation steps:
+1. Design and implement the SmartCanvas UI component for visualizing course structure
+2. Build the auto-arrangement algorithm that organizes course elements based on relationships and sequence
+3. Create interactive elements for course components (drag, resize, connect, edit)
+4. Implement the visual representation of branching paths and adaptive sequences
+5. Build the integration between SmartCanvas and the ChatGenerateSidebar to visualize changes from chat interactions
+6. Develop the course editing functionality through direct canvas manipulation
+7. Create the synchronization system to keep visual representation and underlying data model consistent
+8. Implement export functionality to generate final course structure for deployment
+
+Testing approach:
+- Test canvas rendering performance with complex course structures
+- Verify auto-arrangement algorithms with different course types
+- Test user interactions for editing and manipulating course elements
+- Validate synchronization between chat-based edits and visual representation
+- Conduct usability testing with teachers to ensure intuitive visualization
+

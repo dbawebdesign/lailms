@@ -1,0 +1,76 @@
+# Task ID: 4
+# Title: AppShell and Navigation Implementation
+# Status: done
+# Dependencies: 1
+# Priority: high
+# Description: Create the application shell with responsive layout, navigation, and AI panel
+# Details:
+Implement the AppShell component with Left Nav (240px/64px collapsed), Main Content area, and AI Chat Panel (320px/hidden). Create responsive navigation that collapses to icons on smaller screens. Implement role-based navigation using navConfig.ts arrays per role. Build the UI Context Provider to track UI state for Luna. Create the header with user menu, theme toggle, and notifications. Implement the AI panel with chat interface placeholder.
+
+**PRD Context**
+- Build the application shell using Next.js 14 architecture with responsive layout components
+- Implement role-aware navigation that adapts to user type:
+  * Course Player sidebar for students
+  * Administrative views for Admin users
+  * Curriculum and student management for Teachers
+  * Student progress monitoring for Parents
+- Create global chat panel with AI assistant integration
+- Implement slash-command palette for quick actions and navigation
+- Integrate theme management system supporting:
+  * Light/dark mode toggle
+  * Organization-level branding overrides
+- Ensure all shell components and navigation elements meet WCAG 2.1 AA accessibility standards
+
+# Test Strategy:
+Test responsive behavior across different screen sizes. Verify navigation shows correct links based on user role. Ensure collapse/expand functionality works for both navigation and AI panel. Test theme switching between light and dark modes. Verify organization branding is correctly applied. Conduct accessibility testing to ensure WCAG 2.1 AA compliance. Test slash-command palette functionality across different user roles.
+
+# Subtasks:
+## 1. Create AppShell Layout Structure with Responsive Components [done]
+### Dependencies: None
+### Description: Implement the core AppShell component with responsive layout containers for navigation, main content, and AI panel
+### Details:
+1. Create an AppShell component with CSS Grid or Flexbox layout
+2. Implement the Left Nav container with 240px default width and 64px collapsed state
+3. Create the Main Content area with flexible width
+4. Add the AI Chat Panel container with 320px default width and hidden state
+5. Implement responsive breakpoints that adjust layout based on screen size
+6. Create a UI Context Provider with React Context API to track and manage UI state (nav collapsed, panel visibility)
+7. Add event handlers for toggling navigation and panel states
+8. Implement basic accessibility attributes (ARIA roles, landmarks)
+9. Test the responsive behavior across different viewport sizes
+10. Verify that containers resize and reposition correctly on window resize
+
+## 2. Implement Role-Based Navigation System [done]
+### Dependencies: 4.1
+### Description: Build the navigation component with role-based menu items and responsive behavior
+### Details:
+1. Create a navConfig.ts file with navigation arrays for different user roles (Admin, Teacher, Student, Parent)
+2. Implement the Navigation component that renders appropriate items based on user role
+3. Create navigation items with icons, labels, and active states
+4. Add collapsible navigation groups for related items
+5. Implement responsive behavior to show only icons when navigation is collapsed
+6. Add hover effects to display labels when hovering over collapsed nav items
+7. Implement keyboard navigation support for accessibility
+8. Create the header component with user menu dropdown, theme toggle button, and notifications icon
+9. Connect navigation to Next.js router for page transitions
+10. Test navigation rendering for each user role
+11. Verify that active states update correctly based on current route
+
+## 3. Build AI Chat Panel and Theme Integration [done]
+### Dependencies: 4.1, 4.2
+### Description: Implement the AI assistant panel with chat interface and integrate theme system
+### Details:
+1. Create the AI Chat Panel component with header, message list, and input area
+2. Implement placeholder chat interface with message bubbles and typing indicators
+3. Add panel toggle button in the application header
+4. Create animation for panel opening/closing
+5. Implement the theme toggle functionality in the header
+6. Set up light/dark mode detection and switching
+7. Create theme context provider for global theme state management
+8. Add CSS variables or styled-components theme for consistent styling
+9. Implement organization branding override capability in the theme system
+10. Create slash-command palette component with keyboard shortcut (Cmd+K/Ctrl+K)
+11. Test theme switching between light and dark modes
+12. Verify that AI panel opens/closes correctly and maintains state
+13. Test keyboard accessibility for all interactive elements
+

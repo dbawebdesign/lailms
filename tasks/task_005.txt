@@ -1,0 +1,295 @@
+# Task ID: 5
+# Title: Knowledge Base Ingestion System
+# Status: done
+# Dependencies: 3
+# Priority: high
+# Description: Implement document upload, processing, chunking, and vector storage system
+# Details:
+Create the Knowledge Base UI with FileUploadDropzone and FileListTable components. Implement document upload to Supabase Storage with tenant isolation (org-{id}-uploads buckets). Build document processing pipeline for PDFs, DOCX, PPT, video, audio, and URLs using appropriate libraries (pdf-parse, mammoth, youtube-transcript). Implement chunking algorithm (≤1000 tokens/segment) and generate embeddings using OpenAI's text-embedding-3-small model. Store chunks and metadata in document_chunks table with pgvector. Create API routes for document upload, processing status, and retrieval.
+
+**PRD Context**
+
+**Supported Upload Types:**
+- PDF documents
+- DOCX files
+- PowerPoint presentations (PPT)
+- CSV files
+- Audio files
+- Video files
+- YouTube URLs
+- Web URLs
+
+**Ingestion Pipeline:**
+- Document parsing using appropriate libraries for each file type
+- Text chunking with maximum size of 1000 tokens per segment
+- Vector embedding generation using OpenAI's text-embedding-3-small model
+- Storage in pgvector for efficient similarity search
+- Metadata and tag extraction from documents
+
+**Storage Requirements:**
+- Tenant isolation using org-{id}-uploads bucket structure
+- Secure access controls based on organization membership
+- Tracking of document processing status (queued, processing, completed, error)
+
+**UI Components:**
+- FileUploadDropzone for intuitive document uploading
+- FileListTable for displaying uploaded documents with status and metadata
+
+# Test Strategy:
+Test uploading different file types and verify they are processed correctly. Check that chunks are created with appropriate size and embeddings are generated using the text-embedding-3-small model. Verify vector search works by querying for relevant chunks. Test tenant isolation to ensure documents are only accessible to authorized users within the same organization. Verify processing status is accurately tracked and displayed in the UI.
+
+# Subtasks:
+## 1. Implement UI Components and Storage Infrastructure [done]
+### Dependencies: None
+### Description: Create the Knowledge Base UI with file upload functionality and set up the Supabase Storage infrastructure with proper tenant isolation.
+### Details:
+Implementation steps:
+1. Create a FileUploadDropzone component that supports drag-and-drop and file selection for all required file types (PDF, DOCX, PPT, CSV, audio, video, YouTube URLs, web URLs).
+2. Implement the FileListTable component to display uploaded documents with their status (queued, processing, completed, error) and metadata.
+3. Set up Supabase Storage buckets with tenant isolation using the org-{id}-uploads naming convention.
+4. Create API routes for document upload that validate file types and store files in the appropriate bucket.
+5. Implement secure access controls based on organization membership.
+6. Add status tracking for uploaded documents in a documents table.
+
+Testing approach:
+- Test UI components in isolation using component testing tools.
+- Verify file upload functionality with different file types.
+- Ensure proper tenant isolation by testing with multiple organizations.
+- Test access controls to confirm only authorized users can access organization files.
+
+<info added on 2025-05-05T03:10:47.321Z>
+## Additional Implementation Details
+
+### UI Components
+- **FileUploadDropzone.tsx**:
+  ```tsx
+  import { useCallback, useState } from 'react'
+  import { useDropzone } from 'react-dropzone'
+  import { Upload, File, AlertCircle } from 'lucide-react'
+  import { Button } from '@/components/ui/button'
+  import { Progress } from '@/components/ui/progress'
+
+  // Accept object for file validation
+  const acceptedFileTypes = {
+    'application/pdf': ['.pdf'],
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+    'text/csv': ['.csv'],
+    'audio/*': ['.mp3', '.wav', '.ogg'],
+    'video/*': ['.mp4', '.webm', '.mov']
+  }
+
+  // Size validation (e.g., 50MB max)
+  const MAX_FILE_SIZE = 50 * 1024 * 1024
+  ```
+
+- **FileListTable.tsx**: Implement row-level actions (delete, retry) and status indicators with color coding.
+
+### Database Schema Extensions
+```sql
+-- Add indexes for performance
+CREATE INDEX idx_documents_organisation_id ON documents(organisation_id);
+CREATE INDEX idx_documents_status ON documents(status);
+
+-- Add trigger for updated_at
+CREATE TRIGGER set_updated_at
+BEFORE UPDATE ON documents
+FOR EACH ROW
+EXECUTE FUNCTION trigger_set_timestamp();
+```
+
+### Storage Configuration
+```typescript
+// Helper function to generate storage paths
+export const getStoragePath = (orgId: string, userId: string, fileName: string): string => {
+  const uuid = crypto.randomUUID()
+  const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_')
+  return `${userId}/${uuid}/${sanitizedFileName}`
+}
+
+// Storage bucket policy configuration
+const bucketPolicy = {
+  name: `org-${orgId}-uploads`,
+  public: false,
+  allowedMimeTypes: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+                     'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'text/csv', 
+                     'audio/*', 'video/*'],
+  fileSizeLimit: MAX_FILE_SIZE
+}
+```
+
+### URL Processing Logic
+```typescript
+// For YouTube and web URLs
+async function processUrl(url: string, orgId: string, userId: string) {
+  // Validate URL format
+  const isYouTube = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/.test(url)
+  
+  // Store URL reference in a JSON file
+  const metadata = {
+    originalUrl: url,
+    type: isYouTube ? 'youtube' : 'webpage',
+    extractionDate: new Date().toISOString()
+  }
+  
+  const jsonContent = JSON.stringify(metadata)
+  const fileName = `${isYouTube ? 'youtube' : 'webpage'}_${Date.now()}.json`
+  
+  // Upload JSON reference file to storage
+  // Then create document record with appropriate metadata
+}
+```
+
+### Error Handling and Retry Logic
+```typescript
+// Implement exponential backoff for retries
+const MAX_RETRIES = 3
+async function uploadWithRetry(file, path, retryCount = 0) {
+  try {
+    return await supabaseClient.storage.from(bucketName).upload(path, file)
+  } catch (error) {
+    if (retryCount < MAX_RETRIES) {
+      const delay = Math.pow(2, retryCount) * 1000
+      await new Promise(resolve => setTimeout(resolve, delay))
+      return uploadWithRetry(file, path, retryCount + 1)
+    }
+    throw error
+  }
+}
+```
+
+### Realtime Updates Implementation
+```typescript
+// In the client component
+useEffect(() => {
+  const channel = supabase
+    .channel('document-status-changes')
+    .on('postgres_changes', 
+      { event: 'UPDATE', schema: 'public', table: 'documents', filter: `organisation_id=eq.${orgId}` },
+      (payload) => {
+        // Update document status in the UI
+        setDocuments(current => current.map(doc => 
+          doc.id === payload.new.id ? { ...doc, ...payload.new } : doc
+        ))
+      }
+    )
+    .subscribe()
+
+  return () => { supabase.removeChannel(channel) }
+}, [orgId, supabase])
+```
+</info added on 2025-05-05T03:10:47.321Z>
+
+## 2. Build Document Processing Pipeline [done]
+### Dependencies: 5.1
+### Description: Implement the document processing pipeline to extract text from various file formats using appropriate libraries.
+### Details:
+Implementation steps:
+1. Create a document processing service that handles different file types:
+   - PDF documents: Use pdf-parse library
+   - DOCX files: Use mammoth library
+   - PowerPoint presentations: Implement PPT parsing
+   - CSV files: Use CSV parsing libraries
+   - Audio files: Implement audio transcription
+   - Video files: Extract audio and transcribe
+   - YouTube URLs: Use youtube-transcript API
+   - Web URLs: Implement web scraping
+2. Set up a queue system for processing documents asynchronously.
+3. Implement status updates to track document processing progress.
+4. Extract metadata (title, author, date, etc.) from documents when available.
+5. Create API routes to check document processing status.
+6. Implement error handling and retries for failed processing attempts.
+
+Testing approach:
+- Test each parser with various sample files of the corresponding type.
+- Verify correct text extraction from different file formats.
+- Test the queue system with multiple simultaneous uploads.
+- Ensure proper status updates throughout the processing pipeline.
+- Test error handling with malformed or corrupted files.
+<info added on 2025-05-05T15:49:51.280Z>
+Implementation steps:
+1. Create a document processing service that handles different file types:
+   - PDF documents: Use pdf-parse library
+   - DOCX files: Use mammoth library
+   - PowerPoint presentations: Implement PPT parsing
+   - CSV files: Use CSV parsing libraries
+   - Audio files: Implement audio transcription
+   - Video files: Extract audio and transcribe
+   - YouTube URLs: Use youtube-transcript API
+   - Web URLs: Implement web scraping
+2. Set up a queue system for processing documents asynchronously.
+3. Implement status updates to track document processing progress.
+4. Extract metadata (title, author, date, etc.) from documents when available.
+5. Create API routes to check document processing status.
+6. Implement error handling and retries for failed processing attempts.
+
+Testing approach:
+- Test each parser with various sample files of the corresponding type.
+- Verify correct text extraction from different file formats.
+- Test the queue system with multiple simultaneous uploads.
+- Ensure proper status updates throughout the processing pipeline.
+- Test error handling with malformed or corrupted files.
+
+Technical Implementation Plan:
+
+1. Dependencies Installation:
+   - In packages/functions directory, install required libraries:
+     - Core parsing: pdf-parse, mammoth, youtube-transcript
+     - Database: @supabase/supabase-js
+     - TypeScript types: @types/pdf-parse, @types/mammoth
+   - Additional libraries for other formats will be added during implementation
+
+2. Database Schema Updates:
+   - Create migration for documents table:
+     - Add document_status ENUM ('queued', 'processing', 'completed', 'error')
+     - Add status column (type: document_status, default: 'queued', NOT NULL)
+     - Add processing_error column (type: TEXT, nullable)
+     - Add metadata column (type: JSONB, nullable) for extracted document metadata
+
+3. Supabase Edge Function Implementation:
+   - Create process-document function in packages/functions/src/process-document/index.ts
+   - Function will:
+     - Accept documentId in payload
+     - Update document status to 'processing'
+     - Download file from appropriate storage bucket
+     - Determine file type and route to appropriate parser
+     - Implement parsers for PDF, DOCX, YouTube URLs initially
+     - Store extracted text
+     - Update status to 'completed' or 'error' with details
+
+4. Document Processing Flow:
+   - Upload API (src/app/api/knowledge-base/upload/route.ts) will:
+     - Create documents record with 'queued' status
+     - Upload file to storage
+     - Directly invoke process-document function with documentId
+   - This approach avoids complex storage trigger configuration
+
+5. Frontend Updates:
+   - Update FileListTable.tsx to display new status values
+   - Add tooltips for error messages
+   - Ensure API routes return status and error information
+
+This implementation leverages Supabase for both storage and serverless functions, creating an asynchronous document processing pipeline that can handle various file formats while providing status updates throughout the process.
+</info added on 2025-05-05T15:49:51.280Z>
+
+## 3. Implement Chunking, Embedding Generation, and Vector Storage [done]
+### Dependencies: 5.2
+### Description: Create the chunking algorithm, generate embeddings using OpenAI's model, and store chunks with vector embeddings in the database.
+### Details:
+Implementation steps:
+1. Implement a chunking algorithm that splits document text into segments of ≤1000 tokens each, preserving context where possible.
+2. Create a service to generate embeddings for each chunk using OpenAI's text-embedding-3-small model.
+3. Set up the document_chunks table with pgvector extension to store chunks and their vector embeddings.
+4. Store metadata with each chunk (source document, position in document, etc.).
+5. Implement batch processing for efficient embedding generation of multiple chunks.
+6. Create API routes for retrieving document chunks and performing vector similarity searches.
+7. Add functionality to update the document status to 'completed' when all chunks are processed.
+
+Testing approach:
+- Test the chunking algorithm with various text lengths and formats.
+- Verify that chunks maintain appropriate context and don't exceed token limits.
+- Test embedding generation with different types of content using the text-embedding-3-small model.
+- Benchmark vector storage and retrieval performance.
+- Test end-to-end flow from document upload to searchable vector embeddings.
+- Verify that similarity searches return relevant results.
+

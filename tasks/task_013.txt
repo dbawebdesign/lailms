@@ -1,0 +1,108 @@
+# Task ID: 13
+# Title: Teacher Tools Implementation
+# Status: pending
+# Dependencies: 7, 10, 11
+# Priority: medium
+# Description: Create the suite of AI-powered tools for teachers
+# Details:
+Build the Teacher Tools UI with ToolLibrary component for /teach/tools route. Implement all specified tools: Rubric Generator, Lesson Generator, Quiz Generator, IEP Generator, Report Card Comments, Multiple Explanations, Lesson Hooks, Content Leveler, Mindmap Generator, and BrainBytes Generator. Create dedicated sidebar workflows for each tool. Implement API endpoints for each tool (e.g., POST /api/tools/rubric). Build the tool job tracking system with real-time progress updates. Implement storage of generated outputs in Supabase Storage under org-{id}-generated/.
+
+**PRD Context**
+The following requirements are extracted from the PRD for Teacher Tools Implementation:
+
+1. Implement 10 specific AI generator tools:
+   - Rubric Generator
+   - Lesson Generator
+   - Quiz Generator
+   - IEP Generator
+   - Report Card Comments
+   - Multiple Explanations
+   - Lesson Hooks
+   - Content Leveler
+   - Mind-Map Generator
+   - BrainBytes Generator
+
+2. Teachers must be able to:
+   - Invoke these generators through the UI
+   - Review the generated outputs
+   - Export the outputs in appropriate formats
+   - Monitor the generation progress in real-time
+
+# Test Strategy:
+Test each tool with various inputs and verify outputs match expectations. Check that generated content is properly stored and associated with the correct base_class_id. Verify real-time progress updates work correctly. Test knowledge-base references to ensure outputs align with institutional sources. Validate that teachers can successfully invoke generators, review outputs, export content, and monitor generation progress as specified in the PRD.
+
+# Subtasks:
+## 1. Implement Teacher Tools UI Framework and Base Components [pending]
+### Dependencies: None
+### Description: Create the foundational UI components for the Teacher Tools section, including the main layout, ToolLibrary component, and sidebar navigation structure.
+### Details:
+Implementation steps:
+1. Create the base route structure for /teach/tools
+2. Implement the ToolLibrary component that will display all available tools in a grid or list format
+3. Design and implement the tool card component with icon, title, description, and action button
+4. Create the sidebar navigation framework that will house tool-specific workflows
+5. Implement the base layout for tool execution pages with input form, progress indicator, and results display areas
+6. Set up the state management for tracking selected tools and active workflows
+7. Create placeholder UI components for all 10 tools (Rubric Generator, Lesson Generator, etc.)
+8. Implement responsive design for all components
+
+Testing approach:
+- Verify all UI components render correctly across different screen sizes
+- Test navigation between tool selection and tool execution workflows
+- Ensure placeholder components are properly integrated into the layout
+- Validate that the UI state is maintained correctly during navigation
+
+## 2. Implement API Endpoints and Job Processing System [pending]
+### Dependencies: 13.1
+### Description: Create the backend API endpoints for each tool and implement the job tracking system with real-time progress updates.
+### Details:
+Implementation steps:
+1. Create API route handlers for each of the 10 tools (e.g., POST /api/tools/rubric, POST /api/tools/lesson, etc.)
+2. Implement the job queue system to handle long-running AI generation tasks
+3. Set up WebSocket connections for real-time progress updates
+4. Create the job tracking database schema in Supabase
+5. Implement the job status update mechanism
+6. Create handlers for job cancellation and error recovery
+7. Set up Supabase Storage buckets and permissions for storing generated outputs under org-{id}-generated/
+8. Implement file upload/download functionality for the generated content
+9. Create utility functions for formatting and processing AI responses
+
+Testing approach:
+- Test each API endpoint with various input parameters
+- Verify job creation, tracking, and completion flows
+- Test real-time updates through WebSockets
+- Validate proper error handling and recovery
+- Ensure files are correctly stored in and retrieved from Supabase Storage
+- Test concurrent job processing and rate limiting
+
+## 3. Implement Tool-Specific Workflows and Output Handling [pending]
+### Dependencies: 13.1, 13.2
+### Description: Complete the implementation of all 10 tool-specific workflows, including input forms, generation logic, and output display/export functionality.
+### Details:
+Implementation steps:
+1. For each of the 10 tools, implement dedicated input forms with appropriate fields:
+   - Rubric Generator: subject, grade level, assessment criteria
+   - Lesson Generator: topic, grade level, duration, standards
+   - Quiz Generator: subject, difficulty, number of questions
+   - And so on for all 10 tools
+2. Implement tool-specific AI prompt construction and parameter handling
+3. Create specialized output display components for each tool type:
+   - Table format for rubrics
+   - Structured lesson plans for lessons
+   - Interactive quiz displays
+   - Mind map visualizations
+4. Implement export functionality in appropriate formats (PDF, DOCX, etc.)
+5. Add tool-specific validation rules and error handling
+6. Implement history/favorites functionality to save and recall previous generations
+7. Add contextual help and examples for each tool
+8. Implement final UI polish and animations
+
+Testing approach:
+- Test each tool's complete workflow from input to output
+- Verify that generated content is properly formatted and displayed
+- Test export functionality for all supported formats
+- Validate input validation and error handling
+- Test with various edge cases (very large inputs, unusual requests)
+- Conduct user acceptance testing with teacher personas
+- Verify performance under load with multiple concurrent generations
+

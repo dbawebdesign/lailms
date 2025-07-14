@@ -1,0 +1,62 @@
+# Task ID: 36
+# Title: Migrate Authentication from Deprecated Supabase Helpers to @supabase/ssr Package
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Replace all instances of deprecated Supabase auth helpers with the modern @supabase/ssr package across the application to ensure continued functionality and security of authentication flows.
+# Details:
+This migration requires several key steps:
+
+1. Install the new package: `npm install @supabase/ssr`
+
+2. Identify all files using the deprecated auth helpers (likely in auth-related components, hooks, and middleware)
+
+3. Update server-side authentication:
+   - Replace `createServerSupabaseClient` with `createServerClient`
+   - Update middleware to use the new pattern for session handling
+   - Modify any server components or API routes that use Supabase auth
+
+4. Update client-side authentication:
+   - Replace client initialization methods with those from the new package
+   - Update any custom hooks that wrap Supabase auth functionality
+   - Modify sign-in, sign-up, and sign-out flows to use the new methods
+
+5. Update environment variables and configuration if needed
+
+6. Handle any breaking changes in the API surface:
+   - The new package may have different method signatures
+   - Session handling might follow a different pattern
+   - Cookie management might require updates
+
+Refer to the official migration guide at https://supabase.com/docs/guides/auth/auth-helpers/migrating-to-ssr for specific code examples and migration patterns. Ensure backward compatibility is maintained throughout the transition.
+
+# Test Strategy:
+Testing should verify all authentication flows remain functional after migration:
+
+1. Unit Tests:
+   - Create tests for updated auth utility functions
+   - Verify new client initialization works correctly
+   - Test session handling with the new package
+
+2. Integration Tests:
+   - Test complete authentication flows (sign up, sign in, sign out)
+   - Verify session persistence works correctly
+   - Test protected routes remain protected
+   - Ensure public routes remain accessible
+
+3. Manual Testing Checklist:
+   - Sign up with email/password
+   - Sign in with email/password
+   - Sign in with each OAuth provider (if applicable)
+   - Password reset flow
+   - Email verification flow
+   - Session persistence after page refresh
+   - Session expiration handling
+   - Sign out functionality
+
+4. Regression Testing:
+   - Verify no new authentication errors appear in logs
+   - Check that user profile data is still accessible
+   - Ensure role-based access controls still function
+
+Document any changes in authentication behavior that might affect users or other developers.

@@ -1,0 +1,65 @@
+# Task ID: 29
+# Title: Fix Luna Lesson Creation API Error - Remove Objectives Field References
+# Status: done
+# Dependencies: 10, 23
+# Priority: high
+# Description: Remove references to the objectives field from Luna lesson creation API endpoints since the lessons table doesn't have an objectives column, ensuring the API correctly handles combining objectives into the description field.
+# Details:
+This task involves identifying and removing all references to the 'objectives' field in the Luna lesson creation API endpoints, as the lessons database table does not contain an objectives column. The current implementation is causing errors when creating or updating lessons.
+
+Implementation steps:
+1. Review all API endpoint handlers related to lesson creation and updates in the backend codebase, particularly focusing on:
+   - POST /api/lessons
+   - PUT /api/lessons/:id
+   - Any other endpoints that manipulate lesson data
+
+2. For each identified endpoint:
+   - Remove any direct references to the 'objectives' field in request validation
+   - Update the data transformation logic to ensure objectives data is properly merged into the description field
+   - Ensure any TypeScript interfaces or database models are updated to reflect this change
+
+3. Examine the database schema to confirm the structure of the lessons table and verify it indeed lacks an objectives column
+
+4. Update API documentation to reflect that objectives should be included in the description field rather than as a separate field
+
+5. Implement or modify the logic that combines objectives into the description field:
+   - If objectives are still being sent by clients, extract them from the request
+   - Format them appropriately (e.g., as bullet points or a section at the beginning of the description)
+   - Combine them with the existing description content
+   - Store the combined content in the description column
+
+6. Ensure backward compatibility by handling cases where clients might still send objectives as a separate field during a transition period
+
+7. Update any client-side code that might be explicitly sending objectives as a separate field to instead include them in the description field
+
+# Test Strategy:
+1. Unit Testing:
+   - Write unit tests for the modified API endpoints to verify they correctly handle requests with and without objectives
+   - Test that objectives data is properly merged into the description field
+   - Verify error handling for malformed requests
+
+2. Integration Testing:
+   - Test the full flow of lesson creation and updating through the API
+   - Verify that lessons are correctly stored in the database with objectives incorporated into the description
+   - Test with various combinations of description and objectives data
+
+3. Client Compatibility Testing:
+   - Test with existing client applications to ensure they can still create and update lessons
+   - Verify that the UI correctly displays the combined description (with objectives)
+
+4. Regression Testing:
+   - Ensure that existing lessons can still be retrieved and displayed correctly
+   - Verify that other lesson-related functionality (searching, filtering, etc.) still works as expected
+
+5. Error Handling Testing:
+   - Test error scenarios to ensure appropriate error messages are returned
+   - Verify that invalid requests are properly rejected
+
+6. Performance Testing:
+   - Verify that the changes do not negatively impact API response times
+   - Test with large description/objectives content to ensure proper handling
+
+7. Manual Testing:
+   - Create a new lesson through the UI and verify it saves correctly
+   - Edit an existing lesson, modifying both description and what would have been objectives
+   - Verify the changes are correctly saved and displayed

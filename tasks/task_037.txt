@@ -1,0 +1,204 @@
+# Task ID: 37
+# Title: Design and Implement Knowledge Base Course Generation System
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Create an end-to-end system that transforms uploaded documents into structured courses, including document processing, content extraction, course structure generation, and delivery interface.
+# Details:
+This task requires building a comprehensive system with the following components:
+
+1. Document Upload & Processing:
+   - Create a secure upload interface supporting multiple file formats (PDF, DOCX, TXT, etc.)
+   - Implement document parsing to extract text, headings, and structural elements
+   - Add metadata extraction for document categorization
+
+2. Knowledge Extraction:
+   - Develop NLP processing to identify key concepts, terminology, and relationships
+   - Implement topic modeling to group related content
+   - Create a system to extract learning objectives from content
+
+3. Course Structure Generation:
+   - Design algorithms to organize content into logical learning sequences
+   - Implement module/lesson structure creation with appropriate progression
+   - Add capability to generate summaries for each section
+
+4. Assessment Creation:
+   - Integrate with existing question generation system (from Task #35)
+   - Implement rules for placing assessments at appropriate intervals
+   - Create feedback mechanisms based on assessment performance
+
+5. Course Delivery Interface:
+   - Build a learner-facing interface to navigate through course content
+   - Implement progress tracking and bookmarking
+   - Create instructor views for monitoring learner progress
+
+6. Integration Requirements:
+   - Connect with authentication system (using new @supabase/ssr package from Task #36)
+   - Ensure Luna chat integration for learner support
+   - Implement API endpoints for course data access
+
+The system should maintain document versioning to allow course regeneration when source materials are updated. Performance optimization is critical as document processing may be resource-intensive.
+
+# Test Strategy:
+Testing should cover all components of the end-to-end workflow:
+
+1. Upload Testing:
+   - Verify handling of various file formats (PDF, DOCX, TXT, HTML)
+   - Test large file uploads (>50MB) for performance and timeout handling
+   - Validate error handling for corrupted or unsupported files
+
+2. Processing Testing:
+   - Create test documents with known structures to verify extraction accuracy
+   - Measure processing time for various document sizes to establish performance baselines
+   - Verify metadata extraction accuracy against known document properties
+
+3. Course Generation Testing:
+   - Compare generated course structures against expert-created outlines for the same content
+   - Verify logical progression of topics and appropriate sectioning
+   - Test with documents from different domains to ensure domain-agnostic functionality
+
+4. Assessment Testing:
+   - Verify question relevance to section content
+   - Test assessment difficulty calibration
+   - Validate feedback mechanisms for incorrect answers
+
+5. Integration Testing:
+   - End-to-end workflow tests from upload to course delivery
+   - Authentication integration tests with the new @supabase/ssr package
+   - Luna chat integration for course-specific questions
+
+6. User Acceptance Testing:
+   - Create test scenarios for both learners and instructors
+   - Measure time to complete course creation from document upload
+   - Gather feedback on course structure quality and assessment relevance
+
+Implement automated tests where possible, particularly for the document processing and course generation algorithms. Manual testing should focus on UI/UX aspects and overall workflow coherence.
+
+# Subtasks:
+## 1. Implement Document Upload and Processing Pipeline [done]
+### Dependencies: None
+### Description: Create a secure document upload interface and processing pipeline that handles multiple file formats (PDF, DOCX, TXT), extracts text content, and prepares it for knowledge extraction. This component forms the foundation of the knowledge base system.
+### Details:
+Implementation steps:
+
+1. Create a secure upload interface using React for frontend and FastAPI for backend:
+   - Implement drag-and-drop functionality with progress indicators
+   - Add file type validation for PDF, DOCX, TXT, etc.
+   - Set appropriate file size limits (suggest 50MB max)
+   - Implement CSRF protection and sanitize file inputs
+
+2. Build document parsing services using the Adapter pattern:
+   - Use pdfplumber or PyMuPDF for PDF extraction
+   - Implement python-docx for DOCX files
+   - Create plain text parser for TXT files
+   - Design a common interface that returns standardized content regardless of input format
+
+3. Develop metadata extraction:
+   - Extract document title, author, creation date
+   - Identify document structure (headings, subheadings, paragraphs)
+   - Generate document fingerprint for versioning
+
+4. Implement document storage and versioning:
+   - Store raw documents in a blob storage system
+   - Create database schema for document metadata
+   - Implement versioning to track document changes
+
+5. Create asynchronous processing pipeline:
+   - Use background workers (Celery or similar) for processing large documents
+   - Implement status tracking for long-running processes
+   - Add error handling and retry mechanisms
+
+Testing approach:
+- Unit tests for each parser adapter
+- Integration tests for the complete pipeline
+- Security testing for upload vulnerabilities
+- Performance testing with various document sizes and formats
+
+## 2. Develop Knowledge Extraction and Course Structure Generation [done]
+### Dependencies: 37.1
+### Description: Build the NLP processing system that extracts key concepts, identifies relationships, and generates a logical course structure based on the processed documents. Implement the three knowledge base generation modes (KB Only, KB Priority, KB Supplemented) as specified in the requirements.
+### Details:
+Implementation steps:
+
+1. Implement NLP processing pipeline using the Pipeline pattern:
+   - Use spaCy or NLTK for text preprocessing (tokenization, lemmatization)
+   - Implement named entity recognition to identify key concepts
+   - Create relationship extraction between concepts
+   - Use transformers library for advanced NLP tasks
+
+2. Develop topic modeling and content organization:
+   - Implement LDA or transformer-based topic modeling
+   - Group related content into coherent topics
+   - Create hierarchical relationships between topics
+   - Generate concept maps for visualization
+
+3. Build learning objective extraction:
+   - Use rule-based patterns or fine-tuned LLMs to identify learning objectives
+   - Classify content by Bloom's taxonomy levels
+   - Map content to identified learning objectives
+
+4. Implement course structure generation using the Factory pattern:
+   - Design algorithms for three knowledge base modes:
+     a) KB Only: Strictly use uploaded sources with no external knowledge
+     b) KB Priority: Use sources as primary content but fill minor gaps
+     c) KB Supplemented: Use sources as foundation with general knowledge
+   - Create logical module/lesson structure with appropriate progression
+   - Generate section summaries using extractive and abstractive techniques
+   - Implement content sequencing based on prerequisite relationships
+
+5. Develop assessment placement logic:
+   - Create rules for strategic assessment placement
+   - Implement difficulty progression
+   - Prioritize actual course content for assessment generation
+
+Testing approach:
+- Unit tests for NLP components
+- Evaluation metrics for topic modeling quality
+- A/B testing of different course structure algorithms
+- Validation with subject matter experts for content organization quality
+
+## 3. Create Course Delivery Interface and Integration System [pending]
+### Dependencies: 37.1, 37.2
+### Description: Develop the learner-facing interface for course navigation and consumption, instructor views for monitoring progress, and integrate with external systems including authentication, Luna chat support, and the question generation system from Task #35.
+### Details:
+Implementation steps:
+
+1. Build learner-facing interface using React:
+   - Implement responsive design for multiple devices
+   - Create intuitive navigation through course modules and lessons
+   - Design progress tracking with visual indicators
+   - Add bookmarking and note-taking functionality
+   - Implement search functionality using Elasticsearch
+   - Create different views based on knowledge base mode
+
+2. Develop instructor views:
+   - Build dashboard for monitoring learner progress
+   - Create analytics for content engagement and assessment performance
+   - Implement tools for manual content adjustment
+   - Add capability to switch between knowledge base modes
+
+3. Implement assessment delivery:
+   - Integrate with question generation system from Task #35
+   - Create interactive quiz components
+   - Implement immediate feedback mechanisms
+   - Design adaptive learning paths based on assessment performance
+
+4. Build system integrations:
+   - Implement authentication using @supabase/ssr package from Task #36
+   - Create Luna chat integration for learner support
+   - Develop comprehensive API endpoints for course data access
+   - Implement webhooks for system events
+
+5. Create content update and regeneration system:
+   - Design workflows for document updates
+   - Implement differential processing for changed content
+   - Build course regeneration with version control
+   - Preserve user progress during course updates
+
+Testing approach:
+- User experience testing with actual learners
+- Integration testing with external systems
+- Performance testing under load
+- Cross-browser and device compatibility testing
+- Security testing for authentication and data access
+

@@ -1,0 +1,123 @@
+# Task ID: 15
+# Title: Gradebook and Analytics Implementation
+# Status: pending
+# Dependencies: 11, 14
+# Priority: medium
+# Description: Build the customizable gradebook and analytics dashboards
+# Details:
+Create the Gradebook UI with StudentHeatmap and BulkFeedbackDrawer components for /teach/gradebook/:classId route. Implement customizable weightings, calculated columns, and competency-based scoring. Build the live grade tracking dashboards for students and instructors. Implement the AI-driven rubric builder with criteria suggestions. Create the predictive analytics with 'what-if' forecasting and at-risk alerts. Build the SIS integration via OneRoster/SFTP/API. Implement API routes for gradebook and analytics functionality with proper RLS enforcement.
+
+**PRD Context**
+
+**Real-time Gradebook Grid:**
+- Interactive data grid with real-time updates
+- Color-coded competency heatmaps for visual assessment
+- Sortable and filterable columns
+
+**Teacher Features:**
+- Bulk feedback drawer for efficient grading
+- Grade override capabilities with audit trail
+- Rubric attachment to assignments
+- Export functionality to CSV and SIS systems
+
+**Analytics Features:**
+- Custom weighting schemes for different grading philosophies
+- Calculated columns based on formulas
+- Competency heatmaps showing mastery across standards
+- At-risk predictive model using ML algorithms
+- Rubric calibration assistant to ensure fair assessment
+
+**Student Features:**
+- Live 'what-if' grade forecaster
+- Personal progress tracking dashboard
+- Competency visualization
+
+**Interoperability Requirements:**
+- OneRoster/SIS push integration
+- ePortfolio synchronization
+- API endpoints for third-party tool integration
+
+# Test Strategy:
+Test gradebook customization with different weighting schemes. Verify live grade tracking updates in real-time. Test the AI-driven rubric builder with various learning outcomes. Check that predictive analytics provide accurate forecasts. Test SIS integration with sample data. Validate bulk feedback functionality with large datasets. Verify grade exports to CSV and SIS systems. Test the student 'what-if' forecaster with various scenarios. Ensure competency heatmaps accurately reflect student mastery levels. Validate ePortfolio synchronization works correctly.
+
+# Subtasks:
+## 1. Implement Gradebook UI Core Components [pending]
+### Dependencies: None
+### Description: Build the foundational UI components for the gradebook including the data grid, StudentHeatmap, and BulkFeedbackDrawer
+### Details:
+1. Create the `/teach/gradebook/:classId` route in the router configuration
+2. Implement the GradebookGrid component with:
+   - Interactive data grid with real-time update capabilities
+   - Column sorting and filtering functionality
+   - Cell editing with validation
+   - Color-coded visualization support
+3. Build the StudentHeatmap component to display competency mastery:
+   - Create a color scale for different mastery levels
+   - Implement the heatmap visualization with student rows and competency columns
+   - Add tooltips for detailed information on hover
+4. Develop the BulkFeedbackDrawer component:
+   - Create a slide-out drawer UI
+   - Implement multi-student selection mechanism
+   - Add feedback form with rich text editor
+   - Build grade override functionality with audit logging
+5. Test components individually with mock data
+6. Test components integration in the gradebook view
+
+## 2. Implement Gradebook Data Management and Calculations [pending]
+### Dependencies: 15.1
+### Description: Build the backend services and data management for gradebook functionality including custom weightings, calculated columns, and competency scoring
+### Details:
+1. Create API routes for gradebook data with proper RLS enforcement:
+   - GET `/api/gradebook/:classId` for retrieving gradebook data
+   - POST `/api/gradebook/:classId/grades` for updating grades
+   - PUT `/api/gradebook/:classId/settings` for updating gradebook settings
+2. Implement data models and database schema for:
+   - Grade storage with timestamps and user attribution
+   - Weighting schemes configuration
+   - Calculated column formulas
+   - Competency mappings
+3. Build the calculation engine for:
+   - Custom weighting application to raw scores
+   - Formula parsing and execution for calculated columns
+   - Competency scoring aggregation
+   - Grade forecasting algorithms
+4. Implement real-time update mechanisms:
+   - Set up WebSocket connections for live updates
+   - Create change notification system
+5. Add export functionality:
+   - CSV export with configurable columns
+   - SIS-compatible export format
+6. Test with unit tests for calculation accuracy
+7. Test API endpoints with integration tests
+8. Performance test with large datasets
+
+## 3. Implement Analytics Dashboards and Integrations [pending]
+### Dependencies: 15.1, 15.2
+### Description: Build the analytics dashboards for students and teachers, implement the AI-driven rubric builder, and create SIS integrations
+### Details:
+1. Create teacher analytics dashboard:
+   - Implement class performance overview charts
+   - Build competency heatmaps for class-wide view
+   - Create at-risk student identification with ML model integration
+   - Add assignment performance breakdown visualizations
+2. Implement student dashboard:
+   - Build personal progress tracking visualizations
+   - Create 'what-if' grade forecaster with interactive controls
+   - Implement competency mastery visualization
+3. Develop AI-driven rubric builder:
+   - Integrate with AI service for criteria suggestions
+   - Create rubric template management
+   - Implement rubric attachment to assignments
+   - Build rubric calibration assistant
+4. Implement SIS integration:
+   - Create OneRoster API client
+   - Build SFTP upload capability
+   - Implement configurable API integration
+   - Add scheduled synchronization jobs
+5. Create ePortfolio synchronization:
+   - Implement export API for portfolio systems
+   - Build webhook receivers for third-party updates
+6. Test analytics accuracy with known datasets
+7. Test integrations with mock SIS systems
+8. Conduct end-to-end testing of the complete gradebook and analytics system
+

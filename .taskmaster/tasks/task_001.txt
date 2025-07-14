@@ -1,0 +1,70 @@
+# Task ID: 1
+# Title: Database Schema Design and Migration Planning
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Design the new database schema with questions and assessments tables, and plan the migration from the existing fragmented system.
+# Details:
+Create detailed schema designs for the new unified tables:
+1. Questions table with fields: id (UUID), content (TEXT), options (JSONB), correct_answer (TEXT), question_type (VARCHAR), tags (TEXT[]), base_class_id (UUID), created_at, updated_at
+2. Assessments table with fields: id (UUID), title (VARCHAR), type (VARCHAR), base_class_id (UUID), lesson_id (UUID, nullable), path_id (UUID, nullable), is_enabled (BOOLEAN), settings (JSONB), created_at
+3. Add assessment_config JSONB column to base_classes table
+
+Plan migration strategy:
+- Identify existing data to preserve
+- Create SQL scripts for table creation with proper constraints and indexes
+- Design data migration path from old tables to new schema
+- Include rollback procedures in case of failure
+
+# Test Strategy:
+Validate schema design against requirements with database team review. Test migration scripts in development environment with sample data. Verify referential integrity and constraints. Create test cases for data migration accuracy.
+
+# Subtasks:
+## 1. Document Current Database Structure [pending]
+### Dependencies: None
+### Description: Analyze and document the existing database structure, identifying all tables and fields related to questions and assessments that need to be migrated.
+### Details:
+Create a comprehensive mapping document that includes all current tables storing question and assessment data. Document table names, field names, data types, relationships, and any business logic embedded in the current schema. Identify data quality issues, redundancies, and inconsistencies in the current implementation.
+
+## 2. Design Questions Table Schema [pending]
+### Dependencies: 1.1
+### Description: Create detailed schema design for the new unified questions table with all required fields and constraints.
+### Details:
+Design the questions table with fields: id (UUID primary key), content (TEXT), options (JSONB for storing multiple choice options), correct_answer (TEXT), question_type (VARCHAR with constraints for valid types), tags (TEXT[] for searchability), base_class_id (UUID foreign key), created_at (TIMESTAMP), updated_at (TIMESTAMP). Include appropriate indexes on base_class_id, question_type, and tags for query optimization. Document any check constraints needed for data validation.
+
+## 3. Design Assessments Table Schema [pending]
+### Dependencies: 1.1
+### Description: Create detailed schema design for the new unified assessments table with all required fields and constraints.
+### Details:
+Design the assessments table with fields: id (UUID primary key), title (VARCHAR), type (VARCHAR with constraints for valid assessment types), base_class_id (UUID foreign key), lesson_id (UUID foreign key, nullable), path_id (UUID foreign key, nullable), is_enabled (BOOLEAN), settings (JSONB for flexible configuration options), created_at (TIMESTAMP). Include appropriate indexes on base_class_id, lesson_id, path_id, and type. Document any check constraints needed for data validation and any triggers required for maintaining data integrity.
+
+## 4. Design Base Classes Table Modification [pending]
+### Dependencies: 1.1
+### Description: Design the schema modification to add the assessment_config JSONB column to the base_classes table.
+### Details:
+Create the schema modification script to add the assessment_config JSONB column to the base_classes table. Document the structure of the JSONB data that will be stored in this column, including all possible configuration options and their default values. Consider adding a check constraint to validate the JSONB structure if appropriate.
+
+## 5. Create SQL Migration Scripts for Schema Changes [pending]
+### Dependencies: 1.2, 1.3, 1.4
+### Description: Develop SQL scripts for creating the new tables and modifying existing tables according to the designed schema.
+### Details:
+Write SQL scripts for: 1) Creating the questions table with all fields, constraints, and indexes, 2) Creating the assessments table with all fields, constraints, and indexes, 3) Adding the assessment_config column to the base_classes table. Include appropriate comments in the scripts. Ensure scripts are idempotent where possible. Create separate scripts for schema creation and constraint/index addition to allow for phased deployment.
+
+## 6. Develop Data Migration Strategy [pending]
+### Dependencies: 1.1, 1.2, 1.3, 1.4
+### Description: Create a comprehensive plan for migrating data from the existing fragmented tables to the new unified schema.
+### Details:
+Develop a detailed data migration strategy that includes: 1) Mapping of source fields to destination fields, 2) Data transformation rules for any format changes, 3) Handling of edge cases and inconsistent data, 4) Sequence of migration operations to maintain referential integrity, 5) Estimated data volumes and migration timeframes, 6) Validation queries to verify data integrity before and after migration. Consider performance implications for large data sets.
+
+## 7. Create Data Migration Scripts [pending]
+### Dependencies: 1.5, 1.6
+### Description: Develop SQL scripts to migrate data from existing tables to the new schema based on the migration strategy.
+### Details:
+Write SQL scripts that implement the data migration strategy. Include data transformation logic, handling of NULL values, and generation of new UUIDs where needed. Break down migration into logical chunks that can be executed and verified independently. Include progress reporting for long-running operations. Add extensive error handling and logging to capture any issues during migration.
+
+## 8. Develop Rollback Procedures [pending]
+### Dependencies: 1.5, 1.7
+### Description: Create comprehensive rollback procedures to revert schema changes and data migrations in case of failure.
+### Details:
+Develop rollback scripts that can undo both schema changes and data migrations. Ensure rollback scripts preserve all original data. Document the sequence in which rollback scripts must be executed. Include verification steps to confirm successful rollback. Consider point-in-time recovery options using database backups as an alternative rollback strategy.
+

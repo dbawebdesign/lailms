@@ -1,0 +1,60 @@
+# Task ID: 2
+# Title: Authentication and User Management
+# Status: done
+# Dependencies: 1
+# Priority: high
+# Description: Implement authentication system with Supabase Auth and set up role-based access control for all user types
+# Details:
+Configure Supabase Auth with invite code-based authentication and username/password login using pseudo-emails. Create sign-up with invite code, sign-in, custom password reset, and profile management flows. Implement role-based access control for Super Admin, Admin, Teacher, Student, and Parent roles. Set up middleware to validate authentication on protected routes. Create the members table with role enum and configure RLS policies based on user roles and organization_id. Implement user profile management with avatar upload functionality.
+
+**PRD Context**
+- Authentication: Implement invite code-based signup and username/password login using pseudo-emails
+- Multi-organization tenancy structure: Organization -> School -> Class hierarchy
+- Role management: Support role assignment and switching between roles
+- Parent-child linking: Allow parents to be linked to their children's accounts
+- Custom password reset: Implement password reset flow using invite codes
+- Admin capabilities: Enable user management including invite, bulk import, role changes, and account deactivation
+- Compliance: Ensure adherence to FERPA, GDPR, and COPPA regulations
+- Security: Implement Row-Level Security (RLS) and tenant isolation to protect user data based on organisation_id and role
+- User profiles: Support profile creation and management with appropriate permissions
+
+# Test Strategy:
+Test user registration with invite codes, login with username/password, and custom password reset flows. Verify role-based access control by attempting to access routes with different user roles. Ensure RLS policies correctly restrict access to data based on user role and organisation_id. Test the two-step signup process (code verification, credential submission). Verify multi-org tenancy isolation works correctly. Test parent-child account linking functionality. Validate admin user management capabilities including invites, bulk imports, and role changes. Ensure compliance with privacy regulations through appropriate data handling and permissions.
+
+# Subtasks:
+## 1. Implement Supabase Edge Function /sign-up-with-code [done]
+### Dependencies: None
+### Description: Create Edge Function to validate invite code, create auth user with pseudo-email, mark code redeemed, and create profile record with username, name, grade level.
+### Details:
+
+
+## 2. Implement Frontend Signup UI (2-step) [done]
+### Dependencies: None
+### Description: Create frontend components for 2-step signup: 1) Verify invite code via API route. 2) Submit username, password, first name, last name, grade level via API route to trigger Edge Function.
+### Details:
+
+
+## 3. Implement Frontend Login UI [done]
+### Dependencies: None
+### Description: Create login form for username/password. Construct pseudo-email (<username>@<org-id>.internal - requires fetching org abbr from profile) and call Supabase signInWithPassword.
+### Details:
+
+
+## 4. Implement RLS Policies [done]
+### Dependencies: None
+### Description: Define RLS policies for profiles and invite_codes based on authenticated user's organisation_id and ole extracted from JWT.
+### Details:
+
+
+## 5. Implement Custom Password Reset Flow [done]
+### Dependencies: None
+### Description: Develop a password reset mechanism (e.g., using unique tokens sent via email or another method) as standard Supabase reset won't work with pseudo-emails.
+### Details:
+
+
+## 6. Update Profile Management UI/Logic [done]
+### Dependencies: None
+### Description: Modify profile editing UI and backend logic to read/write irst_name, last_name, grade_level to the profiles table.
+### Details:
+
+

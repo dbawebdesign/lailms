@@ -1,0 +1,95 @@
+# Task ID: 7
+# Title: AI Chat Panel and Integration
+# Status: done
+# Dependencies: 5, 6
+# Priority: medium
+# Description: Implement the AI assistant chat interface with context-aware responses
+# Details:
+Build the AI Chat Panel UI with chat thread, input box, and persona tabs (Tutor, Peer Buddy, Exam Coach). Implement streaming responses from OpenAI GPT-4.1-mini with proper error handling. Create context-aware prompting that incorporates UI state from Luna and relevant knowledge base content. Implement citation display for knowledge base references. Build the chat history storage and retrieval system. Create API routes for chat interactions with proper RLS enforcement.
+
+**PRD Context**
+
+**Global Chat Panel Requirements:**
+- Implement a global chat panel supporting both text and voice input
+- Integrate slash-command palette for quick actions
+- Route commands via GPT functions to appropriate domain RPCs
+- Display inline citations and source links for referenced content
+
+**AI Tutor Chat Functionality:**
+*For Teachers:*
+- Class-level chat capabilities
+- Persona switching between different AI assistant roles
+- Ability to pin resources for student reference
+
+*For Students:*
+- 24/7 contextual help based on current learning materials
+- Access to citation links for further exploration of topics
+
+# Test Strategy:
+Test chat interactions with different personas. Verify streaming responses work correctly. Check that context-aware prompting incorporates relevant UI state and knowledge base content. Ensure citations are displayed correctly for knowledge base references. Test voice input functionality and slash-command palette integration. Verify that teacher-specific and student-specific features work as expected. Test citation links and source references for accuracy.
+
+# Subtasks:
+## 1. Build AI Chat Panel UI Components [done]
+### Dependencies: None
+### Description: Implement the core UI components for the AI chat interface including the chat thread, input box, and persona tabs
+### Details:
+Implementation steps:
+1. Create a responsive chat panel component that can be toggled globally
+2. Implement the chat thread display with support for markdown, code blocks, and citations
+3. Build the message input box with text input and voice input capabilities
+4. Create persona tab switcher for Tutor, Peer Buddy, and Exam Coach roles
+5. Implement slash-command palette UI with autocomplete functionality
+6. Add loading/typing indicators for streaming responses
+7. Design error state displays for network issues or rate limiting
+
+Testing approach:
+- Unit test individual UI components
+- Test responsive behavior across device sizes
+- Verify accessibility compliance (keyboard navigation, screen reader support)
+- Test UI state management with mock chat data
+
+## 2. Implement OpenAI Integration with Streaming Responses [done]
+### Dependencies: 7.1
+### Description: Set up the backend API routes and frontend logic to handle streaming responses from OpenAI GPT-4.1-mini
+### Details:
+Implementation steps:
+1. Create API routes for chat interactions with proper RLS enforcement
+2. Implement OpenAI client configuration with GPT-4.1-mini model
+3. Set up streaming response handling on the backend
+4. Build frontend logic to process and display streaming chunks
+5. Implement proper error handling for API failures, timeouts, and rate limits
+6. Add retry logic for transient failures
+7. Create context-building function that incorporates UI state from Luna
+8. Implement function calling for slash commands
+
+Testing approach:
+- Unit test API routes with mock OpenAI responses
+- Test streaming functionality with various response lengths
+- Verify error handling with simulated failures
+- Load test with concurrent requests
+- Test context building with different UI states
+
+## 3. Implement Context-Aware Prompting and Chat History [done]
+### Dependencies: 7.1, 7.2
+### Description: Build the system for context-aware prompting with knowledge base integration and implement chat history storage and retrieval
+### Details:
+Implementation steps:
+1. Design database schema for storing chat history
+2. Implement chat history storage and retrieval system with proper user scoping
+3. Create context-aware prompting system that incorporates:
+   - Current UI state from Luna
+   - Relevant knowledge base content
+   - User's recent interactions
+   - Selected AI persona
+4. Build citation display system for knowledge base references
+5. Implement knowledge base content retrieval and embedding
+6. Add functionality for teachers to pin resources for student reference
+7. Create system for persisting chat context across sessions
+
+Testing approach:
+- Unit test database operations for chat history
+- Test context building with various knowledge base inputs
+- Verify citation generation and display
+- Test persistence across user sessions
+- Verify proper scoping of chat history by user role
+

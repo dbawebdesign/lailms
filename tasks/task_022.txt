@@ -1,0 +1,102 @@
+# Task ID: 22
+# Title: Implement Document Upload and Listing for Base Classes
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Develop functionality to upload and list documents associated with base classes, including database schema changes, backend API endpoints, and frontend UI components.
+# Details:
+This task requires implementing a complete document management system for base classes across multiple layers of the application:
+
+1. Database Schema Changes:
+   - Add a `base_class_id` foreign key column to the documents table in Supabase
+   - Ensure proper constraints and indexes for performance
+   - Update any existing migrations or schema definitions
+
+2. Backend API Development:
+   - Create an endpoint for document upload that accepts files, validates them, and associates them with the specified base class
+   - Implement a listing endpoint that retrieves all documents for a given base class ID
+   - Add proper authentication and authorization checks to ensure only authorized users can upload/view documents
+   - Implement appropriate error handling and validation
+   - Consider file size limits, allowed file types, and storage considerations
+
+3. Frontend Implementation:
+   - Add a document upload component to the base class details page
+   - Implement a file browser/selector that works across different browsers
+   - Create a document listing component that displays existing documents with relevant metadata
+   - Add download/preview functionality for listed documents
+   - Implement loading states and error handling for API interactions
+   - Ensure the UI is responsive and accessible
+
+4. Integration with Knowledgebase:
+   - Ensure uploaded documents are properly indexed for the knowledgebase
+   - Implement any necessary processing to extract content for lesson generation
+   - Add UI elements that explain how documents will be used in lesson creation
+
+The implementation should follow existing application patterns and coding standards. Consider implementing pagination for the document listing if many documents are expected per base class.
+
+# Test Strategy:
+Testing for this feature should be comprehensive across all layers:
+
+1. Database Testing:
+   - Verify the schema changes are correctly applied
+   - Test foreign key constraints to ensure data integrity
+   - Check that indexes are properly created for query performance
+
+2. Backend API Testing:
+   - Unit test the upload and listing endpoints with various input scenarios
+   - Test authentication and authorization rules
+   - Verify proper handling of edge cases (large files, invalid file types, etc.)
+   - Test error responses and status codes
+   - Implement integration tests that verify the entire flow from upload to storage
+
+3. Frontend Testing:
+   - Write unit tests for React components using Jest and React Testing Library
+   - Test the upload component with various file types and sizes
+   - Verify the document listing correctly displays data from the API
+   - Test loading states, error handling, and empty states
+   - Conduct cross-browser testing to ensure compatibility
+
+4. Manual Testing:
+   - Perform end-to-end testing of the complete document upload and listing flow
+   - Verify that uploaded documents appear correctly in the listing
+   - Test the feature with actual base classes in the development environment
+   - Verify that documents are correctly associated with the knowledgebase
+   - Test the user experience for clarity and ease of use
+
+5. Performance Testing:
+   - Test with large documents and high document counts
+   - Verify loading times for the document listing remain acceptable
+   - Check that the UI remains responsive during uploads
+
+Document all test cases and results for future reference and regression testing.
+
+# Subtasks:
+## 1. Design Database Schema for Document Storage [done]
+### Dependencies: None
+### Description: Create database schema to store uploaded documents with metadata including file name, size, format, upload date, and user information
+### Details:
+Define tables for documents, document versions, permissions, and relationships to users. Include fields for document status tracking, indexing status, and content extraction flags.
+
+## 2. Develop Backend API for Document Management [done]
+### Dependencies: 22.1
+### Description: Create RESTful API endpoints for document upload, retrieval, listing, and deletion with proper authentication and validation
+### Details:
+Implement file validation, chunked uploads for large files, progress tracking, error handling, and security measures. Include endpoints for document status updates and metadata management.
+
+## 3. Build Frontend Upload and Listing UI Components [done]
+### Dependencies: 22.2
+### Description: Develop drag-and-drop file uploader and document listing interface with filtering and sorting capabilities
+### Details:
+Create components for upload field with progress indicators, file token display, error states, and responsive design for mobile and desktop. Implement document listing with search, filter, and preview functionality.
+
+## 4. Implement Knowledgebase Integration and Indexing [done]
+### Dependencies: 22.2, 22.3
+### Description: Develop system to extract content from uploaded documents, index for search, and integrate with existing knowledgebase
+### Details:
+Create content extraction pipeline for different file formats, implement indexing service, and develop integration with search functionality. Include status tracking for indexing process and error handling.
+<info added on 2025-05-13T03:21:53.521Z>
+Create content extraction pipeline for different file formats, implement indexing service, and develop integration with search functionality. Include status tracking for indexing process and error handling.
+
+Database schema has been updated with a migration to add base_class_id to the document_chunks table, enabling proper association between chunks and their respective base classes. Next steps include verifying the summarize-chunks function to ensure it correctly processes document content with the updated schema. Once verified, we need to test the complete end-to-end flow from document upload through chunking, indexing, and retrieval to confirm proper integration with the knowledgebase system.
+</info added on 2025-05-13T03:21:53.521Z>
+

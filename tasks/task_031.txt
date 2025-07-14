@@ -1,0 +1,85 @@
+# Task ID: 31
+# Title: Comprehensive Testing of Luna's Multi-Step Content Creation Workflows
+# Status: done
+# Dependencies: 6, 23, 29, 30
+# Priority: high
+# Description: Test Luna's comprehensive multi-step content creation workflows to ensure all scenarios (path with lessons, lessons with sections, complete hierarchical structures) work correctly without ID confusion issues.
+# Details:
+This task involves creating a comprehensive testing suite for Luna's content creation workflows, focusing on verifying the correct handling of hierarchical content structures and ID management across the system.
+
+Implementation steps:
+
+1. Create test cases for all content creation scenarios:
+   - Creating a learning path with multiple lessons
+   - Creating lessons with multiple sections
+   - Creating complete hierarchical structures (paths → lessons → sections)
+   - Testing content creation with and without AI-assisted generation
+   - Testing manual content creation workflows
+   - Testing batch operations (creating multiple items at once)
+
+2. Implement specific tests for ID management:
+   - Verify that IDs are correctly assigned and maintained throughout the content hierarchy
+   - Test for potential ID collisions or confusion when creating related content
+   - Ensure parent-child relationships are properly maintained in the database
+   - Verify that references between content items remain intact after updates
+
+3. Test edge cases:
+   - Creating content with maximum allowed children
+   - Deleting and recreating content in the same session
+   - Moving content between different parent containers
+   - Duplicating content and verifying unique IDs
+   - Testing with very long content that might trigger edge cases
+
+4. Implement integration tests that verify the entire workflow:
+   - From BaseClass definition to complete learning path generation
+   - From lesson creation to section population
+   - From content creation to content delivery/viewing
+
+5. Create automated test scripts that can be run as part of CI/CD:
+   - Use Playwright or similar tools for end-to-end testing
+   - Create API-level tests for backend functionality
+   - Implement database integrity checks after operations
+
+6. Document all test cases and expected outcomes in a test plan:
+   - Define success criteria for each test case
+   - Create a matrix of test scenarios and their coverage
+   - Document any known limitations or edge cases
+
+# Test Strategy:
+1. Manual Testing:
+   - Create a test matrix covering all content creation scenarios
+   - Perform step-by-step testing of each workflow, documenting results
+   - Verify database state after each operation using SQL queries
+   - Test with different user roles to ensure permissions work correctly
+
+2. Automated Testing:
+   - Implement end-to-end tests using Playwright that simulate user interactions:
+     - Create a learning path with multiple lessons
+     - Add sections to lessons
+     - Verify correct rendering and relationships
+   - Create API tests that verify correct backend behavior:
+     - Test all API endpoints involved in content creation
+     - Verify correct response codes and data structures
+     - Test error handling and edge cases
+
+3. Database Verification:
+   - Create SQL queries to verify database integrity after operations
+   - Check for orphaned records or incorrect relationships
+   - Verify that IDs are unique and correctly referenced
+
+4. Performance Testing:
+   - Test with large datasets to ensure performance remains acceptable
+   - Measure response times for complex operations
+   - Identify any bottlenecks in the content creation process
+
+5. Regression Testing:
+   - Create a suite of tests that can be run after any changes to verify functionality
+   - Automate critical path tests to run in CI/CD pipeline
+   - Document baseline performance metrics for comparison
+
+6. Acceptance Criteria:
+   - All content creation workflows complete successfully without errors
+   - Database integrity is maintained throughout all operations
+   - No ID confusion issues occur in any test scenario
+   - UI correctly displays all created content with proper relationships
+   - Performance remains within acceptable parameters

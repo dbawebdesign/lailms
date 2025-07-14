@@ -1,0 +1,225 @@
+# Task ID: 21
+# Title: Implement Student-Facing Course Player UI
+# Status: pending
+# Dependencies: 4, 10, 11, 14, 16
+# Priority: high
+# Description: Develop a comprehensive Course Player interface that allows students to navigate through course content, view lessons, take assessments, track progress, and experience adaptive learning journeys.
+# Details:
+Create a responsive Course Player UI with the following components:
+
+1. **Main Layout**:
+   - Implement a two-panel layout with collapsible sidebar navigation and main content area
+   - Create breadcrumb navigation showing current position in course structure
+   - Add header with course title, progress summary, and user controls
+
+2. **Sidebar Navigation**:
+   - Display hierarchical course structure (modules, sections, lessons)
+   - Indicate completion status for each item using icons/colors
+   - Implement expand/collapse functionality for nested content
+   - Show estimated time and content type indicators for each item
+
+3. **Content Viewer**:
+   - Render rich lesson content from Lesson Studio (Task 10) including text, images, videos, code blocks, and interactive elements
+   - Support responsive content layout that adapts to different screen sizes
+   - Implement content navigation controls (previous/next, jump to section)
+   - Add bookmarking and note-taking capabilities
+
+4. **Assessment Integration**:
+   - Embed checkpoint quizzes from Assessment Builder (Task 11)
+   - Support multiple question types (multiple choice, fill-in-blank, matching, etc.)
+   - Implement quiz submission and immediate feedback display
+   - Show assessment history and performance metrics
+
+5. **Progress Tracking**:
+   - Create visual progress bar showing completion percentage
+   - Implement milestone markers for key achievements
+   - Connect to Mastery Tracking system (Task 14) to display competency levels
+   - Add visual indicators for recommended next steps
+
+6. **Adaptive Features**:
+   - Implement dynamic content presentation based on student performance
+   - Support conditional content display based on mastery level
+   - Add personalized recommendations for additional resources
+   - Integrate with adaptive journey system (Task 16)
+
+7. **Accessibility**:
+   - Ensure WCAG 2.1 AA compliance throughout the interface
+   - Implement proper heading structure and ARIA attributes
+   - Support keyboard navigation and screen readers
+   - Maintain sufficient color contrast and text sizing
+   - Add alt text for all images and media
+
+8. **PRD Context**:
+   - **Sidebar Navigation**: Implement a collapsible sidebar that displays the complete course structure with clear visual indicators for completion status, current position, and content types. Navigation should allow students to quickly jump between different sections of the course.
+   - **Rich Content Viewer**: Create a robust content display area that renders various content types (text, images, videos, code samples, interactive elements) with consistent styling and responsive layout. Support for bookmarking and note-taking should be integrated directly into the content view.
+   - **Checkpoint Quiz Integration**: Seamlessly embed assessment components that maintain the course's visual language while providing clear feedback on correct/incorrect answers. Support for reviewing past quiz attempts should be available.
+   - **Visual Progress Tracking**: Implement an intuitive progress visualization system showing overall course completion, module completion, and mastery levels for key concepts. Progress indicators should be consistently visible to motivate continued engagement.
+   - **Adaptive Journey Features**: Support dynamic difficulty adjustments based on student performance, allowing content to adapt in complexity or provide additional practice opportunities. Enable variant lesson formats that can be conditionally displayed based on learning style preferences or performance patterns.
+   - **Accessibility Requirements**: Ensure full WCAG 2.1 AA compliance, including proper semantic structure, keyboard navigation, screen reader support, and sufficient color contrast. All interactive elements must be fully accessible with appropriate ARIA attributes.
+
+Use the AppShell (Task 4) as the foundation for the Course Player, ensuring consistent styling and navigation patterns. Implement state management to track user progress within sessions and persist across page refreshes.
+
+# Test Strategy:
+Testing should verify functionality, usability, and accessibility of the Course Player UI:
+
+1. **Functional Testing**:
+   - Verify sidebar navigation correctly displays course structure and updates active state
+   - Test content viewer renders all supported content types from Lesson Studio
+   - Confirm assessment integration displays quizzes correctly and processes submissions
+   - Validate progress tracking accurately reflects completion status
+   - Test adaptive features show appropriate content based on user progress
+
+2. **Integration Testing**:
+   - Verify integration with Lesson Studio content (Task 10)
+   - Test Assessment Builder quiz embedding and submission (Task 11)
+   - Validate Mastery Tracking data display (Task 14)
+   - Confirm adaptive journey features function correctly (Task 16)
+
+3. **Responsive Testing**:
+   - Test UI on multiple devices (desktop, tablet, mobile)
+   - Verify sidebar collapses/expands appropriately on smaller screens
+   - Confirm content reflows correctly at different viewport sizes
+
+4. **Accessibility Testing**:
+   - Run automated WCAG 2.1 AA compliance checks using axe or similar tools
+   - Perform keyboard navigation testing (tab order, focus indicators)
+   - Test with screen readers (NVDA, JAWS, VoiceOver)
+   - Verify color contrast meets minimum ratios
+   - Test with browser zoom up to 200%
+
+5. **User Testing**:
+   - Conduct usability testing with representative users
+   - Gather feedback on navigation intuitiveness and content readability
+   - Test with users who have accessibility needs
+
+6. **Performance Testing**:
+   - Measure and optimize load times for content rendering
+   - Test performance with large course structures
+   - Verify smooth transitions between content sections
+
+Create automated tests using Jest and React Testing Library to verify component rendering and interactions. Document test cases in the test suite with clear descriptions of expected behavior.
+
+# Subtasks:
+## 1. Implement Course Player Layout and Sidebar Navigation [pending]
+### Dependencies: None
+### Description: Create the foundational two-panel layout with a collapsible sidebar navigation and main content area, including the header with course information and the hierarchical course structure navigation.
+### Details:
+Implementation details:
+
+1. Set up the basic Course Player component structure using the AppShell (Task 4) as foundation
+   - Create CoursePlayer container component with responsive layout
+   - Implement header with course title, progress summary, and user controls
+   - Add breadcrumb navigation component showing current position
+
+2. Develop the collapsible sidebar navigation
+   - Create hierarchical navigation structure for modules, sections, and lessons
+   - Implement expand/collapse functionality for nested content
+   - Add visual indicators for completion status (using icons/colors)
+   - Include estimated time and content type indicators for each item
+   - Ensure sidebar is responsive and can be toggled on smaller screens
+
+3. Implement state management for course structure and navigation
+   - Set up Redux/Context store for course structure data
+   - Create actions and reducers for navigation state
+   - Implement persistence of navigation state across page refreshes
+   - Add event handlers for navigation item selection
+
+4. Ensure accessibility for navigation components
+   - Implement proper heading structure and ARIA attributes
+   - Add keyboard navigation support
+   - Ensure sufficient color contrast for status indicators
+   - Test with screen readers
+
+Testing approach:
+- Unit tests for navigation components and state management
+- Integration tests for sidebar interaction with main content area
+- Responsive design testing across different screen sizes
+- Accessibility testing with automated tools and keyboard navigation
+
+## 2. Develop Content Viewer with Rich Media Support [pending]
+### Dependencies: 21.1
+### Description: Create a robust content viewer component that can render various content types (text, images, videos, code blocks, interactive elements) with responsive layout, navigation controls, and bookmarking functionality.
+### Details:
+Implementation details:
+
+1. Create the main content viewer component
+   - Implement responsive container for lesson content
+   - Add content navigation controls (previous/next, jump to section)
+   - Create loading states and error handling for content fetching
+   - Ensure proper content scrolling behavior and viewport management
+
+2. Develop renderers for different content types
+   - Text renderer with support for headings, paragraphs, lists, etc.
+   - Image renderer with lazy loading and responsive sizing
+   - Video player integration with playback controls
+   - Code block renderer with syntax highlighting
+   - Interactive element container for embedded activities
+
+3. Implement bookmarking and note-taking features
+   - Add bookmark toggle UI and state management
+   - Create note-taking interface with text editor
+   - Implement save/load functionality for user-generated content
+   - Add bookmark/notes listing and navigation
+
+4. Connect content viewer to navigation system
+   - Handle navigation events from sidebar to load appropriate content
+   - Update breadcrumb and current position indicators
+   - Implement content transition animations
+   - Save viewing progress to state management
+
+5. Ensure accessibility for all content types
+   - Add proper alt text for images
+   - Ensure video players have captions and transcripts
+   - Maintain proper heading structure in rendered content
+   - Test all interactive elements with keyboard and screen readers
+
+Testing approach:
+- Unit tests for individual content type renderers
+- Integration tests for content navigation and state updates
+- Visual regression tests for content rendering
+- Performance testing for media loading and rendering
+- Accessibility testing for all content types
+
+## 3. Implement Assessment Integration and Progress Tracking [pending]
+### Dependencies: 21.1, 21.2
+### Description: Integrate assessment components, progress tracking visualizations, and adaptive learning features to create a complete interactive learning experience.
+### Details:
+Implementation details:
+
+1. Integrate assessment components
+   - Create container for embedding checkpoint quizzes
+   - Implement renderers for multiple question types (multiple choice, fill-in-blank, matching, etc.)
+   - Add quiz submission handling and immediate feedback display
+   - Develop assessment history and performance metrics views
+
+2. Implement progress tracking visualizations
+   - Create visual progress bar showing completion percentage
+   - Add milestone markers for key achievements
+   - Implement mastery level indicators connected to Mastery Tracking system
+   - Develop visual indicators for recommended next steps
+
+3. Develop adaptive learning features
+   - Implement conditional content display based on student performance
+   - Create system for dynamic content presentation based on mastery level
+   - Add personalized recommendations component
+   - Connect to adaptive journey system for personalized learning paths
+
+4. Integrate all components into cohesive experience
+   - Ensure consistent styling across all components
+   - Implement smooth transitions between content and assessments
+   - Create unified state management for tracking progress across components
+   - Add persistence layer for saving progress to backend
+
+5. Final accessibility and performance optimizations
+   - Conduct comprehensive accessibility audit
+   - Optimize component rendering and state updates
+   - Implement lazy loading for performance
+   - Add final polish for animations and transitions
+
+Testing approach:
+- Unit tests for assessment components and progress tracking
+- Integration tests for adaptive features and content conditionals
+- End-to-end tests for complete user journeys
+- Performance testing under various network conditions
+- User acceptance testing with sample course content
+

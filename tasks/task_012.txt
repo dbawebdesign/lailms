@@ -1,0 +1,144 @@
+# Task ID: 12
+# Title: Study Space Core Implementation
+# Status: pending
+# Dependencies: 5, 7
+# Priority: medium
+# Description: Build the NotebookLM-style study companion suite. This includes a student study space dashboard to access individual class study spaces, and within each class study space, features like knowledge-base chat, smart note-taking, mind-map generation, audio teaching podcasts, and a new lecture/class recording capability. Recordings can be tagged to existing classes or saved as standalone named recordings.
+# Details:
+Create the Study Space UI with NoteEditor, MindMapCanvas, and PodcastPlayer components. Implement the Knowledge-Base Chat with context-aware responses and citation display. Build the Mind-Map Generator using AI to create visual representations of concepts. Implement the Audio Teaching Podcast Creator that generates spoken explanations from text. Create the Smart Note-Taking system with automatic summarization and tagging. Build the collaborative study features for shared notebooks and group sessions. Implement API routes for study space functionality with proper RLS enforcement.
+
+**PRD Context**
+The Study Space suite is inspired by NotebookLM and provides students with the following key features:
+1. Knowledge-base Q&A chat - Allows students to ask questions about their learning materials with context-aware responses and citation display
+2. Smart note-taking system - Enables automatic summarization and tagging of notes for better organization
+3. Interactive mind-map generator - Creates visual representations of concepts with export functionality
+4. Audio podcast creator - Generates spoken explanations from text content for auditory learners
+5. Adaptive flash-card drills - Provides personalized practice based on student performance
+6. Reflection journal - Helps students track their learning progress and insights
+7. Lecture/class recording capability - Allows students to record lectures and tag them to existing classes or save as standalone recordings
+
+These features should work together to create a comprehensive study companion that enhances the learning experience.
+
+# Test Strategy:
+Test note creation and editing. Verify mind map generation creates meaningful visual representations. Test audio podcast generation for clarity and accuracy. Check that smart note-taking correctly summarizes and tags content. Test collaborative features with multiple users. Verify adaptive flash-card functionality adjusts to user performance. Test reflection journal entries and retrieval. Ensure all export functions work properly for mind maps and other content. Test the recording feature for both class-tagged and standalone recordings. Verify that recorded content is properly integrated with other study tools.
+
+# Subtasks:
+## 1. Implement Study Space UI Core Components [pending]
+### Dependencies: None
+### Description: Implement Student Study Space Dashboard UI and Individual Class Study Space Layout. This includes: A main dashboard page (`/learn/study-dashboard` or similar) that lists all of a student's enrolled classes and standalone recordings, allowing navigation into individual study spaces. A layout for individual class/recording study spaces, which will house features like NoteEditor, MindMapCanvas, PodcastPlayer, the new Recording feature, and Knowledge-Base Chat. Core UI components for the NoteEditor, MindMapCanvas, and PodcastPlayer as originally planned, but now contextualized within an individual class/recording study space.
+### Details:
+Implementation steps:
+1. Create a responsive layout for the Study Space Dashboard with a list of enrolled classes and standalone recordings
+2. Implement navigation from the dashboard to individual class/recording study spaces
+3. Build the layout for individual class/recording study spaces with sidebar navigation and main content area
+4. Implement the NoteEditor component with rich text editing capabilities (using a library like Slate.js or Draft.js)
+5. Build a basic MindMapCanvas component with SVG/Canvas rendering for concept visualization
+6. Develop the PodcastPlayer component with audio controls and playback functionality
+7. Create state management for these components using React Context or Redux
+8. Implement responsive design for different screen sizes
+9. Add basic styling with CSS/SCSS following the application's design system
+
+Testing approach:
+- Unit tests for each component's core functionality
+- Integration tests for component interactions
+- Responsive design testing across different viewport sizes
+- Manual testing of UI interactions and layout
+- Navigation flow testing between dashboard and individual study spaces
+
+## 2. Implement Knowledge-Base Chat and Smart Note-Taking System [pending]
+### Dependencies: 12.1
+### Description: Implement Knowledge-Base Chat and Smart Note-Taking System within Individual Class Study Spaces. Knowledge-Base Chat: Context-aware responses and citation display, scoped to the specific class's materials or the content of a standalone recording. Smart Note-Taking System: Automatic summarization and tagging, also scoped to the current class/recording context.
+### Details:
+Implementation steps:
+1. Create the chat interface component with message history display and input field
+2. Implement API integration for sending user queries to the backend
+3. Build the context-aware response system that references learning materials specific to the current class/recording
+4. Develop the citation display mechanism to show sources of information
+5. Implement automatic summarization functionality for notes using AI services
+6. Create a tagging system for notes with both manual and AI-suggested tags
+7. Build the backend API routes for chat functionality with proper RLS enforcement
+8. Implement data persistence for chat history and notes
+9. Add context-switching logic to ensure chat and notes are scoped to the current class/recording
+
+Testing approach:
+- Unit tests for chat and note-taking components
+- Integration tests for API communication
+- End-to-end tests for complete user flows
+- Performance testing for response times
+- Security testing for RLS enforcement
+- Context isolation testing to verify proper scoping to class/recording
+
+## 3. Implement Mind-Map Generator and Audio Teaching Podcast Creator [pending]
+### Dependencies: 12.1, 12.2
+### Description: Implement Mind-Map Generator and Audio Teaching Podcast Creator within Individual Class Study Spaces. Mind-Map Generator: AI-powered visual concept mapping, based on the specific class's materials or standalone recording. Audio Teaching Podcast Creator: Generates spoken explanations from text related to the current class/recording.
+### Details:
+Implementation steps:
+1. Enhance the MindMapCanvas component to support dynamic generation of mind maps
+2. Implement the AI integration for analyzing content and generating mind map structures based on class/recording context
+3. Create interactive features for users to modify and customize generated mind maps
+4. Add export functionality for mind maps (PNG, PDF, SVG formats)
+5. Implement the text-to-speech conversion system for the podcast creator
+6. Build controls for audio generation settings (voice, speed, emphasis)
+7. Create a system for saving and organizing generated podcasts within the class/recording context
+8. Implement backend API routes for mind map and podcast functionality
+9. Add collaborative features for shared mind maps and podcasts
+10. Ensure proper context isolation between different class/recording study spaces
+
+Testing approach:
+- Unit tests for mind map generation and audio creation components
+- Integration tests for AI service communication
+- Quality testing for generated mind maps and audio content
+- Performance testing for generation times
+- User acceptance testing for the complete feature set
+- Context isolation testing between different class/recording spaces
+
+## 4. Implement Lecture/Class Recording Feature [pending]
+### Dependencies: 12.1
+### Description: Develop the functionality for students to record lectures or classes. This includes: A 'Record' button visible within the study space. On click, a modal appears. Inside the modal: A dropdown to select an existing enrolled class. If selected, the recording is tagged to this class and its content added to the class's source materials for the study space. An option to create a 'Standalone Recording'. If selected, the user can provide a name for this recording. It will be treated as a separate entity in their study space dashboard, similar to a class, but without teacher/school association. Backend logic to handle the recording process (actual audio/video capture might leverage browser APIs or a simple placeholder for now, focus on the tagging and storage association). Storing/linking recordings appropriately in the database (e.g., a new `recordings` table, linked to `class_instances` or `user_profiles` for standalone ones).
+### Details:
+Implementation steps:
+1. Create a 'Record' button component that integrates into the study space UI
+2. Implement a modal component for recording configuration
+3. Build the dropdown for selecting existing classes, pulling data from the user's enrolled classes
+4. Create the standalone recording option with name input field
+5. Implement browser API integration for audio/video capture
+6. Build backend API endpoints for storing recording metadata and content
+7. Create database schema updates for the new `recordings` table with appropriate relations
+8. Implement RLS policies for recording access control
+9. Add recording playback functionality within the study space
+10. Create UI elements for managing and organizing recordings
+
+Testing approach:
+- Unit tests for recording UI components
+- Integration tests for browser recording API
+- Backend API tests for recording storage and retrieval
+- Database schema validation tests
+- End-to-end tests for the complete recording workflow
+- Security testing for proper access controls
+- Cross-browser compatibility testing for recording functionality
+
+## 5. Integrate Recording Content into Study Tools [pending]
+### Dependencies: 12.2, 12.3, 12.4
+### Description: Ensure that content from recordings (both class-tagged and standalone) can be processed and utilized by other study space tools. This involves: If recordings include audio, implement or plan for transcription (e.g., via a Supabase function or third-party service) so the text content is available. Making transcribed text from recordings accessible to the Knowledge-Base Chat, Smart Note-Taking (for summarization/tagging), Mind-Map Generator, and Audio Teaching Podcast Creator. Updating the `documents` or a similar table/concept to include recordings as a source type.
+### Details:
+Implementation steps:
+1. Research and integrate a speech-to-text transcription service (e.g., OpenAI Whisper API, Google Speech-to-Text)
+2. Implement a background job system for processing recordings and generating transcriptions
+3. Create a data structure for storing and indexing transcribed content
+4. Update the Knowledge-Base Chat to include recording transcriptions in its context sources
+5. Modify the Smart Note-Taking system to process and summarize recording content
+6. Enhance the Mind-Map Generator to incorporate concepts from recordings
+7. Update the Audio Teaching Podcast Creator to reference and include content from recordings
+8. Modify the `documents` table schema to include recordings as a source type
+9. Implement UI indicators to show when recording content is being used in study tools
+10. Create a system for managing and updating transcriptions if recordings are edited
+
+Testing approach:
+- Unit tests for transcription integration
+- Integration tests for each study tool with recording content
+- Performance testing for transcription processing times
+- Accuracy testing for transcription quality
+- End-to-end tests for the complete workflow from recording to study tool utilization
+- Database schema validation tests
+- Error handling tests for failed transcriptions
+

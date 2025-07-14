@@ -1,0 +1,103 @@
+# Task ID: 23
+# Title: Lesson Structure Generation from BaseClass
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Implement functionality to generate lesson paths and lessons from a BaseClass definition, including optional AI-powered content auto-generation for these lessons.
+# Details:
+
+
+# Test Strategy:
+
+
+# Subtasks:
+## 1. Define BaseClass.settings.curriculum_outline JSON structure and update BaseClass type [done]
+### Dependencies: None
+### Description: Determine and document the JSON structure for curriculum_outline within BaseClass.settings (or a dedicated field). This structure will define paths and their lessons. Update the BaseClass interface in src/types/teach.ts to reflect this new settings field.
+### Details:
+Example curriculum_outline structure:
+```json
+{
+  "paths": [
+    {
+      "id_ref": "path_1", // Optional reference ID for internal use during generation
+      "title": "Module 1: Introduction",
+      "description": "Fundamental concepts.",
+      "order": 1,
+      "lessons": [
+        {
+          "id_ref": "lesson_1_1",
+          "title": "First Lesson Topic",
+          "description": "Details about the first lesson.",
+          "order": 1
+        }
+      ]
+    }
+  ]
+}
+```
+Update BaseClass in `src/types/teach.ts` to include `settings?: { curriculum_outline?: CurriculumOutline; [key: string]: any; };` where CurriculumOutline is a new interface matching this structure.
+<info added on 2025-05-13T13:51:14.780Z>
+The structure to type is now based on `base_classes.settings.generatedOutline`, which contains an array of `modules` (acting as Paths). Each module has a `title` (string), `topics` (string[]), and an array of `suggestedLessons` (acting as Lessons). Each `suggestedLesson` has a `title` (string) and an `objective` (string). The `suggestedAssessments` array can be ignored for this typing task.
+
+Define the following TypeScript interfaces in `src/types/teach.ts`:
+
+```typescript
+interface GeneratedLesson {
+  title: string;
+  objective: string;
+}
+
+interface GeneratedModule {
+  title: string;
+  topics: string[];
+  suggestedLessons: GeneratedLesson[];
+  suggestedAssessments?: any[]; // optional, not typed for this task
+}
+
+interface GeneratedOutline {
+  modules: GeneratedModule[];
+}
+
+interface BaseClass {
+  // ...other fields
+  settings?: {
+    generatedOutline?: GeneratedOutline;
+    [key: string]: any;
+  };
+}
+```
+
+Update the `BaseClass` type to include `settings?: { generatedOutline?: GeneratedOutline; [key: string]: any; };`. Remove or replace any previous `curriculum_outline` types if they were added based on earlier assumptions.
+</info added on 2025-05-13T13:51:14.780Z>
+
+## 2. Create Supabase migration for paths and lessons tables [done]
+### Dependencies: None
+### Description: Create a new Supabase migration file. This migration will: 1. Alter the `paths` table: add `creator_user_id UUID REFERENCES auth.users(id)`, add `base_class_id UUID REFERENCES public.base_classes(id) ON DELETE CASCADE`, add `order_index INTEGER`. Remove/alter old `created_by` if it refers to `members`. Ensure `title` column exists. 2. Alter the `lessons` table: add `creator_user_id UUID REFERENCES auth.users(id)`, (optional) add `base_class_id UUID REFERENCES public.base_classes(id) ON DELETE SET NULL`. Remove/alter old `created_by`. Ensure `order_index INTEGER NOT NULL`.
+### Details:
+
+
+## 3. Implement API for BaseClass-to-Lesson Generation [done]
+### Dependencies: None
+### Description: Create the Next.js API route handler. It will read the `BaseClass.settings.curriculum_outline`, then iterate through the defined paths and lessons to create corresponding records in the `paths` and `lessons` database tables, linking them to the `baseClassId` and to each other (`lessons` to `paths`).
+### Details:
+
+
+## 4. Integrate Lesson Generation Trigger [done]
+### Dependencies: None
+### Description: Determine the trigger point for lesson generation. Choice 1: Automatically call the `generate-lessons` API after a `BaseClass` is successfully created or its `curriculum_outline` is updated. Choice 2: Add a button on the `BaseClass` management/editing page to let the user manually trigger this generation. Implement the chosen method.
+### Details:
+
+
+## 5. Implement API for AI Content Auto-Generation for a Lesson [done]
+### Dependencies: None
+### Description: Create an API route that takes a `lessonId`. This endpoint will use an AI model (e.g., GPT-4) to generate a set of initial `lesson_sections` (e.g., introduction, key topics, summary, simple quiz) for that lesson. The content should be based on the lesson's title, description, and its parent path/base class context. Save these sections to the `lesson_sections` table.
+### Details:
+
+
+## 6. UI for 'Auto-Generate All Lessons' Content Button [done]
+### Dependencies: None
+### Description: On the individual `BaseClass` management page, add a button labeled 'Auto-Generate Content for All Lessons'. When clicked, this should: 1. Fetch all lessons associated with the current `BaseClass`. 2. For each lesson, call the API endpoint from subtask 11.5 (`/api/teach/lessons/[lessonId]/auto-generate-content`). 3. Provide visual feedback for the (potentially long-running) process and report success/failure.
+### Details:
+
+

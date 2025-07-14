@@ -1,0 +1,75 @@
+# Task ID: 6
+# Title: Luna Context Engine Implementation
+# Status: done
+# Dependencies: 4
+# Priority: medium
+# Description: Build the real-time UI context tracking and agentic action system
+# Details:
+Implement the UIContextProvider that registers UI components and tracks their state. Create useUIContext hook for components to register themselves with metadata including role, route, type, props, and visibility flags. Build the context serialization system that creates snapshots of UI state. Implement BroadcastChannel and postMessage communication with AI Chat Panel. Create debounced POST to /api/ui-state endpoint that stores context in ui_contexts table with vector embeddings. Implement intent inference system that analyzes context and suggests actions.
+
+**PRD Context**
+
+- **Component Self-Registration**: Implement the useUIContext hook that allows UI components to register themselves with the context engine, providing metadata about their role, route, type, props, and visibility state.
+
+- **Real-time UI Snapshots**: Develop a system to create and store snapshots of the current UI state in the ui_contexts table, including vector embeddings for efficient retrieval and analysis.
+
+- **Intent Inference**: Build a system that analyzes the current UI context to infer user intent and suggest appropriate actions, which will lead to agentic RPC/Edge function calls.
+
+- **UI Mutation Broadcasting**: Implement real-time broadcasting of UI mutations to ensure all components stay synchronized with the latest state changes.
+
+# Test Strategy:
+Verify components correctly register with UIContextProvider. Test context serialization by checking snapshots contain expected data. Ensure context updates are properly debounced and stored in the database. Validate that intent inference correctly suggests appropriate actions based on UI context. Test the real-time broadcasting system to confirm UI mutations are properly synchronized across components.
+
+# Subtasks:
+## 1. Implement UIContextProvider and useUIContext Hook [done]
+### Dependencies: None
+### Description: Create the core context tracking system with component self-registration capabilities
+### Details:
+1. Create a React context (UIContext) with a provider component (UIContextProvider)
+2. Implement the useUIContext hook that allows components to register themselves with metadata
+3. Design the registration data structure to include component role, route, type, props, and visibility flags
+4. Add methods to track component mounting, unmounting, and state changes
+5. Implement a registry to maintain the current set of active UI components
+6. Add debug utilities to inspect the current context state
+7. Test by creating sample components that register with the context system and verify proper tracking of their lifecycle and state changes
+
+## 2. Build Context Serialization and Storage System [done]
+### Dependencies: 6.1
+### Description: Implement the system to create UI state snapshots and store them with vector embeddings
+### Details:
+1. Create a serialization function that converts the UI context registry to a structured JSON snapshot
+2. Implement debounced context snapshot generation to avoid excessive processing
+3. Set up BroadcastChannel for communication with the AI Chat Panel
+4. Create a POST endpoint at /api/ui-state to receive context snapshots
+5. Implement database operations to store snapshots in the ui_contexts table
+6. Add vector embedding generation for the context data to enable semantic search
+7. Implement proper error handling and retry mechanisms
+8. Test the serialization by generating snapshots of different UI states and verifying the data structure
+9. Test the storage system by confirming snapshots are properly saved to the database with embeddings
+<info added on 2025-05-06T01:59:32.233Z>
+1. Create a serialization function that converts the UI context registry to a structured JSON snapshot
+2. Implement debounced context snapshot generation to avoid excessive processing
+3. Set up BroadcastChannel for communication with the AI Chat Panel
+4. Implement sessionStorage for temporary persistence of context data
+5. Create a mechanism to pass context data to the chat interface when needed
+6. Implement proper error handling for serialization edge cases
+7. Test the serialization by generating snapshots of different UI states and verifying the data structure
+8. Test the communication system by confirming snapshots are properly passed between components
+9. Integrate the context serialization system within LunaContextProvider
+10. Implement a strategy to handle context updates and broadcasts efficiently
+</info added on 2025-05-06T01:59:32.233Z>
+
+## 3. Develop Intent Inference and Action System [done]
+### Dependencies: 6.1, 6.2
+### Description: Create the system that analyzes UI context to infer user intent and suggest actions
+### Details:
+1. Design an intent inference algorithm that analyzes the current UI context
+2. Create a mapping between recognized patterns in UI state and potential user intents
+3. Implement an action suggestion system that proposes relevant actions based on inferred intent
+4. Build the mechanism for executing agentic RPC/Edge function calls based on suggested actions
+5. Implement UI mutation broadcasting to synchronize components after state changes
+6. Create an API for components to subscribe to relevant context changes
+7. Add a feedback mechanism to improve intent inference accuracy over time
+8. Test by simulating various UI states and verifying that appropriate intents and actions are inferred
+9. Test the execution of suggested actions and verify that UI components properly respond to broadcasts
+
