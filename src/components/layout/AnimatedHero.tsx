@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { ArrowRight, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 
 export default function AnimatedHero() {
   useEffect(() => {
@@ -185,10 +186,12 @@ export default function AnimatedHero() {
             Start Building Today
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
-          <Button variant="outline" className="border-gray-600 text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors flex items-center opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.4s'}}>
-            <Play className="mr-2 h-4 w-4" />
-            Watch Demo
-          </Button>
+          <Link href="https://calendly.com/zjones-learnologyai/learnology-ai-demo?month=2025-07" target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" className="border-gray-600 text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors flex items-center opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.4s'}}>
+              <Play className="mr-2 h-4 w-4" />
+              Watch Demo
+            </Button>
+          </Link>
         </div>
 
         {/* Bottom Text */}

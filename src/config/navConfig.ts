@@ -23,6 +23,7 @@ import {
   PenTool,
   MessageCircle,
   Wrench,
+  Play,
 } from "lucide-react";
 import { UserRole } from "@/lib/utils/roleUtils";
 

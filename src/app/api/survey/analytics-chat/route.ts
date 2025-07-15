@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
 
-    // Fetch all survey data for context using admin client
+    // Fetch all regular survey data for context using admin client
     const { data: surveyData, error: surveyError } = await supabaseAdmin
       .from('survey_responses')
       .select(`
@@ -56,7 +56,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch survey data' }, { status: 500 })
     }
 
-    // Fetch all questions for reference
+    // Fetch all public survey data for context using admin client
+    const { data: publicSurveyData, error: publicSurveyError } = await supabaseAdmin
+      .from('public_survey_responses')
+      .select(`
+        *,
+        public_survey_question_responses (
+          question_id,
+          response_value,
+          public_survey_questions (
+            id,
+            question_text,
+            question_type,
+            options,
+            section_id,
+            order_index,
+            public_survey_sections (
+              title,
+              description
+            )
+          )
+        )
+      `)
+      .order('completed_at', { ascending: false })
+
+    if (publicSurveyError) {
+      console.error('Error fetching public survey data:', publicSurveyError)
+      return NextResponse.json({ error: 'Failed to fetch public survey data' }, { status: 500 })
+    }
+
+    // Fetch all questions for reference (regular surveys)
     const { data: questionsData, error: questionsError } = await supabaseAdmin
       .from('survey_questions')
       .select(`
@@ -74,13 +103,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch questions data' }, { status: 500 })
     }
 
-    // Transform survey data for AI context
+    // Fetch all public questions for reference
+    const { data: publicQuestionsData, error: publicQuestionsError } = await supabaseAdmin
+      .from('public_survey_questions')
+      .select(`
+        *,
+        public_survey_sections (
+          title,
+          description
+        )
+      `)
+      .order('section_id', { ascending: true })
+      .order('order_index', { ascending: true })
+
+    if (publicQuestionsError) {
+      console.error('Error fetching public questions:', publicQuestionsError)
+      return NextResponse.json({ error: 'Failed to fetch public questions data' }, { status: 500 })
+    }
+
+    // Transform regular survey data for AI context
     const transformedResponses = surveyData.map((response: any) => ({
       response_id: response.id,
       user_id: response.user_id,
       completed_at: response.completed_at,
       duration_seconds: response.duration_seconds,
       device_info: response.device_info,
+      source: 'authenticated_user',
       responses: response.survey_question_responses.map((qr: any) => ({
         question_id: qr.question_id,
         question_text: qr.survey_questions.question_text,
@@ -93,6 +141,32 @@ export async function POST(request: NextRequest) {
       }))
     }))
 
+    // Transform public survey data for AI context
+    const transformedPublicResponses = publicSurveyData.map((response: any) => ({
+      response_id: response.id,
+      session_id: response.session_id,
+      email: response.email,
+      completed_at: response.completed_at,
+      duration_seconds: response.duration_seconds,
+      device_info: response.device_info,
+      ip_address: response.ip_address,
+      source: 'public_anonymous',
+      responses: response.public_survey_question_responses.map((qr: any) => ({
+        question_id: qr.question_id,
+        question_text: qr.public_survey_questions.question_text,
+        question_type: qr.public_survey_questions.question_type,
+        section_title: qr.public_survey_questions.public_survey_sections.title,
+        section_description: qr.public_survey_questions.public_survey_sections.description,
+        response_value: qr.response_value,
+        response_text: null, // Public surveys don't have response_text
+        options: qr.public_survey_questions.options
+      }))
+    }))
+
+    // Combine all responses
+    const allTransformedResponses = [...transformedResponses, ...transformedPublicResponses]
+
+    // Transform regular questions reference
     const questionsReference = questionsData.map((q: any) => ({
       id: q.id,
       question_text: q.question_text,
@@ -100,81 +174,89 @@ export async function POST(request: NextRequest) {
       options: q.options,
       section_title: q.survey_sections.title,
       section_description: q.survey_sections.description,
-      order_index: q.order_index
+      source: 'authenticated_user'
     }))
 
-    // Create system prompt with survey context
-    const systemPrompt = `You are Luna, an AI analytics assistant for LearnologyAI's homeschool parent survey data. You have access to comprehensive survey response data and can provide detailed insights, analysis, and answer questions about the survey results.
+    // Transform public questions reference
+    const publicQuestionsReference = publicQuestionsData.map((q: any) => ({
+      id: q.id,
+      question_text: q.question_text,
+      question_type: q.question_type,
+      options: q.options,
+      section_title: q.public_survey_sections.title,
+      section_description: q.public_survey_sections.description,
+      source: 'public_anonymous'
+    }))
+
+    // Combine all questions
+    const allQuestionsReference = [...questionsReference, ...publicQuestionsReference]
+
+    // Create comprehensive survey context for AI
+    const surveyContext = {
+      total_responses: allTransformedResponses.length,
+      authenticated_responses: transformedResponses.length,
+      public_responses: transformedPublicResponses.length,
+      responses: allTransformedResponses,
+      questions: allQuestionsReference,
+      data_sources: {
+        authenticated: "Responses from registered users who completed the survey after signing up",
+        public: "Anonymous responses from public users who completed the survey without authentication, includes screening questions"
+      }
+    }
+
+    // Enhanced system prompt to handle both data sources
+    const systemPrompt = `You are Luna, a survey analytics assistant for Learnology AI. You have access to comprehensive survey data from both authenticated users and public anonymous responses.
+
+DATA SOURCES:
+1. Authenticated User Surveys: ${transformedResponses.length} responses from registered users
+2. Public Anonymous Surveys: ${transformedPublicResponses.length} responses from anonymous users (includes screening questions)
 
 SURVEY STRUCTURE:
-- Section 1: Problem Validation (Questions 1-7) - Likert scale (Strongly Disagree to Strongly Agree)
-- Section 2: Product Test (Questions 8-14) - Importance scale (Very Unimportant to Very Important)  
-- Section 3: Primary Concerns (Question 15) - Multiple choice about AI adoption concerns
-- Section 4: Demographics (Questions 16-23) - Mixed question types about background and preferences
+- Both surveys cover similar topics: Problem Validation, Product Interest, Demographics, and Feedback
+- Public surveys include additional screening questions to filter qualified respondents
+- You can analyze patterns across both data sources or focus on specific segments
 
-SURVEY DATA SUMMARY:
-- Total Responses: ${transformedResponses.length}
-- Questions per Response: 23 questions across 4 sections
-- Response Period: ${surveyData[surveyData.length - 1]?.completed_at} to ${surveyData[0]?.completed_at}
+ANALYSIS CAPABILITIES:
+- Identify pain points and challenges in homeschooling
+- Analyze feature preferences and prioritization
+- Examine demographic patterns and correlations
+- Compare responses between authenticated and anonymous users
+- Provide actionable insights for product development
+- Generate data-driven recommendations
 
-AVAILABLE DATA:
-${JSON.stringify(transformedResponses, null, 2)}
+RESPONSE STYLE:
+- Be analytical and data-driven
+- Provide specific numbers and percentages
+- Highlight key insights and patterns
+- Suggest actionable next steps
+- Mention data source when relevant (authenticated vs public)
+- Use clear, professional language
 
-QUESTIONS REFERENCE:
-${JSON.stringify(questionsReference, null, 2)}
-
-CAPABILITIES:
-- Analyze response patterns and trends
-- Calculate statistics and percentages
-- Identify correlations between demographics and responses
-- Provide business insights and recommendations
-- Compare responses across different demographic segments
-- Generate detailed reports on specific aspects of the data
-
-ANALYSIS GUIDELINES:
-- Always provide specific data points and percentages
-- Reference exact question text when discussing responses
-- Consider demographic context when making insights
-- Suggest actionable business recommendations
-- Be precise with statistical calculations
-- Highlight significant patterns or outliers
-
-When asked about the data, provide detailed, accurate analysis with specific numbers, percentages, and insights. Always ground your responses in the actual survey data provided.`
+Survey Data Context: ${JSON.stringify(surveyContext, null, 2)}`
 
     // Build conversation messages
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...conversationHistory.map((msg: any) => ({
-        role: msg.role,
-        content: msg.content
-      })),
+      ...conversationHistory,
       { role: 'user', content: message }
     ]
 
     // Call OpenAI API
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-4o-mini',
       messages: messages as any,
-      temperature: 0.1,
-      max_tokens: 2000,
-      stream: false
+      temperature: 0.7,
+      max_tokens: 1000
     })
 
-    const aiResponse = completion.choices[0]?.message?.content
+    const response = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
 
-    if (!aiResponse) {
-      return NextResponse.json({ error: 'No response from AI' }, { status: 500 })
-    }
-
-    return NextResponse.json({
-      response: aiResponse,
-      usage: completion.usage
-    })
+    return NextResponse.json({ response })
 
   } catch (error) {
-    console.error('Error in analytics chat:', error)
+    console.error('Survey analytics chat error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to process analytics request' },
       { status: 500 }
     )
   }

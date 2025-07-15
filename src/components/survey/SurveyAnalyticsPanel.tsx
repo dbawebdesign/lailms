@@ -37,7 +37,7 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
     {
       id: '1',
       role: 'assistant',
-      content: "Hi! I'm Luna, your survey analytics assistant. I have access to all your survey response data and can provide detailed insights.\n\nTry asking me:\n• What are the biggest pain points for homeschool parents?\n• Which features should we prioritize for development?\n• How do pricing expectations vary by income level?\n• What demographic patterns do you see in the responses?\n• Show me correlations between education level and feature preferences",
+      content: "Hi! I'm Luna, your survey analytics assistant. I have access to all your survey response data from both authenticated users and public anonymous responses, giving you comprehensive insights.\n\n**Data Sources:**\n• Authenticated user surveys (registered users)\n• Public anonymous surveys (includes screening questions)\n\nTry asking me:\n• What are the biggest pain points for homeschool parents?\n• Which features should we prioritize for development?\n• How do responses differ between authenticated and public users?\n• What demographic patterns do you see in the responses?\n• Show me correlations between education level and feature preferences\n• How effective are our screening questions?",
       timestamp: new Date()
     }
   ])
@@ -56,7 +56,8 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
   const suggestedQuestions = [
     "What are the biggest pain points?",
     "Which features should we prioritize?",
-    "How do pricing expectations vary?",
+    "Compare authenticated vs public responses",
+    "How effective are screening questions?",
     "Show me demographic patterns",
     "Education level correlations"
   ]

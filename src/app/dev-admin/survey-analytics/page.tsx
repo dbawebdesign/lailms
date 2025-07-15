@@ -109,14 +109,18 @@ interface SurveyQuestion {
 
 interface SurveyResponse {
   id: number
-  user_id: string
+  user_id: string | null
   completed_at: string
   duration_seconds: number
   device_info: any
+  source: 'authenticated' | 'public'
+  email?: string
+  session_id?: string
+  ip_address?: string
   question_responses: Array<{
     question_id: number
     response_value: string
-    response_text: string
+    response_text: string | null
     question: SurveyQuestion
   }>
 }
@@ -125,6 +129,8 @@ interface AnalyticsData {
   responses: SurveyResponse[]
   questions: SurveyQuestion[]
   totalResponses: number
+  authenticatedResponses: number
+  publicResponses: number
   problemValidationScores: Record<string, number>
   featureImportanceScores: Record<string, number>
   primaryConcerns: Record<string, number>
@@ -180,10 +186,13 @@ export default function SurveyAnalyticsPage() {
         throw new Error(`Failed to fetch survey data: ${response.statusText}`)
       }
 
-      const { responses, questions } = await response.json()
+      const { responses, questions, totalResponses, authenticatedResponses, publicResponses } = await response.json()
 
       // Calculate analytics from ALL survey responses
       const analytics = calculateAnalytics(responses, questions)
+      analytics.totalResponses = totalResponses
+      analytics.authenticatedResponses = authenticatedResponses
+      analytics.publicResponses = publicResponses
       setData(analytics)
 
     } catch (err) {
@@ -348,6 +357,8 @@ export default function SurveyAnalyticsPage() {
       responses: filteredResponses,
       questions,
       totalResponses: filteredResponses.length,
+      authenticatedResponses: filteredResponses.filter(r => r.source === 'authenticated').length,
+      publicResponses: filteredResponses.filter(r => r.source === 'public').length,
       problemValidationScores,
       featureImportanceScores,
       primaryConcerns,
@@ -1103,6 +1114,14 @@ export default function SurveyAnalyticsPage() {
                     <div>
                       <p className="text-sm text-muted-foreground">Total Responses</p>
                       <p className="text-2xl font-bold text-blue-600">{data?.totalResponses || 0}</p>
+                      <div className="flex gap-2 mt-1">
+                        <Badge variant="secondary" className="text-xs">
+                          {data?.authenticatedResponses || 0} Authenticated
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {data?.publicResponses || 0} Public
+                        </Badge>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

@@ -1,13 +1,17 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, CheckCircle, Zap, Users, BookOpen, Brain, TrendingUp, Shield, Star, Play, ChevronRight, GraduationCap, Home, School, Sparkles, Clock, Target, Award, Lightbulb } from 'lucide-react'
+import { ArrowRight, CheckCircle, Zap, Users, BookOpen, Brain, TrendingUp, Shield, Star, Play, ChevronRight, GraduationCap, Home, School, Sparkles, Target, Award, Lightbulb, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ShinyButton } from '@/components/ui/shiny-button'
+import AnimatedGridBackground from '@/components/layout/AnimatedGridBackground'
+import { ContactModal } from '@/components/ui/ContactModal'
 
 export default function LandingPage() {
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false)
+
   useEffect(() => {
     // Word by word animation
     function animateWords() {
@@ -97,8 +101,15 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Navigation */}
-      <nav className="px-6 py-4 flex items-center justify-between border-b border-gray-800 relative z-50">
-        <div className="flex items-center space-x-8">
+      <nav className="relative px-6 py-4 flex items-center justify-between border-b border-gray-800 z-50">
+        <AnimatedGridBackground 
+          opacity={0.02}
+          patternId="nav-grid"
+          showFloatingElements={false}
+          showCornerElements={false}
+          showDetailDots={false}
+        />
+        <div className="flex items-center space-x-8 relative z-10">
           <Image
             src="/Horizontal white text.png"
             alt="Learnology AI"
@@ -111,10 +122,15 @@ export default function LandingPage() {
             <Link href="#homeschool" className="text-gray-300 hover:text-white transition-colors">Homeschool</Link>
             <Link href="#features" className="text-gray-300 hover:text-white transition-colors">Features</Link>
             <Link href="#pricing" className="text-gray-300 hover:text-white transition-colors">Pricing</Link>
-            <Link href="#contact" className="text-gray-300 hover:text-white transition-colors">Contact</Link>
+            <button 
+              onClick={() => setIsContactModalOpen(true)}
+              className="text-gray-300 hover:text-white transition-colors"
+            >
+              Contact
+            </button>
           </div>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-4 relative z-10">
           <Link href="/login" className="text-sm text-gray-300 hover:text-white transition-colors">Sign In</Link>
           <Link href="/signup">
             <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white text-sm px-6 py-2 rounded-lg hover:opacity-90 transition-opacity">
@@ -126,52 +142,13 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex flex-col justify-center items-center px-8 py-12 md:px-16 md:py-20 overflow-hidden">
-        {/* Grid Background */}
-        <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
-              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(107,93,229,0.25)" strokeWidth="0.5"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
-          
-          {/* Main grid lines */}
-          <line x1="0" y1="20%" x2="100%" y2="20%" className="grid-line" style={{animationDelay: '0.5s'}} />
-          <line x1="0" y1="80%" x2="100%" y2="80%" className="grid-line" style={{animationDelay: '1s'}} />
-          <line x1="20%" y1="0" x2="20%" y2="100%" className="grid-line" style={{animationDelay: '1.5s'}} />
-          <line x1="80%" y1="0" x2="80%" y2="100%" className="grid-line" style={{animationDelay: '2s'}} />
-          
-          {/* Accent lines */}
-          <line x1="50%" y1="0" x2="50%" y2="100%" className="grid-line opacity-10" style={{animationDelay: '2.5s'}} />
-          <line x1="0" y1="50%" x2="100%" y2="50%" className="grid-line opacity-10" style={{animationDelay: '3s'}} />
-          
-          {/* Detail dots */}
-          <circle cx="20%" cy="20%" r="2" className="detail-dot" style={{animationDelay: '3s'}} />
-          <circle cx="80%" cy="20%" r="2" className="detail-dot" style={{animationDelay: '3.2s'}} />
-          <circle cx="20%" cy="80%" r="2" className="detail-dot" style={{animationDelay: '3.4s'}} />
-          <circle cx="80%" cy="80%" r="2" className="detail-dot" style={{animationDelay: '3.6s'}} />
-          <circle cx="50%" cy="50%" r="1.5" className="detail-dot" style={{animationDelay: '4s'}} />
-        </svg>
-
-        {/* Corner Elements */}
-        <div className="corner-element top-8 left-8" style={{animationDelay: '4s'}}>
-          <div className="absolute top-0 left-0 w-2 h-2 bg-[#6B5DE5] opacity-60"></div>
-        </div>
-        <div className="corner-element top-8 right-8" style={{animationDelay: '4.2s'}}>
-          <div className="absolute top-0 right-0 w-2 h-2 bg-[#E45DE5] opacity-60"></div>
-        </div>
-        <div className="corner-element bottom-8 left-8" style={{animationDelay: '4.4s'}}>
-          <div className="absolute bottom-0 left-0 w-2 h-2 bg-[#FF835D] opacity-60"></div>
-        </div>
-        <div className="corner-element bottom-8 right-8" style={{animationDelay: '4.6s'}}>
-          <div className="absolute bottom-0 right-0 w-2 h-2 bg-[#6B5DE5] opacity-60"></div>
-        </div>
-
-        {/* Floating Elements */}
-        <div className="floating-element floating-element-1" style={{animationDelay: '5s'}}></div>
-        <div className="floating-element floating-element-2" style={{animationDelay: '5.5s'}}></div>
-        <div className="floating-element floating-element-3" style={{animationDelay: '6s'}}></div>
-        <div className="floating-element floating-element-4" style={{animationDelay: '6.5s'}}></div>
+        <AnimatedGridBackground 
+          opacity={0.25}
+          patternId="hero-grid"
+          showFloatingElements={true}
+          showCornerElements={true}
+          showDetailDots={true}
+        />
 
         {/* Top Text */}
         <div className="text-center mb-16">
@@ -219,16 +196,18 @@ export default function LandingPage() {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 mb-16">
-          <Link href="/signup">
+          <Link href="https://calendly.com/zjones-learnologyai/learnology-ai-demo?month=2025-07" target="_blank" rel="noopener noreferrer">
             <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.2s'}}>
               Book a Consultation
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
-          <ShinyButton className="px-8 py-3 flex items-center opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.4s'}}>
-            <Play className="mr-2 h-4 w-4" />
-            Watch Demo
-          </ShinyButton>
+          <Link href="https://calendly.com/zjones-learnologyai/learnology-ai-demo?month=2025-07" target="_blank" rel="noopener noreferrer">
+            <ShinyButton className="px-8 py-3 flex items-center opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.4s'}}>
+              <Play className="mr-2 h-4 w-4" />
+              Watch Demo
+            </ShinyButton>
+          </Link>
         </div>
 
         {/* Bottom Text */}
@@ -255,8 +234,15 @@ export default function LandingPage() {
       </section>
 
       {/* K-12 & College Section */}
-      <section id="k12-college" className="px-6 py-20 bg-gray-900/50">
-        <div className="max-w-7xl mx-auto">
+      <section id="k12-college" className="relative px-6 py-20 bg-gray-900/50">
+        <AnimatedGridBackground 
+          opacity={0.04}
+          patternId="k12-grid"
+          showFloatingElements={false}
+          showCornerElements={false}
+          showDetailDots={false}
+        />
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
             <div className="flex items-center justify-center mb-4">
               <GraduationCap className="w-8 h-8 text-[#6B5DE5] mr-3" />
@@ -293,7 +279,7 @@ export default function LandingPage() {
             </div>
             
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#E45DE5]/50 transition-colors">
-              <Clock className="w-12 h-12 text-[#E45DE5] mb-4" />
+              <CheckCircle className="w-12 h-12 text-[#E45DE5] mb-4" />
               <h3 className="text-xl font-bold mb-3">Automated Grading</h3>
               <p className="text-gray-300">AI-powered assessment that provides instant feedback on assignments, essays, and complex projects with detailed rubrics.</p>
             </div>
@@ -311,22 +297,26 @@ export default function LandingPage() {
               Join leading educational institutions that have reduced course development time by 75% while improving student outcomes.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/signup">
+              <Link href="https://calendly.com/zjones-learnologyai/learnology-ai-demo?month=2025-07" target="_blank" rel="noopener noreferrer">
                 <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity">
                   Schedule Demo
                 </Button>
               </Link>
-              <Button variant="outline" className="border-gray-600 text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors">
-                View Case Studies
-              </Button>
             </div>
           </div>
         </div>
       </section>
 
       {/* Homeschool Section */}
-      <section id="homeschool" className="px-6 py-20">
-        <div className="max-w-7xl mx-auto">
+      <section id="homeschool" className="relative px-6 py-20">
+        <AnimatedGridBackground 
+          opacity={0.06}
+          patternId="homeschool-grid"
+          showFloatingElements={true}
+          showCornerElements={false}
+          showDetailDots={true}
+        />
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
             <div className="flex items-center justify-center mb-4">
               <Home className="w-8 h-8 text-[#E45DE5] mr-3" />
@@ -381,22 +371,26 @@ export default function LandingPage() {
               Join thousands of homeschool families who have discovered the power of AI-personalized education that grows with their children.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/homeschool-signup">
+              <Link href="https://buy.stripe.com/eVa9Ce5AmaJm4py288" target="_blank" rel="noopener noreferrer">
                 <Button className="bg-gradient-to-r from-[#E45DE5] via-[#FF835D] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity">
                   Start Free Trial
                 </Button>
               </Link>
-              <Button variant="outline" className="border-gray-600 text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors">
-                Explore Curriculum
-              </Button>
             </div>
           </div>
         </div>
       </section>
 
       {/* Features Grid */}
-      <section id="features" className="px-6 py-20 bg-gray-900/50">
-        <div className="max-w-7xl mx-auto">
+      <section id="features" className="relative px-6 py-20 bg-gray-900/50">
+        <AnimatedGridBackground 
+          opacity={0.04}
+          patternId="features-grid"
+          showFloatingElements={false}
+          showCornerElements={false}
+          showDetailDots={false}
+        />
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold mb-4">AI-Native Features That Transform Learning</h2>
             <p className="text-xl text-gray-300">Powered by advanced AI that understands education at every level</p>
@@ -443,8 +437,15 @@ export default function LandingPage() {
       </section>
 
       {/* Stats Section */}
-      <section className="px-6 py-20">
-        <div className="max-w-7xl mx-auto text-center">
+      <section className="relative px-6 py-20">
+        <AnimatedGridBackground 
+          opacity={0.08}
+          patternId="stats-grid"
+          showFloatingElements={true}
+          showCornerElements={true}
+          showDetailDots={true}
+        />
+        <div className="max-w-7xl mx-auto text-center relative z-10">
           <h2 className="text-4xl font-bold mb-4">Transforming Education at Scale</h2>
           <p className="text-xl text-gray-300 mb-16">Join forward-thinking institutions already revolutionizing learning</p>
           
@@ -470,8 +471,15 @@ export default function LandingPage() {
       </section>
 
       {/* AI Tools Showcase */}
-      <section className="px-6 py-20 bg-gray-900/50">
-        <div className="max-w-7xl mx-auto">
+      <section className="relative px-6 py-20 bg-gray-900/50">
+        <AnimatedGridBackground 
+          opacity={0.04}
+          patternId="ai-tools-grid"
+          showFloatingElements={false}
+          showCornerElements={false}
+          showDetailDots={false}
+        />
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8">
               <div className="space-y-4">
@@ -511,11 +519,6 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
-              
-              <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity">
-                Explore All Tools
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
             </div>
             
             <div className="relative">
@@ -563,8 +566,15 @@ export default function LandingPage() {
       </section>
 
       {/* Student Experience */}
-      <section className="px-6 py-20">
-        <div className="max-w-7xl mx-auto">
+      <section className="relative px-6 py-20">
+        <AnimatedGridBackground 
+          opacity={0.06}
+          patternId="student-grid"
+          showFloatingElements={true}
+          showCornerElements={false}
+          showDetailDots={true}
+        />
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="relative order-2 lg:order-1">
               <div className="bg-gradient-to-br from-gray-900 to-black rounded-2xl border border-gray-800 p-6 shadow-2xl">
@@ -648,106 +658,19 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="px-6 py-20 bg-gray-900/50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">Trusted by Innovative Educators</h2>
-            <p className="text-xl text-gray-300">See how Learnology AI is transforming learning experiences</p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-black/50 rounded-2xl p-8 border border-gray-800">
-              <div className="flex items-center mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                ))}
-              </div>
-              <p className="text-gray-300 mb-6">
-                "Learnology AI has revolutionized our curriculum development. What used to take weeks now takes minutes, and the quality is exceptional."
-              </p>
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-[#6B5DE5] to-[#E45DE5] rounded-full flex items-center justify-center">
-                  <span className="text-sm font-bold">DR</span>
-                </div>
-                <div>
-                  <div className="font-semibold">Dr. Sarah Rodriguez</div>
-                  <div className="text-sm text-gray-400">Director of Curriculum, Metro University</div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-black/50 rounded-2xl p-8 border border-gray-800">
-              <div className="flex items-center mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                ))}
-              </div>
-              <p className="text-gray-300 mb-6">
-                "The adaptive learning paths have increased student engagement by 200%. Our students are more motivated than ever."
-              </p>
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-[#E45DE5] to-[#FF835D] rounded-full flex items-center justify-center">
-                  <span className="text-sm font-bold">MJ</span>
-                </div>
-                <div>
-                  <div className="font-semibold">Michael Johnson</div>
-                  <div className="text-sm text-gray-400">High School Principal, Innovation Academy</div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-black/50 rounded-2xl p-8 border border-gray-800">
-              <div className="flex items-center mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                ))}
-              </div>
-              <p className="text-gray-300 mb-6">
-                "The AI tutoring system provides 24/7 support that rivals human tutors. Our students love the personalized assistance."
-              </p>
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-[#FF835D] to-[#6B5DE5] rounded-full flex items-center justify-center">
-                  <span className="text-sm font-bold">LC</span>
-                </div>
-                <div>
-                  <div className="font-semibold">Lisa Chen</div>
-                  <div className="text-sm text-gray-400">Professor of Computer Science, Tech Institute</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* CTA Section */}
-      <section className="px-6 py-20">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl font-bold mb-6">Ready to Transform Your Institution?</h2>
-          <p className="text-xl text-gray-300 mb-12">
-            Join the AI-first education revolution. Start creating intelligent, adaptive learning experiences today.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/signup">
-              <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-12 py-4 text-lg rounded-lg hover:opacity-90 transition-opacity">
-                Start Free Trial
-              </Button>
-            </Link>
-            <Button variant="outline" className="border-gray-600 text-white px-12 py-4 text-lg rounded-lg hover:bg-gray-800 transition-colors">
-              Schedule Demo
-            </Button>
-          </div>
-          
-          <p className="text-sm text-gray-400 mt-6">
-            No credit card required • 14-day free trial • Cancel anytime
-          </p>
-        </div>
-      </section>
+
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 px-6 bg-gradient-to-b from-black to-gray-900">
-        <div className="max-w-7xl mx-auto">
+      <section id="pricing" className="relative py-20 px-6 bg-gradient-to-b from-black to-gray-900">
+        <AnimatedGridBackground 
+          opacity={0.06}
+          patternId="pricing-grid"
+          showFloatingElements={true}
+          showCornerElements={false}
+          showDetailDots={true}
+        />
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
               Simple, Transparent Pricing
@@ -802,9 +725,11 @@ export default function LandingPage() {
                     <span className="text-sm">Full access to all features</span>
                   </li>
                 </ul>
-                <Button className="w-full bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white py-3 rounded-lg hover:opacity-90 transition-opacity">
-                  Reserve Your Spot
-                </Button>
+                <Link href="https://buy.stripe.com/eVa9Ce5AmaJm4py288" target="_blank" rel="noopener noreferrer">
+                  <Button className="w-full bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white py-3 rounded-lg hover:opacity-90 transition-opacity">
+                    Reserve Your Spot
+                  </Button>
+                </Link>
               </div>
 
               {/* Standard Family */}
@@ -863,9 +788,11 @@ export default function LandingPage() {
                     <span className="text-sm">Full access to all features</span>
                   </li>
                 </ul>
-                <Button className="w-full bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white py-3 rounded-lg hover:opacity-90 transition-opacity">
-                  Contact Us for Setup
-                </Button>
+                <Link href="mailto:zjones@learnologyai.com?subject=Setup%20Inquiry&body=Hi%20there,%0D%0A%0D%0AI'm%20interested%20in%20setting%20up%20Learnology%20AI%20for%20my%20organization.%20Please%20contact%20me%20to%20discuss%20next%20steps.%0D%0A%0D%0AThank%20you!">
+                  <Button className="w-full bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white py-3 rounded-lg hover:opacity-90 transition-opacity">
+                    Contact Us for Setup
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>
@@ -934,9 +861,11 @@ export default function LandingPage() {
               <p className="text-gray-400 mb-6">
                 Ready to transform your organization's learning experience?
               </p>
-              <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity">
-                Contact Sales
-              </Button>
+              <Link href="mailto:zjones@learnologyai.com?subject=Sales%20Inquiry&body=Hi%20there,%0D%0A%0D%0AI'm%20interested%20in%20learning%20more%20about%20Learnology%20AI%20for%20my%20organization.%20Please%20contact%20me%20to%20discuss%20pricing%20and%20features.%0D%0A%0D%0AThank%20you!">
+                <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity">
+                  Contact Sales
+                </Button>
+              </Link>
             </div>
           </div>
 
@@ -981,66 +910,192 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-800 px-6 py-12">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div className="space-y-4">
-              <Image
-                src="/Horizontal white text.png"
-                alt="Learnology AI"
-                width={160}
-                height={32}
-                className="h-8 w-auto"
-              />
-              <p className="text-gray-400 text-sm">
-                AI-first learning management system transforming education through intelligent automation and personalization.
+      {/* Video Guides Section */}
+      <section id="video-guides" className="relative py-24 px-6 bg-gradient-to-b from-gray-900 to-black">
+        <AnimatedGridBackground 
+          opacity={0.05}
+          patternId="video-guides-grid"
+          showFloatingElements={true}
+          showCornerElements={false}
+          showDetailDots={true}
+        />
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold mb-6">
+              <span className="word" data-delay="0">Learn</span>{' '}
+              <span className="word" data-delay="200">How</span>{' '}
+              <span className="word" data-delay="400">to</span>{' '}
+              <span className="word" data-delay="600">Get</span>{' '}
+              <span className="word" data-delay="800">Started</span>
+            </h2>
+            <p className="text-xl text-gray-400 max-w-3xl mx-auto mb-10">
+              Watch our step-by-step video guides to master the platform quickly. 
+              No account required - these resources are available to everyone.
+            </p>
+            <div className="flex justify-center">
+              <Link href="/help">
+                <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-4 rounded-lg hover:opacity-90 transition-all duration-200 ease-in-out text-lg">
+                  <Play className="w-5 h-5 mr-2" />
+                  Watch Video Guides
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {/* Getting Started */}
+            <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700 hover:border-gray-600 transition-all duration-200 ease-in-out">
+              <div className="flex items-center mb-6">
+                <div className="bg-gradient-to-r from-[#FF835D] to-[#E45DE5] p-4 rounded-xl mr-4">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold">Getting Started</h3>
+              </div>
+              <p className="text-gray-400 mb-6 leading-relaxed">
+                Learn the basics of setting up your account, navigating the interface, and creating your first course.
               </p>
+
             </div>
-            
-            <div className="space-y-4">
-              <h4 className="font-semibold">Solutions</h4>
-              <div className="space-y-2 text-sm text-gray-400">
-                <div><Link href="#k12-college" className="hover:text-white transition-colors">K-12 & College</Link></div>
-                <div><Link href="#homeschool" className="hover:text-white transition-colors">Homeschool</Link></div>
-                <div><Link href="#features" className="hover:text-white transition-colors">Features</Link></div>
-                <div><Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link></div>
+
+            {/* For Teachers */}
+            <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700 hover:border-gray-600 transition-all duration-200 ease-in-out">
+              <div className="flex items-center mb-6">
+                <div className="bg-gradient-to-r from-[#E45DE5] to-[#6B5DE5] p-4 rounded-xl mr-4">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold">For Teachers</h3>
+              </div>
+              <p className="text-gray-400 mb-6 leading-relaxed">
+                Discover advanced features like AI-powered course generation, assessment creation, and student progress tracking.
+              </p>
+
+            </div>
+
+            {/* For Parents */}
+            <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700 hover:border-gray-600 transition-all duration-200 ease-in-out">
+              <div className="flex items-center mb-6">
+                <div className="bg-gradient-to-r from-[#6B5DE5] to-[#FF835D] p-4 rounded-xl mr-4">
+                  <GraduationCap className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold">For Parents</h3>
+              </div>
+              <p className="text-gray-400 mb-6 leading-relaxed">
+                Learn how to monitor your child's progress, set learning goals, and collaborate with teachers effectively.
+              </p>
+
+            </div>
+          </div>
+
+          <div className="text-center mt-16">
+            <p className="text-gray-400 mb-8 text-lg max-w-2xl mx-auto">
+              Need help with something specific? Our comprehensive video library covers everything from basic setup to advanced features.
+            </p>
+            <div className="flex justify-center">
+              <Link href="/help">
+                <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800 transition-all duration-200 ease-in-out px-6 py-3">
+                  <Play className="w-4 h-4 mr-2" />
+                  Browse All Videos
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="relative border-t border-gray-800 px-6 py-16">
+        <AnimatedGridBackground 
+          opacity={0.03}
+          patternId="footer-grid"
+          showFloatingElements={false}
+          showCornerElements={false}
+          showDetailDots={false}
+        />
+        <div className="max-w-7xl mx-auto relative z-10">
+          {/* Main Footer Content */}
+          <div className="grid lg:grid-cols-3 gap-12 mb-12">
+            {/* Logo and Description - Takes up more space */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="space-y-4">
+                <Image
+                  src="/Horizontal white text.png"
+                  alt="Learnology AI"
+                  width={280}
+                  height={56}
+                  className="h-12 w-auto"
+                />
+                <p className="text-gray-400 text-base max-w-2xl leading-relaxed">
+                  AI-first learning management system transforming education through intelligent automation and personalization. 
+                  Empowering educators with cutting-edge tools to create engaging, adaptive learning experiences.
+                </p>
+              </div>
+              
+              {/* Contact Information */}
+              <div className="space-y-2">
+                <h4 className="font-semibold text-white">Get in Touch</h4>
+                <div className="space-y-1 text-sm text-gray-400">
+                  <div>
+                    <a 
+                      href="mailto:zjones@learnologyai.com?subject=General Inquiry&body=Hello,%0D%0A%0D%0AI'm interested in learning more about Learnology AI and how it can benefit our educational institution.%0D%0A%0D%0AThank you!"
+                      className="hover:text-white transition-colors"
+                    >
+                      zjones@learnologyai.com
+                    </a>
+                  </div>
+                  <div>
+                    <a 
+                      href="https://calendly.com/zjones-learnologyai/learnology-ai-demo?month=2025-01"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-white transition-colors"
+                    >
+                      Schedule a Demo
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
             
-            <div className="space-y-4">
-              <h4 className="font-semibold">Resources</h4>
-              <div className="space-y-2 text-sm text-gray-400">
-                <div><Link href="#" className="hover:text-white transition-colors">Documentation</Link></div>
-                <div><Link href="#" className="hover:text-white transition-colors">API Reference</Link></div>
-                <div><Link href="#" className="hover:text-white transition-colors">Case Studies</Link></div>
-                <div><Link href="#" className="hover:text-white transition-colors">Support</Link></div>
+            {/* Navigation Links */}
+            <div className="space-y-8">
+              <div className="space-y-4">
+                <h4 className="font-semibold text-white">Solutions</h4>
+                <div className="space-y-2 text-sm text-gray-400">
+                  <div><Link href="#k12-college" className="hover:text-white transition-colors">K-12 & College</Link></div>
+                  <div><Link href="#homeschool" className="hover:text-white transition-colors">Homeschool</Link></div>
+                  <div><Link href="#features" className="hover:text-white transition-colors">Features</Link></div>
+                  <div><Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link></div>
+                </div>
               </div>
-            </div>
-            
-            <div className="space-y-4">
-              <h4 className="font-semibold">Company</h4>
-              <div className="space-y-2 text-sm text-gray-400">
-                <div><Link href="#" className="hover:text-white transition-colors">About</Link></div>
-                <div><Link href="#" className="hover:text-white transition-colors">Blog</Link></div>
-                <div><Link href="#" className="hover:text-white transition-colors">Careers</Link></div>
-                <div><Link href="#contact" className="hover:text-white transition-colors">Contact</Link></div>
+              
+              <div className="space-y-4">
+                <h4 className="font-semibold text-white">Resources</h4>
+                <div className="space-y-2 text-sm text-gray-400">
+                  <div><Link href="/help" className="hover:text-white transition-colors">Video Guides</Link></div>
+                </div>
               </div>
             </div>
           </div>
           
-          <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
+          {/* Bottom Footer */}
+          <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
             <div className="text-sm text-gray-400">
-              © 2024 Learnology AI. All rights reserved.
+              © 2025 Learnology AI. All rights reserved.
             </div>
             <div className="flex space-x-6 text-sm text-gray-400 mt-4 md:mt-0">
-              <Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link>
-              <Link href="#" className="hover:text-white transition-colors">Terms of Service</Link>
-              <Link href="#" className="hover:text-white transition-colors">Cookie Policy</Link>
+              <Link href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
+              <Link href="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link>
+              <Link href="/cookie-policy" className="hover:text-white transition-colors">Cookie Policy</Link>
             </div>
           </div>
         </div>
       </footer>
+
+      {/* Contact Modal */}
+      <ContactModal 
+        isOpen={isContactModalOpen} 
+        onClose={() => setIsContactModalOpen(false)} 
+      />
     </div>
   )
 }

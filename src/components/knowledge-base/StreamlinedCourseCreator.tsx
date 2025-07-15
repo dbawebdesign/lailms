@@ -125,6 +125,17 @@ export default function StreamlinedCourseCreator({
     
     try {
       new URL(urlInput); // Validate URL
+      
+      // Check if it's a YouTube URL and reject it
+      if (urlInput.includes('youtube.com') || urlInput.includes('youtu.be')) {
+        toast({
+          title: 'YouTube URLs not supported',
+          description: 'YouTube video processing is coming soon. Please use other webpage URLs.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
       const newItem: QueuedItem = {
         id: crypto.randomUUID(),
         type: 'url',
@@ -377,13 +388,13 @@ export default function StreamlinedCourseCreator({
               Drop files here or click to browse
             </h3>
             <p className="text-muted-foreground">
-              PDF, Word, PowerPoint, or text files up to 50MB each
+              PDF, Word, or text files up to 50MB each
             </p>
             <input
               ref={fileInputRef}
               type="file"
               multiple
-              accept=".pdf,.docx,.doc,.pptx,.ppt,.txt,.csv"
+              accept=".pdf,.docx,.doc,.txt,.csv"
               className="hidden"
               onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
             />

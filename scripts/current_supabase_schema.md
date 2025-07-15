@@ -24,9 +24,24 @@ This document tracks the current state of our Supabase database schema, includin
 
 **Feature**: Added comprehensive survey system for new homeschool users with 4-section, 23-question survey for product validation and demographics.
 
+**Public Survey Enhancement**: Added public survey system with screening questions to filter qualified respondents. The public survey now includes:
+- **Screening Section**: 4 questions to qualify respondents (homeschool status, number of children, grade levels, experience)
+- **Complete Survey Content**: All questions from the main survey system synchronized for public access
+- **Termination Logic**: Automatically terminates survey for non-homeschooling respondents
+
 **Tables Added**:
 
-1. **survey_sections** - Survey section metadata
+1. **website_contacts** - Contact form submissions from website
+   - `id` (UUID, primary key) - Unique identifier
+   - `name` (varchar(255), not null) - Contact's full name
+   - `email` (varchar(255), not null) - Contact's email address
+   - `message` (text, not null) - Contact message/inquiry
+   - `consent_given` (boolean, not null, default false) - Authorization to contact
+   - `created_at`, `updated_at` (timestamps) - Record metadata
+   - **Indexes**: created_at (DESC), email
+   - **RLS**: Public insert, authenticated read only
+
+2. **survey_sections** - Survey section metadata
    - `id` (serial, primary key)
    - `title` (text, not null) - Section title
    - `description` (text) - Optional section description
@@ -46,6 +61,92 @@ This document tracks the current state of our Supabase database schema, includin
 3. **survey_responses** - User completion records
    - `id` (serial, primary key)
    - `user_id` (uuid, foreign key to profiles.user_id, unique)
+   - `completed_at` (timestamp) - When survey was completed
+   - `duration_seconds` (integer) - Time spent on survey
+
+### Public Survey Feature Implementation (January 2025)
+
+**Feature**: Added standalone public survey system for non-authenticated users to collect market research and feedback.
+
+**Tables Added**:
+
+1. **public_survey_sections** - Public survey section metadata (5 sections)
+   - `id` (serial, primary key)
+   - `title` (text, not null) - Section title
+   - `description` (text) - Optional section description
+   - `order_index` (integer, not null) - Display order (0-4)
+   - `created_at`, `updated_at` (timestamps)
+   - **Current Sections**:
+     - Section 0: "Screening" - Qualification questions
+     - Section 1: "Problem Validation" - Pain point assessment
+     - Section 2: "Product Test" - Feature importance rating
+     - Section 3: "Primary Concerns" - Adoption concerns
+     - Section 4: "Demographics" - Background information
+
+2. **public_survey_questions** - Public survey questions (31 total questions)
+   - `id` (serial, primary key)
+   - `section_id` (integer, foreign key to public_survey_sections)
+   - `question_text` (text, not null) - The question content
+   - `question_type` (text, not null) - Type: 'likert', 'multiple_choice', 'text', 'numerical', 'scale'
+   - `options` (jsonb) - Question-specific options and configuration
+   - `required` (boolean, default true)
+   - `order_index` (integer, not null) - Order within section
+   - `created_at`, `updated_at` (timestamps)
+   - **Special Features**:
+     - Screening question includes `terminateOn` option for early termination
+     - Synchronized with main survey questions for consistency
+
+3. **public_survey_responses** - Anonymous response records
+   - `id` (serial, primary key)
+   - `session_id` (uuid, not null) - Unique session identifier
+   - `email` (text) - Optional email for follow-up
+   - `completed_at` (timestamp) - When survey was completed
+   - `duration_seconds` (integer) - Time spent on survey
+   - `device_info` (jsonb) - Device and browser information
+   - `ip_address` (inet) - IP address for analytics
+   - `user_agent` (text) - User agent string
+   - `created_at`, `updated_at` (timestamps)
+
+4. **public_survey_question_responses** - Individual question answers
+   - `id` (serial, primary key)
+   - `survey_response_id` (integer, foreign key to public_survey_responses)
+   - `question_id` (integer, foreign key to public_survey_questions)
+   - `response_value` (text) - The answer value
+   - `response_text` (text) - Additional text response
+   - `created_at`, `updated_at` (timestamps)
+
+**Security Model**:
+- **Response Tables**: RLS disabled for public submissions (anonymous users can insert/read)
+- **Structure Tables**: RLS enabled with public read access for survey structure, admin management only
+- **Rationale**: Public survey is designed for anonymous data collection, so response tables allow unrestricted access while maintaining admin control over survey structure
+
+---
+
+## Main Survey System (Authenticated Users)
+
+### Tables:
+
+1. **survey_sections** - Survey section metadata
+   - `id` (serial, primary key)
+   - `title` (text, not null) - Section title
+   - `description` (text) - Optional section description
+   - `order_index` (integer, not null) - Display order
+   - `created_at`, `updated_at` (timestamps)
+
+2. **survey_questions** - Survey questions
+   - `id` (serial, primary key)
+   - `section_id` (integer, foreign key to survey_sections)
+   - `question_text` (text, not null) - The question content
+   - `question_type` (text, not null) - Type: 'likert', 'multiple_choice', 'text', 'numerical', 'scale'
+   - `options` (jsonb) - Question-specific options and configuration
+   - `required` (boolean, default true)
+   - `order_index` (integer, not null) - Order within section
+   - `created_at`, `updated_at` (timestamps)
+
+3. **survey_responses** - User survey responses
+   - `id` (serial, primary key)
+   - `user_id` (uuid, foreign key to profiles)
+   - `session_id` (uuid, not null) - Unique session identifier
    - `completed_at` (timestamp) - When survey was completed
    - `duration_seconds` (integer) - Time spent on survey
    - `device_info` (jsonb) - Device and browser information

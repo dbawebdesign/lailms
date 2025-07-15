@@ -200,6 +200,26 @@
   animation: float 4s ease-in-out infinite;
 }
 
+.floating-element-1 {
+  top: 25%;
+  left: 15%;
+}
+
+.floating-element-2 {
+  top: 70%;
+  right: 20%;
+}
+
+.floating-element-3 {
+  top: 40%;
+  right: 10%;
+}
+
+.floating-element-4 {
+  bottom: 30%;
+  left: 25%;
+}
+
 /* Minimal Mind Map Animations - Premium Subtle */
 @keyframes nodeAppear {
   0% { 
