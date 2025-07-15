@@ -12,8 +12,9 @@ interface PathParams {
 // GET /api/teach/paths/[pathId] - Get a specific path
 export async function GET(
   request: Request,
-  { params }: { params: { pathId: string } }
+  { params }: { params: Promise<{ pathId: string }> }
 ) {
+  const { pathId } = await params;
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -43,7 +44,7 @@ export async function GET(
         *,
         lessons(*)
       `)
-      .eq('id', params.pathId)
+      .eq('id', pathId)
       .eq('organisation_id', profile.organisation_id)
       .single();
 
@@ -61,8 +62,9 @@ export async function GET(
 // PUT /api/teach/paths/[pathId] - Update a path
 export async function PUT(
   request: Request,
-  { params }: { params: { pathId: string } }
+  { params }: { params: Promise<{ pathId: string }> }
 ) {
+  const { pathId } = await params;
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -97,7 +99,7 @@ export async function PUT(
         status,
         updated_at: new Date().toISOString()
       })
-      .eq('id', params.pathId)
+      .eq('id', pathId)
       .eq('organisation_id', profile.organisation_id)
       .select()
       .single();
@@ -116,8 +118,9 @@ export async function PUT(
 // DELETE /api/teach/paths/[pathId] - Delete a path
 export async function DELETE(
   request: Request,
-  { params }: { params: { pathId: string } }
+  { params }: { params: Promise<{ pathId: string }> }
 ) {
+  const { pathId } = await params;
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -144,7 +147,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('paths')
       .delete()
-      .eq('id', params.pathId)
+      .eq('id', pathId)
       .eq('organisation_id', profile.organisation_id);
 
     if (error) {
