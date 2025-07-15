@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
 export const metadata = {
-  title: "Authentication - Learnology AI",
-  description: "Sign in or sign up to Learnology AI",
+  title: "Sign In or Sign Up | Learnology AI",
+  description: "Access your Learnology AI account. Sign in or sign up to the world's first AI-native LMS for personalized, adaptive learning.",
 }
 
 export default function AuthLayout({

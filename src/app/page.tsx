@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button'
 import { ShinyButton } from '@/components/ui/shiny-button'
 import AnimatedGridBackground from '@/components/layout/AnimatedGridBackground'
 import { ContactModal } from '@/components/ui/ContactModal'
+import { VideoModal } from '@/components/ui/VideoModal'
 
 export default function LandingPage() {
   const [isContactModalOpen, setIsContactModalOpen] = useState(false)
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
 
   useEffect(() => {
     // Word by word animation
@@ -202,12 +204,14 @@ export default function LandingPage() {
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
-          <Link href="https://calendly.com/zjones-learnologyai/learnology-ai-demo?month=2025-07" target="_blank" rel="noopener noreferrer">
-            <ShinyButton className="px-8 py-3 flex items-center opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.4s'}}>
-              <Play className="mr-2 h-4 w-4" />
-              Watch Demo
-            </ShinyButton>
-          </Link>
+          <ShinyButton 
+            className="px-8 py-3 flex items-center opacity-0" 
+            style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.4s'}}
+            onClick={() => setIsVideoModalOpen(true)}
+          >
+            <Play className="mr-2 h-4 w-4" />
+            Watch Demo
+          </ShinyButton>
         </div>
 
         {/* Bottom Text */}
@@ -1095,6 +1099,15 @@ export default function LandingPage() {
       <ContactModal 
         isOpen={isContactModalOpen} 
         onClose={() => setIsContactModalOpen(false)} 
+      />
+
+      <VideoModal
+        isOpen={isVideoModalOpen}
+        onClose={() => setIsVideoModalOpen(false)}
+        videoUrl="Course generation - Made with Clipchamp_1752574974128.mp4"
+        title="Course Generation Demo"
+        description="Watch how to create comprehensive courses in minutes using our AI-powered course generation system."
+        autoplay={true}
       />
     </div>
   )

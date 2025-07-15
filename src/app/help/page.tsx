@@ -286,6 +286,15 @@ export default function HelpPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-12">
+        <div className="flex flex-col items-center mb-8">
+          <Image
+            src="/Horizontal white text.png"
+            alt="Learnology AI"
+            width={240}
+            height={60}
+            className="h-16 w-auto mb-4"
+          />
+        </div>
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-foreground mb-6">Help & Video Guides</h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">

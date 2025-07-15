@@ -166,7 +166,7 @@ export default function PublicSurveyPage() {
                   alt="Learnology AI"
                   width={280}
                   height={70}
-                  className="h-12 w-auto"
+                  className="h-20 w-auto"
                 />
               </div>
 
@@ -190,7 +190,7 @@ export default function PublicSurveyPage() {
                   <ul className="space-y-2 text-slate-700">
                     <li className="flex items-start">
                       <span className="text-blue-600 mr-2">•</span>
-                      <span><strong>5-7 minutes</strong> to complete</span>
+                      <span><strong>3-5 minutes</strong> to complete</span>
                     </li>
                     <li className="flex items-start">
                       <span className="text-blue-600 mr-2">•</span>
@@ -208,21 +208,18 @@ export default function PublicSurveyPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center justify-center space-x-4">
-                    <Mail className="w-5 h-5 text-slate-500" />
-                    <div className="flex-1">
-                      <Label htmlFor="email" className="text-sm font-medium text-slate-700">
-                        Email (optional - for follow-up)
-                      </Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="your@email.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor="email" className="text-sm font-medium text-slate-700">
+                      Email (optional - for follow-up)
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="mt-1 bg-white border border-gray-700 text-gray-900 placeholder-gray-500"
+                    />
                   </div>
 
                   <Button
@@ -244,7 +241,7 @@ export default function PublicSurveyPage() {
                   alt="Learnology AI"
                   width={280}
                   height={70}
-                  className="h-12 w-auto"
+                  className="h-20 w-auto"
                 />
               </div>
 
@@ -315,7 +312,7 @@ export default function PublicSurveyPage() {
                       alt="Learnology AI"
                       width={200}
                       height={50}
-                      className="h-10 w-auto"
+                      className="h-20 w-auto"
                     />
                     <div>
                       <h1 className="text-xl font-medium text-slate-900">

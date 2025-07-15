@@ -933,4 +933,37 @@ ALTER TABLE profiles ADD COLUMN survey_completed BOOLEAN DEFAULT false;
    - `is_favorite` (boolean, default false) - User favorite flag
    - `created_at`, `updated_at` (timestamps with timezone) - Record metadata
    - **Indexes**: user_id, tool_id, created_at (DESC), is_favorite
-   - **RLS**: Users can only access their own creations 
+   - **RLS**: Users can only access their own creations
+
+### Video Guides System (January 2025)
+
+**Feature**: Added video tutorial and help system for user onboarding and feature demonstrations.
+
+**Tables Added**:
+
+1. **video_guides** - Stores video tutorials and help content
+   - `id` (UUID, primary key) - Unique identifier
+   - `title` (text, not null) - Video title
+   - `description` (text) - Video description
+   - `video_url` (text, not null) - Video file path in Supabase storage or YouTube URL
+   - `thumbnail_url` (text) - Thumbnail image URL
+   - `duration_seconds` (integer) - Video duration in seconds
+   - `category` (text, default 'general') - Video category
+   - `target_roles` (text[], default '{}') - Target user roles
+   - `order_index` (integer, default 0) - Display order
+   - `is_featured` (boolean, default false) - Featured video flag
+   - `is_published` (boolean, default true) - Published status
+   - `tags` (text[], default '{}') - Video tags
+   - `created_by` (UUID) - References auth.users (creator)
+   - `created_at`, `updated_at` (timestamps with timezone) - Record metadata
+   - **Storage**: Videos stored in 'guide-videos' Supabase storage bucket
+   - **RLS**: Public read access, no authentication required
+
+**Current Featured Video**:
+- **Course Generation Demo** (ID: b39e0f77-d12e-4bab-bbb2-b03562c2b1b1)
+  - Duration: 2:20 (140 seconds)
+  - Category: teacher-tools
+  - Featured: true
+  - Tags: course-generation, ai-tools, demo, getting-started
+  - File: "Course generation - Made with Clipchamp_1752574974128.mp4"
+  - Used on landing page "Watch Demo" button with custom VideoModal component 
