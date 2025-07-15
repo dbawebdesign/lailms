@@ -72,7 +72,17 @@ interface CoopStats {
   growthRate: number;
 }
 
-export default function HomeschoolCoopDashboard() {
+interface HomeschoolCoopDashboardProps {
+  organizationId: string;
+  organizationName: string;
+  userRole: string;
+}
+
+export default function HomeschoolCoopDashboard({ 
+  organizationId, 
+  organizationName, 
+  userRole 
+}: HomeschoolCoopDashboardProps) {
   const [families, setFamilies] = useState<Family[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -135,7 +145,7 @@ export default function HomeschoolCoopDashboard() {
         return;
       }
 
-      const organizationId = profile.organisation_units.organisation_id;
+      // const organizationId = profile.organisation_units.organisation_id; // This line is now passed as a prop
 
       // Get all families (organisation_units) in this coop
       const { data: familiesData, error: familiesError } = await supabase
