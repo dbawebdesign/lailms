@@ -42,16 +42,10 @@ export async function GET(req: Request) {
     { cookies: supabaseCookieMethods }
   )
 
-  // Check user authentication
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-
-  if (sessionError) {
-    console.error('Error getting session:', sessionError);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-  }
-
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   // Get the target chunk
@@ -103,7 +97,7 @@ export async function GET(req: Request) {
   const { data: memberData, error: memberError } = await supabase
     .from('profiles')
     .select('user_id')
-    .eq('user_id', session.user.id)
+    .eq('user_id', user.id)
     .eq('organisation_id', documentData.organisation_id)
     .single<Tables<"profiles">>();
     

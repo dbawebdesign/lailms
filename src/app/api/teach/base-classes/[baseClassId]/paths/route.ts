@@ -15,10 +15,11 @@ export async function POST(request: NextRequest, { params }: BaseClassPathsParam
   const { baseClassId } = await params;
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest, { params }: BaseClassPathsParam
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organisation_id')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single<Tables<'profiles'>>();
 
     if (profileError || !profile) {
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest, { params }: BaseClassPathsParam
       description,
       base_class_id: baseClassId,
       organisation_id: profile.organisation_id,
-      creator_user_id: session.user.id,
+      creator_user_id: user.id,
       order_index: order_index || 0,
     };
 

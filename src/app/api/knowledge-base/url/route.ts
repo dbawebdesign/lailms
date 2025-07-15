@@ -10,10 +10,11 @@ export async function POST(request: Request) {
   const supabase = createSupabaseServerClient();
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organisation_id')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .maybeSingle<Tables<'profiles'>>();
 
     if (profileError) {
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
       storage_path: storagePath,
       file_type: type === 'youtube' ? 'video/youtube' : 'text/html',
       file_size: url.length, // URL content size
-      uploaded_by: session.user.id,
+      uploaded_by: user.id,
       status: 'queued' as DocumentStatus,
       metadata: metadata
     };

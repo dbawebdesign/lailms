@@ -14,10 +14,11 @@ export async function POST(request: NextRequest, { params }: PathLessonsParams) 
   const { pathId } = await params;
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest, { params }: PathLessonsParams) 
       title,
       description,
       path_id: pathId,
-      creator_user_id: session.user.id,
+      creator_user_id: user.id,
       order_index: order_index || 0,
     };
 

@@ -62,7 +62,7 @@ export default function TeacherKnowledgeBaseDashboard({
   useEffect(() => {
     async function loadStats() {
       try {
-        const response = await fetch(`/api/knowledge-base/stats?organisationId=${organisationId}`);
+        const response = await fetch(`/api/knowledge-base/stats`);
         if (response.ok) {
           const data = await response.json();
           setStats(prev => ({
@@ -76,7 +76,7 @@ export default function TeacherKnowledgeBaseDashboard({
     }
 
     loadStats();
-  }, [organisationId]);
+  }, []);
 
   const StatCard = ({ title, value, description, icon: Icon, trend }: {
     title: string;
@@ -239,6 +239,7 @@ export default function TeacherKnowledgeBaseDashboard({
                 <FileListTable 
                   organisationId={organisationId}
                   baseClassId={selectedClass === 'all' ? undefined : selectedClass}
+                  userOnly={true}
                 />
               </CardContent>
             </Card>

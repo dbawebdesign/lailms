@@ -16,12 +16,9 @@ export function LikertScaleQuestion({ question, value, onChange }: LikertScaleQu
     <div className="space-y-6">
       {/* Question Header */}
       <div className="space-y-2">
-        <h3 className="text-lg font-medium text-slate-900 leading-relaxed">
+        <h3 className="text-base font-medium text-slate-900 leading-relaxed">
           {question.question_text}
         </h3>
-        {question.required && (
-          <span className="text-red-600 text-sm font-normal">Required</span>
-        )}
       </div>
 
       {/* Scale Options */}
@@ -33,7 +30,7 @@ export function LikertScaleQuestion({ question, value, onChange }: LikertScaleQu
             whileTap={{ scale: 0.98 }}
             onClick={() => onChange(option)}
             className={`
-              group relative px-4 py-3 rounded-lg border transition-all duration-200 text-sm font-medium
+              group relative px-4 py-3 rounded-lg border transition-all duration-200 text-xs font-medium
               ${value === option
                 ? 'border-slate-900 bg-slate-900 text-white shadow-md'
                 : 'border-slate-300 bg-white text-slate-700 hover:border-slate-500 hover:shadow-md'

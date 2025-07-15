@@ -119,30 +119,11 @@ export async function POST(request: NextRequest) {
     );
 
     // Check user authentication
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-
-    if (sessionError) {
-      console.error('Error getting session:', sessionError)
-      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-    }
-
-    if (!session) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+  
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    // Get organization ID for the user
-    const { data: memberData, error: memberError } = await supabase
-      .from('profiles')
-      .select('organisation_id')
-      .eq('user_id', session.user.id)
-      .single<Tables<"profiles">>()
-
-    if (memberError || !memberData?.organisation_id) {
-      console.error('Error fetching member organization:', memberError)
-      return NextResponse.json({ error: 'Could not determine user organization' }, { status: 403 })
-    }
-
-    const organisationId = memberData.organisation_id
 
     // Parse the search query from the request
     const { query, limit = 10, filter } = await request.json()
@@ -160,12 +141,12 @@ export async function POST(request: NextRequest) {
 
     const queryEmbeddingArray = embeddingResponse.data[0].embedding
     
-    // Execute the vector similarity search using the RPC function
+    // Execute the vector similarity search using the RPC function, filtering by user's documents
     const { data, error: searchError } = await (supabase as any).rpc(
-      'vector_search',
+      'vector_search_by_user',
       {
-        query_embedding: queryEmbeddingArray, // Pass array directly, not as string
-        organisation_id: organisationId,
+        query_embedding: queryEmbeddingArray,
+        user_id: user.id,
         match_threshold: 0.5,
         match_count: limit
       }
@@ -183,7 +164,7 @@ export async function POST(request: NextRequest) {
           file_type,
           metadata
         `)
-        .eq('organisation_id', organisationId)
+        .eq('uploaded_by', user.id)
         .limit(limit)
         .returns<Tables<'documents'>[]>();
       
@@ -251,7 +232,7 @@ export async function POST(request: NextRequest) {
       query,
       queryId,
       count: filteredResults.length,
-      method: 'vector_search'
+      method: 'vector_search_by_user'
     })
     
   } catch (error) {

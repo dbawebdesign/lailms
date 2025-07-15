@@ -37,7 +37,7 @@ export default async function AppPagesLayout({
     
     const { data, error } = await supabase
       .from('profiles')
-      .select(`${PROFILE_ROLE_FIELDS}, survey_completed`)
+      .select(`${PROFILE_ROLE_FIELDS}, survey_completed, organisation_id, organisations(organisation_type)`)
       .eq('user_id', user.id)
       .single<Tables<'profiles'>>();
     

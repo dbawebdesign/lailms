@@ -133,21 +133,9 @@ const navConfig: NavItem[] = [
     roles: ["teacher"],
   },
   {
-    title: "Tutor Chat",
-    href: "/teach/tutor-chat",
-    icon: MessageCircle, // Re-using MessageCircle
-    roles: ["teacher"],
-  },
-  {
     title: "Teacher Tools",
     href: "/teach/tools",
     icon: Wrench, // Changed from UserCog to Wrench
-    roles: ["teacher"],
-  },
-  {
-    title: "Community",
-    href: "/teach/community",
-    icon: Users, // Using Users for teacher community
     roles: ["teacher"],
   },
 

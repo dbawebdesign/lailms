@@ -1,312 +1,84 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-import { NextRequest, NextResponse } from 'next/server'
-import { Database } from '../../../../../packages/types/db'
-import { Tables } from 'packages/types/db';
-import { isSuperAdmin, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
-export async function GET(request: NextRequest) {
+import { NextResponse } from 'next/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+
+const DEV_ADMIN_PASSWORD = 'TerroirLAI';
+
+function validateDevAdminPassword(request: Request): boolean {
+  const authHeader = request.headers.get('x-dev-admin-password');
+  return authHeader === DEV_ADMIN_PASSWORD;
+}
+
+export async function GET(request: Request) {
+  // Check dev admin password
+  if (!validateDevAdminPassword(request)) {
+    return NextResponse.json({ error: 'Unauthorized - Invalid dev admin password' }, { status: 401 });
+  }
+
+  const supabase = createSupabaseServerClient();
+
   try {
-    const cookieStore = await cookies();
-    
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name: string, value: string, options: CookieOptions) {
-            try {
-              cookieStore.set({ name, value, ...options });
-            } catch (error) {
-              // Ignore error on Server Components (middleware handles refresh)
-            }
-          },
-          remove(name: string, options: CookieOptions) {
-            try {
-              cookieStore.set({ name, value: '', ...options });
-            } catch (error) {
-              // Ignore error on Server Components (middleware handles refresh)
-            }
-          },
-        },
-      }
-    );
-
-    // Check user authentication and role
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-
-    if (sessionError) {
-        console.error('Error getting session:', sessionError)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-    }
-
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Fetch user role from profiles table
-    const { data: memberData, error: memberError } = await supabase
-      .from('profiles')
-      .select(PROFILE_ROLE_FIELDS)
-      .eq('user_id', session.user.id)
-      .single<Tables<'profiles'>>()
-
-    if (memberError) {
-      console.error('Error fetching member role:', memberError)
-      return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 })
-    }
-
-    if (!memberData) {
-       console.error('Member data not found for user:', session.user.id)
-       return NextResponse.json({ error: 'Forbidden: User profile not found' }, { status: 403 })
-    }
-
-    // --- Role Check ---
-    // Using the actual Enum type from Database
-    if (!isSuperAdmin(memberData)) { 
-      console.warn(`User ${session.user.id} attempted dev-admin access with role: ${memberData.role}`)
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-    // --- End Role Check ---
-
-    // If authorized, fetch all organisations using a service role client 
-    // NOTE: This requires SUPABASE_SERVICE_ROLE_KEY to be set in env
-    const supabaseAdminClient = createServerClient<Database>(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { 
-          cookies: {
-            get(name: string) {
-              return cookieStore.get(name)?.value;
-            },
-            set(name: string, value: string, options: CookieOptions) {
-              try {
-                cookieStore.set({ name, value, ...options });
-              } catch (error) {
-                // Ignore error on Server Components (middleware handles refresh)
-              }
-            },
-            remove(name: string, options: CookieOptions) {
-              try {
-                cookieStore.set({ name, value: '', ...options });
-              } catch (error) {
-                 // Ignore error on Server Components (middleware handles refresh)
-              }
-            },
-          },
-          auth: { 
-              persistSession: false, 
-              autoRefreshToken: false, 
-              detectSessionInUrl: false 
-          } 
-        }
-      )
-
-    const { data: organisations, error: orgError } = await supabaseAdminClient
+    // Get all organizations with member counts
+    const { data: organizations, error } = await supabase
       .from('organisations')
-      .select('id, name, abbr, organisation_type, created_at') 
-      .order('name')
-      .returns<Tables<'organisations'>[]>()
+      .select(`
+        *,
+        profiles(count)
+      `)
+      .order('created_at', { ascending: false });
 
-    if (orgError) {
-      console.error('Error fetching organisations:', orgError)
-      return NextResponse.json(
-        { error: 'Failed to fetch organisations' },
-        { status: 500 }
-      )
+    if (error) {
+      console.error('Error fetching organizations:', error);
+      return NextResponse.json({ error: 'Failed to fetch organizations' }, { status: 500 });
     }
 
-    return NextResponse.json(organisations)
+    return NextResponse.json(organizations);
   } catch (error) {
-    console.error('Error in GET request:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch organisations' },
-      { status: 500 }
-    )
+    console.error('Error in organizations GET:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// --- POST handler will be added next --- 
-export async function POST(req: Request) {
-  const cookieStore = await cookies()
-  
-  // Helper function to adapt Next.js cookies to Supabase methods - same as in GET
-  const supabaseCookieMethods = {
-    get(name: string) {
-      return cookieStore.get(name)?.value
-    },
-    set(name: string, value: string, options: CookieOptions) {
-      try {
-        cookieStore.set({ name, value, ...options })
-      } catch (error) {
-        // Ignore error on Server Components (middleware handles refresh)
-      }
-    },
-    remove(name: string, options: CookieOptions) {
-      try {
-        cookieStore.set({ name, value: '', ...options })
-      } catch (error) {
-         // Ignore error on Server Components (middleware handles refresh)
-      }
-    },
+export async function POST(request: Request) {
+  // Check dev admin password
+  if (!validateDevAdminPassword(request)) {
+    return NextResponse.json({ error: 'Unauthorized - Invalid dev admin password' }, { status: 401 });
   }
 
-  // Create client for checking user session and role
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: supabaseCookieMethods }
-  )
+  const supabase = createSupabaseServerClient();
 
-  // Check user authentication and role (same as in GET)
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-
-  if (sessionError) {
-    console.error('Error getting session:', sessionError)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-  }
-
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  // Fetch user role from profiles table
-  const { data: memberData, error: memberError } = await supabase
-    .from('profiles')
-    .select(PROFILE_ROLE_FIELDS)
-    .eq('user_id', session.user.id)
-    .single<Tables<'profiles'>>()
-
-  if (memberError) {
-    console.error('Error fetching member role:', memberError)
-    return NextResponse.json({ error: 'Forbidden: Could not verify user role' }, { status: 403 })
-  }
-
-  if (!memberData) {
-    console.error('Member data not found for user:', session.user.id)
-    return NextResponse.json({ error: 'Forbidden: User profile not found' }, { status: 403 })
-  }
-
-  // --- Role Check ---
-  if (!isSuperAdmin(memberData)) { 
-    console.warn(`User ${session.user.id} attempted dev-admin access with role: ${memberData.role}`)
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-  // --- End Role Check ---
-
-  // Parse and validate request body
-  let body;
   try {
-    body = await req.json();
-  } catch (error) {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+    const body = await request.json();
+    const { name, organisation_type, settings, password } = body;
 
-  // Validate required fields
-  if (!body.name) {
-    return NextResponse.json({ error: 'Organisation name is required' }, { status: 400 });
-  }
-
-  // Validate organization_type if provided
-  const validTypes = ['Education', 'Business', 'Government', 'Homeschool'];
-  if (body.organisation_type && !validTypes.includes(body.organisation_type)) {
-    return NextResponse.json({ 
-      error: `Invalid organisation_type. Must be one of: ${validTypes.join(', ')}` 
-    }, { status: 400 });
-  }
-
-  // Create supabase admin client for creating the organization
-  const supabaseAdminClient = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { 
-      cookies: supabaseCookieMethods,
-      auth: { 
-        persistSession: false, 
-        autoRefreshToken: false, 
-        detectSessionInUrl: false 
-      } 
+    // Also allow password in request body as fallback
+    if (!validateDevAdminPassword(request) && password !== DEV_ADMIN_PASSWORD) {
+      return NextResponse.json({ error: 'Unauthorized - Invalid dev admin password' }, { status: 401 });
     }
-  )
 
-  // Prepare organization data
-  const organisationData = {
-    name: body.name,
-    abbr: body.abbr || null,
-    organisation_type: body.organisation_type || null,
-    settings: body.settings || null
-  };
+    // Validate required fields
+    if (!name || !organisation_type) {
+      return NextResponse.json({ error: 'Name and organisation_type are required' }, { status: 400 });
+    }
 
-  try {
-    // Insert the new organization
-    const { data: newOrganisation, error: createError } = await supabaseAdminClient
+    // Create organization
+    const { data: organization, error } = await supabase
       .from('organisations')
-      .insert(organisationData)
+      .insert({
+        name,
+        organisation_type,
+        settings: settings || {}
+      })
       .select()
-      .single<Tables<'organisations'>>();
+      .single();
 
-    if (createError) {
-      console.error('Error creating organisation:', createError);
-      return NextResponse.json(
-        { error: 'Failed to create organisation', details: createError.message },
-        { status: 500 }
-      );
+    if (error) {
+      console.error('Error creating organization:', error);
+      return NextResponse.json({ error: 'Failed to create organization' }, { status: 500 });
     }
 
-    // Create a storage bucket for the organization
-    const orgId = newOrganisation.id;
-    const bucketName = `org-${orgId}-uploads`;
-    
-    console.log(`Creating storage bucket: ${bucketName}`);
-    const { error: bucketError } = await supabaseAdminClient.storage.createBucket(
-      bucketName,
-      { 
-        public: false,
-        fileSizeLimit: 50 * 1024 * 1024, // 50 MB limit
-        allowedMimeTypes: [
-          'application/pdf',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-          'application/vnd.ms-powerpoint',
-          'text/csv',
-          'text/plain',
-          'audio/mpeg',
-          'audio/wav',
-          'audio/ogg',
-          'video/mp4',
-          'video/webm',
-          'video/ogg',
-          'image/jpeg',
-          'image/png',
-          'image/gif',
-          'image/webp'
-        ]
-      }
-    );
-
-    if (bucketError) {
-      console.error(`Error creating bucket for organisation ${orgId}:`, bucketError);
-      // We don't want to fail the whole request if just the bucket creation fails
-      // The bucket can be created later if needed
-      return NextResponse.json({
-        ...newOrganisation,
-        warning: `Organisation created but storage bucket creation failed: ${bucketError.message}`
-      }, { status: 201 });
-    }
-
-    return NextResponse.json({
-      ...newOrganisation,
-      message: 'Organisation and storage bucket created successfully'
-    }, { status: 201 });
+    return NextResponse.json(organization, { status: 201 });
   } catch (error) {
-    console.error('Error in organisation creation process:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return NextResponse.json(
-      { error: 'Failed to complete organisation setup', details: errorMessage },
-      { status: 500 }
-    );
+    console.error('Error in organizations POST:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

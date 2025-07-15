@@ -38,12 +38,9 @@ export default function OrganisationsPage() {
   
   // Check if the auth is correct
   const checkPassword = () => {
-    // This is a simple example - in reality, you should use a more secure method
-    // like storing an env variable or using a proper authentication system
-    const devPassword = 'learnology-ai-dev-2024'
+    const devPassword = 'TerroirLAI'
     if (password === devPassword) {
       setAuthenticated(true)
-      localStorage.setItem('dev-admin-auth', 'true')
       fetchOrganisations()
     } else {
       setError('Invalid password')
@@ -52,41 +49,36 @@ export default function OrganisationsPage() {
   
   // Check for existing auth
   useEffect(() => {
-    const existingAuth = localStorage.getItem('dev-admin-auth')
-    if (existingAuth === 'true') {
-      setAuthenticated(true)
-      fetchOrganisations()
-    } else {
-      setLoading(false)
-    }
+    setLoading(false)
   }, [])
   
-  // Fetch organizations
+  // Fetch organisations from API
   const fetchOrganisations = async () => {
-    setLoading(true)
+    if (!authenticated) return
+    
     try {
-      const response = await fetch('/api/dev-admin/organisations')
+      setLoading(true)
+      const response = await fetch('/api/dev-admin/organisations', {
+        method: 'GET',
+        headers: {
+          'x-dev-admin-password': 'TerroirLAI'
+        }
+      })
       
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          // Handle auth errors
-          // setAuthenticated(false) // Keep user "authenticated" on client-side
-          // localStorage.removeItem('dev-admin-auth') // Do not remove local storage item
-          setError('API Authentication failed. Ensure you have super_admin rights or check API logs.')
-        } else {
-          const errorData = await response.json()
-          setError(errorData.error || 'Failed to fetch organisations')
-        }
-        setLoading(false)
-        return
+        throw new Error('Failed to fetch organisations')
       }
       
       const data = await response.json()
       setOrganisations(data)
-      setError(null)
     } catch (err) {
-      setError('An error occurred while fetching organisations')
-      console.error(err)
+      console.error('Error fetching organisations:', err)
+      setError('Failed to load organisations')
+      toast({
+        title: 'Error',
+        description: 'Failed to load organisations',
+        variant: 'destructive'
+      })
     } finally {
       setLoading(false)
     }
@@ -111,7 +103,8 @@ export default function OrganisationsPage() {
       const response = await fetch('/api/dev-admin/organisations', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'x-dev-admin-password': 'TerroirLAI'
         },
         body: JSON.stringify({
           name,

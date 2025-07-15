@@ -51,19 +51,6 @@ export function ToolCard({ tool, onSelect }: ToolCardProps) {
     router.push(`/teach/tools/${tool.id}/library`);
   };
 
-  const getComplexityColor = (complexity: string) => {
-    switch (complexity) {
-      case 'simple':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-      case 'intermediate':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-      case 'advanced':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
-    }
-  };
-
   const getCategoryColor = (category: string) => {
     switch (category) {
       case 'assessment':
@@ -114,9 +101,6 @@ export function ToolCard({ tool, onSelect }: ToolCardProps) {
             <div className="flex items-center gap-2 mt-2">
               <Badge className={`text-xs px-2 py-1 transition-all duration-300 ${getCategoryColor(tool.category)}`}>
                 {tool.category.replace('-', ' ')}
-              </Badge>
-              <Badge className={`text-xs px-2 py-1 transition-all duration-300 ${getComplexityColor(tool.complexity)}`}>
-                {tool.complexity}
               </Badge>
             </div>
           </div>

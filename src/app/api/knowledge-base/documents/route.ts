@@ -8,22 +8,25 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const baseClassId = searchParams.get('base_class_id');
   const summaryParam = searchParams.get('summary');
+  const userOnlyParam = searchParams.get('user_only');
   const isRequestingSummary = summaryParam === 'true';
+  const isUserOnly = userOnlyParam === 'true';
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    // 1. Get the user's organisation ID from their profile record
+    // Get user's profile to get organization info (needed for organization-based filtering)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organisation_id')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single<Tables<'profiles'>>();
 
     if (profileError) {
@@ -34,20 +37,50 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Could not verify user organisation membership.' }, { status: 500 });
     }
 
-    if (!profile || !profile.organisation_id) {
+    if (!profile || (!profile.organisation_id && !isUserOnly)) {
       return NextResponse.json({ error: 'User is not associated with an organisation.' }, { status: 403 });
     }
 
-    const userOrganisationId = profile.organisation_id;
-
-    // 2. Build query with filters
+    // Build query with appropriate filtering
     let query = supabase
       .from('documents')
-      .select('*')
-      .eq('organisation_id', userOrganisationId);
+      .select('*');
+
+    // Apply filtering based on user_only parameter
+    if (isUserOnly) {
+      // Filter by user for /teach/knowledge page
+      query = query.eq('uploaded_by', user.id);
+    } else {
+      // Filter by organization for other pages
+      if (!profile.organisation_id) {
+        return NextResponse.json({ error: 'User is not associated with an organisation.' }, { status: 403 });
+      }
+      query = query.eq('organisation_id', profile.organisation_id);
+    }
 
     // Filter by base class if provided
     if (baseClassId) {
+      // Verify the base class belongs to the user (for user-only) or organization
+      const baseClassQuery = supabase
+        .from('base_classes')
+        .select('id')
+        .eq('id', baseClassId);
+      
+      if (isUserOnly) {
+        baseClassQuery.eq('user_id', user.id);
+      } else {
+        if (!profile.organisation_id) {
+          return NextResponse.json({ error: 'User is not associated with an organisation.' }, { status: 403 });
+        }
+        baseClassQuery.eq('organisation_id', profile.organisation_id);
+      }
+      
+      const { data: baseClass } = await baseClassQuery.single();
+      
+      if (!baseClass) {
+        return NextResponse.json({ error: 'Base class not found or access denied' }, { status: 404 });
+      }
+      
       query = query.eq('base_class_id', baseClassId);
     }
 
@@ -99,10 +132,11 @@ export async function DELETE(request: Request) {
   const supabase = createSupabaseServerClient();
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -119,7 +153,7 @@ export async function DELETE(request: Request) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organisation_id')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single<Tables<'profiles'>>();
 
     if (profileError || !profile || !profile.organisation_id) {
@@ -142,7 +176,7 @@ export async function DELETE(request: Request) {
     }
 
     if (document.organisation_id !== userOrganisationId) {
-        console.warn(`User ${session.user.id} attempted to delete document ${docId} belonging to org ${document.organisation_id}`);
+        console.warn(`User ${user.id} attempted to delete document ${docId} belonging to org ${document.organisation_id}`);
         return NextResponse.json({ error: 'Forbidden: You do not own this document.' }, { status: 403 });
     }
 

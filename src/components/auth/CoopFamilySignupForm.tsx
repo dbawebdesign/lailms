@@ -316,9 +316,8 @@ export default function CoopFamilySignupForm({
                   <ol className="list-decimal list-inside space-y-1 text-sm text-amber-800 dark:text-amber-200">
                     <li>Share student invite codes with your children</li>
                     <li>Help them create their accounts using the codes</li>
-                    <li>Explore courses created by the co-op</li>
-                    <li>Connect with other families in the co-op</li>
-                    <li>Consider creating your own courses to share</li>
+                    <li>Create your first Base Class and class instance</li>
+                    <li>Send your children the invite code to enroll in the class and start learning!</li>
                   </ol>
                 </div>
 

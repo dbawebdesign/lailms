@@ -1,66 +1,80 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import type { UserRole } from "@/lib/utils/roleUtils";
-import WelcomeCard from "@/components/dashboard/WelcomeCard";
-import { Tables } from "packages/types/db";
-import { getEffectiveRole, isAdmin, PROFILE_ROLE_FIELDS } from "@/lib/utils/roleUtils";
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import HomeschoolCoopDashboard from '@/components/dashboard/HomeschoolCoopDashboard'
+import HomeschoolFamilyAdminDashboard from '@/components/dashboard/HomeschoolFamilyAdminDashboard'
 
-export default async function AdminDashboardPage() {
-  const supabase = createSupabaseServerClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+export default async function SchoolPage() {
+  const supabase = createSupabaseServerClient()
 
-  if (authError || !user) {
-    console.error('Auth error or no user:', authError);
-    redirect("/login?error=auth");
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select(PROFILE_ROLE_FIELDS + ", first_name, last_name, user_id")
-    .eq("user_id", user.id)
-    .single<Tables<"profiles">>();
-
-  if (profileError || !profile) {
-    console.error("Error fetching admin profile or profile not found:", profileError);
-    redirect("/login?error=profile");
-  }
-
-  // Check if user has admin access
-  const hasAdminAccess = isAdmin(profile);
-
-  if (!hasAdminAccess) {
-    const currentRole = getEffectiveRole(profile);
-    console.warn(`User with role ${currentRole} accessed admin (/school) dashboard. Redirecting.`);
-    redirect("/dashboard?error=unauthorized"); 
-  }
+  // Get the current user
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
   
-  const userName = profile.first_name || user.email || "Administrator";
-  const currentRole = getEffectiveRole(profile);
+  if (userError || !user) {
+    redirect('/login')
+  }
 
+  // Get user profile with organization information
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select(`
+      *,
+      organisations (
+        id,
+        name,
+        organisation_type
+      )
+    `)
+    .eq('user_id', user.id)
+    .single()
+
+  if (profileError || !profile || !profile.organisations) {
+    redirect('/login')
+  }
+
+  // Determine which dashboard to show based on organization type and user role
+  const orgType = profile.organisations.organisation_type
+  const userRole = profile.role
+
+  // Coop leaders: super_admin role in coop_network organization
+  if (orgType === 'coop_network' && userRole === 'super_admin') {
+    return (
+      <HomeschoolCoopDashboard />
+    )
+  }
+
+  // Family admins: admin role in either coop_network or individual_family organization
+  if (userRole === 'admin' && (orgType === 'coop_network' || orgType === 'individual_family')) {
+    return (
+      <HomeschoolFamilyAdminDashboard />
+    )
+  }
+
+  // Default: Traditional school dashboard for all other cases
   return (
-    <div className="container mx-auto p-4 sm:p-6 md:p-8">
-      <WelcomeCard userName={userName} userRole={currentRole as UserRole} />
-      <h1 className="text-3xl font-bold mb-6">Welcome, {userName}! (Admin Dashboard - /school)</h1>
-      
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-6">School Administration</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Placeholder for "School/Department At-a-Glance" KPIs */}
-        <div className="bg-card p-6 rounded-lg shadow lg:col-span-2">
-          <h2 className="text-xl font-semibold mb-3">School/Department At-a-Glance</h2>
-          <p className="text-muted-foreground">Key Performance Indicators (total users, course stats, engagement trends) will appear here.</p>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold mb-4">Students</h2>
+          <p className="text-gray-600">Manage student enrollment and records</p>
         </div>
-
-        {/* Placeholder for "Key Administrative Links" */}
-        <div className="bg-card p-6 rounded-lg shadow lg:col-span-1">
-          <h2 className="text-xl font-semibold mb-3">Key Administrative Links</h2>
-          <p className="text-muted-foreground">Quick links to: Manage Users & Roles, Oversee Courses, View School Analytics.</p>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold mb-4">Teachers</h2>
+          <p className="text-gray-600">Manage teaching staff and assignments</p>
         </div>
-
-        {/* Placeholder for "System Updates / Pending Approvals" */}
-        <div className="bg-card p-6 rounded-lg shadow lg:col-span-3">
-          <h2 className="text-xl font-semibold mb-3">System Updates & Approvals</h2>
-          <p className="text-muted-foreground">Notifications about new user approvals, pending reviews, etc.</p>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold mb-4">Courses</h2>
+          <p className="text-gray-600">Manage curriculum and course offerings</p>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold mb-4">Reports</h2>
+          <p className="text-gray-600">View academic and administrative reports</p>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold mb-4">Settings</h2>
+          <p className="text-gray-600">Configure school settings and policies</p>
         </div>
       </div>
     </div>
-  );
+  )
 } 

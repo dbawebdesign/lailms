@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { Tables } from 'packages/types/db';
 
 interface PathParams {
   params: Promise<{
@@ -8,120 +9,151 @@ interface PathParams {
   }>;
 }
 
-// GET - Fetch a single path
-export async function GET(request: NextRequest, { params }: PathParams) {
-  const supabase = await createSupabaseServerClient();
-  const { pathId } = await params;
-
+// GET /api/teach/paths/[pathId] - Get a specific path
+export async function GET(
+  request: Request,
+  { params }: { params: { pathId: string } }
+) {
+  const supabase = createSupabaseServerClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const { data: path, error: fetchError } = await supabase
-      .from('paths')
-      .select('*')
-      .eq('id', pathId)
-      .single();
+    // Get user's organization
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('organisation_id')
+      .eq('user_id', user.id)
+      .single<Tables<'profiles'>>();
 
-    if (fetchError) {
-      console.error('Error fetching path:', fetchError);
-      return NextResponse.json({ error: 'Failed to fetch path', details: fetchError.message }, { status: 500 });
+    if (!profile?.organisation_id) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
-    if (!path) {
+    // Get the path with lessons
+    const { data: path, error } = await supabase
+      .from('paths')
+      .select(`
+        *,
+        lessons(*)
+      `)
+      .eq('id', params.pathId)
+      .eq('organisation_id', profile.organisation_id)
+      .single();
+
+    if (error) {
       return NextResponse.json({ error: 'Path not found' }, { status: 404 });
     }
 
     return NextResponse.json(path);
-
-  } catch (error: any) {
-    console.error('GET Path API Error:', error);
-    return NextResponse.json({ error: 'An unexpected error occurred', details: error.message }, { status: 500 });
+  } catch (error) {
+    console.error('Error fetching path:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// PATCH - Update a path
-export async function PATCH(request: NextRequest, { params }: PathParams) {
-  const supabase = await createSupabaseServerClient();
-  const { pathId } = await params;
-
+// PUT /api/teach/paths/[pathId] - Update a path
+export async function PUT(
+  request: Request,
+  { params }: { params: { pathId: string } }
+) {
+  const supabase = createSupabaseServerClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const updates = await request.json();
+    const body = await request.json();
+    const { title, description, status } = body;
 
-    // Remove any fields that shouldn't be updated directly
-    const allowedFields = ['title', 'description'];
-    const filteredUpdates = Object.keys(updates)
-      .filter(key => allowedFields.includes(key))
-      .reduce((obj: any, key) => {
-        obj[key] = updates[key];
-        return obj;
-      }, {});
+    // Get user's organization
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('organisation_id')
+      .eq('user_id', user.id)
+      .single<Tables<'profiles'>>();
 
-    if (Object.keys(filteredUpdates).length === 0) {
-      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+    if (!profile?.organisation_id) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
-    const { data: updatedPath, error: updateError } = await supabase
+    // Update the path
+    const { data: path, error } = await supabase
       .from('paths')
-      .update(filteredUpdates)
-      .eq('id', pathId)
-      .select('*')
+      .update({
+        title,
+        description,
+        status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', params.pathId)
+      .eq('organisation_id', profile.organisation_id)
+      .select()
       .single();
 
-    if (updateError) {
-      console.error('Error updating path:', updateError);
-      return NextResponse.json({ error: 'Failed to update path', details: updateError.message }, { status: 500 });
+    if (error) {
+      return NextResponse.json({ error: 'Failed to update path' }, { status: 500 });
     }
 
-    return NextResponse.json(updatedPath);
-
-  } catch (error: any) {
-    console.error('PATCH Path API Error:', error);
-    return NextResponse.json({ error: 'An unexpected error occurred', details: error.message }, { status: 500 });
+    return NextResponse.json(path);
+  } catch (error) {
+    console.error('Error updating path:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// DELETE - Delete a path
-export async function DELETE(request: NextRequest, { params }: PathParams) {
-  const supabase = await createSupabaseServerClient();
-  const { pathId } = await params;
-
+// DELETE /api/teach/paths/[pathId] - Delete a path
+export async function DELETE(
+  request: Request,
+  { params }: { params: { pathId: string } }
+) {
+  const supabase = createSupabaseServerClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const { error: deleteError } = await supabase
+    // Get user's organization
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('organisation_id')
+      .eq('user_id', user.id)
+      .single<Tables<'profiles'>>();
+
+    if (!profile?.organisation_id) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    }
+
+    // Delete the path
+    const { error } = await supabase
       .from('paths')
       .delete()
-      .eq('id', pathId);
+      .eq('id', params.pathId)
+      .eq('organisation_id', profile.organisation_id);
 
-    if (deleteError) {
-      console.error('Error deleting path:', deleteError);
-      return NextResponse.json({ error: 'Failed to delete path', details: deleteError.message }, { status: 500 });
+    if (error) {
+      return NextResponse.json({ error: 'Failed to delete path' }, { status: 500 });
     }
 
     return NextResponse.json({ message: 'Path deleted successfully' });
-
-  } catch (error: any) {
-    console.error('DELETE Path API Error:', error);
-    return NextResponse.json({ error: 'An unexpected error occurred', details: error.message }, { status: 500 });
+  } catch (error) {
+    console.error('Error deleting path:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

@@ -1,12 +1,69 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Users, GraduationCap, BarChart3 } from 'lucide-react'
 
 export default function DevAdminPage() {
+  const [password, setPassword] = useState('')
+  const [authenticated, setAuthenticated] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const checkPassword = () => {
+    const devPassword = 'TerroirLAI'
+    if (password === devPassword) {
+      setAuthenticated(true)
+      setError(null)
+    } else {
+      setError('Invalid password')
+    }
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    checkPassword()
+  }
+
+  if (!authenticated) {
+    return (
+      <div className="container mx-auto p-6 max-w-md">
+        <Card>
+          <CardHeader>
+            <CardTitle>Developer Admin Access</CardTitle>
+            <CardDescription>
+              Enter the developer password to access admin tools
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter developer password"
+                />
+              </div>
+              {error && (
+                <p className="text-sm text-red-600">{error}</p>
+              )}
+              <Button type="submit" className="w-full">
+                Access Admin Tools
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-8">
@@ -62,13 +119,13 @@ export default function DevAdminPage() {
               Survey Analytics
             </CardTitle>
             <CardDescription>
-              View survey responses and analytics dashboard
+              View and analyze survey data and responses
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Link href="/dev-admin/survey-analytics">
               <Button className="w-full">
-                View Survey Data
+                Access Survey Analytics
               </Button>
             </Link>
           </CardContent>

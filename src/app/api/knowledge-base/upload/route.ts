@@ -11,10 +11,11 @@ export async function POST(request: Request) {
   const supabase = createSupabaseServerClient(); // Server client for auth and initial actions
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
   const { data: profile, error: profileError } = await supabase
     .from('profiles') // Use the profiles table
     .select('organisation_id')
-    .eq('user_id', session.user.id) // Match using the user_id column
+    .eq('user_id', user.id) // Match using the user_id column
     .maybeSingle<Tables<'profiles'>>();
 
   if (profileError) {
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
 
   const bucketName = `org-${userOrganisationId}-uploads`;
   // Generate a unique path, maybe user ID + timestamp + filename?
-  const uniqueFileName = `${session.user.id}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
+  const uniqueFileName = `${user.id}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
   const filePath = `${uniqueFileName}`;
   let insertedDocumentId: string | null = null; // To store the ID for cleanup/invocation
 
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
       storage_path: filePath, // Store the planned path
       file_type: file.type,
       file_size: file.size,
-      uploaded_by: session.user.id,
+      uploaded_by: user.id,
       status: 'queued' as DocumentStatus, // Use the defined enum type
       // processing_error and metadata are initially null
     };

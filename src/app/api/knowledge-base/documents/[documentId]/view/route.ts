@@ -10,10 +10,11 @@ export async function GET(
   const { documentId } = await params;
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -22,7 +23,7 @@ export async function GET(
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organisation_id')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .maybeSingle<Tables<'profiles'>>();
 
     if (profileError || !profile?.organisation_id) {

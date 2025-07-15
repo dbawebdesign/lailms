@@ -173,18 +173,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create family info' }, { status: 500 })
     }
 
-    // Generate student invite codes for this family
-    const studentInviteResponse = await supabase
-      .from('invite_codes')
-      .insert([{
-        organisation_id: organizationId,
-        organisation_unit_id: organizationUnitId,
-        role: 'student',
-        expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
-        created_by: parentUserId
-      }])
-      .select()
-
     // Mark the admin invite code as used
     await supabase
       .from('invite_codes')
@@ -194,12 +182,15 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', inviteData.id)
 
-    // Get the generated student invite codes
+    // Get the student invite code for this co-op organization
     const { data: studentCodes } = await supabase
       .from('invite_codes')
       .select('code, role')
-      .eq('organisation_unit_id', organizationUnitId)
+      .eq('organisation_id', organizationId)
       .eq('role', 'student')
+      .is('organisation_unit_id', null)
+      .is('used_at', null)
+      .limit(1)
 
     return NextResponse.json({
       success: true,

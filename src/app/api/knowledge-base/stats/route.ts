@@ -5,15 +5,6 @@ import { Tables } from 'packages/types/db';
 export async function GET(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
-    const { searchParams } = new URL(request.url);
-    const organisationId = searchParams.get('organisationId');
-
-    if (!organisationId) {
-      return NextResponse.json(
-        { error: 'Organisation ID is required' },
-        { status: 400 }
-      );
-    }
 
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -24,56 +15,42 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Verify user has access to this organization
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('organisation_id')
-      .eq('user_id', user.id)
-      .single<Tables<"profiles">>();
-
-    if (profileError || !profile || profile.organisation_id !== organisationId) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      );
-    }
-
-    // Get total documents count
+    // Get total documents count for the current user
     const { count: totalDocuments, error: documentsError } = await supabase
       .from('documents')
       .select('*', { count: 'exact', head: true })
-      .eq('organisation_id', organisationId);
+      .eq('uploaded_by', user.id);
 
     if (documentsError) {
       console.error('Error fetching documents count:', documentsError);
     }
 
-    // Get pending processing count
+    // Get pending processing count for the current user
     const { count: pendingProcessing, error: pendingError } = await supabase
       .from('documents')
       .select('*', { count: 'exact', head: true })
-      .eq('organisation_id', organisationId)
+      .eq('uploaded_by', user.id)
       .in('status', ['queued', 'processing']);
 
     if (pendingError) {
       console.error('Error fetching pending documents count:', pendingError);
     }
 
-    // Get recent uploads (last 7 days)
+    // Get recent uploads (last 7 days) for the current user
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const { count: recentUploads, error: recentError } = await supabase
       .from('documents')
       .select('*', { count: 'exact', head: true })
-      .eq('organisation_id', organisationId)
+      .eq('uploaded_by', user.id)
       .gte('created_at', sevenDaysAgo.toISOString());
 
     if (recentError) {
       console.error('Error fetching recent uploads count:', recentError);
     }
 
-    // Get active base classes count (classes with documents)
+    // Get active base classes count (classes owned by user that have documents uploaded by them)
     const { data: activeClasses, error: classesError } = await supabase
       .from('base_classes')
       .select(`
@@ -82,7 +59,8 @@ export async function GET(request: NextRequest) {
           id
         )
       `)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .eq('documents.uploaded_by', user.id);
 
     if (classesError) {
       console.error('Error fetching active classes:', classesError);

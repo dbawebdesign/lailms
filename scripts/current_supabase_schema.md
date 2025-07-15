@@ -4,6 +4,22 @@ This document tracks the current state of our Supabase database schema, includin
 
 ## Recent Updates and Fixes
 
+### Role-Based Dashboard Access Implementation (January 2025)
+
+**Feature**: Implemented role-based access control for homeschool administrative dashboards based on user role and organization type.
+
+**Access Control Logic**:
+- **Coop Leaders**: Users with `role = 'super_admin'` in `organisation_type = 'coop_network'` organizations see the HomeschoolCoopDashboard
+- **Family Admins**: Users with `role = 'admin'` in either `organisation_type = 'coop_network'` or `organisation_type = 'individual_family'` organizations see the HomeschoolFamilyAdminDashboard
+- **Default**: All other users see the traditional school administration dashboard
+
+**Key Tables**:
+- `profiles.role` - User's primary role (super_admin, admin, teacher, student)
+- `organisations.organisation_type` - Organization classification (coop_network, individual_family, Education)
+- `profiles.organisation_id` - Links user to their organization
+
+**Implementation**: Located in `/src/app/(app)/school/page.tsx` with proper role and organization type validation.
+
 ### Survey Feature Implementation (January 2025)
 
 **Feature**: Added comprehensive survey system for new homeschool users with 4-section, 23-question survey for product validation and demographics.

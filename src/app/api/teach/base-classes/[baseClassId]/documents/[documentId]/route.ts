@@ -15,10 +15,11 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const { baseClassId, documentId } = await params;
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -36,7 +37,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organisation_id')
-      .eq('user_id', session.user.id) // Use user_id instead of id
+      .eq('user_id', user.id) // Use user_id instead of id
       .single<Tables<'profiles'>>();
 
     if (profileError || !profile || !profile.organisation_id) {
@@ -60,13 +61,13 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     // Verify ownership: document must belong to the user's organisation AND the specified baseClassId
     if (document.organisation_id !== userOrganisationId) {
-      console.warn(`User ${session.user.id} from org ${userOrganisationId} attempted to delete document ${documentId} belonging to org ${document.organisation_id}.`);
+      console.warn(`User ${user.id} from org ${userOrganisationId} attempted to delete document ${documentId} belonging to org ${document.organisation_id}.`);
       return NextResponse.json({ error: 'Forbidden: You do not own this document (org mismatch).' }, { status: 403 });
     }
     // Also check if the document is correctly associated with the baseClassId in the route
     // This check is important if a document could be in the correct org but wrong base class.
     if (document.base_class_id !== baseClassId) {
-        console.warn(`User ${session.user.id} attempted to delete document ${documentId} (base_class_id ${document.base_class_id}) via baseClassId ${baseClassId} route.`);
+        console.warn(`User ${user.id} attempted to delete document ${documentId} (base_class_id ${document.base_class_id}) via baseClassId ${baseClassId} route.`);
         return NextResponse.json({ error: 'Forbidden: Document not associated with this base class.' }, { status: 403 });
     }
 

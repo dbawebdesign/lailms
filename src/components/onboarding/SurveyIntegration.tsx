@@ -7,7 +7,11 @@ import { Tables } from 'packages/types/db';
 
 interface SurveyIntegrationProps {
   userRole: string;
-  profile: Tables<'profiles'>;
+  profile: Tables<'profiles'> & {
+    organisations?: {
+      organisation_type: string | null;
+    } | null;
+  };
 }
 
 export function SurveyIntegration({ userRole, profile }: SurveyIntegrationProps) {
@@ -29,7 +33,14 @@ export function SurveyIntegration({ userRole, profile }: SurveyIntegrationProps)
           return;
         }
 
-        // Show survey if user is not a student and hasn't completed it
+        // Check if user's organization type is eligible for survey
+        const organizationType = profile.organisations?.organisation_type;
+        if (!organizationType || (organizationType !== 'individual_family' && organizationType !== 'coop_network')) {
+          setIsLoading(false);
+          return;
+        }
+
+        // Show survey if user is not a student, hasn't completed it, and is in eligible organization
         setShowSurvey(true);
       } catch (error) {
         console.error('Error checking survey status:', error);
@@ -68,8 +79,11 @@ export function SurveyIntegration({ userRole, profile }: SurveyIntegrationProps)
     // Do nothing - survey must be completed
   };
 
-  // Check if user should see survey (all roles except student)
-  const shouldShowSurvey = userRole !== 'student';
+  // Check if user should see survey (non-students in eligible organizations)
+  const organizationType = profile.organisations?.organisation_type;
+  const shouldShowSurvey = userRole !== 'student' && 
+    organizationType && 
+    (organizationType === 'individual_family' || organizationType === 'coop_network');
 
   if (isLoading && shouldShowSurvey) {
     return (

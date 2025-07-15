@@ -46,9 +46,10 @@ type Document = Database['public']['Tables']['documents']['Row']
 interface FileListTableProps {
   organisationId: string;
   baseClassId?: string;
+  userOnly?: boolean; // New prop to filter by user instead of organization
 }
 
-export function FileListTable({ organisationId, baseClassId }: FileListTableProps) {
+export function FileListTable({ organisationId, baseClassId, userOnly = false }: FileListTableProps) {
   const [documents, setDocuments] = useState<Document[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -57,13 +58,16 @@ export function FileListTable({ organisationId, baseClassId }: FileListTableProp
   useEffect(() => {
     async function fetchDocuments() {
       if (!organisationId) return;
-
+      
       setIsLoading(true);
       setError(null);
       try {
-        let url = `/api/knowledge-base/documents`;
+        let url = `/api/knowledge-base/documents?organisation_id=${organisationId}`;
         if (baseClassId) {
-          url += `?base_class_id=${baseClassId}`;
+          url += `&base_class_id=${baseClassId}`;
+        }
+        if (userOnly) {
+          url += `&user_only=${userOnly}`;
         }
         
         const response = await fetch(url);
@@ -85,7 +89,7 @@ export function FileListTable({ organisationId, baseClassId }: FileListTableProp
     }
 
     fetchDocuments();
-  }, [organisationId, baseClassId]);
+  }, [organisationId, baseClassId, userOnly]);
 
   // Get status badge based on document status and processing stage
   const getStatusBadge = (status: DocumentStatus, metadata: any) => {
