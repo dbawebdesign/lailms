@@ -6,6 +6,7 @@ import { UIContextProvider } from "@/context/UIContext";
 import { LunaContextRegistration } from "@/components/providers/LunaContextRegistration";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -65,6 +66,7 @@ export default function RootLayout({
             </LunaContextRegistration>
           </UIContextProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
