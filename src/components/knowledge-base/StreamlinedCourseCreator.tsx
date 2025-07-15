@@ -400,6 +400,9 @@ export default function StreamlinedCourseCreator({
                   onKeyPress={(e) => e.key === 'Enter' && handleAddUrl()}
                   className="bg-background border-border focus:border-primary focus:ring-primary"
                 />
+                <p className="text-sm text-muted-foreground mt-2">
+                  YouTube video processing coming soon
+                </p>
               </div>
               <Button
                 onClick={handleAddUrl}
