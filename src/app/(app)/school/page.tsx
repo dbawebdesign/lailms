@@ -38,7 +38,11 @@ export default async function SchoolPage() {
   // Coop leaders: super_admin role in coop_network organization
   if (orgType === 'coop_network' && userRole === 'super_admin') {
     return (
-      <HomeschoolCoopDashboard />
+      <HomeschoolCoopDashboard 
+        organizationId={profile.organisations.id}
+        organizationName={profile.organisations.name}
+        userRole={userRole}
+      />
     )
   }
 

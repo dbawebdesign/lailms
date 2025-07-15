@@ -394,7 +394,7 @@ export default function StreamlinedCourseCreator({
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <Input
-                  placeholder="Add a URL (webpage, YouTube video, etc.)"
+                  placeholder="Add a URL"
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleAddUrl()}
