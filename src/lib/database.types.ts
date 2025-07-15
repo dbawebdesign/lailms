@@ -278,6 +278,51 @@ export type Database = {
           },
         ]
       }
+      teacher_tool_creations: {
+        Row: {
+          content: Json
+          created_at: string | null
+          description: string | null
+          id: string
+          is_favorite: boolean | null
+          metadata: Json | null
+          tags: string[] | null
+          title: string
+          tool_id: string
+          tool_name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content: Json
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          metadata?: Json | null
+          tags?: string[] | null
+          title: string
+          tool_id: string
+          tool_name: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          metadata?: Json | null
+          tags?: string[] | null
+          title?: string
+          tool_id?: string
+          tool_name?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       // ... existing code ...
