@@ -10,6 +10,7 @@ import { PasswordInput } from '@/components/ui/password-input'
 import { InviteCodeCopyButton } from '@/components/ui/copy-button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
+import TermsCheckbox from '../ui/terms-checkbox'
 import { toast } from '@/components/ui/use-toast'
 import { Loader2, Users, Home, ArrowRight, CheckCircle, UserPlus, GraduationCap, Building, User } from 'lucide-react'
 import { useInviteCodeClipboard } from '@/hooks/useClipboard'
@@ -29,6 +30,7 @@ interface SignupFormData {
     password: string
     confirmPassword: string
   }
+  agreedToTerms: boolean
 }
 
 interface InviteCode {
@@ -184,7 +186,8 @@ export default function HomeschoolSignupForm() {
       lastName: '',
       password: '',
       confirmPassword: ''
-    }
+    },
+    agreedToTerms: false
   })
 
   const updateFormData = (updates: Partial<SignupFormData>) => {
@@ -444,6 +447,12 @@ export default function HomeschoolSignupForm() {
                 onChange={(e) => updateContactInfo({ confirmPassword: e.target.value })}
                 placeholder="Confirm your password"
               />
+
+              <TermsCheckbox
+                checked={formData.agreedToTerms}
+                onCheckedChange={(checked: boolean) => updateFormData({ agreedToTerms: checked })}
+                disabled={isLoading}
+              />
             </div>
           </div>
         )
@@ -512,7 +521,8 @@ export default function HomeschoolSignupForm() {
           formData.primaryContactInfo.lastName.trim() !== '' &&
           formData.primaryContactInfo.username.trim() !== '' &&
           formData.primaryContactInfo.password.trim() !== '' &&
-          formData.primaryContactInfo.confirmPassword.trim() !== ''
+          formData.primaryContactInfo.confirmPassword.trim() !== '' &&
+          formData.agreedToTerms
         )
       default:
         return true

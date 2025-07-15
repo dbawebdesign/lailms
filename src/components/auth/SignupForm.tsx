@@ -6,6 +6,7 @@ import Image from 'next/image'
 // import { Button } from '@learnologyai/ui' // Temporarily comment out
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/ui/password-input'
+import TermsCheckbox from '../ui/terms-checkbox'
 import { toast } from 'sonner'
 import CoopFamilySignupForm from './CoopFamilySignupForm'
 
@@ -38,6 +39,7 @@ export default function SignupForm() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [gradeLevel, setGradeLevel] = useState('')
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   // Step 1: Verify invite code
   const handleVerifyCode = async (e: React.FormEvent) => {
@@ -97,6 +99,12 @@ export default function SignupForm() {
     // Basic validation
     if (password !== confirmPassword) {
       setError('Passwords do not match')
+      setIsLoading(false)
+      return
+    }
+
+    if (!agreedToTerms) {
+      setError('You must agree to the Terms of Service to create an account')
       setIsLoading(false)
       return
     }
@@ -323,11 +331,18 @@ export default function SignupForm() {
               />
             </div>
           )}
+
+          <TermsCheckbox
+            checked={agreedToTerms}
+            onCheckedChange={setAgreedToTerms}
+            disabled={isLoading}
+            error={error && !agreedToTerms ? 'You must agree to the Terms of Service' : undefined}
+          />
           
           <button
             type="submit"
             className="w-full mt-8 py-3 px-4 bg-neutral-800 text-neutral-100 font-semibold rounded-lg hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:focus:ring-offset-black dark:focus:ring-neutral-500 disabled:opacity-50 transition-colors duration-150"
-            disabled={isLoading}
+            disabled={isLoading || !firstName.trim() || !lastName.trim() || !username.trim() || !password.trim() || !confirmPassword.trim() || !agreedToTerms}
           >
             {isLoading ? 'Creating Account...' : 'Sign Up'}
           </button>

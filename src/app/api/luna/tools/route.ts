@@ -225,41 +225,39 @@ IMPORTANT: Use the hierarchical structure with ### for main branches and - for d
         requiresFollowUp: true
       },
       'brain-bytes': {
-        name: 'Brain Bytes Generator',
-        systemPrompt: `You are Luna, an expert educational AI assistant specializing in creating bite-sized learning content. You help teachers break down complex topics into digestible "brain bytes" for better comprehension.
+        name: 'BrainBytes Generator',
+        systemPrompt: `You are Luna, an expert educational AI assistant specializing in creating standalone 2-3 minute educational podcasts. You help teachers create engaging audio content that students can listen to independently.
 
 CONVERSATION APPROACH:
-- Understand the complex topic or concept they want to break down
-- Ask about the grade level and attention span considerations
-- Determine how many bytes they need (suggest 3-7)
-- Ask about the learning context (review, introduction, reinforcement)
-- Find out preferred format (facts, questions, activities, etc.)
+- Understand the topic they want to create a podcast about
+- Ask about the grade level for age-appropriate content
+- Ask about the learning context (warm-up, transition, independent study)
+- Gather any specific focus areas or learning objectives
 
-WHEN READY: Create brain bytes using this EXACT format:
+IMPORTANT: You will ALWAYS create exactly ONE 2-3 minute educational podcast. Never ask about quantity or how many episodes - it's always just one standalone podcast.
 
-# Brain Bytes: [Topic Title]
+WHEN READY: Create a podcast script using this EXACT format:
 
-## Byte 1: [Subtopic Name]
-**Key Concept:** [Main idea in one sentence]
-**Details:** [2-3 supporting details or examples]
-**Memory Hook:** [Mnemonic, analogy, or memorable connection]
+# BrainBytes Podcast: [Topic Title]
 
-## Byte 2: [Subtopic Name]
-**Key Concept:** [Main idea in one sentence]
-**Details:** [2-3 supporting details or examples]
-**Memory Hook:** [Mnemonic, analogy, or memorable connection]
+## Introduction (15-20 seconds)
+[Engaging hook and topic introduction]
 
-(Continue for all bytes)
+## Main Content (90-120 seconds)
+[Educational content broken into digestible segments with smooth transitions]
+
+## Conclusion (15-20 seconds)
+[Summary and memorable takeaway]
 
 ---
 
-**Teaching Tips:**
+**Podcast Details:**
 - **Grade Level:** [Grade level]
-- **Timing:** [Suggested time per byte]
-- **Sequence:** [Recommended order of delivery]
-- **Assessment Ideas:** [Quick check suggestions]
+- **Duration:** 2-3 minutes
+- **Topic:** [Main topic]
+- **Key Learning Points:** [3-4 bullet points]
 
-IMPORTANT: Keep each byte focused and concise. Use the exact format shown above for proper parsing.`,
+IMPORTANT: This will be converted to audio, so write in a conversational, engaging tone suitable for listening. Use natural speech patterns and include cues for emphasis.`,
         requiresFollowUp: true
       }
     };
@@ -329,7 +327,141 @@ IMPORTANT: Keep each byte focused and concise. Use the exact format shown above 
       (toolId === 'content-leveler' && response.toLowerCase().includes('adapted version')) ||
       (toolId === 'iep-generator' && response.toLowerCase().includes('goal')) ||
       (toolId === 'mindmap-generator' && (response.includes('### Branch') || response.includes('## Central Theme:'))) ||
-      (toolId === 'brain-bytes' && response.includes('## Byte'));
+      (toolId === 'brain-bytes' && (response.includes('## Introduction') && response.includes('## Main Content')));
+
+    // For BrainBytes, always generate audio if we have any structured content
+    if (toolId === 'brain-bytes' && (response.includes('## Introduction') || response.includes('## Main Content'))) {
+      console.log('🎵 BrainBytes: Starting audio generation...');
+      try {
+        // Extract the script content from Luna's response - handle timing annotations
+        const scriptMatch = response.match(/## Introduction[\s\S]*?(?=---|\n\n\*\*|$)/);
+        let script = scriptMatch ? scriptMatch[0] : response;
+        
+        console.log('🎵 BrainBytes: Extracted script:', script.substring(0, 200) + '...');
+        
+        // Remove timing annotations from headers (e.g., "## Introduction (15-20 seconds)")
+        script = script.replace(/^##\s+([^(]+)\s*\([^)]+\)/gm, '## $1');
+        
+        // Clean up script for TTS (remove markdown formatting)
+        let cleanScript = script
+          .replace(/^##\s+.*$/gm, '') // Remove entire markdown header lines
+          .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold formatting
+          .replace(/\*(.*?)\*/g, '$1') // Remove italic formatting
+          .replace(/\n\n+/g, '\n\n') // Normalize line breaks
+          .replace(/^\s*\n/gm, '') // Remove empty lines at start
+          .trim();
+        
+        console.log('🎵 BrainBytes: Cleaned script preview:', cleanScript.substring(0, 200) + '...');
+
+        // Ensure script is within TTS character limit (4096 characters)
+        if (cleanScript.length > 4096) {
+          console.log(`Script too long (${cleanScript.length} chars), truncating to 4096 characters`);
+          const truncateAt = cleanScript.lastIndexOf('.', 4050);
+          if (truncateAt > 3500) {
+            cleanScript = cleanScript.substring(0, truncateAt + 1);
+          } else {
+            cleanScript = cleanScript.substring(0, 4090) + '.';
+          }
+        }
+
+        // Generate audio using OpenAI TTS
+        const audioResponse = await openai.audio.speech.create({
+          model: 'tts-1',
+          voice: 'nova', // Luna's voice
+          input: cleanScript,
+          speed: 1.0,
+        });
+
+        // Convert audio to buffer
+        const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
+        
+        // Calculate estimated duration
+        const wordCount = cleanScript.split(/\s+/).length;
+        const estimatedDuration = Math.round((wordCount / 150) * 60); // in seconds
+
+        // Create Supabase client for file upload
+        const supabase = createSupabaseServerClient();
+        
+        // Upload audio to Supabase Storage
+        const fileName = `brainbytes_luna_${Date.now()}.mp3`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('lesson-media')
+          .upload(fileName, audioBuffer, {
+            contentType: 'audio/mpeg',
+            cacheControl: '3600'
+          });
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          throw new Error('Failed to upload audio file');
+        }
+
+        // Get public URL for the audio file
+        const { data: { publicUrl } } = supabase.storage
+          .from('lesson-media')
+          .getPublicUrl(fileName);
+
+        // Create BrainBytesContent object
+        const brainBytesContent = {
+          script: response,
+          cleanScript: cleanScript,
+          audioUrl: publicUrl,
+          fileName: fileName,
+          duration: estimatedDuration,
+          title: 'BrainBytes Podcast',
+          metadata: {
+            topic: 'Generated by Luna',
+            gradeLevel: 'General',
+            duration: estimatedDuration,
+            generatedAt: new Date().toISOString(),
+            wordCount: wordCount,
+            scriptLength: cleanScript.length,
+            voice: 'nova'
+          }
+        };
+
+        console.log('🎵 BrainBytes: Audio generation successful!', {
+          audioUrl: brainBytesContent.audioUrl,
+          duration: brainBytesContent.duration,
+          title: brainBytesContent.title
+        });
+
+        const responseData = {
+          response,
+          isComplete: true, // Always mark as complete when we generate audio
+          toolId,
+          audioContent: brainBytesContent,
+          conversationHistory: [
+            ...conversationHistory,
+            { role: 'user', content: prompt },
+            { role: 'assistant', content: response }
+          ]
+        };
+
+        console.log('🎵 BrainBytes: Returning response to frontend:', {
+          isComplete: responseData.isComplete,
+          hasAudioContent: !!responseData.audioContent,
+          audioContentKeys: responseData.audioContent ? Object.keys(responseData.audioContent) : [],
+          toolId: responseData.toolId
+        });
+
+        return NextResponse.json(responseData);
+      } catch (error) {
+        console.error('Error generating BrainBytes audio:', error);
+        // Return the text response with an error message if audio generation fails
+        return NextResponse.json({
+          response: response + '\n\n⚠️ Audio generation failed. Please try again.',
+          isComplete: false, // Don't mark as complete if audio generation failed
+          toolId,
+          error: 'Audio generation failed',
+          conversationHistory: [
+            ...conversationHistory,
+            { role: 'user', content: prompt },
+            { role: 'assistant', content: response }
+          ]
+        });
+      }
+    }
 
     return NextResponse.json({
       response,

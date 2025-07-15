@@ -46,7 +46,8 @@ import {
   ToolCreationContent, 
   RubricContent, 
   MindMapContent,
-  TeacherToolCreation 
+  TeacherToolCreation,
+  BrainBytesContent
 } from '@/types/teachingTools';
 import { useRouter } from 'next/navigation';
 
@@ -69,6 +70,24 @@ interface GenerationResult {
   };
 }
 
+interface BrainBytesResult {
+  script: string;
+  cleanScript: string;
+  audioUrl: string;
+  fileName: string;
+  duration: number;
+  title: string;
+  metadata: {
+    topic: string;
+    gradeLevel: string;
+    duration: number;
+    generatedAt: string;
+    wordCount: number;
+    scriptLength: number;
+    voice: string;
+  };
+}
+
 interface ConversationMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -86,6 +105,7 @@ export function ToolWorkflow({ tool, onBack }: ToolWorkflowProps) {
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
+  const [brainBytesResult, setBrainBytesResult] = useState<BrainBytesResult | null>(null);
   const [error, setError] = useState<string>('');
   const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
@@ -188,7 +208,18 @@ export function ToolWorkflow({ tool, onBack }: ToolWorkflowProps) {
       }
 
       const data = await response.json();
-      setResult(data);
+      
+      // Handle BrainBytes special response structure
+      if (tool.id === 'brain-bytes' && data.success && data.content) {
+        setResult({ 
+          content: JSON.stringify(data.content), 
+          format: 'audio',
+          metadata: data.content.metadata 
+        });
+      } else {
+        setResult(data);
+      }
+      
       scrollToResults();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -212,6 +243,13 @@ export function ToolWorkflow({ tool, onBack }: ToolWorkflowProps) {
     setAiPrompt('');
     
     try {
+      console.log('🎵 ToolWorkflow: Sending request to Luna tools API', {
+        toolId: tool.id,
+        prompt: userMessage.content.substring(0, 100) + '...',
+        conversationLength: conversation.length,
+        isRefinement: refinementMode
+      });
+
       const response = await fetch('/api/luna/tools', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -226,11 +264,28 @@ export function ToolWorkflow({ tool, onBack }: ToolWorkflowProps) {
         }),
       });
 
+      console.log('🎵 ToolWorkflow: Received response', {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText
+      });
+
       if (!response.ok) {
         throw new Error('Failed to generate content');
       }
 
       const data = await response.json();
+      
+      console.log('🎵 ToolWorkflow: Raw response from Luna tools API:', {
+        status: response.status,
+        ok: response.ok,
+        dataKeys: Object.keys(data),
+        isComplete: data.isComplete,
+        hasAudioContent: !!data.audioContent,
+        toolId: data.toolId,
+        expectedToolId: tool.id,
+        responseLength: data.response?.length
+      });
       
       const assistantMessage: ConversationMessage = {
         role: 'assistant',
@@ -241,17 +296,36 @@ export function ToolWorkflow({ tool, onBack }: ToolWorkflowProps) {
       setConversation(prev => [...prev, assistantMessage]);
       setIsInConversation(true);
       
+      console.log('🎵 ToolWorkflow: Received response from Luna tools API', {
+        isComplete: data.isComplete,
+        hasAudioContent: !!data.audioContent,
+        toolId: tool.id,
+        responseLength: data.response?.length
+      });
+      
       // If Luna has completed the task, set the result
       if (data.isComplete) {
-        setResult({
-          content: data.response,
-          format: 'text',
-          metadata: {
-            wordCount: data.response.split(' ').length,
-            estimatedTime: '2-3 minutes',
-            difficulty: 'Professional'
-          }
+        console.log('🎵 ToolWorkflow: Task completed', { 
+          toolId: tool.id, 
+          hasAudioContent: !!data.audioContent,
+          audioContent: data.audioContent 
         });
+        
+        // Handle BrainBytes audio content
+        if (tool.id === 'brain-bytes' && data.audioContent) {
+          console.log('🎵 ToolWorkflow: Setting BrainBytes result with audio content');
+          setBrainBytesResult(data.audioContent);
+        } else {
+          setResult({
+            content: data.response,
+            format: 'text',
+            metadata: {
+              wordCount: data.response.split(' ').length,
+              estimatedTime: '2-3 minutes',
+              difficulty: 'Professional'
+            }
+          });
+        }
         scrollToResults();
       }
     } catch (err) {
@@ -266,6 +340,7 @@ export function ToolWorkflow({ tool, onBack }: ToolWorkflowProps) {
     setIsInConversation(false);
     setAiPrompt('');
     setResult(null);
+    setBrainBytesResult(null);
     setError('');
     setRefinementMode(false);
   };
@@ -332,6 +407,36 @@ What would you like to improve or expand on?`,
     }, 100);
   };
 
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    // Handle Enter key press for form submission
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!isGenerating && validateForm()) {
+        handleManualGenerate();
+      }
+    }
+  };
+
+  const handleAIChatKeyPress = (e: React.KeyboardEvent) => {
+    // Handle Enter key press for AI chat submission
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!isGenerating && aiPrompt.trim()) {
+        handleAIChat();
+      }
+    }
+  };
+
+  const handleConversationKeyPress = (e: React.KeyboardEvent) => {
+    // Handle Enter key press for conversation input
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!isGenerating && aiPrompt.trim()) {
+        handleAIChat();
+      }
+    }
+  };
+
   const copyToClipboard = async (text: string, itemId: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -363,7 +468,7 @@ What would you like to improve or expand on?`,
   };
 
   const saveToLibrary = async () => {
-    if (!result) return;
+    if (!result && !brainBytesResult) return;
 
     setIsSaving(true);
     setSaveSuccess(false);
@@ -372,22 +477,43 @@ What would you like to improve or expand on?`,
       // Generate title based on form data or content
       const title = generateTitle();
       
-      // For mind map generator, use updated mind map data if available, otherwise use original content
-      let contentToSave = result.content;
-      if (tool.id === 'mindmap-generator' && updatedMindMapData) {
-        // Convert the updated mind map data back to string format for saving
-        contentToSave = JSON.stringify(updatedMindMapData, null, 2);
-      }
+      // Handle different content types
+      let contentToSave: string;
+      let metadata: any;
       
-      // Extract metadata from form data and result
-      const metadata = {
-        ...result.metadata,
-        gradeLevel: formData.gradeLevel,
-        subject: formData.subject,
-        duration: formData.duration,
-        difficulty: formData.difficulty,
-        ...extractMetadataFromFormData()
-      };
+      if (brainBytesResult) {
+        // For BrainBytes, save the full audio content object
+        contentToSave = JSON.stringify(brainBytesResult, null, 2);
+        metadata = {
+          ...brainBytesResult.metadata,
+          gradeLevel: brainBytesResult.metadata.gradeLevel,
+          subject: formData.subject,
+          duration: `${brainBytesResult.duration}s`,
+          difficulty: 'Professional',
+          topic: brainBytesResult.metadata.topic,
+          audioUrl: brainBytesResult.audioUrl,
+          ...extractMetadataFromFormData()
+        };
+      } else if (result) {
+        // For mind map generator, use updated mind map data if available, otherwise use original content
+        contentToSave = result.content;
+        if (tool.id === 'mindmap-generator' && updatedMindMapData) {
+          // Convert the updated mind map data back to string format for saving
+          contentToSave = JSON.stringify(updatedMindMapData, null, 2);
+        }
+        
+        // Extract metadata from form data and result
+        metadata = {
+          ...result.metadata,
+          gradeLevel: formData.gradeLevel,
+          subject: formData.subject,
+          duration: formData.duration,
+          difficulty: formData.difficulty,
+          ...extractMetadataFromFormData()
+        };
+      } else {
+        return;
+      }
 
       // Generate tags
       const tags = generateTags();
@@ -584,6 +710,7 @@ What would you like to improve or expand on?`,
               placeholder={field.placeholder}
               value={value || ''}
               onChange={(e) => handleInputChange(field.id, e.target.value)}
+              onKeyPress={handleKeyPress}
               className="w-full"
             />
             {field.description && (
@@ -604,6 +731,7 @@ What would you like to improve or expand on?`,
               placeholder={field.placeholder}
               value={value || ''}
               onChange={(e) => handleInputChange(field.id, e.target.value)}
+              onKeyPress={handleKeyPress}
               className="min-h-[100px] resize-y"
             />
             {field.description && (
@@ -806,6 +934,7 @@ What would you like to improve or expand on?`,
                           placeholder={`Tell me about the ${tool.name.toLowerCase()} you'd like to create...`}
                           value={aiPrompt}
                           onChange={(e) => setAiPrompt(e.target.value)}
+                          onKeyPress={handleAIChatKeyPress}
                           className="min-h-[120px] resize-none border-2 focus:border-purple-300 dark:focus:border-purple-600"
                         />
                         
@@ -889,6 +1018,7 @@ What would you like to improve or expand on?`,
                             placeholder="Type your response..."
                             value={aiPrompt}
                             onChange={(e) => setAiPrompt(e.target.value)}
+                            onKeyPress={handleConversationKeyPress}
                             className="min-h-[80px] resize-none"
                           />
                           <Button 
@@ -1011,8 +1141,8 @@ What would you like to improve or expand on?`,
         </div>
       </div>
 
-      {/* Results Section */}
-      {result && (
+              {/* Results Section */}
+              {(result || brainBytesResult) && (
         <div ref={resultRef} className="space-y-4">
           <Separator />
           <Card className="border-0 shadow-sm">
@@ -1023,44 +1153,50 @@ What would you like to improve or expand on?`,
                   Your {tool.name} is Ready!
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copyToClipboard(result.content, 'result')}
-                    className="flex items-center gap-2"
-                  >
-                    {copiedItems.has('result') ? (
-                      <Check className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
-                    Copy
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => downloadResult('txt')}
-                    className="flex items-center gap-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={saveToLibrary}
-                    disabled={isSaving}
-                    className="flex items-center gap-2"
-                  >
-                    {isSaving ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : saveSuccess ? (
-                      <Check className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <Save className="w-4 h-4" />
-                    )}
-                    {isSaving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save'}
-                  </Button>
+                  {result && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyToClipboard(result.content, 'result')}
+                      className="flex items-center gap-2"
+                    >
+                      {copiedItems.has('result') ? (
+                        <Check className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                      Copy
+                    </Button>
+                  )}
+                  {(result || brainBytesResult) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadResult('txt')}
+                      className="flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download
+                    </Button>
+                  )}
+                  {(result || brainBytesResult) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={saveToLibrary}
+                      disabled={isSaving}
+                      className="flex items-center gap-2"
+                    >
+                      {isSaving ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : saveSuccess ? (
+                        <Check className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                      {isSaving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save'}
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -1072,7 +1208,7 @@ What would you like to improve or expand on?`,
                   </Button>
                 </div>
               </div>
-              {result.metadata && (
+              {result?.metadata && (
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   {result.metadata.wordCount && (
                     <span>{result.metadata.wordCount} words</span>
@@ -1087,7 +1223,7 @@ What would you like to improve or expand on?`,
               )}
             </CardHeader>
             <CardContent>
-              {tool.id === 'rubric-generator' ? (
+              {result && tool.id === 'rubric-generator' ? (
                 <RubricDisplay 
                   content={result.content} 
                   metadata={result.metadata}
@@ -1095,7 +1231,7 @@ What would you like to improve or expand on?`,
                   copiedItems={copiedItems}
                   onRefineWithLuna={handleRubricRefinement}
                 />
-              ) : tool.id === 'mindmap-generator' ? (
+              ) : result && tool.id === 'mindmap-generator' ? (
                 <MindMapDisplay 
                   content={result.content} 
                   metadata={result.metadata}
@@ -1104,15 +1240,24 @@ What would you like to improve or expand on?`,
                   onRefineWithLuna={handleMindMapRefinement}
                   onMindMapUpdate={handleMindMapUpdate}
                 />
-              ) : tool.id === 'brain-bytes' ? (
+              ) : tool.id === 'brain-bytes' && brainBytesResult ? (
+                <>
+                  {console.log('🎵 ToolWorkflow: Rendering BrainBytesDisplay with:', brainBytesResult)}
+                  <BrainBytesDisplay 
+                    content={brainBytesResult} 
+                    onCopy={copyToClipboard}
+                    copiedItems={copiedItems}
+                    onRefineWithLuna={handleRubricRefinement}
+                  />
+                </>
+              ) : result && tool.id === 'brain-bytes' ? (
                 <BrainBytesDisplay 
-                  content={result.content} 
-                  metadata={result.metadata}
+                  content={JSON.parse(result.content)} 
                   onCopy={copyToClipboard}
                   copiedItems={copiedItems}
                   onRefineWithLuna={handleRubricRefinement}
                 />
-              ) : tool.id === 'quiz-generator' ? (
+              ) : result && tool.id === 'quiz-generator' ? (
                 <QuizDisplay 
                   content={result.content} 
                   metadata={result.metadata}
@@ -1120,13 +1265,13 @@ What would you like to improve or expand on?`,
                   copiedItems={copiedItems}
                   onRefineWithLuna={handleRubricRefinement}
                 />
-              ) : (
+              ) : result ? (
                 <div className="prose dark:prose-invert max-w-none">
                   <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed bg-muted/30 p-4 rounded-lg">
                     {result.content}
                   </pre>
                 </div>
-              )}
+              ) : null}
             </CardContent>
           </Card>
         </div>

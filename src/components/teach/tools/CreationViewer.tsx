@@ -189,10 +189,13 @@ export function CreationViewer({ creationId, onBack }: CreationViewerProps) {
         );
 
       case 'brain-bytes':
+        // Parse the JSON string back to object for BrainBytes
+        const brainBytesContent = typeof creation.content === 'string' 
+          ? JSON.parse(creation.content) 
+          : creation.content;
         return (
           <BrainBytesDisplay
-            content={contentString}
-            metadata={creation.metadata}
+            content={brainBytesContent}
             onCopy={copyToClipboard}
             copiedItems={copiedItems}
             onRefineWithLuna={handleRefineWithLuna}

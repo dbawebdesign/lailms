@@ -8,7 +8,7 @@ export type ToolCategory =
 
 export type ToolComplexity = 'simple' | 'intermediate' | 'advanced';
 
-export type ToolOutputFormat = 'pdf' | 'docx' | 'html' | 'json' | 'csv' | 'image' | 'text';
+export type ToolOutputFormat = 'pdf' | 'docx' | 'html' | 'json' | 'csv' | 'image' | 'text' | 'audio' | 'mp3';
 
 export interface ToolInputField {
   id: string;

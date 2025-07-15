@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PasswordInput } from '@/components/ui/password-input'
 import { InviteCodeCopyButton } from '@/components/ui/copy-button'
+import TermsCheckbox from '../ui/terms-checkbox'
 import { toast } from '@/components/ui/use-toast'
 import { Loader2, CheckCircle, GraduationCap, Home } from 'lucide-react'
 import { useInviteCodeClipboard } from '@/hooks/useClipboard'
@@ -28,6 +29,7 @@ interface SignupFormData {
     password: string
     confirmPassword: string
   }
+  agreedToTerms: boolean
 }
 
 interface SignupResult {
@@ -70,7 +72,8 @@ export default function CoopFamilySignupForm({
       lastName: '',
       password: '',
       confirmPassword: ''
-    }
+    },
+    agreedToTerms: false
   })
 
   const updateFormData = (updates: Partial<SignupFormData>) => {
@@ -94,6 +97,16 @@ export default function CoopFamilySignupForm({
         toast({
           title: "Error",
           description: "Passwords do not match",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Validate terms agreement
+      if (!formData.agreedToTerms) {
+        toast({
+          title: "Error",
+          description: "You must agree to the Terms of Service to create an account",
           variant: "destructive"
         })
         return
@@ -217,6 +230,12 @@ export default function CoopFamilySignupForm({
                   placeholder="Confirm your password"
                   required={true}
                 />
+
+                <TermsCheckbox
+                  checked={formData.agreedToTerms}
+                  onCheckedChange={(checked: boolean) => updateFormData({ agreedToTerms: checked })}
+                  disabled={isLoading}
+                />
               </div>
 
               <div className="flex space-x-3">
@@ -230,7 +249,7 @@ export default function CoopFamilySignupForm({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || !formData.familyName.trim() || !formData.primaryParentInfo.firstName.trim() || !formData.primaryParentInfo.lastName.trim() || !formData.primaryParentInfo.username.trim() || !formData.primaryParentInfo.password.trim() || !formData.primaryParentInfo.confirmPassword.trim() || !formData.agreedToTerms}
                   className="flex-1"
                 >
                   {isLoading ? (

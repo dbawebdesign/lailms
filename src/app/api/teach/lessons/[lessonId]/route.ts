@@ -12,9 +12,10 @@ interface LessonParams {
 // GET /api/teach/lessons/[lessonId] - Get a specific lesson
 export async function GET(
   request: Request,
-  { params }: { params: { lessonId: string } }
+  { params }: LessonParams
 ) {
   const supabase = createSupabaseServerClient();
+  const { lessonId } = await params;
   const {
     data: { user },
     error: authError
@@ -40,7 +41,7 @@ export async function GET(
     const { data: lesson, error } = await supabase
       .from('lessons')
       .select('*')
-      .eq('id', params.lessonId)
+      .eq('id', lessonId)
       .eq('organisation_id', profile.organisation_id)
       .single();
 
@@ -58,9 +59,10 @@ export async function GET(
 // PUT /api/teach/lessons/[lessonId] - Update a lesson
 export async function PUT(
   request: Request,
-  { params }: { params: { lessonId: string } }
+  { params }: LessonParams
 ) {
   const supabase = createSupabaseServerClient();
+  const { lessonId } = await params;
   const {
     data: { user },
     error: authError
@@ -95,7 +97,7 @@ export async function PUT(
         status,
         updated_at: new Date().toISOString()
       })
-      .eq('id', params.lessonId)
+      .eq('id', lessonId)
       .eq('organisation_id', profile.organisation_id)
       .select()
       .single();

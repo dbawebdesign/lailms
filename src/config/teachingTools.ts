@@ -55,147 +55,14 @@ export const teachingTools: TeachingTool[] = [
       }
     ],
     examples: [
-      'Science Fair Project Rubric for Grade 8',
-      'Essay Writing Rubric for High School English',
-      'Art Project Assessment for Elementary'
+      'Math Problem-Solving Rubric for Grade 5',
+      'Creative Writing Assessment for High School',
+      'Science Lab Report Evaluation for Middle School'
     ],
     tips: [
-      'Be specific with your criteria for more detailed rubrics',
-      'Consider including both content and process criteria',
-      'Use language appropriate for your grade level'
-    ]
-  },
-  {
-    id: 'lesson-generator',
-    name: 'Lesson Generator',
-    description: 'Generate comprehensive lesson plans with objectives, activities, and assessment strategies',
-    category: 'planning',
-    icon: 'BookOpen',
-    complexity: 'intermediate',
-    estimatedTime: '3-5 minutes',
-    outputFormats: ['pdf', 'docx', 'html'],
-    keywords: ['lesson plan', 'curriculum', 'activities', 'objectives', 'teaching'],
-    isPopular: true,
-    apiEndpoint: '/api/tools/lesson',
-    inputFields: [
-      {
-        id: 'topic',
-        label: 'Lesson Topic',
-        type: 'text',
-        placeholder: 'e.g., Photosynthesis, World War II, Fractions',
-        required: true
-      },
-      {
-        id: 'gradeLevel',
-        label: 'Grade Level',
-        type: 'select',
-        options: ['K', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
-        required: true
-      },
-      {
-        id: 'duration',
-        label: 'Lesson Duration',
-        type: 'select',
-        options: ['30 minutes', '45 minutes', '60 minutes', '90 minutes', '2 hours'],
-        required: true
-      },
-      {
-        id: 'learningObjectives',
-        label: 'Learning Objectives',
-        type: 'textarea',
-        placeholder: 'What should students know or be able to do by the end of this lesson?',
-        required: true
-      },
-      {
-        id: 'priorKnowledge',
-        label: 'Prior Knowledge Required',
-        type: 'textarea',
-        placeholder: 'What concepts should students already understand?'
-      },
-      {
-        id: 'standards',
-        label: 'Educational Standards',
-        type: 'text',
-        placeholder: 'e.g., CCSS.MATH.5.NF.1, NGSS.5-PS1-1'
-      }
-    ],
-    examples: [
-      'Introduction to Ecosystems for 5th Grade',
-      'Shakespeare\'s Romeo and Juliet for 9th Grade',
-      'Basic Geometry Shapes for 2nd Grade'
-    ],
-    tips: [
-      'Include specific, measurable learning objectives',
-      'Consider different learning styles in your activities',
-      'Plan for formative assessment throughout the lesson'
-    ]
-  },
-  {
-    id: 'quiz-generator',
-    name: 'Quiz Generator',
-    description: 'Create engaging quizzes with various question types and automatic answer keys',
-    category: 'assessment',
-    icon: 'HelpCircle',
-    complexity: 'simple',
-    estimatedTime: '2-4 minutes',
-    outputFormats: ['pdf', 'html', 'json'],
-    keywords: ['quiz', 'test', 'questions', 'assessment', 'multiple choice'],
-    isPopular: true,
-    apiEndpoint: '/api/tools/quiz',
-    inputFields: [
-      {
-        id: 'subject',
-        label: 'Subject',
-        type: 'text',
-        placeholder: 'e.g., Biology, History, Algebra',
-        required: true
-      },
-      {
-        id: 'topic',
-        label: 'Topic/Chapter',
-        type: 'text',
-        placeholder: 'e.g., Cell Structure, American Revolution',
-        required: true
-      },
-      {
-        id: 'gradeLevel',
-        label: 'Grade Level',
-        type: 'select',
-        options: ['K', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
-        required: true
-      },
-      {
-        id: 'questionCount',
-        label: 'Number of Questions',
-        type: 'range',
-        min: 5,
-        max: 50,
-        defaultValue: 15
-      },
-      {
-        id: 'questionTypes',
-        label: 'Question Types',
-        type: 'multiselect',
-        options: ['Multiple Choice', 'True/False', 'Short Answer', 'Fill in the Blank', 'Matching'],
-        defaultValue: ['Multiple Choice', 'True/False']
-      },
-      {
-        id: 'difficulty',
-        label: 'Difficulty Level',
-        type: 'select',
-        options: ['Easy', 'Medium', 'Hard', 'Mixed'],
-        defaultValue: 'Medium'
-      }
-    ],
-    examples: [
-      'Photosynthesis Quiz for 7th Grade Science',
-      'Revolutionary War Quiz for 8th Grade History',
-      'Fractions and Decimals Quiz for 5th Grade Math'
-    ],
-    tips: [
-      'Mix different question types for variety',
-      'Include questions at different cognitive levels',
-      'Review generated questions for accuracy and clarity'
+      'Start with 3-4 main criteria for clarity',
+      'Use specific, observable behaviors in descriptions',
+      'Align criteria with learning objectives'
     ]
   },
   {
@@ -208,7 +75,7 @@ export const teachingTools: TeachingTool[] = [
     estimatedTime: '5-8 minutes',
     outputFormats: ['pdf', 'docx'],
     keywords: ['IEP', 'special education', 'accommodations', 'goals', 'disabilities'],
-    apiEndpoint: '/api/tools/iep',
+    apiEndpoint: '/api/tools/iep-generator',
     inputFields: [
       {
         id: 'studentAge',
@@ -253,27 +120,27 @@ export const teachingTools: TeachingTool[] = [
       },
       {
         id: 'currentPerformance',
-        label: 'Current Academic Performance',
+        label: 'Current Performance Level',
         type: 'textarea',
-        placeholder: 'Describe the student\'s current performance levels and abilities',
+        placeholder: 'Describe the student\'s current academic and functional performance',
         required: true
       },
       {
         id: 'behavioralNeeds',
-        label: 'Behavioral/Social Needs',
+        label: 'Behavioral Considerations',
         type: 'textarea',
-        placeholder: 'Describe any behavioral or social-emotional needs'
+        placeholder: 'Any behavioral supports or interventions needed (optional)'
       }
     ],
     examples: [
-      'Reading Goals for Student with Dyslexia',
-      'Communication Goals for Student with Autism',
-      'Math Goals for Student with Intellectual Disability'
+      'Reading goals for student with dyslexia',
+      'Communication objectives for autism spectrum',
+      'Math accommodations for intellectual disability'
     ],
     tips: [
       'Be specific about current performance levels',
-      'Include measurable and achievable goals',
-      'Consider the student\'s strengths and interests'
+      'Focus on measurable, achievable goals',
+      'Consider both academic and functional needs'
     ]
   },
   {
@@ -285,14 +152,14 @@ export const teachingTools: TeachingTool[] = [
     complexity: 'simple',
     estimatedTime: '1-2 minutes',
     outputFormats: ['text', 'docx'],
-    keywords: ['report card', 'comments', 'feedback', 'progress', 'communication'],
+    keywords: ['report cards', 'comments', 'feedback', 'communication', 'parents'],
     apiEndpoint: '/api/tools/report-comments',
     inputFields: [
       {
         id: 'subject',
         label: 'Subject',
         type: 'text',
-        placeholder: 'e.g., Mathematics, Language Arts, Science',
+        placeholder: 'e.g., Mathematics, English, Science',
         required: true
       },
       {
@@ -304,7 +171,7 @@ export const teachingTools: TeachingTool[] = [
       },
       {
         id: 'studentPerformance',
-        label: 'Overall Performance Level',
+        label: 'Student Performance',
         type: 'select',
         options: ['Exceeds Expectations', 'Meets Expectations', 'Approaching Expectations', 'Below Expectations'],
         required: true
@@ -313,32 +180,32 @@ export const teachingTools: TeachingTool[] = [
         id: 'strengths',
         label: 'Student Strengths',
         type: 'textarea',
-        placeholder: 'What does the student do well in this subject?',
+        placeholder: 'What is the student doing well? (e.g., participates actively, shows creativity)',
         required: true
       },
       {
         id: 'areasForGrowth',
         label: 'Areas for Growth',
         type: 'textarea',
-        placeholder: 'What areas need improvement or focus?'
+        placeholder: 'What areas need improvement? (e.g., organization, following directions)'
       },
       {
         id: 'tone',
         label: 'Comment Tone',
         type: 'select',
-        options: ['Encouraging', 'Professional', 'Detailed', 'Concise'],
+        options: ['Encouraging', 'Professional', 'Supportive', 'Direct'],
         defaultValue: 'Encouraging'
       }
     ],
     examples: [
-      'Math Progress Comments for 3rd Grader',
-      'Reading Development Comments for 1st Grader',
-      'Science Performance Comments for 6th Grader'
+      'Positive math progress comment',
+      'Reading improvement suggestions',
+      'Science participation feedback'
     ],
     tips: [
-      'Focus on specific behaviors and achievements',
-      'Include both strengths and growth areas',
-      'Use positive, constructive language'
+      'Balance positive feedback with growth areas',
+      'Use specific examples when possible',
+      'Keep language parent-friendly'
     ]
   },
   {
@@ -389,14 +256,14 @@ export const teachingTools: TeachingTool[] = [
       }
     ],
     examples: [
-      'Different ways to explain multiplication to 3rd graders',
-      'Multiple explanations of the water cycle for 4th grade',
-      'Various approaches to teaching fractions to 5th graders'
+      'Multiple ways to explain fractions',
+      'Different approaches to photosynthesis',
+      'Various explanations for democracy'
     ],
     tips: [
-      'Consider your students\' diverse learning preferences',
-      'Include both concrete and abstract approaches',
-      'Test different explanations with different students'
+      'Consider your students\' backgrounds and interests',
+      'Use familiar analogies and examples',
+      'Provide both concrete and abstract explanations'
     ]
   },
   {
@@ -404,11 +271,11 @@ export const teachingTools: TeachingTool[] = [
     name: 'Lesson Hooks',
     description: 'Create engaging opening activities to capture student attention and interest',
     category: 'content-creation',
-    icon: 'Zap',
+    icon: 'Sparkles',
     complexity: 'simple',
     estimatedTime: '1-2 minutes',
     outputFormats: ['text', 'html'],
-    keywords: ['engagement', 'opening', 'hook', 'attention', 'motivation', 'starter'],
+    keywords: ['engagement', 'opening', 'attention', 'motivation', 'interest'],
     isNew: true,
     apiEndpoint: '/api/tools/lesson-hooks',
     inputFields: [
@@ -416,7 +283,7 @@ export const teachingTools: TeachingTool[] = [
         id: 'topic',
         label: 'Lesson Topic',
         type: 'text',
-        placeholder: 'e.g., Ancient Egypt, Chemical Reactions, Poetry',
+        placeholder: 'e.g., The Solar System, Persuasive Writing, Algebra',
         required: true
       },
       {
@@ -428,34 +295,34 @@ export const teachingTools: TeachingTool[] = [
       },
       {
         id: 'hookTypes',
-        label: 'Types of Hooks',
+        label: 'Hook Types',
         type: 'multiselect',
-        options: ['Question/Poll', 'Surprising Fact', 'Story/Anecdote', 'Video Clip', 'Hands-On Activity', 'Game/Competition', 'Mystery/Problem'],
-        defaultValue: ['Question/Poll', 'Surprising Fact', 'Hands-On Activity']
+        options: ['Question', 'Story', 'Demonstration', 'Game', 'Video', 'Mystery', 'Real-World Connection'],
+        defaultValue: ['Question', 'Story', 'Real-World Connection']
       },
       {
         id: 'timeLimit',
-        label: 'Hook Duration',
+        label: 'Time Available',
         type: 'select',
-        options: ['2-3 minutes', '5 minutes', '7-10 minutes', '15 minutes'],
+        options: ['2-3 minutes', '5 minutes', '10 minutes', '15 minutes'],
         defaultValue: '5 minutes'
       },
       {
         id: 'materials',
-        label: 'Available Materials/Technology',
-        type: 'text',
-        placeholder: 'e.g., projector, tablets, lab equipment, art supplies'
+        label: 'Available Materials',
+        type: 'textarea',
+        placeholder: 'What materials or technology do you have available? (optional)'
       }
     ],
     examples: [
-      'Engaging hooks for geometry lessons',
-      'Creative openers for literature discussions',
-      'Science experiment hooks for chemistry'
+      'Engaging math lesson starter',
+      'Science experiment hook',
+      'History mystery opening'
     ],
     tips: [
-      'Connect hooks to students\' interests and experiences',
-      'Keep hooks short but impactful',
-      'Ensure hooks relate clearly to the lesson objective'
+      'Connect to students\' interests and experiences',
+      'Create curiosity and questions',
+      'Keep it brief but impactful'
     ]
   },
   {
@@ -527,7 +394,7 @@ export const teachingTools: TeachingTool[] = [
     estimatedTime: '2-3 minutes',
     outputFormats: ['image', 'html', 'pdf'],
     keywords: ['mind map', 'visual', 'concepts', 'organization', 'brainstorming'],
-    apiEndpoint: '/api/tools/mindmap',
+    apiEndpoint: '/api/tools/mindmap-generator',
     inputFields: [
       {
         id: 'centralTopic',
@@ -578,13 +445,13 @@ export const teachingTools: TeachingTool[] = [
   {
     id: 'brain-bytes',
     name: 'BrainBytes Generator',
-    description: 'Create bite-sized, engaging educational content for quick learning moments',
+    description: 'Create standalone 2-3 minute educational podcasts on any topic, hosted by Luna',
     category: 'content-creation',
     icon: 'Sparkles',
     complexity: 'simple',
     estimatedTime: '1-2 minutes',
-    outputFormats: ['text', 'html', 'image'],
-    keywords: ['micro-learning', 'quick facts', 'engagement', 'bite-sized', 'fun facts'],
+    outputFormats: ['audio', 'mp3'],
+    keywords: ['podcast', 'audio', 'educational', 'bite-sized', 'luna'],
     isNew: true,
     apiEndpoint: '/api/tools/brain-bytes',
     inputFields: [
@@ -601,28 +468,6 @@ export const teachingTools: TeachingTool[] = [
         type: 'select',
         options: ['K', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
         required: true
-      },
-      {
-        id: 'byteTypes',
-        label: 'Types of BrainBytes',
-        type: 'multiselect',
-        options: ['Fun Facts', 'Did You Know?', 'Quick Quiz', 'Brain Teaser', 'Connection to Today', 'Amazing Stat'],
-        defaultValue: ['Fun Facts', 'Did You Know?']
-      },
-      {
-        id: 'count',
-        label: 'Number of BrainBytes',
-        type: 'range',
-        min: 3,
-        max: 15,
-        defaultValue: 5
-      },
-      {
-        id: 'format',
-        label: 'Format Preference',
-        type: 'select',
-        options: ['Text Only', 'Text with Emojis', 'Visual Cards', 'Social Media Style'],
-        defaultValue: 'Text with Emojis'
       }
     ],
     examples: [
@@ -631,9 +476,9 @@ export const teachingTools: TeachingTool[] = [
       'Historical fun facts for high school'
     ],
     tips: [
-      'Use BrainBytes as warm-ups or transitions',
-      'Share one per day to maintain engagement',
-      'Encourage students to find their own BrainBytes'
+      'Choose topics that are engaging and age-appropriate',
+      'Perfect for warm-ups, transitions, or independent listening',
+      'Luna will create an educational and entertaining 2-3 minute podcast'
     ]
   }
 ]; 

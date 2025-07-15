@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Tables } from "packages/types/db";
-
 import { isTeacher, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+interface TeacherBrainBytesRequest {
+  topic: string;
+  gradeLevel: string;
+}
+
+const LUNA_VOICE_ID = 'alloy'; // Consistent voice for Luna across all podcasts
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Access denied. Teacher role required.' }, { status: 403 });
     }
 
-    const { topic, gradeLevel, byteTypes, count, format } = await request.json();
+    const { topic, gradeLevel }: TeacherBrainBytesRequest = await request.json();
 
     // Validate required fields
     if (!topic || !gradeLevel) {
@@ -38,152 +45,165 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // GPT-4.1-mini optimized prompt
-    const systemPrompt = `# Role and Objective
-You are an expert educational content creator specializing in bite-sized, engaging learning content for K-12 students. Your expertise includes cognitive science, attention spans, and making complex topics accessible and memorable.
+    // Generate podcast script using OpenAI
+    const scriptPrompt = `# Role and Objective
+Create an engaging educational podcast script for "Brain Bytes" hosted by Luna. The content should be appropriate for grade ${gradeLevel} students and should teach about ${topic}.
+
+# Content Context
+Topic: ${topic}
+Grade Level: ${gradeLevel}
 
 # Instructions
-Create compelling BrainBytes (bite-sized educational content) that capture student attention and deliver meaningful learning moments:
 
-1. **Content Analysis**: Analyze the topic and grade level to identify the most fascinating and educationally valuable aspects
-2. **Engagement Strategy**: Craft each BrainByte to spark curiosity, surprise, or wonder while maintaining educational value
-3. **Age Appropriateness**: Ensure all content, language, and concepts are perfectly suited for the specified grade level
-4. **Variety Creation**: Mix different types of BrainBytes to maintain interest and appeal to different learning preferences
-5. **Accuracy Verification**: Ensure all facts, statistics, and information are scientifically accurate and current
+## Host Character
+- **Name**: Luna (friendly, knowledgeable, encouraging AI)
+- **Personality**: Enthusiastic about learning, supportive, excellent at explaining complex concepts in simple terms
+- **Goal**: Make learning feel accessible and fun
 
-## Content Standards
-- Each BrainByte should be digestible in 30 seconds or less
-- Use vivid, concrete examples that students can visualize
-- Include surprising facts or connections that make learning memorable
-- Maintain scientific accuracy while being engaging
-- Connect to students' everyday experiences when possible
-- Use age-appropriate vocabulary with brief explanations for complex terms
+## Content Requirements
+1. **Educational Focus**: Actually teach about the topic, don't just mention it
+2. **Grade Appropriateness**: Content must be suitable for grade ${gradeLevel} students
+3. **Engagement**: Include examples and analogies that students at this grade level would understand
+4. **Concept Breakdown**: Break down complex concepts into digestible parts
+5. **Encouraging Language**: Use encouraging language throughout
+6. **Standalone Content**: This should be complete on its own, not tied to any specific lesson
 
-## BrainByte Types Guide
-- **Fun Facts**: Surprising, verifiable information that amazes students
-- **Did You Know?**: Intriguing questions followed by fascinating answers
-- **Quick Quiz**: Simple, engaging questions that test understanding
-- **Brain Teaser**: Logic puzzles or riddles related to the topic
-- **Connection to Today**: How the topic relates to modern life or technology
-- **Amazing Stat**: Impressive numbers or comparisons that put things in perspective
+## Format Requirements
+- **Length**: Aim for 2-3 minutes of spoken content
+- **Character Limit**: MAXIMUM 3500 characters total (critical for TTS compatibility)
+- **Structure**: Follow the provided script format exactly
 
-# Output Format
-Provide your response as a structured JSON object with this exact format:
+## Script Format
+[INTRO MUSIC - 5 seconds]
 
-\`\`\`json
-{
-  "title": "BrainBytes Collection Title",
-  "topic": "Main topic",
-  "metadata": {
-    "gradeLevel": "Grade level",
-    "totalCount": "Number of BrainBytes",
-    "format": "Format style",
-    "estimatedTime": "Total time to consume all",
-    "subject": "Primary subject area"
-  },
-  "brainBytes": [
-    {
-      "id": 1,
-      "type": "Fun Facts",
-      "title": "Catchy title",
-      "content": "The actual BrainByte content",
-      "emoji": "📚",
-      "difficulty": "Easy/Medium/Hard",
-      "timeToRead": "15 seconds",
-      "tags": ["tag1", "tag2"]
-    }
-  ],
-  "usageTips": [
-    "Suggestion for classroom use",
-    "Ideas for engagement"
-  ]
-}
-\`\`\`
+LUNA: Welcome to Brain Bytes, where we explore amazing ideas in bite-sized pieces! I'm Luna, and today we're diving into ${topic}. 
 
-# Examples
+[Continue with main content about the topic, teaching key concepts clearly - keep this section concise but informative]
 
-## Example: Grade 4 Ocean BrainBytes
-\`\`\`json
-{
-  "brainBytes": [
-    {
-      "id": 1,
-      "type": "Fun Facts",
-      "title": "Ocean Depth Mystery",
-      "content": "🌊 Did you know we've explored less than 5% of our oceans? That means there are more mysteries underwater than in outer space! Scientists think there might be creatures down there we've never seen before.",
-      "emoji": "🌊",
-      "difficulty": "Easy",
-      "timeToRead": "20 seconds",
-      "tags": ["exploration", "mystery", "ocean"]
-    }
-  ]
-}
-\`\`\`
+[OUTRO]
 
-# Final Instructions
-Think step by step about what would genuinely fascinate students at this grade level. Create BrainBytes that make learning feel like discovering secrets about the world. Focus on the "wow factor" while maintaining educational integrity.`;
+LUNA: That's a wrap on today's Brain Bytes! Remember, learning is an adventure, and every concept you master today builds the foundation for tomorrow's discoveries. Keep being curious, and I'll see you next time!
 
-    const userPrompt = `Create BrainBytes for the following specifications:
+[OUTRO MUSIC - 3 seconds]
 
-**Topic**: ${topic}
-**Grade Level**: ${gradeLevel}
-**Types Requested**: ${Array.isArray(byteTypes) ? byteTypes.join(', ') : 'Fun Facts, Did You Know?'}
-**Number of BrainBytes**: ${count || 5}
-**Format Style**: ${format || 'Text with Emojis'}
+# Output Requirements
+- Return only the script text, no additional formatting or comments
+- Keep the total length under 3500 characters
+- Ensure the content is educational and engaging for grade ${gradeLevel} students
+- Maintain Luna's encouraging and educational tone throughout`;
 
-Generate engaging, educational BrainBytes that will captivate students and enhance their learning experience.`;
-
-    const completion = await openai.chat.completions.create({
+    const scriptCompletion = await openai.chat.completions.create({
       model: 'gpt-4.1-mini',
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
+        {
+          role: 'system',
+          content: `# Role and Objective
+You are Luna, an AI educational podcast host who creates engaging, grade-appropriate content for the "Brain Bytes" podcast.
+
+# Instructions
+- You're enthusiastic about learning, supportive, and excellent at explaining complex concepts in simple terms
+- Always make learning feel accessible and fun
+- Focus on actually teaching concepts, not just mentioning them
+- Keep content appropriate for the specified grade level
+- Maintain an encouraging and educational tone throughout
+- CRITICAL: Stay within the 3500 character limit for TTS compatibility`
+        },
+        {
+          role: 'user',
+          content: scriptPrompt
+        }
       ],
+      max_tokens: 2000,
       temperature: 0.8,
-      max_tokens: 1500,
     });
 
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('No content generated');
+    const script = scriptCompletion.choices[0]?.message?.content;
+    if (!script) {
+      throw new Error('Failed to generate podcast script');
     }
 
-    // Extract JSON from the response
-    const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
-    let brainBytesData;
-    
-    if (jsonMatch) {
-      try {
-        brainBytesData = JSON.parse(jsonMatch[1]);
-      } catch (parseError) {
-        console.error('JSON parsing error:', parseError);
-        brainBytesData = null;
+    // Clean up script for TTS (remove stage directions and music cues)
+    let cleanScript = script
+      .replace(/\[.*?\]/g, '') // Remove [INTRO MUSIC], [OUTRO MUSIC], etc.
+      .replace(/LUNA:/g, '') // Remove speaker labels
+      .replace(/\n\n+/g, '\n\n') // Normalize line breaks
+      .trim();
+
+    // Ensure script is within TTS character limit (4096 characters)
+    if (cleanScript.length > 4096) {
+      console.log(`Script too long (${cleanScript.length} chars), truncating to 4096 characters`);
+      // Find a good truncation point (end of sentence near the limit)
+      const truncateAt = cleanScript.lastIndexOf('.', 4050);
+      if (truncateAt > 3500) {
+        cleanScript = cleanScript.substring(0, truncateAt + 1);
+      } else {
+        // Fallback: hard truncate at 4090 chars and add period
+        cleanScript = cleanScript.substring(0, 4090) + '.';
       }
     }
 
+    // Generate audio using OpenAI TTS
+    const audioResponse = await openai.audio.speech.create({
+      model: 'tts-1',
+      voice: LUNA_VOICE_ID,
+      input: cleanScript,
+      speed: 1.0,
+    });
+
+    // Convert audio to buffer
+    const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
+    
+    // Calculate estimated duration (rough estimate: ~150 words per minute)
+    const wordCount = cleanScript.split(/\s+/).length;
+    const estimatedDuration = Math.round((wordCount / 150) * 60); // in seconds
+
+    // Upload audio to Supabase Storage
+    const fileName = `brainbytes_${Date.now()}.mp3`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('lesson-media')
+      .upload(fileName, audioBuffer, {
+        contentType: 'audio/mpeg',
+        cacheControl: '3600'
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      throw new Error('Failed to upload audio file');
+    }
+
+    // Get public URL for the audio file
+    const { data: { publicUrl } } = supabase.storage
+      .from('lesson-media')
+      .getPublicUrl(fileName);
+
     // Generate metadata
     const metadata = {
-      subject: brainBytesData?.metadata?.subject || 'General',
+      topic: topic,
       gradeLevel: gradeLevel,
-      format: format || 'Text with Emojis',
-      count: count || 5,
+      duration: estimatedDuration,
       generatedAt: new Date().toISOString(),
-      wordCount: content.length,
-      estimatedTime: brainBytesData?.metadata?.estimatedTime || `${(count || 5) * 2} minutes`,
-      difficulty: 'Mixed'
+      wordCount: wordCount,
+      scriptLength: cleanScript.length,
+      voice: LUNA_VOICE_ID
     };
 
     return NextResponse.json({
-      content,
-      brainBytesData,
-      metadata,
-      success: true
+      success: true,
+      content: {
+        script: script,
+        cleanScript: cleanScript,
+        audioUrl: publicUrl,
+        fileName: fileName,
+        duration: estimatedDuration,
+        title: `Brain Bytes: ${topic}`,
+        metadata: metadata
+      }
     });
 
   } catch (error) {
-    console.error('BrainBytes generation error:', error);
+    console.error('BrainBytes podcast generation error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate BrainBytes. Please try again.' },
+      { error: 'Failed to generate BrainBytes podcast. Please try again.' },
       { status: 500 }
     );
   }
