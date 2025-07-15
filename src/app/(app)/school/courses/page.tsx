@@ -1,8 +1,6 @@
 'use client';
-
 import Image from 'next/image';
-
-export default function ParentDashboardComingSoon() {
+export default function CoursesOverviewComingSoon() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background">
       <Image
@@ -12,9 +10,9 @@ export default function ParentDashboardComingSoon() {
         height={60}
         className="h-16 w-auto mb-8"
       />
-      <h1 className="text-3xl font-bold text-center text-foreground mb-4">Parent Dashboard Coming Soon</h1>
+      <h1 className="text-3xl font-bold text-center text-foreground mb-4">Courses Overview Coming Soon</h1>
       <p className="text-lg text-muted-foreground text-center max-w-md">
-        We’re working hard to bring you a dedicated dashboard for parents. Stay tuned for updates!
+        We’re working hard to bring you a comprehensive courses overview. Stay tuned for updates!
       </p>
     </div>
   );

@@ -39,13 +39,6 @@ export type NavItem = {
 // Helper function to create common bottom items
 const createBottomNavItems = (roles: UserRole[]): NavItem[] => [
   {
-    title: "Settings",
-    href: "/settings", // This could lead to a page that redirects to role-specific profile or a general settings page
-    icon: Settings,
-    roles: roles,
-    isBottom: true,
-  },
-  {
     title: "Help",
     href: "/help",
     icon: HelpCircle,
@@ -171,24 +164,6 @@ const navConfig: NavItem[] = [
     title: "Org Dashboard",
     href: "/org", // PRD route
     icon: Briefcase, // Changed from LayoutDashboard
-    roles: ["super_admin"],
-  },
-  {
-    title: "Institutions",
-    href: "/org/institutions", // PRD route
-    icon: Building,
-    roles: ["super_admin"],
-  },
-  {
-    title: "Billing & Usage",
-    href: "/org/billing", // PRD route
-    icon: FileText,
-    roles: ["super_admin"],
-  },
-  {
-    title: "Global Settings",
-    href: "/org/settings", // PRD route
-    icon: SlidersHorizontal,
     roles: ["super_admin"],
   },
   
