@@ -155,7 +155,7 @@ export default function PublicSurveyPage() {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.3 }}
-          className="min-h-screen flex items-center justify-center p-4"
+          className={`min-h-screen flex items-center justify-center ${showIntro || showThankYou ? 'p-4' : 'p-0 sm:p-4'}`}
         >
           {showIntro ? (
             // Intro Screen
@@ -302,9 +302,9 @@ export default function PublicSurveyPage() {
             </div>
           ) : (
             // Main Survey
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col mx-4">
+            <div className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col sm:mx-4">
               {/* Header */}
-              <div className="bg-white px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-slate-200 rounded-t-2xl">
+              <div className="bg-white px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-slate-200 rounded-none sm:rounded-t-2xl">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-6 space-y-2 sm:space-y-0">
                     <Image
@@ -323,41 +323,17 @@ export default function PublicSurveyPage() {
                       </p>
                     </div>
                   </div>
-                  
-                  <div className="text-center sm:text-right">
-                    <p className="text-sm font-medium text-slate-900">
-                      {currentSection + 1} of {sections.length}
-                    </p>
-                  </div>
                 </div>
 
                 {/* Progress */}
                 <div className="mt-4 sm:mt-6 space-y-2">
                   <div className="flex justify-between text-xs sm:text-sm font-medium text-slate-900">
                     <span>Progress</span>
-                    <span>{getAnsweredQuestions()} of {getTotalQuestions()} questions</span>
                   </div>
                   <Progress 
                     value={(getAnsweredQuestions() / getTotalQuestions()) * 100} 
                     className="h-2 bg-slate-200"
                   />
-                </div>
-
-                {/* Section Navigation */}
-                <div className="flex flex-wrap gap-2 mt-4 sm:mt-6">
-                  {sections.map((section, index) => (
-                    <button
-                      key={section.id}
-                      onClick={() => setCurrentSection(index)}
-                      className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 min-h-[40px] ${
-                        index === currentSection
-                          ? 'bg-slate-900 text-white shadow-sm'
-                          : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
-                      }`}
-                    >
-                      {section.title}
-                    </button>
-                  ))}
                 </div>
               </div>
 
@@ -390,7 +366,7 @@ export default function PublicSurveyPage() {
               </div>
 
               {/* Footer */}
-              <div className="border-t border-slate-200 p-4 sm:p-6 bg-slate-50 rounded-b-2xl">
+              <div className="border-t border-slate-200 p-4 sm:p-6 bg-slate-50 rounded-none sm:rounded-b-2xl">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-3 sm:space-y-0">
                   <Button
                     variant="ghost"
