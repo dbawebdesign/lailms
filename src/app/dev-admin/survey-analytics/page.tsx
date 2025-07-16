@@ -393,9 +393,23 @@ export default function SurveyAnalyticsPage() {
       ? data.demographics.maxPricing.reduce((a, b) => a + b, 0) / data.demographics.maxPricing.length
       : 0
 
-    const npsCategory = data.demographics.npsScore >= 9 ? 'Promoters' 
-      : data.demographics.npsScore >= 7 ? 'Passives' 
-      : 'Detractors'
+    // Updated NPS interpretation logic
+    const npsScore = data.demographics.npsScore;
+    let npsCategory = '';
+    let npsDescription = '';
+    if (npsScore >= 70) {
+      npsCategory = 'World-class loyalty';
+      npsDescription = 'NPS above 70 indicates world-class customer loyalty.';
+    } else if (npsScore >= 50) {
+      npsCategory = 'Excellent';
+      npsDescription = 'NPS above 50 is considered excellent.';
+    } else if (npsScore >= 0) {
+      npsCategory = 'Generally good';
+      npsDescription = 'NPS above 0 means more promoters than detractors.';
+    } else {
+      npsCategory = 'Problematic';
+      npsDescription = 'NPS below 0 means more detractors than promoters.';
+    }
 
     return {
       topProblems,
@@ -403,7 +417,8 @@ export default function SurveyAnalyticsPage() {
       averageExpectedPrice,
       averageMaxPrice,
       npsCategory,
-      npsScore: data.demographics.npsScore
+      npsDescription,
+      npsScore: npsScore
     }
   }, [data])
 
@@ -659,6 +674,9 @@ export default function SurveyAnalyticsPage() {
                 </div>
                 <div className="text-xs text-blue-700">
                   {insights.npsCategory}
+                </div>
+                <div className="text-xs text-blue-500">
+                  {insights.npsDescription}
                 </div>
                 <Progress 
                   value={(insights.npsScore / 10) * 100} 
@@ -1454,11 +1472,8 @@ export default function SurveyAnalyticsPage() {
                   <div className="p-4 bg-purple-50 rounded-lg">
                     <h4 className="font-medium text-purple-900 mb-2">Customer Satisfaction</h4>
                     <p className="text-sm text-purple-800">
-                      NPS Score: {insights?.npsScore.toFixed(1)}/10 ({insights?.npsCategory}). 
-                      {insights?.npsScore && insights.npsScore >= 7 
-                        ? "Strong likelihood of recommendations."
-                        : "Focus on improving user experience."
-                      }
+                      NPS Score: {insights?.npsScore.toFixed(1)}/10 ({insights?.npsCategory}). <br />
+                      {insights?.npsDescription}
                     </p>
                   </div>
                 </div>
