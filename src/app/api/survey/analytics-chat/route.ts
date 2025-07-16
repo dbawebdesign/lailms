@@ -243,7 +243,7 @@ Survey Data Context: ${JSON.stringify(surveyContext, null, 2)}`
 
     // Call OpenAI API
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini',
       messages: messages as any,
       temperature: 0.7,
       max_tokens: 1000
