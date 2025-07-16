@@ -1133,9 +1133,7 @@ export default function SurveyAnalyticsPage() {
                         <Badge variant="secondary" className="text-xs">
                           {data?.authenticatedResponses || 0} Authenticated
                         </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {data?.publicResponses || 0} Public
-                        </Badge>
+                        <Badge className="text-xs bg-green-600 text-white border-none">{data?.publicResponses || 0} Public</Badge>
                       </div>
                     </div>
                   </div>
