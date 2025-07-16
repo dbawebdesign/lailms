@@ -146,7 +146,6 @@ interface AnalyticsData {
   }
   dataQuality: {
     totalExpectedQuestions: number
-    responsesWithAllQuestions: number
     responsesWithDuration: number
     responsesWithDeviceInfo: number
     dataIntegrityScore: number
@@ -345,12 +344,11 @@ export default function SurveyAnalyticsPage() {
 
     // Calculate data quality metrics
     const totalExpectedQuestions = 23 // We have 23 questions in total
-    const responsesWithAllQuestions = filteredResponses.filter(r => r.question_responses.length === totalExpectedQuestions).length
     const responsesWithDuration = filteredResponses.filter(r => r.duration_seconds > 0).length
     const responsesWithDeviceInfo = filteredResponses.filter(r => r.device_info !== null).length
     
     const dataIntegrityScore = filteredResponses.length > 0 
-      ? ((responsesWithAllQuestions + responsesWithDuration + responsesWithDeviceInfo) / (filteredResponses.length * 3)) * 100
+      ? ((responsesWithDuration + responsesWithDeviceInfo) / (filteredResponses.length * 2)) * 100
       : 0
 
     return {
@@ -365,7 +363,6 @@ export default function SurveyAnalyticsPage() {
       demographics,
       dataQuality: {
         totalExpectedQuestions,
-        responsesWithAllQuestions,
         responsesWithDuration,
         responsesWithDeviceInfo,
         dataIntegrityScore
@@ -1541,20 +1538,6 @@ export default function SurveyAnalyticsPage() {
 
                    <div className="space-y-3">
                      <div className="flex justify-between items-center">
-                       <span className="text-sm">Complete Responses</span>
-                       <div className="flex items-center gap-2">
-                         {(data?.dataQuality?.responsesWithAllQuestions || 0) === (data?.totalResponses || 0) ? (
-                           <CheckCircle className="w-4 h-4 text-green-600" />
-                         ) : (
-                           <XCircle className="w-4 h-4 text-red-600" />
-                         )}
-                         <span className="font-medium">
-                           {data?.dataQuality?.responsesWithAllQuestions || 0}/{data?.totalResponses || 0}
-                         </span>
-                       </div>
-                     </div>
-
-                     <div className="flex justify-between items-center">
                        <span className="text-sm">Duration Tracking</span>
                        <div className="flex items-center gap-2">
                          {(data?.dataQuality?.responsesWithDuration || 0) === (data?.totalResponses || 0) ? (
@@ -1639,9 +1622,6 @@ export default function SurveyAnalyticsPage() {
                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                        <h4 className="font-medium text-yellow-900 mb-2">Data Quality Recommendations</h4>
                        <ul className="text-sm text-yellow-800 space-y-1">
-                         {(data?.dataQuality?.responsesWithAllQuestions || 0) < (data?.totalResponses || 0) && (
-                           <li>• Some responses are missing question answers - check survey completion flow</li>
-                         )}
                          {(data?.dataQuality?.responsesWithDuration || 0) < (data?.totalResponses || 0) && (
                            <li>• Duration tracking is incomplete - verify timer implementation</li>
                          )}
