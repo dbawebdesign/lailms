@@ -25,8 +25,8 @@ export default function PublicTextQuestion({
 
   return (
     <Card className="bg-gray-50 border border-gray-200 rounded-lg">
-      <CardContent className="p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-6 leading-relaxed">
+      <CardContent className="p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-4 sm:mb-6 leading-relaxed">
           {question.question_text}
           {question.required && <span className="text-red-500 ml-1">*</span>}
         </h3>
@@ -36,7 +36,7 @@ export default function PublicTextQuestion({
             value={value}
             onChange={handleChange}
             placeholder={placeholder}
-            className="min-h-[120px] resize-none bg-white border-gray-200 focus:border-blue-300 focus:ring-blue-200 rounded-lg"
+            className="min-h-[100px] sm:min-h-[120px] resize-none bg-white border-gray-200 focus:border-blue-300 focus:ring-blue-200 rounded-lg text-sm sm:text-base"
           />
         ) : (
           <Input
@@ -44,7 +44,7 @@ export default function PublicTextQuestion({
             value={value}
             onChange={handleChange}
             placeholder={placeholder}
-            className="bg-white border-gray-200 focus:border-blue-300 focus:ring-blue-200 rounded-lg"
+            className="bg-white border-gray-200 focus:border-blue-300 focus:ring-blue-200 rounded-lg h-11 sm:h-12 text-sm sm:text-base"
           />
         )}
       </CardContent>

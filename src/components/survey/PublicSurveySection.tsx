@@ -77,19 +77,19 @@ export default function PublicSurveySection({
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-8 space-y-8">
+    <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
       <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-        <CardHeader className="px-8 py-6">
-          <CardTitle className="text-2xl font-semibold text-gray-900 text-center">
+        <CardHeader className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+          <CardTitle className="text-xl sm:text-2xl font-semibold text-gray-900 text-center">
             {section.title}
           </CardTitle>
           {section.description && (
-            <p className="text-center text-gray-600 mt-3 text-base leading-relaxed">
+            <p className="text-center text-gray-600 mt-2 sm:mt-3 text-sm sm:text-base leading-relaxed">
               {section.description}
             </p>
           )}
         </CardHeader>
-        <CardContent className="px-8 pb-8 space-y-8">
+        <CardContent className="px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8 space-y-6 sm:space-y-8">
           {questions.map(renderQuestion)}
         </CardContent>
       </Card>

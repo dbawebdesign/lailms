@@ -32,13 +32,13 @@ export default function PublicMultipleChoiceQuestion({
 
   return (
     <Card className="bg-gray-50 border border-gray-200 rounded-lg">
-      <CardContent className="p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-6 leading-relaxed">
+      <CardContent className="p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-4 sm:mb-6 leading-relaxed">
           {question.question_text}
           {question.required && <span className="text-red-500 ml-1">*</span>}
         </h3>
         
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {options.map((option: string, index: number) => {
             const isSelected = isMultiple
               ? (Array.isArray(value) && value.includes(option))
@@ -48,21 +48,21 @@ export default function PublicMultipleChoiceQuestion({
               <Button
                 key={index}
                 variant={isSelected ? "default" : "outline"}
-                className={`w-full justify-start text-left h-auto py-3 px-4 rounded-lg transition-all duration-200 ${
+                className={`w-full justify-start text-left h-auto py-3 sm:py-4 px-4 sm:px-5 rounded-lg transition-all duration-200 text-sm sm:text-base min-h-[48px] whitespace-normal break-words ${
                   isSelected
                     ? "bg-blue-50 border-blue-200 text-blue-900 hover:bg-blue-100"
                     : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                 }`}
                 onClick={() => isMultiple ? handleMultipleChoice(option) : handleSingleChoice(option)}
               >
-                {option}
+                <span className="leading-relaxed break-words text-left w-full">{option}</span>
               </Button>
             );
           })}
         </div>
         
         {isMultiple && (
-          <p className="text-sm text-gray-500 mt-4">
+          <p className="text-xs sm:text-sm text-gray-500 mt-3 sm:mt-4">
             Select all that apply
           </p>
         )}
