@@ -703,11 +703,11 @@ export default function SurveyAnalyticsPage() {
             {/* Chart View */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-300 font-semibold">
-                  <BarChart3 className="w-5 h-5 text-blue-400" />
+                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-300 font-semibold">
+                  <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   Problem Validation Scores
                 </CardTitle>
-                <CardDescription className="text-gray-400 font-normal">
+                <CardDescription className="text-gray-700 dark:text-gray-400 font-normal">
                   Visual ranking of homeschooling challenges by agreement level
                 </CardDescription>
               </CardHeader>
@@ -771,11 +771,11 @@ export default function SurveyAnalyticsPage() {
             {/* Detailed List View */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-300 font-semibold">
-                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-300 font-semibold">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                   Detailed Problem Analysis
                 </CardTitle>
-                <CardDescription className="text-gray-400 font-normal">
+                <CardDescription className="text-gray-700 dark:text-gray-400 font-normal">
                   Ranked by agreement level (1=Strongly Disagree, 5=Strongly Agree)
                 </CardDescription>
               </CardHeader>
@@ -837,11 +837,11 @@ export default function SurveyAnalyticsPage() {
             {/* Chart View */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-300 font-semibold">
-                  <Star className="w-5 h-5 text-yellow-400" />
+                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-300 font-semibold">
+                  <Star className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
                   Feature Importance Ranking
                 </CardTitle>
-                <CardDescription className="text-gray-400 font-normal">
+                <CardDescription className="text-gray-700 dark:text-gray-400 font-normal">
                   Visual ranking of feature importance by parent ratings
                 </CardDescription>
               </CardHeader>
@@ -983,11 +983,11 @@ export default function SurveyAnalyticsPage() {
             {/* Pie Chart View */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-300 font-semibold">
-                  <PieChart className="w-5 h-5 text-purple-400" />
+                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-300 font-semibold">
+                  <PieChart className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                   Concern Distribution
                 </CardTitle>
-                <CardDescription className="text-gray-400 font-normal">
+                <CardDescription className="text-gray-700 dark:text-gray-400 font-normal">
                   Visual breakdown of primary concerns about AI adoption
                 </CardDescription>
               </CardHeader>
@@ -1187,11 +1187,11 @@ export default function SurveyAnalyticsPage() {
             <div className="grid gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-gray-300 font-semibold">
-                    <Users className="w-5 h-5 text-blue-400" />
+                  <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-300 font-semibold">
+                    <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     Homeschooling Approaches
                   </CardTitle>
-                  <CardDescription className="text-gray-400 font-normal">Distribution of current teaching methods</CardDescription>
+                  <CardDescription className="text-gray-700 dark:text-gray-400 font-normal">Distribution of current teaching methods</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
@@ -1249,11 +1249,11 @@ export default function SurveyAnalyticsPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-gray-300 font-semibold">
-                    <DollarSign className="w-5 h-5 text-green-400" />
+                  <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-300 font-semibold">
+                    <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
                     Income Distribution
                   </CardTitle>
-                  <CardDescription className="text-gray-400 font-normal">Household income ranges of respondents</CardDescription>
+                  <CardDescription className="text-gray-700 dark:text-gray-400 font-normal">Household income ranges of respondents</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
