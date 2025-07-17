@@ -134,16 +134,17 @@ interface AnalyticsData {
   problemValidationScores: Record<string, number>
   featureImportanceScores: Record<string, number>
   primaryConcerns: Record<string, number>
-  demographics: {
-    approaches: Record<string, number>
-    coopParticipation: Record<string, number>
-    incomeRanges: Record<string, number>
-    educationLevels: Record<string, number>
-    pricingExpectations: Array<number>
-    maxPricing: Array<number>
-    npsScore: number
-    techPlatforms: Record<string, number>
-  }
+      demographics: {
+      approaches: Record<string, number>
+      coopParticipation: Record<string, number>
+      incomeRanges: Record<string, number>
+      educationLevels: Record<string, number>
+      pricingExpectations: Array<number>
+      maxPricing: Array<number>
+      npsScore: number
+      npsResponses: Array<number>
+      techPlatforms: Record<string, number>
+    }
   dataQuality: {
     totalExpectedQuestions: number
     responsesWithDuration: number
@@ -280,6 +281,7 @@ export default function SurveyAnalyticsPage() {
       pricingExpectations: [] as number[],
       maxPricing: [] as number[],
       npsScore: 0,
+      npsResponses: [] as number[],
       techPlatforms: {} as Record<string, number>
     }
 
@@ -322,7 +324,11 @@ export default function SurveyAnalyticsPage() {
           case 22: // NPS Score
             const npsValue = parseFloat(qr.response_value)
             if (!isNaN(npsValue)) {
-              demographics.npsScore += npsValue
+              // Store individual NPS responses for proper calculation
+              if (!demographics.npsResponses) {
+                demographics.npsResponses = []
+              }
+              demographics.npsResponses.push(npsValue)
             }
             break
           case 23: // Tech platforms
@@ -339,8 +345,19 @@ export default function SurveyAnalyticsPage() {
       })
     })
 
-    // Calculate average NPS
-    demographics.npsScore = filteredResponses.length > 0 ? demographics.npsScore / filteredResponses.length : 0
+    // Calculate proper NPS score using standard methodology
+    if (demographics.npsResponses.length > 0) {
+      const promoters = demographics.npsResponses.filter(score => score >= 9).length
+      const detractors = demographics.npsResponses.filter(score => score <= 6).length
+      const totalResponses = demographics.npsResponses.length
+      
+      // NPS = (% of Promoters) - (% of Detractors)
+      const promoterPercentage = (promoters / totalResponses) * 100
+      const detractorPercentage = (detractors / totalResponses) * 100
+      demographics.npsScore = promoterPercentage - detractorPercentage
+    } else {
+      demographics.npsScore = 0
+    }
 
     // Calculate data quality metrics
     const totalExpectedQuestions = 23 // We have 23 questions in total
@@ -390,7 +407,7 @@ export default function SurveyAnalyticsPage() {
       ? data.demographics.maxPricing.reduce((a, b) => a + b, 0) / data.demographics.maxPricing.length
       : 0
 
-    // Updated NPS interpretation logic
+    // Standard NPS interpretation logic for -100 to +100 scale
     const npsScore = data.demographics.npsScore;
     let npsCategory = '';
     let npsDescription = '';
@@ -663,10 +680,10 @@ export default function SurveyAnalyticsPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-2xl font-bold text-blue-600">
-                    {insights.npsScore.toFixed(1)}
+                    {insights.npsScore.toFixed(0)}
                   </span>
                   <span className="text-sm text-blue-700">
-                    /10
+                    NPS
                   </span>
                 </div>
                 <div className="text-xs text-blue-700">
@@ -676,7 +693,7 @@ export default function SurveyAnalyticsPage() {
                   {insights.npsDescription}
                 </div>
                 <Progress 
-                  value={(insights.npsScore / 10) * 100} 
+                  value={Math.max(0, (insights.npsScore + 100) / 2)} 
                   className="h-2"
                   style={{ 
                     background: `linear-gradient(to right, ${CHART_COLORS.primary}20, ${CHART_COLORS.primary}40)`
@@ -1176,7 +1193,7 @@ export default function SurveyAnalyticsPage() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">NPS Score</p>
-                      <p className="text-2xl font-bold text-amber-600">{insights?.npsScore.toFixed(1)}</p>
+                      <p className="text-2xl font-bold text-amber-600">{insights?.npsScore.toFixed(0)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -1467,7 +1484,7 @@ export default function SurveyAnalyticsPage() {
                   <div className="p-4 bg-purple-50 rounded-lg">
                     <h4 className="font-medium text-purple-900 mb-2">Customer Satisfaction</h4>
                     <p className="text-sm text-purple-800">
-                      NPS Score: {insights?.npsScore.toFixed(1)}/10 ({insights?.npsCategory}). <br />
+                      NPS Score: {insights?.npsScore.toFixed(0)} ({insights?.npsCategory}). <br />
                       {insights?.npsDescription}
                     </p>
                   </div>
