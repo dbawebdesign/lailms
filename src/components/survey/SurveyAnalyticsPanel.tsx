@@ -14,7 +14,12 @@ import {
   BarChart3,
   X,
   Database,
-  GripVertical
+  GripVertical,
+  Download,
+  Code,
+  ExternalLink,
+  Copy,
+  CheckCircle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -23,6 +28,19 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+  visualization?: {
+    file: string
+    downloadUrl: string
+    embedCode: string
+    previewUrl: string
+  }
+  metadata?: {
+    generatedAt: string
+    fileSize: number
+    visualizationType: string
+    dataSource: string
+    outputFormat?: string
+  }
 }
 
 interface SurveyAnalyticsPanelProps {
@@ -37,7 +55,7 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
     {
       id: '1',
       role: 'assistant',
-      content: "Hi! I'm Luna, your survey analytics assistant. I have access to all your survey response data from both authenticated users and public anonymous responses, giving you comprehensive insights.\n\n**Data Sources:**\n• Authenticated user surveys (registered users)\n• Public anonymous surveys (includes screening questions)\n\nTry asking me:\n• What are the biggest pain points for homeschool parents?\n• Which features should we prioritize for development?\n• How do responses differ between authenticated and public users?\n• What demographic patterns do you see in the responses?\n• Show me correlations between education level and feature preferences\n• How effective are our screening questions?",
+      content: "Hi! I'm Luna, your survey analytics assistant. I have access to all your survey response data from both authenticated users and public anonymous responses, giving you comprehensive insights.\n\n**Data Sources:**\n• Authenticated user surveys (registered users)\n• Public anonymous surveys (includes screening questions)\n\n**What I Can Do:**\n• Analyze data patterns and provide insights\n• Create interactive visualizations and charts\n• Generate presentation-ready graphics\n• Build social media content from your data\n\nTry asking me:\n• What are the biggest pain points for homeschool parents?\n• **Create a visual showing our problem/solution data**\n• **Generate an infographic about user demographics**\n• **Make a chart for my PowerPoint presentation**\n• How do responses differ between authenticated and public users?\n• Show me correlations between education level and feature preferences",
       timestamp: new Date()
     }
   ])
@@ -45,8 +63,9 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
   const [isLoading, setIsLoading] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [viewportHeight, setViewportHeight] = useState('100vh')
-  const [panelWidth, setPanelWidth] = useState(320) // Default width (w-80 = 320px)
+  const [panelWidth, setPanelWidth] = useState(320)
   const [isResizing, setIsResizing] = useState(false)
+  const [copiedStates, setCopiedStates] = useState<{[key: string]: boolean}>({})
   
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -55,146 +74,76 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
 
   const suggestedQuestions = [
     "What are the biggest pain points?",
-    "Which features should we prioritize?",
-    "Compare authenticated vs public responses",
-    "How effective are screening questions?",
-    "Show me demographic patterns",
-    "Education level correlations"
+    "Create a visual for PowerPoint",
+    "Generate a Google Slides presentation",
+    "Make a social media graphic",
+    "Show demographic patterns",
+    "Create an interactive dashboard"
   ]
 
-  // Handle mobile detection and viewport changes
+  // Mobile detection and viewport height handling
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768)
     }
 
-    const handleResize = () => {
-      checkMobile()
-      
-      if (window.innerWidth < 768) {
-        const visualHeight = window.visualViewport?.height || window.innerHeight
-        setViewportHeight(`${visualHeight}px`)
-        const vh = visualHeight * 0.01
-        document.documentElement.style.setProperty('--vh', `${vh}px`)
-      } else {
-        setViewportHeight('100vh')
-        document.documentElement.style.removeProperty('--vh')
-      }
+    const updateViewportHeight = () => {
+      setViewportHeight(`${window.innerHeight}px`)
     }
 
-    handleResize()
+    checkMobile()
+    updateViewportHeight()
     
-    window.addEventListener('resize', handleResize)
-    window.addEventListener('orientationchange', handleResize)
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleResize)
-    }
-
+    window.addEventListener('resize', checkMobile)
+    window.addEventListener('resize', updateViewportHeight)
+    
     return () => {
-      window.removeEventListener('resize', handleResize)
-      window.removeEventListener('orientationchange', handleResize)
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleResize)
-      }
+      window.removeEventListener('resize', checkMobile)
+      window.removeEventListener('resize', updateViewportHeight)
     }
   }, [])
-
-  // Prevent background scrolling on mobile when panel is open
-  useEffect(() => {
-    let originalBodyOverflow = ''
-    let originalBodyPosition = ''
-    let originalBodyTop = ''
-    let originalBodyWidth = ''
-    let originalBodyHeight = ''
-    let originalDocElementOverflow = ''
-    let scrollY = 0
-    let stylesApplied = false
-
-    if (isMobile && isOpen) {
-      scrollY = window.scrollY
-      const bodyStyle = window.getComputedStyle(document.body)
-      originalBodyOverflow = bodyStyle.overflow
-      originalBodyPosition = bodyStyle.position
-      originalBodyTop = bodyStyle.top
-      originalBodyWidth = bodyStyle.width
-      originalBodyHeight = bodyStyle.height
-
-      document.body.style.overflow = 'hidden'
-      document.body.style.position = 'fixed'
-      document.body.style.top = `-${scrollY}px`
-      document.body.style.width = '100%'
-      document.body.style.height = '100vh'
-
-      originalDocElementOverflow = document.documentElement.style.overflow
-      document.documentElement.style.overflow = 'hidden'
-      stylesApplied = true
-    }
-
-    return () => {
-      if (stylesApplied) {
-        document.body.style.overflow = originalBodyOverflow
-        document.body.style.position = originalBodyPosition
-        document.body.style.top = originalBodyTop
-        document.body.style.width = originalBodyWidth
-        document.body.style.height = originalBodyHeight
-        document.documentElement.style.overflow = originalDocElementOverflow
-        window.scrollTo(0, scrollY)
-      }
-    }
-  }, [isMobile, isOpen])
-
-  // Auto-scroll to bottom when new messages are added
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
 
   // Resize functionality
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
+  const startResize = useCallback((e: React.MouseEvent) => {
     setIsResizing(true)
-  }, [])
+    const startX = e.clientX
+    const startWidth = panelWidth
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing) return
-    
-    const newWidth = window.innerWidth - e.clientX
-    // Minimum width of 320px (w-80), maximum of 60% of screen width
-    const minWidth = 320
-    const maxWidth = window.innerWidth * 0.6
-    const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth))
-    
-    setPanelWidth(clampedWidth)
-    onWidthChange?.(clampedWidth)
-  }, [isResizing])
-
-  const handleMouseUp = useCallback(() => {
-    setIsResizing(false)
-  }, [])
-
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-      document.body.style.cursor = 'col-resize'
-      document.body.style.userSelect = 'none'
-      
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove)
-        document.removeEventListener('mouseup', handleMouseUp)
-        document.body.style.cursor = ''
-        document.body.style.userSelect = ''
-      }
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = startX - e.clientX
+      const newWidth = Math.max(280, Math.min(800, startWidth + deltaX))
+      setPanelWidth(newWidth)
+      onWidthChange?.(newWidth)
     }
-  }, [isResizing, handleMouseMove, handleMouseUp])
 
-  const scrollToBottom = () => {
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [panelWidth, onWidthChange])
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
       if (scrollContainer) {
         scrollContainer.scrollTop = scrollContainer.scrollHeight
       }
     }
-  }
+  }, [messages])
+
+  // Auto-focus input when panel opens
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      setTimeout(() => {
+        inputRef.current?.focus()
+      }, 100)
+    }
+  }, [isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -236,7 +185,9 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: data.response,
-        timestamp: new Date()
+        timestamp: new Date(),
+        visualization: data.visualization,
+        metadata: data.metadata
       }
 
       setMessages(prev => [...prev, assistantMessage])
@@ -254,10 +205,137 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
     }
   }
 
+  const copyToClipboard = async (text: string, messageId: string, type: 'embed' | 'url') => {
+    try {
+      await navigator.clipboard.writeText(text)
+      const key = `${messageId}-${type}`
+      setCopiedStates(prev => ({ ...prev, [key]: true }))
+      setTimeout(() => {
+        setCopiedStates(prev => ({ ...prev, [key]: false }))
+      }, 2000)
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error)
+    }
+  }
+
+  const renderVisualizationActions = (message: Message) => {
+    if (!message.visualization) return null
+
+    const { downloadUrl, embedCode, previewUrl } = message.visualization
+    const embedKey = `${message.id}-embed`
+    const urlKey = `${message.id}-url`
+
+    return (
+      <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+        <div className="flex items-center gap-2 mb-3">
+          <BarChart3 className="w-5 h-5 text-blue-600" />
+          <span className="font-semibold text-blue-900">Interactive Visualization Ready</span>
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Download Button */}
+          <Button
+            onClick={() => window.open(downloadUrl, '_blank')}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+            size="sm"
+          >
+            <Download className="w-4 h-4" />
+            Download HTML
+          </Button>
+
+          {/* Preview Button */}
+          <Button
+            onClick={() => window.open(previewUrl, '_blank')}
+            variant="outline"
+            className="flex items-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+            size="sm"
+          >
+            <ExternalLink className="w-4 h-4" />
+            Preview
+          </Button>
+
+          {/* Copy Embed Code */}
+          <Button
+            onClick={() => copyToClipboard(embedCode, message.id, 'embed')}
+            variant="outline"
+            className="flex items-center gap-2 border-purple-300 text-purple-700 hover:bg-purple-50"
+            size="sm"
+          >
+            {copiedStates[embedKey] ? (
+              <CheckCircle className="w-4 h-4" />
+            ) : (
+              <Code className="w-4 h-4" />
+            )}
+            {copiedStates[embedKey] ? 'Copied!' : 'Copy Embed'}
+          </Button>
+        </div>
+
+        {/* Embed Code Preview */}
+        <div className="mt-3 p-3 bg-gray-100 rounded text-xs font-mono text-gray-700 overflow-x-auto">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-gray-500">Embed Code:</span>
+            <Button
+              onClick={() => copyToClipboard(embedCode, message.id, 'embed')}
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2"
+            >
+              <Copy className="w-3 h-3" />
+            </Button>
+          </div>
+          <code className="block truncate">{embedCode}</code>
+        </div>
+
+        {/* Direct URL */}
+        <div className="mt-2 p-3 bg-gray-100 rounded text-xs">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-gray-500">Direct URL:</span>
+            <Button
+              onClick={() => copyToClipboard(downloadUrl, message.id, 'url')}
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2"
+            >
+              {copiedStates[urlKey] ? (
+                <CheckCircle className="w-3 h-3" />
+              ) : (
+                <Copy className="w-3 h-3" />
+              )}
+            </Button>
+          </div>
+          <code className="block truncate font-mono text-blue-600">{downloadUrl}</code>
+        </div>
+
+        {/* Metadata */}
+        {message.metadata && (
+          <div className="mt-3 text-xs text-gray-500 flex flex-wrap gap-4">
+            <span>Type: {message.metadata.visualizationType}</span>
+            <span>Size: {(message.metadata.fileSize / 1024).toFixed(1)}KB</span>
+            <span>Generated: {new Date(message.metadata.generatedAt).toLocaleTimeString()}</span>
+            {message.metadata.outputFormat && (
+              <span>Format: {message.metadata.outputFormat === 'powerpoint' ? 'PowerPoint Ready' : 
+                             message.metadata.outputFormat === 'google-slides' ? 'Google Slides Ready' : 
+                             message.metadata.outputFormat}</span>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const formatContent = (content: string) => {
     return content.split('\n').map((line, index) => {
       if (line.trim() === '') {
         return <br key={index} />
+      }
+      
+      // Handle emoji bullets and enhanced formatting
+      if (line.trim().startsWith('🎯') || line.trim().startsWith('📊') || line.trim().startsWith('🔗')) {
+        return (
+          <p key={index} className="mb-2 font-medium text-blue-900">
+            {line.trim()}
+          </p>
+        )
       }
       
       // Handle bullet points
@@ -277,6 +355,18 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
           </p>
         )
       }
+
+      // Handle bold text
+      if (line.includes('**')) {
+        const parts = line.split('**')
+        return (
+          <p key={index} className="mb-2">
+            {parts.map((part, i) => 
+              i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+            )}
+          </p>
+        )
+      }
       
       return (
         <p key={index} className="mb-2">
@@ -286,226 +376,58 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
     })
   }
 
-  const handleSuggestedQuestion = (question: string) => {
-    setInput(question)
-    inputRef.current?.focus()
-  }
+  return (
+    <>
+      {/* Backdrop */}
+      {isOpen && isMobile && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={onClose}
+        />
+      )}
 
-  // Mobile full-screen layout
-  if (isMobile && isOpen) {
-    return (
-      <div 
-        className="fixed inset-0 flex flex-col bg-background mobile-chat-overlay"
-        style={{ 
-          height: viewportHeight,
-          minHeight: viewportHeight,
-          maxHeight: viewportHeight,
-          zIndex: 9999,
-          isolation: 'isolate'
+      {/* Panel */}
+      <div
+        ref={panelRef}
+        className={cn(
+          "fixed right-0 top-0 h-full bg-white border-l border-gray-200 z-50 flex flex-col transition-all duration-300 ease-in-out",
+          isOpen ? "translate-x-0" : "translate-x-full",
+          isMobile ? "w-full" : "",
+          className
+        )}
+        style={{
+          width: !isMobile ? `${panelWidth}px` : '100%',
+          height: viewportHeight
         }}
       >
-        {/* Mobile Header */}
-        <div className="bg-gradient-to-r from-blue-500 to-purple-600 px-4 py-3 text-white flex items-center justify-between border-b flex-shrink-0 relative z-10">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg">
+            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
               <Image
                 src="/web-app-manifest-512x512.png"
-                alt="Learnology AI"
-                width={20}
-                height={20}
+                alt="Luna"
+                width={16}
+                height={16}
                 className="object-contain"
               />
             </div>
             <div>
-              <h2 className="font-medium text-lg">Survey Analytics</h2>
-              <div className="flex items-center gap-2 mt-0.5">
-                <Badge variant="secondary" className="text-xs bg-white/20 text-white border-white/30">
-                  <Database className="w-3 h-3 mr-1" />
-                  Live Data
-                </Badge>
-              </div>
+              <h2 className="font-semibold text-lg">Luna Analytics</h2>
+              <p className="text-sm text-blue-100">Survey Data & Visualizations</p>
             </div>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-white hover:bg-white/20"
+          <Button
             onClick={onClose}
-            aria-label="Close Survey Analytics Panel"
+            variant="ghost"
+            size="sm"
+            className="text-white hover:bg-white/10"
           >
-            <X size={20} />
+            <X className="w-4 h-4" />
           </Button>
         </div>
 
-        {/* Mobile Chat Thread */}
-        <div className="flex-1 overflow-hidden min-h-0 relative bg-background">
-          <ScrollArea ref={scrollAreaRef} className="h-full overscroll-contain">
-            <div className="p-4 space-y-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "flex gap-3 max-w-full animate-in slide-in-from-bottom-2",
-                    message.role === 'user' ? "justify-end" : "justify-start"
-                  )}
-                >
-                  {message.role === 'assistant' && (
-                    <div className="flex-shrink-0 w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                      <Image
-                        src="/web-app-manifest-512x512.png"
-                        alt="Luna"
-                        width={16}
-                        height={16}
-                        className="object-contain"
-                      />
-                    </div>
-                  )}
-                  
-                  <div
-                    className={cn(
-                      "rounded-2xl px-4 py-3 max-w-[85%] break-words",
-                      message.role === 'user'
-                        ? "bg-gradient-to-br from-blue-500 to-purple-600 text-white ml-auto"
-                        : "bg-muted text-foreground"
-                    )}
-                  >
-                    <div className="text-sm leading-relaxed">
-                      {formatContent(message.content)}
-                    </div>
-                  </div>
-
-                  {message.role === 'user' && (
-                    <div className="flex-shrink-0 w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4" />
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {isLoading && (
-                <div className="flex gap-3 justify-start animate-in slide-in-from-bottom-2">
-                  <div className="flex-shrink-0 w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                    <Image
-                      src="/web-app-manifest-512x512.png"
-                      alt="Luna"
-                      width={16}
-                      height={16}
-                      className="object-contain"
-                    />
-                  </div>
-                  <div className="bg-muted rounded-2xl px-4 py-3">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Analyzing survey data...
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Suggested Questions for Mobile */}
-              {messages.length === 1 && (
-                <div className="mt-6">
-                  <p className="text-sm font-medium text-muted-foreground mb-3">Quick questions:</p>
-                  <div className="space-y-2">
-                    {suggestedQuestions.map((question, index) => (
-                      <Button
-                        key={index}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSuggestedQuestion(question)}
-                        className="text-xs h-7 text-left w-full justify-start"
-                      >
-                        {question}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </div>
-
-        {/* Mobile Input Area */}
-        <div className="p-4 border-t bg-background flex-shrink-0">
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <Input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about survey insights..."
-              disabled={isLoading}
-              className="flex-1"
-            />
-            <Button 
-              type="submit" 
-              disabled={!input.trim() || isLoading}
-              size="icon"
-              className="bg-primary hover:bg-primary/90"
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
-          </form>
-        </div>
-      </div>
-    )
-  }
-
-  // Desktop side panel layout (like Luna)
-  if (!isMobile && isOpen) {
-    return (
-      <aside
-        ref={panelRef}
-        className="fixed top-0 right-0 h-screen flex flex-col bg-background border-l border-[#E0E0E0] dark:border-[#333333] z-50 transform transition-transform duration-300 ease-in-out"
-        style={{ width: `${panelWidth}px` }}
-        aria-label="Survey Analytics Panel"
-      >
-        {/* Resize Handle */}
-        <div
-          ref={resizeRef}
-          className={cn(
-            "absolute left-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-500/50 transition-colors z-10",
-            isResizing && "bg-blue-500"
-          )}
-          onMouseDown={handleMouseDown}
-        />
-        {/* Panel Header */}
-        <div className="h-14 sm:h-16 flex items-center justify-between px-4 sm:px-6 border-b border-[#E0E0E0] dark:border-[#333333] shrink-0">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              aria-label="Close Survey Analytics Panel"
-              className="h-8 w-8 hover:bg-gradient-to-r hover:from-[#6B5DE5]/5 hover:to-[#6B5DE5]/10"
-            >
-              <X className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg">
-                <Image
-                  src="/web-app-manifest-512x512.png"
-                  alt="Learnology AI"
-                  width={24}
-                  height={24}
-                  className="object-contain"
-                />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">Survey Analytics</h2>
-                <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                  <Database className="w-3 h-3 mr-1" />
-                  Live Data
-                </Badge>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Chat Thread */}
+        {/* Messages */}
         <div className="flex-1 overflow-hidden">
           <ScrollArea ref={scrollAreaRef} className="h-full">
             <div className="p-4 space-y-4">
@@ -529,17 +451,22 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
                     </div>
                   )}
                   
-                  <div
-                    className={cn(
-                      "rounded-2xl px-4 py-3 max-w-[85%] break-words",
-                      message.role === 'user'
-                        ? "bg-gradient-to-br from-blue-500 to-purple-600 text-white ml-auto"
-                        : "bg-muted text-foreground"
-                    )}
-                  >
-                    <div className="text-sm leading-relaxed">
-                      {formatContent(message.content)}
+                  <div className="flex-1 max-w-[85%]">
+                    <div
+                      className={cn(
+                        "rounded-2xl px-4 py-3 break-words",
+                        message.role === 'user'
+                          ? "bg-gradient-to-br from-blue-500 to-purple-600 text-white ml-auto"
+                          : "bg-muted text-foreground"
+                      )}
+                    >
+                      <div className="text-sm leading-relaxed">
+                        {formatContent(message.content)}
+                      </div>
                     </div>
+                    
+                    {/* Visualization Actions */}
+                    {renderVisualizationActions(message)}
                   </div>
 
                   {message.role === 'user' && (
@@ -551,7 +478,7 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
               ))}
 
               {isLoading && (
-                <div className="flex gap-3 justify-start animate-in slide-in-from-bottom-2">
+                <div className="flex gap-3 justify-start">
                   <div className="flex-shrink-0 w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                     <Image
                       src="/web-app-manifest-512x512.png"
@@ -564,7 +491,7 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
                   <div className="bg-muted rounded-2xl px-4 py-3">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Analyzing survey data...
+                      Analyzing data...
                     </div>
                   </div>
                 </div>
@@ -574,41 +501,37 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
         </div>
 
         {/* Suggested Questions */}
-        {messages.length === 1 && (
-          <div className="px-4 py-3 border-t bg-muted/30">
-            <p className="text-xs font-medium text-muted-foreground mb-2">Quick questions:</p>
-            <div className="flex flex-wrap gap-2">
-              {suggestedQuestions.map((question, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSuggestedQuestion(question)}
-                  className="text-xs h-7"
-                >
-                  {question}
-                </Button>
-              ))}
-            </div>
+        <div className="p-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex flex-wrap gap-2 mb-3">
+            {suggestedQuestions.map((question, index) => (
+              <Button
+                key={index}
+                onClick={() => setInput(question)}
+                variant="outline"
+                size="sm"
+                className="text-xs h-7 px-2 bg-white hover:bg-blue-50 border-blue-200 text-blue-700"
+              >
+                {question}
+              </Button>
+            ))}
           </div>
-        )}
+        </div>
 
-        {/* Input Area */}
-        <div className="p-4 border-t">
-          <form onSubmit={handleSubmit} className="flex gap-2">
+        {/* Input */}
+        <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200">
+          <div className="flex gap-2">
             <Input
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about survey insights..."
-              disabled={isLoading}
+              placeholder="Ask about survey data or request a visualization..."
               className="flex-1"
+              disabled={isLoading}
             />
             <Button 
               type="submit" 
-              disabled={!input.trim() || isLoading}
-              size="icon"
-              className="bg-primary hover:bg-primary/90"
+              disabled={isLoading || !input.trim()}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             >
               {isLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -616,12 +539,22 @@ export function SurveyAnalyticsPanel({ isOpen, onClose, className, onWidthChange
                 <Send className="w-4 h-4" />
               )}
             </Button>
-          </form>
-        </div>
-      </aside>
-    )
-  }
+          </div>
+        </form>
 
-  // Default: panel is not visible
-  return null
+        {/* Resize Handle */}
+        {!isMobile && (
+          <div
+            ref={resizeRef}
+            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 transition-colors group"
+            onMouseDown={startResize}
+          >
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-3 h-8 bg-gray-300 rounded-l-md opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <GripVertical className="w-3 h-3 text-gray-600" />
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  )
 } 
