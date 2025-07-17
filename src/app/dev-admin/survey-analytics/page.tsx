@@ -204,28 +204,47 @@ export default function SurveyAnalyticsPage() {
   }
 
   const calculateAnalytics = (responses: SurveyResponse[], questions: SurveyQuestion[]): AnalyticsData => {
+    // This function processes combined data from both authenticated and public surveys
+    // Question mappings:
+    // - Problem Validation: Q1-7 (auth) + Q47-53 (public)
+    // - Feature Importance: Q8-14 (auth) + Q54-60 (public)
+    // - Primary Concerns: Q15 (auth) + Q61 (public)
+    // - Demographics: Q16-23 (auth) + Q62-69 (public)
+    // - NPS: Q22 (auth) + Q68 (public)
     // Filter responses based on selected demographics
     const filteredResponses = responses.filter(response => {
       if (incomeFilter !== 'all') {
-        const incomeResponse = response.question_responses.find(qr => qr.question_id === 18)
+        const incomeResponse = response.question_responses.find(qr => qr.question_id === 18 || qr.question_id === 64)
         if (!incomeResponse || incomeResponse.response_value !== incomeFilter) return false
       }
       
       if (educationFilter !== 'all') {
-        const educationResponse = response.question_responses.find(qr => qr.question_id === 19)
+        const educationResponse = response.question_responses.find(qr => qr.question_id === 19 || qr.question_id === 65)
         if (!educationResponse || educationResponse.response_value !== educationFilter) return false
       }
       
       return true
     })
 
-    // Problem Validation Analysis (Questions 1-7)
+    // Problem Validation Analysis (Questions 1-7 from auth, 47-53 from public)
     const problemValidationScores: Record<string, number> = {}
     const likertScale = ['Strongly Disagree', 'Disagree', 'Somewhat Agree', 'Agree', 'Strongly Agree']
     
-    for (let questionId = 1; questionId <= 7; questionId++) {
+    // Map of authenticated question IDs to public question IDs
+    const problemValidationMapping = [
+      { auth: 1, public: 47 },
+      { auth: 2, public: 48 },
+      { auth: 3, public: 49 },
+      { auth: 4, public: 50 },
+      { auth: 5, public: 51 },
+      { auth: 6, public: 52 },
+      { auth: 7, public: 53 }
+    ]
+    
+    problemValidationMapping.forEach(({ auth, public: pub }) => {
+      // Get responses from both authenticated and public surveys
       const questionResponses = filteredResponses.flatMap(r => 
-        r.question_responses.filter(qr => qr.question_id === questionId)
+        r.question_responses.filter(qr => qr.question_id === auth || qr.question_id === pub)
       )
       
       if (questionResponses.length > 0) {
@@ -234,20 +253,33 @@ export default function SurveyAnalyticsPage() {
           return sum + (score || 0)
         }, 0) / questionResponses.length
         
-        const question = questions.find(q => q.id === questionId)
+        // Use the authenticated question for the label (they have the same text)
+        const question = questions.find(q => q.id === auth)
         if (question) {
           problemValidationScores[question.question_text] = averageScore
         }
       }
-    }
+    })
 
-    // Feature Importance Analysis (Questions 8-14)
+    // Feature Importance Analysis (Questions 8-14 from auth, 54-60 from public)
     const featureImportanceScores: Record<string, number> = {}
     const importanceScale = ['Very Unimportant', 'Unimportant', 'Neutral', 'Somewhat Important', 'Very Important']
     
-    for (let questionId = 8; questionId <= 14; questionId++) {
+    // Map of authenticated question IDs to public question IDs
+    const featureImportanceMapping = [
+      { auth: 8, public: 54 },
+      { auth: 9, public: 55 },
+      { auth: 10, public: 56 },
+      { auth: 11, public: 57 },
+      { auth: 12, public: 58 },
+      { auth: 13, public: 59 },
+      { auth: 14, public: 60 }
+    ]
+    
+    featureImportanceMapping.forEach(({ auth, public: pub }) => {
+      // Get responses from both authenticated and public surveys
       const questionResponses = filteredResponses.flatMap(r => 
-        r.question_responses.filter(qr => qr.question_id === questionId)
+        r.question_responses.filter(qr => qr.question_id === auth || qr.question_id === pub)
       )
       
       if (questionResponses.length > 0) {
@@ -256,17 +288,18 @@ export default function SurveyAnalyticsPage() {
           return sum + (score || 0)
         }, 0) / questionResponses.length
         
-        const question = questions.find(q => q.id === questionId)
+        // Use the authenticated question for the label (they have the same text)
+        const question = questions.find(q => q.id === auth)
         if (question) {
           featureImportanceScores[question.question_text] = averageScore
         }
       }
-    }
+    })
 
-    // Primary Concerns Analysis (Question 15)
+    // Primary Concerns Analysis (Question 15 from auth, 61 from public)
     const primaryConcerns: Record<string, number> = {}
     const concernResponses = filteredResponses.flatMap(r => 
-      r.question_responses.filter(qr => qr.question_id === 15)
+      r.question_responses.filter(qr => qr.question_id === 15 || qr.question_id === 61)
     )
     concernResponses.forEach(qr => {
       primaryConcerns[qr.response_value] = (primaryConcerns[qr.response_value] || 0) + 1
@@ -289,7 +322,8 @@ export default function SurveyAnalyticsPage() {
     filteredResponses.forEach(response => {
       response.question_responses.forEach(qr => {
         switch (qr.question_id) {
-          case 16: // Homeschooling approaches
+          case 16: // Homeschooling approaches (authenticated)
+          case 62: // Homeschooling approaches (public)
             try {
               const approaches = JSON.parse(qr.response_value)
               approaches.forEach((approach: string) => {
@@ -300,28 +334,34 @@ export default function SurveyAnalyticsPage() {
               demographics.approaches[qr.response_value] = (demographics.approaches[qr.response_value] || 0) + 1
             }
             break
-          case 17: // Co-op participation
+          case 17: // Co-op participation (authenticated)
+          case 63: // Co-op participation (public)
             demographics.coopParticipation[qr.response_value] = (demographics.coopParticipation[qr.response_value] || 0) + 1
             break
-          case 18: // Income ranges
+          case 18: // Income ranges (authenticated)
+          case 64: // Income ranges (public)
             demographics.incomeRanges[qr.response_value] = (demographics.incomeRanges[qr.response_value] || 0) + 1
             break
-          case 19: // Education levels
+          case 19: // Education levels (authenticated)
+          case 65: // Education levels (public)
             demographics.educationLevels[qr.response_value] = (demographics.educationLevels[qr.response_value] || 0) + 1
             break
-          case 20: // Expected pricing
+          case 20: // Expected pricing (authenticated)
+          case 66: // Expected pricing (public)
             const expectedPrice = parseFloat(qr.response_value)
             if (!isNaN(expectedPrice)) {
               demographics.pricingExpectations.push(expectedPrice)
             }
             break
-          case 21: // Max pricing
+          case 21: // Max pricing (authenticated)
+          case 67: // Max pricing (public)
             const maxPrice = parseFloat(qr.response_value)
             if (!isNaN(maxPrice)) {
               demographics.maxPricing.push(maxPrice)
             }
             break
-          case 22: // NPS Score
+          case 22: // NPS Score (authenticated survey)
+          case 68: // NPS Score (public survey)
             const npsValue = parseFloat(qr.response_value)
             if (!isNaN(npsValue)) {
               // Store individual NPS responses for proper calculation
@@ -331,7 +371,8 @@ export default function SurveyAnalyticsPage() {
               demographics.npsResponses.push(npsValue)
             }
             break
-          case 23: // Tech platforms
+          case 23: // Tech platforms (authenticated)
+          case 69: // Tech platforms (public)
             try {
               const platforms = JSON.parse(qr.response_value)
               platforms.forEach((platform: string) => {
@@ -346,6 +387,7 @@ export default function SurveyAnalyticsPage() {
     })
 
     // Calculate proper NPS score using standard methodology
+    // Combines responses from both authenticated (Q22) and public (Q68) surveys
     if (demographics.npsResponses.length > 0) {
       const promoters = demographics.npsResponses.filter(score => score >= 9).length
       const detractors = demographics.npsResponses.filter(score => score <= 6).length
