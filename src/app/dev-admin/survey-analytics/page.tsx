@@ -429,6 +429,19 @@ export default function SurveyAnalyticsPage() {
     }
   }
 
+  // Helper function to calculate median
+  const calculateMedian = (values: number[]): number => {
+    if (values.length === 0) return 0
+    const sorted = [...values].sort((a, b) => a - b)
+    const middle = Math.floor(sorted.length / 2)
+    
+    if (sorted.length % 2 === 0) {
+      return (sorted[middle - 1] + sorted[middle]) / 2
+    } else {
+      return sorted[middle]
+    }
+  }
+
   // Memoized calculations for insights
   const insights = useMemo(() => {
     if (!data) return null
@@ -445,9 +458,76 @@ export default function SurveyAnalyticsPage() {
       ? data.demographics.pricingExpectations.reduce((a, b) => a + b, 0) / data.demographics.pricingExpectations.length
       : 0
 
+    const medianExpectedPrice = calculateMedian(data.demographics.pricingExpectations)
+
     const averageMaxPrice = data.demographics.maxPricing.length > 0
       ? data.demographics.maxPricing.reduce((a, b) => a + b, 0) / data.demographics.maxPricing.length
       : 0
+
+    const medianMaxPrice = calculateMedian(data.demographics.maxPricing)
+
+    const medianNpsScore = calculateMedian(data.demographics.npsResponses || [])
+
+    // Calculate median scores for problem validation and feature importance
+    const problemValidationMedians: Record<string, number> = {}
+    const featureImportanceMedians: Record<string, number> = {}
+
+    // Calculate medians for problem validation scores
+    Object.entries(data.problemValidationScores).forEach(([question, avgScore]) => {
+      // Get all individual responses for this question
+      const likertScale = ['Strongly Disagree', 'Disagree', 'Somewhat Agree', 'Agree', 'Strongly Agree']
+      const problemValidationMapping = [
+        { auth: 1, public: 47 },
+        { auth: 2, public: 48 },
+        { auth: 3, public: 49 },
+        { auth: 4, public: 50 },
+        { auth: 5, public: 51 },
+        { auth: 6, public: 52 },
+        { auth: 7, public: 53 }
+      ]
+      
+      // Find the question IDs for this question text
+      const questionObj = data.questions.find(q => q.question_text === question)
+      if (questionObj) {
+        const mapping = problemValidationMapping.find(m => m.auth === questionObj.id)
+        if (mapping) {
+          const questionResponses = data.responses.flatMap(r => 
+            r.question_responses.filter(qr => qr.question_id === mapping.auth || qr.question_id === mapping.public)
+          )
+          
+          const scores = questionResponses.map(qr => likertScale.indexOf(qr.response_value) + 1).filter(score => score > 0)
+          problemValidationMedians[question] = calculateMedian(scores)
+        }
+      }
+    })
+
+    // Calculate medians for feature importance scores
+    Object.entries(data.featureImportanceScores).forEach(([feature, avgScore]) => {
+      const importanceScale = ['Very Unimportant', 'Unimportant', 'Neutral', 'Somewhat Important', 'Very Important']
+      const featureImportanceMapping = [
+        { auth: 8, public: 54 },
+        { auth: 9, public: 55 },
+        { auth: 10, public: 56 },
+        { auth: 11, public: 57 },
+        { auth: 12, public: 58 },
+        { auth: 13, public: 59 },
+        { auth: 14, public: 60 }
+      ]
+      
+      // Find the question IDs for this feature text
+      const questionObj = data.questions.find(q => q.question_text === feature)
+      if (questionObj) {
+        const mapping = featureImportanceMapping.find(m => m.auth === questionObj.id)
+        if (mapping) {
+          const questionResponses = data.responses.flatMap(r => 
+            r.question_responses.filter(qr => qr.question_id === mapping.auth || qr.question_id === mapping.public)
+          )
+          
+          const scores = questionResponses.map(qr => importanceScale.indexOf(qr.response_value) + 1).filter(score => score > 0)
+          featureImportanceMedians[feature] = calculateMedian(scores)
+        }
+      }
+    })
 
     // Standard NPS interpretation logic for -100 to +100 scale
     const npsScore = data.demographics.npsScore;
@@ -471,7 +551,12 @@ export default function SurveyAnalyticsPage() {
       topProblems,
       topFeatures,
       averageExpectedPrice,
+      medianExpectedPrice,
       averageMaxPrice,
+      medianMaxPrice,
+      medianNpsScore,
+      problemValidationMedians,
+      featureImportanceMedians,
       npsCategory,
       npsDescription,
       npsScore: npsScore
@@ -734,6 +819,9 @@ export default function SurveyAnalyticsPage() {
                 <div className="text-xs text-blue-500">
                   {insights.npsDescription}
                 </div>
+                <div className="text-xs text-blue-600 mt-1">
+                  Median score: {insights.medianNpsScore.toFixed(1)}/10
+                </div>
                 <Progress 
                   value={Math.max(0, (insights.npsScore + 100) / 2)} 
                   className="h-2"
@@ -798,7 +886,17 @@ export default function SurveyAnalyticsPage() {
                         tick={{ fill: '#9CA3AF', fontWeight: 500 }}
                       />
                       <Tooltip 
-                        formatter={(value: number) => [`${value.toFixed(1)}/5`, 'Score']}
+                        formatter={(value: number, name: string, props: any) => {
+                          const fullName = props.payload?.fullName || name
+                          const median = insights?.problemValidationMedians?.[fullName] || 0
+                          return [
+                            <div key="tooltip">
+                              <div>Average: {value.toFixed(1)}/5</div>
+                              <div>Median: {median.toFixed(1)}/5</div>
+                            </div>,
+                            'Score'
+                          ]
+                        }}
                         labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
                         labelStyle={{ color: '#374151', fontWeight: 600 }}
                         contentStyle={{ 
@@ -932,7 +1030,17 @@ export default function SurveyAnalyticsPage() {
                         tick={{ fill: '#9CA3AF', fontWeight: 500 }}
                       />
                       <Tooltip 
-                        formatter={(value: number) => [`${value.toFixed(1)}/5`, 'Score']}
+                        formatter={(value: number, name: string, props: any) => {
+                          const fullName = props.payload?.fullName || name
+                          const median = insights?.featureImportanceMedians?.[fullName] || 0
+                          return [
+                            <div key="tooltip">
+                              <div>Average: {value.toFixed(1)}/5</div>
+                              <div>Median: {median.toFixed(1)}/5</div>
+                            </div>,
+                            'Score'
+                          ]
+                        }}
                         labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
                         labelStyle={{ color: '#374151', fontWeight: 600 }}
                         contentStyle={{ 
@@ -1385,6 +1493,9 @@ export default function SurveyAnalyticsPage() {
                       <div className="text-xs text-green-700">
                         Range: ${Math.min(...(data?.demographics.pricingExpectations || [0]))} - ${Math.max(...(data?.demographics.pricingExpectations || [0]))}
                       </div>
+                      <div className="text-xs text-green-700 mt-1">
+                        Median: ${insights?.medianExpectedPrice.toFixed(0)}/month
+                      </div>
                       <div className="mt-2">
                         <Progress 
                           value={insights?.averageExpectedPrice ? (insights.averageExpectedPrice / 100) * 100 : 0} 
@@ -1402,6 +1513,9 @@ export default function SurveyAnalyticsPage() {
                       </div>
                       <div className="text-xs text-purple-700">
                         Range: ${Math.min(...(data?.demographics.maxPricing || [0]))} - ${Math.max(...(data?.demographics.maxPricing || [0]))}
+                      </div>
+                      <div className="text-xs text-purple-700 mt-1">
+                        Median: ${insights?.medianMaxPrice.toFixed(0)}/month
                       </div>
                       <div className="mt-2">
                         <Progress 
@@ -1527,7 +1641,8 @@ export default function SurveyAnalyticsPage() {
                     <h4 className="font-medium text-purple-900 mb-2">Customer Satisfaction</h4>
                     <p className="text-sm text-purple-800">
                       NPS Score: {insights?.npsScore.toFixed(0)} ({insights?.npsCategory}). <br />
-                      {insights?.npsDescription}
+                      {insights?.npsDescription} <br />
+                      Median individual score: {insights?.medianNpsScore.toFixed(1)}/10
                     </p>
                   </div>
                 </div>
@@ -1548,7 +1663,9 @@ export default function SurveyAnalyticsPage() {
                   <h4 className="font-medium mb-2">Income-Based Insights</h4>
                   <p className="text-sm text-muted-foreground">
                     Higher income families show greater willingness to pay premium prices for time-saving features.
-                    Consider tiered pricing model.
+                    Consider tiered pricing model. <br />
+                    Median expected price: ${insights?.medianExpectedPrice.toFixed(0)}/month, 
+                    median max price: ${insights?.medianMaxPrice.toFixed(0)}/month.
                   </p>
                 </div>
 
