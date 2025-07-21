@@ -323,6 +323,251 @@ export type Database = {
         }
         Relationships: []
       }
+      content_indexing_jobs: {
+        Row: {
+          base_class_id: string
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          organisation_id: string
+          processed_items: number | null
+          progress: number | null
+          started_at: string | null
+          stats: Json | null
+          status: string
+          total_items: number | null
+          updated_at: string
+        }
+        Insert: {
+          base_class_id: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          organisation_id: string
+          processed_items?: number | null
+          progress?: number | null
+          started_at?: string | null
+          stats?: Json | null
+          status?: string
+          total_items?: number | null
+          updated_at?: string
+        }
+        Update: {
+          base_class_id?: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          organisation_id?: string
+          processed_items?: number | null
+          progress?: number | null
+          started_at?: string | null
+          stats?: Json | null
+          status?: string
+          total_items?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_indexing_jobs_base_class_id_fkey"
+            columns: ["base_class_id"]
+            isOneToOne: false
+            referencedRelation: "base_classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_indexing_jobs_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_content_index: {
+        Row: {
+          assessment_ids: string[] | null
+          base_class_id: string
+          content_embedding: string | null
+          content_json: Json | null
+          content_text: string
+          content_tsvector: unknown | null
+          content_type: string
+          created_at: string
+          description: string | null
+          difficulty_level: string | null
+          estimated_time: number | null
+          id: string
+          indexed_at: string
+          is_bookmarkable: boolean | null
+          is_notable: boolean | null
+          learning_objectives: string[] | null
+          lesson_id: string | null
+          media_asset_ids: string[] | null
+          organisation_id: string
+          parent_content_id: string | null
+          path_id: string | null
+          prerequisites: string[] | null
+          progress_trackable: boolean | null
+          related_content_ids: string[] | null
+          search_keywords: string[] | null
+          source_id: string
+          source_table: string
+          tags: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assessment_ids?: string[] | null
+          base_class_id: string
+          content_embedding?: string | null
+          content_json?: Json | null
+          content_text: string
+          content_tsvector?: unknown | null
+          content_type: string
+          created_at: string
+          description?: string | null
+          difficulty_level?: string | null
+          estimated_time?: number | null
+          id?: string
+          indexed_at?: string
+          is_bookmarkable?: boolean | null
+          is_notable?: boolean | null
+          learning_objectives?: string[] | null
+          lesson_id?: string | null
+          media_asset_ids?: string[] | null
+          organisation_id: string
+          parent_content_id?: string | null
+          path_id?: string | null
+          prerequisites?: string[] | null
+          progress_trackable?: boolean | null
+          related_content_ids?: string[] | null
+          search_keywords?: string[] | null
+          source_id: string
+          source_table: string
+          tags?: string[] | null
+          title: string
+          updated_at: string
+        }
+        Update: {
+          assessment_ids?: string[] | null
+          base_class_id?: string
+          content_embedding?: string | null
+          content_json?: Json | null
+          content_text?: string
+          content_tsvector?: unknown | null
+          content_type?: string
+          created_at?: string
+          description?: string | null
+          difficulty_level?: string | null
+          estimated_time?: number | null
+          id?: string
+          indexed_at?: string
+          is_bookmarkable?: boolean | null
+          is_notable?: boolean | null
+          learning_objectives?: string[] | null
+          lesson_id?: string | null
+          media_asset_ids?: string[] | null
+          organisation_id?: string
+          parent_content_id?: string | null
+          path_id?: string | null
+          prerequisites?: string[] | null
+          progress_trackable?: boolean | null
+          related_content_ids?: string[] | null
+          search_keywords?: string[] | null
+          source_id?: string
+          source_table?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_content_index_base_class_id_fkey"
+            columns: ["base_class_id"]
+            isOneToOne: false
+            referencedRelation: "base_classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_content_index_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_content_index_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_content_index_parent_content_id_fkey"
+            columns: ["parent_content_id"]
+            isOneToOne: false
+            referencedRelation: "study_content_index"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_content_index_path_id_fkey"
+            columns: ["path_id"]
+            isOneToOne: false
+            referencedRelation: "paths"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_spaces: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          organisation_id: string
+          settings: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          organisation_id: string
+          settings?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          organisation_id?: string
+          settings?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_spaces_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       // ... existing code ...
