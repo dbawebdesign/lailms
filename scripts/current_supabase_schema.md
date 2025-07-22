@@ -39,6 +39,28 @@ Added automatic status management for class instances based on start and end dat
 
 This document tracks the current state of our Supabase database schema.
 
+### Luna AI Chat Tables (2025-01-21)
+Added comprehensive Luna AI chat functionality with conversation persistence:
+
+- **Tables Added:**
+  - `luna_conversations`: Stores conversation metadata with personas, titles, and settings
+  - `luna_messages`: Stores individual messages with context data and embeddings
+  - `luna_contexts`: Stores conversation context including study materials and user state
+  - `luna_citations`: Links messages to source materials for citation tracking
+
+- **Features:**
+  - Full conversation persistence across sessions
+  - Context-aware responses based on study materials
+  - Support for multiple personas (chat, teacher, tutor)
+  - Citation tracking for academic integrity
+  - Message search and conversation management
+  - Study space integration with real-time context
+
+- **Integration Points:**
+  - Connected to study_notes for note-taking integration
+  - Links to lesson_sections for content context
+  - Integrates with study_sessions for tracking
+
 ## Core Tables
 
 ### Profiles
@@ -130,8 +152,44 @@ All tables implement Row Level Security (RLS) policies following these patterns:
 - **Organization Scope**: Teachers/admins can view student data within their organization
 - **Role-Based Access**: Different permissions for students, teachers, and administrators
 
+## Study Sessions Table (2025-01-21)
+
+### `study_sessions`
+- **Purpose**: Track user study activities and analytics
+- **Key Fields**: 
+  - `id` (UUID, primary key)
+  - `study_space_id` (UUID, NOT NULL) - References study_spaces
+  - `user_id` (UUID, NOT NULL) - References auth.users  
+  - `organisation_id` (UUID, NOT NULL) - References organisations
+  - `session_type` (text, NOT NULL) - Type of study session
+  - `duration_minutes` (integer, nullable)
+  - `started_at` (timestamptz, default NOW())
+  - `ended_at` (timestamptz, nullable)
+  - `linked_lesson_id` (UUID, nullable) - References lessons
+  - `linked_lesson_section_id` (UUID, nullable) - References lesson_sections
+  - `linked_path_id` (UUID, nullable) - References paths
+  - `notes_created` (integer, default 0)
+  - `flashcards_reviewed` (integer, default 0)
+  - `bookmarks_added` (integer, default 0)
+  - `session_data` (jsonb, default '{}')
+  - `quality_rating` (integer, nullable)
+  - `created_at` (timestamptz, default NOW())
+  - `updated_at` (timestamptz, default NOW())
+
+**Features**:
+- Session tracking with start/end times
+- Links to specific learning content (lessons, paths, sections)
+- Activity metrics (notes, flashcards, bookmarks)
+- Quality ratings and session metadata
+- Required organization and study space associations
+
+**Integration Points**:
+- Used by study space for session tracking
+- Links to learning content for analytics
+- Provides data for progress tracking and insights
+
 ## Recent Updates
 
-- **2025-01-21**: Added complete Study Space system (6 new tables)
+- **2025-01-21**: Added complete Study Space system (6 new tables) + Study Sessions table
 - **2025-01-10**: Added AI insights system for learning analytics
 - **Previous**: Core educational platform tables (profiles, classes, lessons, etc.) 

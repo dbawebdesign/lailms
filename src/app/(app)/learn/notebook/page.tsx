@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import ReactMarkdown from 'react-markdown';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -86,32 +87,73 @@ import {
   RefreshCw,
   Trash2,
   Copy,
-  ChevronLeft
+  ChevronLeft,
+  Loader2,
+  Image,
+  CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NotionEditorWrapper } from '@/components/tiptap-templates/notion-like/notion-editor-wrapper';
+import { lunaAIService, type StudyContext, type LunaConversation } from '@/lib/services/luna-ai-service';
+import { StudyMindMapViewer } from '@/components/study-space/MindMapViewer';
+import { LessonContentRenderer } from '@/components/study-space/LessonContentRenderer';
 
 interface Course {
   id: string;
   name: string;
+  title: string; // Add title property
   description: string;
   instructor: string;
   progress: number;
   color: string;
+  base_class_id?: string;
+}
+
+interface LessonSectionContent {
+  introduction?: string;
+  sectionTitle?: string;
+  expertSummary?: string;
+  bridgeToNext?: string;
+  checkForUnderstanding?: string[];
+  expertTeachingContent?: {
+    conceptIntroduction?: string;
+    detailedExplanation?: string;
+    practicalExamples?: Array<{
+      title: string;
+      context?: string;
+      walkthrough?: string;
+      keyTakeaways?: string[];
+    }>;
+    commonMisconceptions?: Array<{
+      misconception: string;
+      correction: string;
+      prevention: string;
+    }>;
+    expertInsights?: string[];
+    realWorldConnections?: string[];
+  };
 }
 
 interface ContentItem {
   id: string;
   title: string;
-  type: 'lesson' | 'document' | 'video' | 'assignment' | 'discussion' | 'resource';
+  type: 'lesson' | 'document' | 'video' | 'assignment' | 'discussion' | 'resource' | 'section';
   description?: string;
   duration?: string;
   progress?: number;
   thumbnail?: string;
   tags?: string[];
   course_id?: string;
-  content?: string;
+  content?: string | LessonSectionContent;
   url?: string;
+  base_class_id?: string;
+  lesson_id?: string;
+  path_id?: string;
+  order_index?: number;
+  section_type?: 'text' | 'video' | 'audio' | 'image' | 'interactive';
+  video_url?: string;
+  audio_url?: string;
+  image_url?: string;
 }
 
 interface StudySpace {
@@ -141,6 +183,7 @@ interface Note {
   tags: string[];
   source?: string;
   isStarred: boolean;
+  study_space_id?: string;
 }
 
 type PanelExpansion = 'none' | 'sources' | 'tools';
@@ -152,20 +195,36 @@ export default function UnifiedStudySpace() {
   const spaceId = searchParams?.get('space');
   const contentRef = useRef<HTMLDivElement>(null);
   const noteEditorRef = useRef<any>(null);
+  const supabase = createClient();
 
+  // UI State
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [selectedSpace, setSelectedSpace] = useState<StudySpace | null>(null);
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [sourceDropdownOpen, setSourceDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Hierarchical content selection state
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+  const [selectedLessons, setSelectedLessons] = useState<Set<string>>(new Set());
+  const [selectedSections, setSelectedSections] = useState<Set<string>>(new Set());
   const [chatMessage, setChatMessage] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showCreateSpace, setShowCreateSpace] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');
   const [expandedPanel, setExpandedPanel] = useState<PanelExpansion>('none');
   const [activeToolTab, setActiveToolTab] = useState('chat');
+
+  // Reset auto-generate flag when switching away from mindmaps tab
+  useEffect(() => {
+    if (activeToolTab !== 'mindmaps') {
+      setShouldAutoGenerateMindMap(false);
+    }
+  }, [activeToolTab]);
   const [textSelection, setTextSelection] = useState<TextSelection | null>(null);
   const [showSelectionPopover, setShowSelectionPopover] = useState(false);
+  const [persistedSelection, setPersistedSelection] = useState<Range | null>(null);
+  const [shouldAutoGenerateMindMap, setShouldAutoGenerateMindMap] = useState(false);
 
   // Note-taking states
   const [noteView, setNoteView] = useState<NoteView>('list');
@@ -184,105 +243,424 @@ export default function UnifiedStudySpace() {
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
 
-  // Mock notes data
-  const [notes, setNotes] = useState<Note[]>([
-    {
-      id: '1',
-      title: 'React Hooks Summary',
-      content: 'Key concepts: useState for state management, useEffect for side effects, custom hooks for reusable logic. Remember to only call hooks at the top level and use the ESLint plugin to catch common mistakes.',
-      created_at: '2024-01-22T10:30:00Z',
-      updated_at: '2024-01-22T14:30:00Z',
-      tags: ['react', 'hooks'],
-      source: 'Introduction to React Hooks',
-      isStarred: false
-    },
-    {
-      id: '2',
-      title: 'State Management Notes',
-      content: 'useReducer vs useState: useReducer is better for complex state logic with multiple sub-values or when the next state depends on the previous one. Context API provides a way to pass data through the component tree without prop drilling.',
-      created_at: '2024-01-21T09:15:00Z',
-      updated_at: '2024-01-21T09:15:00Z',
-      tags: ['react', 'state'],
-      source: 'Advanced State Management',
-      isStarred: true
-    }
-  ]);
+  // Loading states
+  const [isLoadingCourses, setIsLoadingCourses] = useState(true);
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
 
-  // Mock data - replace with real Supabase data
-  const [courses] = useState<Course[]>([
-    {
-      id: '1',
-      name: 'Advanced React Development',
-      description: 'Master React with hooks, context, and advanced patterns',
-      instructor: 'Dr. Sarah Johnson',
-      progress: 75,
-      color: 'bg-blue-500'
-    },
-    {
-      id: '2',
-      name: 'Full Stack JavaScript',
-      description: 'Complete JavaScript development from frontend to backend',
-      instructor: 'Prof. Mike Chen',
-      progress: 45,
-      color: 'bg-emerald-500'
-    },
-    {
-      id: '3',
-      name: 'UI/UX Design Principles',
-      description: 'Learn design thinking and user experience fundamentals',
-      instructor: 'Maria Rodriguez',
-      progress: 60,
-      color: 'bg-purple-500'
-    }
-  ]);
-
-  const [studySpaces] = useState<StudySpace[]>([
-    {
-      id: 'custom-1',
-      name: 'Personal Research',
-      type: 'custom',
-      description: 'My independent study materials',
-      color: 'bg-orange-500',
-      created_at: '2024-01-15'
-    }
-  ]);
-
+  // Data states - now connected to Supabase
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [studySpaces, setStudySpaces] = useState<StudySpace[]>([]);
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentConversation, setCurrentConversation] = useState<LunaConversation | null>(null);
 
+  // Initialize user and load data
   useEffect(() => {
+    const initializeUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setCurrentUser(user);
+          await loadUserCourses(user.id);
+          await loadUserStudySpaces(user.id);
+          await loadUserNotes(user.id);
+          // Don't create study session until user selects a course/space
+        }
+      } catch (error) {
+        console.error('Error initializing user:', error);
+      } finally {
+        setIsLoadingCourses(false);
+      }
+    };
+
+    initializeUser();
+  }, []);
+
+  // Load user's enrolled courses and class instances
+  const loadUserCourses = async (userId: string) => {
+    try {
+      setIsLoadingCourses(true);
+      
+      // Use the exact same query pattern as the working student dashboard API
+      const { data: enrollments, error: enrollmentError } = await supabase
+        .from('rosters')
+        .select(`
+          id,
+          role,
+          joined_at,
+          class_instances!inner (
+            id,
+            name,
+            enrollment_code,
+            start_date,
+            end_date,
+            status,
+            settings,
+            base_classes!inner (
+              id,
+              name,
+              description
+            )
+          )
+        `)
+        .eq('profile_id', userId)
+        .eq('role', 'student');
+
+      if (enrollmentError) {
+        console.error('Error loading enrollments:', enrollmentError);
+        return;
+      }
+
+      console.log('Study space enrollments:', enrollments);
+
+      if (enrollments && enrollments.length > 0) {
+        const courseData: Course[] = enrollments.map((enrollment: any) => {
+          const classInstance = enrollment.class_instances;
+          const baseClass = classInstance.base_classes;
+          
+          console.log('Processing enrollment:', { classInstance, baseClass });
+          
+          return {
+            id: classInstance.id,
+            name: classInstance.name || baseClass.name,
+            title: classInstance.name || baseClass.name, // Use name instead of title
+            description: baseClass.description || 'No description available',
+            instructor: 'Instructor', // TODO: Get actual instructor info
+            progress: 0, // TODO: Calculate actual progress
+            color: getRandomColor(),
+            base_class_id: baseClass.id
+          };
+        });
+
+        console.log('Processed course data:', courseData);
+        setCourses(courseData);
+      } else {
+        console.log('No enrollments found for user:', userId);
+        setCourses([]);
+      }
+    } catch (error) {
+      console.error('Error loading courses:', error);
+    } finally {
+      setIsLoadingCourses(false);
+    }
+  };
+
+  // Load user's study spaces
+  const loadUserStudySpaces = async (userId: string) => {
+    try {
+      const { data: spaces, error } = await supabase
+        .from('study_spaces')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading study spaces:', error);
+        return;
+      }
+
+      if (spaces) {
+        const studySpaceData: StudySpace[] = spaces.map(space => ({
+          id: space.id,
+          name: space.name,
+          type: 'custom' as const,
+          description: space.description,
+          color: space.color || 'bg-orange-500',
+          created_at: space.created_at
+        }));
+
+        setStudySpaces(studySpaceData);
+      }
+    } catch (error) {
+      console.error('Error loading study spaces:', error);
+    }
+  };
+
+  // Load user's notes
+  const loadUserNotes = async (userId: string) => {
+    try {
+      setIsLoadingNotes(true);
+      
+      const { data: userNotes, error } = await supabase
+        .from('study_notes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading notes:', error);
+        return;
+      }
+
+      if (userNotes) {
+        const noteData: Note[] = userNotes.map(note => ({
+          id: note.id,
+          title: note.title,
+          content: note.content,
+          created_at: note.created_at,
+          updated_at: note.updated_at,
+          tags: note.tags || [],
+          isStarred: note.is_favorite || false,
+          study_space_id: note.study_space_id
+        }));
+
+        setNotes(noteData);
+      }
+    } catch (error) {
+      console.error('Error loading notes:', error);
+    } finally {
+      setIsLoadingNotes(false);
+    }
+  };
+
     // Load content based on selected course or space
+  useEffect(() => {
     if (selectedCourse) {
-      loadCourseContent(selectedCourse.id);
+      loadCourseContent(selectedCourse.base_class_id || selectedCourse.id);
     } else if (selectedSpace && selectedSpace.type === 'custom') {
       loadCustomContent(selectedSpace.id);
     }
   }, [selectedCourse, selectedSpace]);
 
+  const loadCourseContent = async (baseClassId: string) => {
+    try {
+      setIsLoadingContent(true);
+      
+      console.log('Loading course content for base class:', baseClassId);
+      
+      // Load paths first (using the same pattern as the working navigation API)
+      const { data: paths, error: pathsError } = await supabase
+        .from('paths')
+        .select('id, title, description, order_index')
+        .eq('base_class_id', baseClassId)
+        .order('order_index');
+
+      if (pathsError) {
+        console.error('Error loading paths:', pathsError);
+        return;
+      }
+
+      console.log('Loaded paths:', paths);
+
+      if (paths && paths.length > 0) {
+        const contentItems: ContentItem[] = [];
+        const pathIds = paths.map(p => p.id);
+
+        // Load lessons for all paths
+        const { data: lessons, error: lessonsError } = await supabase
+          .from('lessons')
+          .select('*')
+          .in('path_id', pathIds)
+          .order('order_index');
+
+        if (lessonsError) {
+          console.error('Error loading lessons:', lessonsError);
+          return;
+        }
+
+        console.log('Loaded lessons:', lessons);
+
+        // Load lesson sections for all lessons
+        let lessonSections: any[] = [];
+        if (lessons && lessons.length > 0) {
+          const lessonIds = lessons.map(l => l.id);
+          
+          const { data: sections, error: sectionsError } = await supabase
+            .from('lesson_sections')
+            .select('*')
+            .in('lesson_id', lessonIds)
+            .order('order_index');
+
+          if (sectionsError) {
+            console.error('Error loading lesson sections:', sectionsError);
+            return;
+          }
+
+          console.log('Loaded lesson sections:', sections);
+          lessonSections = sections || [];
+        }
+
+        // Process paths and build content items
+        paths.forEach((path: any) => {
+          contentItems.push({
+            id: `path-${path.id}`,
+            title: path.title,
+            type: 'lesson' as const,
+            description: path.description || 'Learning path',
+            course_id: baseClassId,
+            base_class_id: baseClassId,
+            order_index: path.order_index,
+            tags: ['path']
+          });
+
+          // Add lessons for this path
+          const pathLessons = lessons?.filter(lesson => lesson.path_id === path.id) || [];
+          pathLessons.forEach((lesson: any) => {
+            contentItems.push({
+              id: `lesson-${lesson.id}`,
+              title: lesson.title,
+              type: 'lesson' as const,
+              description: lesson.description || 'Lesson content',
+              course_id: baseClassId,
+              base_class_id: baseClassId,
+              lesson_id: lesson.id,
+              path_id: path.id,
+              order_index: lesson.order_index,
+              tags: ['lesson']
+            });
+
+            // Add lesson sections for this lesson
+            const sectionsByLesson = lessonSections.filter(section => section.lesson_id === lesson.id);
+            sectionsByLesson.forEach((section: any) => {
+              contentItems.push({
+                id: `section-${section.id}`,
+                title: section.title,
+                type: 'section' as const,
+                description: `${section.section_type} content`,
+                content: section.content,
+                course_id: baseClassId,
+                base_class_id: baseClassId,
+                lesson_id: lesson.id,
+                path_id: path.id,
+                order_index: section.order_index,
+                section_type: section.section_type as ContentItem['section_type'],
+                video_url: section.video_url,
+                audio_url: section.audio_url,
+                image_url: section.image_url,
+                tags: ['section', section.section_type]
+              });
+            });
+          });
+        });
+
+        console.log('Processed content items:', contentItems);
+        setContentItems(contentItems);
+      } else {
+        console.log('No paths found for base class:', baseClassId);
+        setContentItems([]);
+      }
+    } catch (error) {
+      console.error('Error loading course content:', error);
+    } finally {
+      setIsLoadingContent(false);
+    }
+  };
+
+  const loadCustomContent = async (spaceId: string) => {
+    try {
+      setIsLoadingContent(true);
+      
+      // Load bookmarks and other custom content from the study space
+      const { data: bookmarks, error } = await supabase
+        .from('bookmarks')
+        .select('*')
+        .eq('study_space_id', spaceId);
+
+      if (error) {
+        console.error('Error loading custom content:', error);
+        return;
+      }
+
+      if (bookmarks) {
+        const contentItems: ContentItem[] = bookmarks.map(bookmark => ({
+          id: bookmark.id,
+          title: bookmark.title,
+          type: 'resource' as const,
+          description: bookmark.description,
+          url: bookmark.url,
+          tags: bookmark.tags || []
+        }));
+
+        setContentItems(contentItems);
+      }
+    } catch (error) {
+      console.error('Error loading custom content:', error);
+    } finally {
+      setIsLoadingContent(false);
+    }
+  };
+
+  // Utility function to get random colors for courses
+  const getRandomColor = () => {
+    const colors = [
+      'bg-blue-500',
+      'bg-emerald-500',
+      'bg-purple-500',
+      'bg-orange-500',
+      'bg-pink-500',
+      'bg-indigo-500',
+      'bg-teal-500'
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+
   // Handle text selection in source content
   useEffect(() => {
     const handleMouseUp = () => {
       const selection = window.getSelection();
-      if (selection && selection.toString().trim() && contentRef.current?.contains(selection.anchorNode)) {
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
+      if (selection && selection.toString().trim()) {
+        // Check if selection is within content area or source content display
+        const isInContentArea = contentRef.current?.contains(selection.anchorNode);
+        const isInSourceContent = selection.anchorNode && 
+          (selection.anchorNode.nodeType === Node.TEXT_NODE ? 
+            selection.anchorNode.parentElement : 
+            selection.anchorNode as Element)?.closest('[data-source-content]');
         
-        setTextSelection({
-          text: selection.toString(),
-          startOffset: range.startOffset,
-          endOffset: range.endOffset,
-          x: rect.left + rect.width / 2,
-          y: rect.bottom + 5 // Position below the selected text
-        });
-        setShowSelectionPopover(true);
-      } else {
-        setShowSelectionPopover(false);
-        setTextSelection(null);
+        if (isInContentArea || isInSourceContent) {
+          const range = selection.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          
+          // Store the range for later restoration
+          setPersistedSelection(range.cloneRange());
+          
+          // Add visual highlight to show the full selection
+          addCustomHighlight(range);
+          
+          // Get selected text with debugging
+          const selectedText = selection.toString();
+          
+          // Alternative method: get text from range without modifying DOM
+          let rangeText = '';
+          try {
+            const clonedRange = range.cloneRange();
+            const contents = clonedRange.cloneContents();
+            rangeText = contents.textContent || '';
+          } catch (e) {
+            console.log('Range cloning failed, using selection.toString()');
+          }
+          
+          const finalText = rangeText && rangeText.length > selectedText.length ? rangeText : selectedText;
+          
+          console.log('Selection method - length:', selectedText.length);
+          console.log('Range method - length:', rangeText.length);
+          console.log('Final text - length:', finalText.length);
+          console.log('Preview:', finalText.substring(0, 200) + (finalText.length > 200 ? '...' : ''));
+          
+          setTextSelection({
+            text: finalText,
+            startOffset: range.startOffset,
+            endOffset: range.endOffset,
+            x: rect.left + rect.width / 2,
+            y: rect.bottom + 5 // Position below the selected text
+          });
+          setShowSelectionPopover(true);
+        }
       }
     };
 
-    const handleMouseDown = () => {
-      setShowSelectionPopover(false);
-      setTextSelection(null);
+    const handleMouseDown = (e: MouseEvent) => {
+      // Don't clear selection if clicking on the popover
+      const target = e.target as Element;
+      const isPopoverClick = target.closest('[data-selection-popover]');
+      
+      if (!isPopoverClick) {
+        setShowSelectionPopover(false);
+        setTextSelection(null);
+        setPersistedSelection(null);
+        removeCustomHighlight();
+      }
     };
 
     document.addEventListener('mouseup', handleMouseUp);
@@ -293,6 +671,57 @@ export default function UnifiedStudySpace() {
       document.removeEventListener('mousedown', handleMouseDown);
     };
   }, []);
+
+  // Function to restore text selection
+  const restoreSelection = () => {
+    if (persistedSelection) {
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(persistedSelection);
+      }
+    }
+  };
+
+  // Function to add custom visual highlight
+  const addCustomHighlight = (range: Range) => {
+    // Remove any existing custom highlights
+    removeCustomHighlight();
+    
+    try {
+      // Create a highlight using CSS
+      const rects = range.getClientRects();
+      const container = contentRef.current;
+      if (!container) return;
+      
+      // Create highlight elements for each rect
+      Array.from(rects).forEach((rect, index) => {
+        const highlight = document.createElement('div');
+        highlight.className = 'custom-text-highlight';
+        highlight.style.cssText = `
+          position: absolute;
+          left: ${rect.left + window.scrollX - container.getBoundingClientRect().left}px;
+          top: ${rect.top + window.scrollY - container.getBoundingClientRect().top}px;
+          width: ${rect.width}px;
+          height: ${rect.height}px;
+          background-color: rgba(147, 51, 234, 0.3);
+          pointer-events: none;
+          z-index: 1;
+          border-radius: 2px;
+        `;
+        highlight.setAttribute('data-highlight-id', 'custom-selection');
+        container.appendChild(highlight);
+      });
+    } catch (error) {
+      console.log('Custom highlight failed:', error);
+    }
+  };
+
+  // Function to remove custom highlight
+  const removeCustomHighlight = () => {
+    const highlights = document.querySelectorAll('[data-highlight-id="custom-selection"]');
+    highlights.forEach(highlight => highlight.remove());
+  };
 
   // Handle text selection in note editor
   useEffect(() => {
@@ -339,346 +768,507 @@ export default function UnifiedStudySpace() {
     };
   }, [noteView]);
 
-  const loadCourseContent = (courseId: string) => {
-    // Mock course content - replace with Supabase queries
-    const mockContent: ContentItem[] = [
-      {
-        id: '1',
-        title: 'Introduction to React Hooks',
-        type: 'lesson',
-        description: 'Learn the fundamentals of React Hooks and how to use them effectively.',
-        duration: '45 min',
-        progress: 75,
-        tags: ['react', 'hooks', 'frontend'],
-        course_id: courseId,
-        content: `# Introduction to React Hooks
-
-React Hooks are functions that let you use state and other React features without writing a class. They were introduced in React 16.8 and have revolutionized how we write React components.
-
-## Key Concepts
-
-### useState Hook
-The useState hook allows you to add state to functional components:
-
-\`\`\`javascript
-import React, { useState } from 'react';
-
-function Counter() {
-  const [count, setCount] = useState(0);
-  
-  return (
-    <div>
-      <p>You clicked {count} times</p>
-      <button onClick={() => setCount(count + 1)}>
-        Click me
-      </button>
-    </div>
-  );
-}
-\`\`\`
-
-### useEffect Hook
-The useEffect hook lets you perform side effects in function components:
-
-\`\`\`javascript
-import React, { useState, useEffect } from 'react';
-
-function Example() {
-  const [count, setCount] = useState(0);
-
   useEffect(() => {
-    document.title = \`You clicked \${count} times\`;
-  });
+    if (noteView === 'editor' && noteEditorRef.current && currentNote) {
+      const editor = noteEditorRef.current;
+      const handleUpdate = () => {
+        if (editor.isFocused) {
+          setNoteContent(editor.getHTML());
+        }
+      };
 
-  return (
-    <div>
-      <p>You clicked {count} times</p>
-      <button onClick={() => setCount(count + 1)}>
-        Click me
-      </button>
-    </div>
-  );
-}
-\`\`\`
+      if (editor.isDestroyed) return;
 
-## Best Practices
+      editor.commands.setContent(currentNote.content, false);
+      
+      editor.on('transaction', handleUpdate);
 
-1. **Only call hooks at the top level** - Don't call hooks inside loops, conditions, or nested functions
-2. **Use the ESLint plugin** - Install eslint-plugin-react-hooks to catch common mistakes
-3. **Separate concerns** - Use multiple state variables for unrelated data
-4. **Custom hooks** - Extract component logic into reusable functions
-
-## Common Patterns
-
-### Fetching Data
-\`\`\`javascript
-function UserProfile({ userId }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchUser(userId).then(user => {
-      setUser(user);
-      setLoading(false);
-    });
-  }, [userId]);
-
-  if (loading) return <div>Loading...</div>;
-  return <div>Hello {user.name}!</div>;
-}
-\`\`\`
-
-This lesson covers the fundamental concepts you need to get started with React Hooks.`
-      },
-      {
-        id: '2',
-        title: 'Advanced State Management',
-        type: 'lesson',
-        description: 'Deep dive into complex state management patterns.',
-        duration: '60 min',
-        progress: 30,
-        tags: ['react', 'state', 'advanced'],
-        course_id: courseId,
-        content: `# Advanced State Management
-
-As your React applications grow, managing state becomes more complex. This lesson explores advanced patterns and techniques for effective state management.
-
-## useReducer Hook
-
-For complex state logic, useReducer is often preferable to useState:
-
-\`\`\`javascript
-import React, { useReducer } from 'react';
-
-const initialState = { count: 0 };
-
-function reducer(state, action) {
-  switch (action.type) {
-    case 'increment':
-      return { count: state.count + 1 };
-    case 'decrement':
-      return { count: state.count - 1 };
-    case 'reset':
-      return initialState;
-    default:
-      throw new Error();
-  }
-}
-
-function Counter() {
-  const [state, dispatch] = useReducer(reducer, initialState);
-  
-  return (
-    <>
-      Count: {state.count}
-      <button onClick={() => dispatch({ type: 'reset' })}>
-        Reset
-      </button>
-      <button onClick={() => dispatch({ type: 'increment' })}>+</button>
-      <button onClick={() => dispatch({ type: 'decrement' })}>-</button>
-    </>
-  );
-}
-\`\`\`
-
-## Context API
-
-React Context provides a way to pass data through the component tree without having to pass props down manually at every level.
-
-\`\`\`javascript
-const ThemeContext = React.createContext('light');
-
-function App() {
-  return (
-    <ThemeContext.Provider value="dark">
-      <Toolbar />
-    </ThemeContext.Provider>
-  );
-}
-
-function Toolbar() {
-  return (
-    <div>
-      <ThemedButton />
-    </div>
-  );
-}
-
-function ThemedButton() {
-  const theme = useContext(ThemeContext);
-  return <button className={theme}>I am styled by theme context!</button>;
-}
-\`\`\`
-
-## Custom Hooks
-
-Create reusable stateful logic:
-
-\`\`\`javascript
-function useCounter(initialValue = 0) {
-  const [count, setCount] = useState(initialValue);
-  
-  const increment = () => setCount(count + 1);
-  const decrement = () => setCount(count - 1);
-  const reset = () => setCount(initialValue);
-  
-  return { count, increment, decrement, reset };
-}
-
-// Usage
-function Counter() {
-  const { count, increment, decrement, reset } = useCounter(10);
-  
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={increment}>+</button>
-      <button onClick={decrement}>-</button>
-      <button onClick={reset}>Reset</button>
-    </div>
-  );
-}
-\`\`\`
-
-This approach allows you to share stateful logic between components without changing your component hierarchy.`
-      },
-      {
-        id: '3',
-        title: 'Project Requirements Document',
-        type: 'document',
-        description: 'Detailed specifications for the final project.',
-        tags: ['project', 'requirements'],
-        course_id: courseId,
-        content: `# Final Project Requirements
-
-## Project Overview
-Build a full-stack React application that demonstrates mastery of the concepts covered in this course.
-
-## Technical Requirements
-
-### Frontend (React)
-- Use functional components with hooks
-- Implement at least 3 custom hooks
-- Use Context API for global state management
-- Responsive design with CSS Grid/Flexbox
-- Form validation and error handling
-- Loading states and user feedback
-
-### Backend (Node.js/Express)
-- RESTful API with proper HTTP status codes
-- Authentication and authorization
-- Input validation and sanitization
-- Error handling middleware
-- Database integration (MongoDB or PostgreSQL)
-
-### Additional Features
-- Real-time features (WebSocket or Server-Sent Events)
-- File upload functionality
-- Search and filtering capabilities
-- Pagination for large datasets
-- Unit and integration tests
-
-## Deliverables
-1. Source code repository (GitHub)
-2. Live deployment (Vercel, Netlify, or Heroku)
-3. Documentation (README with setup instructions)
-4. Video demonstration (5-10 minutes)
-
-## Timeline
-- Week 1-2: Project planning and setup
-- Week 3-4: Core functionality development
-- Week 5-6: Advanced features and testing
-- Week 7: Documentation and deployment
-- Week 8: Final presentation
-
-## Evaluation Criteria
-- Code quality and organization (25%)
-- Functionality and user experience (25%)
-- Technical complexity (25%)
-- Documentation and presentation (25%)
-
-## Project Ideas
-- Social media dashboard
-- E-commerce platform
-- Project management tool
-- Real-time chat application
-- Data visualization dashboard
-- Learning management system
-
-Choose a project that interests you and allows you to demonstrate the skills learned in this course.`
-      },
-      {
-        id: '4',
-        title: 'React Best Practices Video',
-        type: 'video',
-        description: 'Industry expert discusses React best practices.',
-        duration: '30 min',
-        tags: ['react', 'best-practices'],
-        course_id: courseId,
-        url: 'https://example.com/video.mp4',
-        thumbnail: 'https://via.placeholder.com/800x450/3B82F6/FFFFFF?text=React+Best+Practices'
-      },
-      {
-        id: '5',
-        title: 'Component Architecture Assignment',
-        type: 'assignment',
-        description: 'Build a complex component hierarchy.',
-        tags: ['react', 'components', 'assignment'],
-        course_id: courseId,
-      },
-      {
-        id: '6',
-        title: 'React Testing Documentation',
-        type: 'resource',
-        description: 'Comprehensive guide to testing React applications.',
-        tags: ['react', 'testing', 'documentation'],
-        course_id: courseId,
-      }
-    ];
-    setContentItems(mockContent);
-  };
-
-  const loadCustomContent = (spaceId: string) => {
-    // Mock custom content
-    const mockContent: ContentItem[] = [
-      {
-        id: 'custom-1',
-        title: 'Machine Learning Research Paper',
-        type: 'document',
-        description: 'Latest research on neural networks',
-        tags: ['ml', 'research'],
-        content: `# Neural Network Architectures for Natural Language Processing
-
-## Abstract
-This paper presents a comprehensive analysis of modern neural network architectures specifically designed for natural language processing tasks...
-
-## Introduction
-Natural Language Processing has seen remarkable advances in recent years, primarily driven by the development of transformer-based architectures...`
-      }
-    ];
-    setContentItems(mockContent);
-  };
+      return () => {
+        editor.off('transaction', handleUpdate);
+      };
+    }
+  }, [noteView, currentNote, noteEditorRef.current]);
 
   const getSelectedContent = () => {
-    return contentItems.filter(item => selectedSources.has(item.id));
+    return contentItems.filter(item => selectedSources.has(item.id)).map(item => ({
+      ...item,
+      content: typeof item.content === 'object' 
+        ? `${item.content.introduction || ''}\n\n${item.content.expertTeachingContent?.detailedExplanation || ''}\n\n${item.content.expertSummary || ''}`.trim()
+        : item.content
+    }));
   };
 
-  const handleSendMessage = () => {
-    if (!chatMessage.trim()) return;
+  // Helper functions for hierarchical selection
+  const handlePathSelection = (pathId: string, checked: boolean) => {
+    const newSelectedPaths = new Set(selectedPaths);
+    const newSelectedLessons = new Set(selectedLessons);
+    const newSelectedSections = new Set(selectedSections);
+    const newSelectedSources = new Set(selectedSources);
+
+    if (checked) {
+      newSelectedPaths.add(pathId);
+      // Auto-select all lessons and sections in this path
+      const pathLessons = contentItems.filter(item => item.id.startsWith(`lesson-`) && item.path_id === pathId);
+      pathLessons.forEach(lesson => {
+        newSelectedLessons.add(lesson.id);
+        newSelectedSources.add(lesson.id);
+        // Auto-select all sections in this lesson
+        const lessonSections = contentItems.filter(item => 
+          item.id.startsWith(`section-`) && item.lesson_id === lesson.id.replace('lesson-', '')
+        );
+        lessonSections.forEach(section => {
+          newSelectedSections.add(section.id);
+          newSelectedSources.add(section.id);
+        });
+      });
+      // Add path itself to selected sources
+      newSelectedSources.add(`path-${pathId}`);
+    } else {
+      newSelectedPaths.delete(pathId);
+      // Auto-deselect all lessons and sections in this path
+      const pathLessons = contentItems.filter(item => item.id.startsWith(`lesson-`) && item.path_id === pathId);
+      pathLessons.forEach(lesson => {
+        newSelectedLessons.delete(lesson.id);
+        newSelectedSources.delete(lesson.id);
+        // Auto-deselect all sections in this lesson
+        const lessonSections = contentItems.filter(item => 
+          item.id.startsWith(`section-`) && item.lesson_id === lesson.id.replace('lesson-', '')
+        );
+        lessonSections.forEach(section => {
+          newSelectedSections.delete(section.id);
+          newSelectedSources.delete(section.id);
+        });
+      });
+      // Remove path itself from selected sources
+      newSelectedSources.delete(`path-${pathId}`);
+    }
+
+    setSelectedPaths(newSelectedPaths);
+    setSelectedLessons(newSelectedLessons);
+    setSelectedSections(newSelectedSections);
+    setSelectedSources(newSelectedSources);
+  };
+
+  const handleLessonSelection = (lessonId: string, pathId: string, checked: boolean) => {
+    const newSelectedLessons = new Set(selectedLessons);
+    const newSelectedSections = new Set(selectedSections);
+    const newSelectedSources = new Set(selectedSources);
+
+    if (checked) {
+      newSelectedLessons.add(lessonId);
+      newSelectedSources.add(lessonId);
+      // Auto-select all sections in this lesson
+      const lessonSections = contentItems.filter(item => 
+        item.id.startsWith(`section-`) && item.lesson_id === lessonId.replace('lesson-', '')
+      );
+      lessonSections.forEach(section => {
+        newSelectedSections.add(section.id);
+        newSelectedSources.add(section.id);
+      });
+    } else {
+      newSelectedLessons.delete(lessonId);
+      newSelectedSources.delete(lessonId);
+      // Auto-deselect all sections in this lesson
+      const lessonSections = contentItems.filter(item => 
+        item.id.startsWith(`section-`) && item.lesson_id === lessonId.replace('lesson-', '')
+      );
+      lessonSections.forEach(section => {
+        newSelectedSections.delete(section.id);
+        newSelectedSources.delete(section.id);
+      });
+      // If no lessons in path are selected, deselect path
+      const pathLessons = contentItems.filter(item => item.id.startsWith(`lesson-`) && item.path_id === pathId);
+      const anyPathLessonsSelected = pathLessons.some(lesson => newSelectedLessons.has(lesson.id));
+      if (!anyPathLessonsSelected) {
+        setSelectedPaths(prev => {
+          const newPaths = new Set(prev);
+          newPaths.delete(pathId);
+          newSelectedSources.delete(`path-${pathId}`);
+          return newPaths;
+        });
+      }
+    }
+
+    setSelectedLessons(newSelectedLessons);
+    setSelectedSections(newSelectedSections);
+    setSelectedSources(newSelectedSources);
+  };
+
+  const handleSectionSelection = (sectionId: string, lessonId: string, pathId: string, checked: boolean) => {
+    const newSelectedSections = new Set(selectedSections);
+    const newSelectedSources = new Set(selectedSources);
+
+    if (checked) {
+      newSelectedSections.add(sectionId);
+      newSelectedSources.add(sectionId);
+    } else {
+      newSelectedSections.delete(sectionId);
+      newSelectedSources.delete(sectionId);
+      
+      // If no sections in lesson are selected, deselect lesson
+      const lessonSections = contentItems.filter(item => 
+        item.id.startsWith(`section-`) && item.lesson_id === lessonId.replace('lesson-', '')
+      );
+      const anyLessonSectionsSelected = lessonSections.some(section => newSelectedSections.has(section.id));
+      if (!anyLessonSectionsSelected) {
+        setSelectedLessons(prev => {
+          const newLessons = new Set(prev);
+          newLessons.delete(lessonId);
+          newSelectedSources.delete(lessonId);
+          return newLessons;
+        });
+        
+        // If no lessons in path are selected, deselect path
+        const pathLessons = contentItems.filter(item => item.id.startsWith(`lesson-`) && item.path_id === pathId);
+        const anyPathLessonsSelected = pathLessons.some(lesson => 
+          lesson.id !== lessonId && selectedLessons.has(lesson.id)
+        );
+        if (!anyPathLessonsSelected) {
+          setSelectedPaths(prev => {
+            const newPaths = new Set(prev);
+            newPaths.delete(pathId);
+            newSelectedSources.delete(`path-${pathId}`);
+            return newPaths;
+          });
+        }
+      }
+    }
+
+    setSelectedSections(newSelectedSections);
+    setSelectedSources(newSelectedSources);
+  };
+
+  const handleSendMessage = async () => {
+    if (!chatMessage.trim() || !currentUser) return;
     
     setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
+    
+    try {
+      // Get or create conversation
+      if (!currentConversation) {
+        const newConversation = await lunaAIService.createConversation(
+          currentUser.id,
+          'lunaChat',
+          'Study Session'
+        );
+        setCurrentConversation(newConversation);
+      }
+
+      // Build study context
+      const studyContext: StudyContext = {
+        selectedCourse: selectedCourse ? {
+          id: selectedCourse.id,
+          title: selectedCourse.title,
+          type: 'course'
+        } : selectedSpace ? {
+          id: selectedSpace.id,
+          title: selectedSpace.name,
+          type: 'space'
+        } : undefined,
+        selectedContent: getSelectedContent(),
+        selectedText: textSelection ? {
+          text: textSelection.text,
+          source: 'Study Material'
+        } : undefined,
+        currentNotes: notes.map(note => ({
+          id: note.id,
+          title: note.title,
+          content: note.content
+        }))
+      };
+
+      // Generate AI response
+      const response = await lunaAIService.generateResponse(
+        currentConversation!.id,
+        chatMessage,
+        studyContext,
+        'lunaChat'
+      );
+
+      // Handle the response (this would integrate with your chat UI)
+      console.log('Luna response:', response);
+      
       setChatMessage('');
-    }, 1500);
+    } catch (error) {
+      console.error('Error sending message to Luna:', error);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const createCustomSpace = () => {
-    if (!newSpaceName.trim()) return;
+  const createCustomSpace = async () => {
+    if (!newSpaceName.trim() || !currentUser) return;
     
-    // TODO: Create space in Supabase
+    try {
+      const { data: newSpace, error } = await supabase
+        .from('study_spaces')
+        .insert({
+          name: newSpaceName,
+          user_id: currentUser.id,
+          organisation_id: null, // Personal space
+          description: 'Personal study space',
+          color: getRandomColor(),
+          is_default: false
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating study space:', error);
+        return;
+      }
+
+      if (newSpace) {
+        const studySpaceData: StudySpace = {
+          id: newSpace.id,
+          name: newSpace.name,
+          type: 'custom',
+          description: newSpace.description,
+          color: newSpace.color,
+          created_at: newSpace.created_at
+        };
+
+        setStudySpaces(prev => [studySpaceData, ...prev]);
+      }
+    } catch (error) {
+      console.error('Error creating study space:', error);
+    }
+    
     setShowCreateSpace(false);
     setNewSpaceName('');
+  };
+
+  const openNewNoteWithText = (text: string) => {
+    setNoteView('editor');
+    setCurrentNote(null);
+    setNoteTitle('New Note');
+    setNoteContent(text);
+    setIsEditingNote(true);
+    setActiveToolTab('notes');
+  };
+
+  const openNote = (note: Note) => {
+    setCurrentNote(note);
+    setNoteTitle(note.title);
+    setNoteContent(note.content);
+    setNoteView('editor');
+    setIsEditingNote(false);
+  };
+
+  const createNewNote = () => {
+    setCurrentNote(null);
+    setNoteTitle('');
+    setNoteContent('');
+    setNoteView('editor');
+    setIsEditingNote(true);
+    if (noteEditorRef.current) {
+      noteEditorRef.current.commands.setContent('');
+    }
+  };
+
+  const saveNote = async () => {
+    if (!noteTitle.trim() || !currentUser) return;
+    
+    let contentToSave = noteContent;
+    if (noteEditorRef.current) {
+      contentToSave = noteEditorRef.current.getHTML();
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      const now = new Date().toISOString();
+      
+      if (currentNote) {
+        // Update existing note
+        const { data: updatedNote, error } = await supabase
+          .from('study_notes')
+          .update({
+            title: noteTitle,
+            content: contentToSave,
+            updated_at: now
+          })
+          .eq('id', currentNote.id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error updating note:', error);
+          return;
+        }
+
+        if (updatedNote) {
+          const updatedNotes = notes.map(note => 
+            note.id === currentNote.id 
+              ? { ...note, title: noteTitle, content: contentToSave, updated_at: now }
+              : note
+          );
+          setNotes(updatedNotes);
+        }
+      } else {
+        // Create new note
+        const { data: newNote, error } = await supabase
+          .from('study_notes')
+          .insert({
+            title: noteTitle,
+            content: contentToSave,
+            user_id: currentUser.id,
+            study_space_id: selectedSpace?.id || null,
+            organisation_id: null,
+            tags: [],
+            is_favorite: false
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error creating note:', error);
+          return;
+        }
+
+        if (newNote) {
+          const noteData: Note = {
+            id: newNote.id,
+            title: newNote.title,
+            content: newNote.content,
+            created_at: newNote.created_at,
+            updated_at: newNote.updated_at,
+            tags: newNote.tags || [],
+            isStarred: newNote.is_favorite || false,
+            study_space_id: newNote.study_space_id
+          };
+
+          setNotes([noteData, ...notes]);
+          setCurrentNote(noteData);
+        }
+      }
+      
+      setIsEditingNote(false);
+    } catch (error) {
+      console.error('Error saving note:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteNote = async (noteId: string) => {
+    try {
+      const { error } = await supabase
+        .from('study_notes')
+        .delete()
+        .eq('id', noteId);
+
+      if (error) {
+        console.error('Error deleting note:', error);
+        return;
+      }
+
+      setNotes(notes.filter(note => note.id !== noteId));
+      if (currentNote?.id === noteId) {
+        setNoteView('list');
+        setCurrentNote(null);
+      }
+    } catch (error) {
+      console.error('Error deleting note:', error);
+    }
+  };
+
+  const createMindMap = async (content: string) => {
+    if (!currentUser) return;
+
+    // Switch to mind map tab and trigger mind map generation
+    setActiveToolTab('mindmaps');
+    
+    // The StudyMindMapViewer component will handle the actual mind map generation
+    // using the selected content, text, and notes
+    console.log('Switching to mind map tab with content:', content);
+  };
+
+  const createStudySession = async (userId: string, baseClassId?: string) => {
+    try {
+      // Get user's organization first
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organisation_id')
+        .eq('user_id', userId)
+        .single();
+
+      if (!profile?.organisation_id) {
+        console.error('No organisation found for user');
+        return null;
+      }
+
+      // Create a study space if needed (or get existing one)
+      let studySpaceId = selectedSpace?.id;
+      if (!studySpaceId) {
+        // Create a default study space for the session
+        const { data: studySpace, error: spaceError } = await supabase
+          .from('study_spaces')
+          .insert({
+            user_id: userId,
+            organisation_id: profile.organisation_id,
+            name: 'Study Session',
+            description: 'Auto-created for study session',
+            is_default: false
+          })
+          .select()
+          .single();
+
+        if (spaceError) {
+          console.error('Error creating study space:', spaceError);
+          return null;
+        }
+        studySpaceId = studySpace.id;
+      }
+
+      const { data, error } = await supabase
+        .from('study_sessions')
+        .insert({
+          user_id: userId,
+          organisation_id: profile.organisation_id,
+          study_space_id: studySpaceId,
+          session_type: 'focus'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating study session:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        return null;
+      }
+
+      console.log('Study session created:', data);
+      return data;
+    } catch (error) {
+      console.error('Error creating study session:', error);
+      return null;
+    }
+  };
+
+  const toggleStarNote = async (noteId: string) => {
+    try {
+      const note = notes.find(n => n.id === noteId);
+      if (!note) return;
+
+      const { error } = await supabase
+        .from('study_notes')
+        .update({ is_favorite: !note.isStarred })
+        .eq('id', noteId);
+
+      if (error) {
+        console.error('Error toggling note star:', error);
+        return;
+      }
+
+      setNotes(notes.map(note => 
+        note.id === noteId 
+          ? { ...note, isStarred: !note.isStarred }
+          : note
+      ));
+    } catch (error) {
+      console.error('Error toggling note star:', error);
+    }
   };
 
   const togglePanelExpansion = (panel: PanelExpansion) => {
@@ -709,132 +1299,54 @@ Natural Language Processing has seen remarkable advances in recent years, primar
       case 'note':
         // Add to notes
         openNewNoteWithText(selectedText);
+        // Keep selection for potential further actions
+        restoreSelection();
         break;
       case 'mindmap':
-        // Create mind map
-        console.log('Creating mind map from:', selectedText);
+        // Switch to mind map tab and trigger auto-generation
+        setActiveToolTab('mindmaps');
+        setShouldAutoGenerateMindMap(true);
+        // Keep the text selection available for the mind map viewer
+        // Don't clear the selection immediately, let the mind map viewer handle it
         break;
       case 'explain':
         // Ask Luna to explain
         setChatMessage(`Can you explain this: "${selectedText}"`);
         setActiveToolTab('chat'); // Switch to chat tab
+        // Keep selection for potential further actions
+        restoreSelection();
         break;
       case 'quote':
         // Save as quote
         console.log('Saving quote:', selectedText);
+        // Keep selection for potential further actions
+        restoreSelection();
         break;
     }
     
+    // Only hide popover, don't clear selection for mind map action
     setShowSelectionPopover(false);
-    setTextSelection(null);
-  };
-
-  const openNewNoteWithText = (text: string) => {
-    setNoteView('editor');
-    setCurrentNote(null);
-    setNoteTitle('New Note');
-    setNoteContent(text);
-    setIsEditingNote(true);
-    setActiveToolTab('notes');
-  };
-
-  const openNote = (note: Note) => {
-    setCurrentNote(note);
-    setNoteTitle(note.title);
-    setNoteContent(note.content);
-    setNoteView('editor');
-    setIsEditingNote(false);
-  };
-
-  useEffect(() => {
-    if (noteView === 'editor' && noteEditorRef.current && currentNote) {
-      const editor = noteEditorRef.current;
-      const handleUpdate = () => {
-        if (editor.isFocused) {
-          setNoteContent(editor.getHTML());
-        }
-      };
-
-      if (editor.isDestroyed) return;
-
-      editor.commands.setContent(currentNote.content, false);
-      
-      editor.on('transaction', handleUpdate);
-
-      return () => {
-        editor.off('transaction', handleUpdate);
-      };
-    }
-  }, [noteView, currentNote, noteEditorRef.current]);
-  
-  const createNewNote = () => {
-    setCurrentNote(null);
-    setNoteTitle('');
-    setNoteContent('');
-    setNoteView('editor');
-    setIsEditingNote(true);
-    if (noteEditorRef.current) {
-      noteEditorRef.current.commands.setContent('');
-    }
-  };
-
-  const saveNote = async () => {
-    if (!noteTitle.trim()) return;
     
-    let contentToSave = noteContent;
-    if (noteEditorRef.current) {
-      contentToSave = noteEditorRef.current.getHTML();
-    }
-    
-    setIsSaving(true);
-    
-    // Simulate save delay
-    setTimeout(() => {
-      const now = new Date().toISOString();
-      
-      if (currentNote) {
-        // Update existing note
-        const updatedNotes = notes.map(note => 
-          note.id === currentNote.id 
-            ? { ...note, title: noteTitle, content: contentToSave, updated_at: now }
-            : note
-        );
-        setNotes(updatedNotes);
-      } else {
-        // Create new note
-        const newNote: Note = {
-          id: Date.now().toString(),
-          title: noteTitle,
-          content: contentToSave,
-          created_at: now,
-          updated_at: now,
-          tags: [],
-          isStarred: false
-        };
-        setNotes([newNote, ...notes]);
-        setCurrentNote(newNote);
-      }
-      
-      setIsEditingNote(false);
-      setIsSaving(false);
-    }, 800);
-  };
-
-  const deleteNote = (noteId: string) => {
-    setNotes(notes.filter(note => note.id !== noteId));
-    if (currentNote?.id === noteId) {
-      setNoteView('list');
-      setCurrentNote(null);
+    // For non-mindmap actions, clear the selection after a brief delay
+    if (action !== 'mindmap') {
+      setTimeout(() => {
+        setTextSelection(null);
+        setPersistedSelection(null);
+        setShouldAutoGenerateMindMap(false); // Reset auto-generate flag
+        removeCustomHighlight();
+      }, 100);
+    } else {
+      // For mindmap action, clear the selection after a longer delay to allow the mind map viewer to process it
+      setTimeout(() => {
+        setTextSelection(null);
+        setPersistedSelection(null);
+        removeCustomHighlight();
+        // Don't reset shouldAutoGenerateMindMap here - let the mind map viewer handle it
+      }, 1000);
     }
   };
 
-  const toggleStarNote = (noteId: string) => {
-    setNotes(notes.map(note => 
-      note.id === noteId 
-        ? { ...note, isStarred: !note.isStarred }
-        : note
-    ));
-  };
+  // Old functions removed - using the new Supabase-connected versions above
 
   const handleNoteAction = (action: 'enhance' | 'summarize' | 'expand' | 'format') => {
     if (!noteSelection) return;
@@ -914,8 +1426,19 @@ Natural Language Processing has seen remarkable advances in recent years, primar
       );
     }
 
+    if (isLoadingContent) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-slate-600 dark:text-slate-400">Loading content...</p>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="space-y-8 relative" ref={contentRef}>
+      <div className="space-y-8 relative" ref={contentRef} data-source-content style={{ position: 'relative' }}>
         {contentToShow.map((content, index) => {
           if (!content) return null;
           
@@ -927,10 +1450,10 @@ Natural Language Processing has seen remarkable advances in recent years, primar
                     <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/20">
                       <Video className="h-5 w-5 text-red-600 dark:text-red-400" />
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-lg text-slate-900 dark:text-slate-100">{content.title}</h3>
+                    <div data-source-content>
+                      <h3 className="font-semibold text-lg text-slate-900 dark:text-slate-100 select-text">{content.title}</h3>
                       {content.description && (
-                        <p className="text-sm text-slate-600 dark:text-slate-400">{content.description}</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 select-text">{content.description}</p>
                       )}
                     </div>
                   </div>
@@ -998,53 +1521,298 @@ Natural Language Processing has seen remarkable advances in recent years, primar
                 </div>
               );
 
-            case 'document':
-            case 'lesson':
+            case 'section':
               return (
-                <div key={content.id} className="prose prose-slate dark:prose-invert max-w-none">
-                  <div className="bg-white dark:bg-slate-800/50 rounded-xl p-8 shadow-sm border border-slate-200 dark:border-slate-700">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className={cn(
-                        "p-2 rounded-lg",
-                        content.type === 'lesson' ? "bg-blue-100 dark:bg-blue-900/20" : "bg-emerald-100 dark:bg-emerald-900/20"
-                      )}>
-                        {content.type === 'lesson' ? (
-                          <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        ) : (
-                          <FileText className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                        )}
+                <article key={content.id} className="max-w-none">
+                  <div className="bg-white dark:bg-slate-900/50 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-700/60 overflow-hidden backdrop-blur-sm">
+                    {/* Content Header */}
+                    <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800">
+                      <div className="flex items-start gap-4">
+                        <div className={cn(
+                          "p-3 rounded-xl shrink-0",
+                          content.section_type === 'video' ? "bg-red-50 dark:bg-red-900/20" :
+                          content.section_type === 'audio' ? "bg-purple-50 dark:bg-purple-900/20" :
+                          content.section_type === 'image' ? "bg-orange-50 dark:bg-orange-900/20" :
+                          "bg-slate-50 dark:bg-slate-800/50"
+                        )}>
+                          {content.section_type === 'video' && <Video className="h-5 w-5 text-red-600 dark:text-red-400" />}
+                          {content.section_type === 'audio' && <Volume2 className="h-5 w-5 text-purple-600 dark:text-purple-400" />}
+                          {content.section_type === 'image' && <Image className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
+                          {(!content.section_type || content.section_type === 'text') && <FileText className="h-5 w-5 text-slate-600 dark:text-slate-400" />}
+                        </div>
+                        <div className="flex-1 min-w-0" data-source-content>
+                          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2 leading-tight select-text">
+                            {content.title}
+                          </h2>
+                          {content.description && (
+                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed select-text">
+                              {content.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 mt-3">
+                            {content.section_type && (
+                              <Badge variant="secondary" className="text-xs px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                {content.section_type}
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="text-xs px-2 py-1">
+                              section
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-xl text-slate-900 dark:text-slate-100 mb-1">{content.title}</h3>
-                        {content.description && (
-                          <p className="text-sm text-slate-600 dark:text-slate-400">{content.description}</p>
+                    </div>
+
+                    {/* Content Body */}
+                    <div className="px-8 py-6">
+                      <div className="space-y-6">
+                        {/* Video Content */}
+                        {content.section_type === 'video' && content.video_url && (
+                          <div className="relative bg-slate-900 rounded-xl overflow-hidden shadow-lg">
+                            <div className="aspect-video">
+                              <iframe
+                                src={content.video_url}
+                                className="w-full h-full"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                title={content.title}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Audio Content */}
+                        {content.section_type === 'audio' && content.audio_url && (
+                          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
+                            <div className="flex items-center gap-4 mb-4">
+                              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20">
+                                <Volume2 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                              </div>
+                              <div>
+                                <h3 className="font-medium text-slate-900 dark:text-slate-100">Audio Content</h3>
+                                <p className="text-sm text-slate-600 dark:text-slate-400">Listen to the lesson audio</p>
+                              </div>
+                            </div>
+                            <audio 
+                              controls 
+                              className="w-full h-12 bg-white dark:bg-slate-700 rounded-lg"
+                              preload="metadata"
+                            >
+                              <source src={content.audio_url} type="audio/mpeg" />
+                              <source src={content.audio_url} type="audio/wav" />
+                              <source src={content.audio_url} type="audio/ogg" />
+                              Your browser does not support the audio element.
+                            </audio>
+                          </div>
+                        )}
+                        
+                        {/* Image Content */}
+                        {content.section_type === 'image' && content.image_url && (
+                          <div className="rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-700">
+                            <img
+                              src={content.image_url}
+                              alt={content.title}
+                              className="w-full h-auto object-cover"
+                              loading="lazy"
+                            />
+                          </div>
+                        )}
+                        
+                        {/* Text Content - Simple fallback for now */}
+                        {content.content && typeof content.content === 'string' && (
+                          <div className="prose prose-slate dark:prose-invert max-w-none">
+                            <ReactMarkdown className="text-base leading-relaxed select-text">
+                              {content.content}
+                            </ReactMarkdown>
+                          </div>
+                        )}
+                        
+                        {/* Structured Content - JSON object */}
+                        {content.content && typeof content.content === 'object' && (
+                          <LessonContentRenderer content={content.content as LessonSectionContent} />
+                        )}
+                        
+                        {/* Empty state for sections without content */}
+                        {!content.content && !content.video_url && !content.audio_url && !content.image_url && (
+                          <div className="text-center py-12 text-slate-500 dark:text-slate-400">
+                            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 inline-block mb-4">
+                              <FileText className="h-8 w-8 opacity-50" />
+                            </div>
+                            <p className="text-sm">No content available for this section</p>
+                          </div>
                         )}
                       </div>
                     </div>
-                    
-                    {content.content ? (
-                      <div 
-                        className="text-sm leading-relaxed select-text"
-                        dangerouslySetInnerHTML={{ 
-                          __html: content.content
-                            .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mb-6 text-slate-900 dark:text-slate-100 border-b border-slate-200 dark:border-slate-700 pb-3">$1</h1>')
-                            .replace(/^## (.+)$/gm, '<h2 class="text-xl font-semibold mb-4 mt-8 text-slate-800 dark:text-slate-200">$1</h2>')
-                            .replace(/^### (.+)$/gm, '<h3 class="text-lg font-medium mb-3 mt-6 text-slate-700 dark:text-slate-300">$1</h3>')
-                            .replace(/```javascript\n([\s\S]*?)\n```/g, '<pre class="bg-slate-100 dark:bg-slate-900 p-4 rounded-lg overflow-x-auto my-6 border border-slate-200 dark:border-slate-700"><code class="text-sm font-mono">$1</code></pre>')
-                            .replace(/```\n([\s\S]*?)\n```/g, '<pre class="bg-slate-100 dark:bg-slate-900 p-4 rounded-lg overflow-x-auto my-6 border border-slate-200 dark:border-slate-700"><code class="text-sm font-mono">$1</code></pre>')
-                            .replace(/`([^`]+)`/g, '<code class="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-sm font-mono border border-slate-200 dark:border-slate-600">$1</code>')
-                            .replace(/\n\n/g, '</p><p class="mb-4 text-slate-700 dark:text-slate-300 leading-relaxed">')
-                            .replace(/^(?!<[h|p|c|u])(.+)$/gm, '<p class="mb-4 text-slate-700 dark:text-slate-300 leading-relaxed">$1</p>')
-                        }}
-                      />
-                    ) : (
-                      <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>Content will be loaded here</p>
-                      </div>
-                    )}
                   </div>
-                </div>
+                </article>
+              );
+
+            case 'document':
+            case 'lesson':
+              return (
+                <article key={content.id} className="max-w-none">
+                  <div className="bg-white dark:bg-slate-900/50 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-700/60 overflow-hidden backdrop-blur-sm">
+                    {/* Lesson Header */}
+                    <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800">
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 rounded-xl shrink-0 bg-blue-50 dark:bg-blue-900/20">
+                          <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="flex-1 min-w-0" data-source-content>
+                          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2 leading-tight select-text">
+                            {content.title}
+                          </h2>
+                          {content.description && (
+                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed select-text">
+                              {content.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 mt-3">
+                            <Badge variant="outline" className="text-xs px-2 py-1">
+                              {content.type}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Lesson Sections */}
+                    <div className="px-8 py-6">
+                      {(() => {
+                        // Find all sections for this lesson
+                        const lessonSections = contentToShow.filter(item => 
+                          item.type === 'section' && 
+                          item.lesson_id === content.lesson_id &&
+                          selectedSources.has(item.id)
+                        );
+                        
+                        if (lessonSections.length === 0) {
+                          return (
+                            <div className="text-center py-12 text-slate-500 dark:text-slate-400">
+                              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 inline-block mb-4">
+                                <BookOpen className="h-8 w-8 opacity-50" />
+                              </div>
+                              <p className="text-sm">No sections selected for this lesson</p>
+                              <p className="text-xs text-slate-400 mt-1">Select lesson sections from the sources dropdown to view content</p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="space-y-8">
+                            {lessonSections
+                              .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+                              .map((section, sectionIndex) => (
+                                <div key={section.id} className="border-l-2 border-slate-200 dark:border-slate-700 pl-6">
+                                  {/* Section Header */}
+                                  <div className="flex items-center gap-3 mb-4">
+                                    <div className={cn(
+                                      "p-2 rounded-lg",
+                                      section.section_type === 'video' ? "bg-red-100 dark:bg-red-900/20" :
+                                      section.section_type === 'audio' ? "bg-purple-100 dark:bg-purple-900/20" :
+                                      section.section_type === 'image' ? "bg-orange-100 dark:bg-orange-900/20" :
+                                      "bg-slate-100 dark:bg-slate-800"
+                                    )}>
+                                      {section.section_type === 'video' && <Video className="h-4 w-4 text-red-600 dark:text-red-400" />}
+                                      {section.section_type === 'audio' && <Volume2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />}
+                                      {section.section_type === 'image' && <Image className="h-4 w-4 text-orange-600 dark:text-orange-400" />}
+                                      {(!section.section_type || section.section_type === 'text') && <FileText className="h-4 w-4 text-slate-600 dark:text-slate-400" />}
+                                    </div>
+                                    <div>
+                                      <h3 className="font-medium text-slate-900 dark:text-slate-100">{section.title}</h3>
+                                      {section.section_type && (
+                                        <span className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+                                          {section.section_type} content
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Section Content */}
+                                  <div className="space-y-4">
+                                    {/* Video */}
+                                    {section.section_type === 'video' && section.video_url && (
+                                      <div className="relative bg-slate-900 rounded-xl overflow-hidden shadow-lg">
+                                        <div className="aspect-video">
+                                          <iframe
+                                            src={section.video_url}
+                                            className="w-full h-full"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                            title={section.title}
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Audio */}
+                                    {section.section_type === 'audio' && section.audio_url && (
+                                      <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                                        <audio 
+                                          controls 
+                                          className="w-full h-10 bg-white dark:bg-slate-700 rounded-lg"
+                                          preload="metadata"
+                                        >
+                                          <source src={section.audio_url} type="audio/mpeg" />
+                                          <source src={section.audio_url} type="audio/wav" />
+                                          <source src={section.audio_url} type="audio/ogg" />
+                                          Your browser does not support the audio element.
+                                        </audio>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Image */}
+                                    {section.section_type === 'image' && section.image_url && (
+                                      <div className="rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-700">
+                                        <img
+                                          src={section.image_url}
+                                          alt={section.title}
+                                          className="w-full h-auto object-cover"
+                                          loading="lazy"
+                                        />
+                                      </div>
+                                    )}
+                                    
+                                    {/* Text Content */}
+                                    {section.content && typeof section.content === 'string' && section.content.trim() && (
+                                      <div className="prose prose-slate dark:prose-invert max-w-none prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-code:text-slate-800 dark:prose-code:text-slate-200">
+                                        <ReactMarkdown 
+                                          className="text-base leading-relaxed select-text"
+                                          components={{
+                                            h1: ({children}) => <h1 className="text-2xl font-bold mb-4 mt-6 first:mt-0 text-slate-900 dark:text-slate-100">{children}</h1>,
+                                            h2: ({children}) => <h2 className="text-xl font-semibold mb-3 mt-5 first:mt-0 text-slate-800 dark:text-slate-200">{children}</h2>,
+                                            h3: ({children}) => <h3 className="text-lg font-medium mb-2 mt-4 first:mt-0 text-slate-700 dark:text-slate-300">{children}</h3>,
+                                            h4: ({children}) => <h4 className="text-base font-medium mb-2 mt-3 first:mt-0 text-slate-700 dark:text-slate-300">{children}</h4>,
+                                            p: ({children}) => <p className="mb-3 text-slate-700 dark:text-slate-300 leading-relaxed">{children}</p>,
+                                            ul: ({children}) => <ul className="mb-3 space-y-1">{children}</ul>,
+                                            ol: ({children}) => <ol className="mb-3 space-y-1">{children}</ol>,
+                                            li: ({children}) => <li className="text-slate-700 dark:text-slate-300 ml-4">{children}</li>,
+                                            code: ({children, className}) => {
+                                              const isInline = !className;
+                                              if (isInline) {
+                                                return <code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-sm font-mono border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200">{children}</code>
+                                              }
+                                              return <code className="text-sm font-mono text-slate-800 dark:text-slate-200">{children}</code>
+                                            },
+                                            pre: ({children}) => <pre className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg overflow-x-auto my-4 border border-slate-200 dark:border-slate-700 shadow-sm">{children}</pre>,
+                                            strong: ({children}) => <strong className="font-semibold text-slate-900 dark:text-slate-100">{children}</strong>,
+                                            em: ({children}) => <em className="italic text-slate-800 dark:text-slate-200">{children}</em>,
+                                            blockquote: ({children}) => <blockquote className="border-l-4 border-slate-300 dark:border-slate-600 pl-4 my-3 italic text-slate-600 dark:text-slate-400">{children}</blockquote>
+                                          }}
+                                        >
+                                          {section.content}
+                                        </ReactMarkdown>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </article>
               );
 
             default:
@@ -1063,6 +1831,7 @@ Natural Language Processing has seen remarkable advances in recent years, primar
         {/* Text Selection Popover */}
         {showSelectionPopover && textSelection && typeof document !== 'undefined' && createPortal(
           <div
+            data-selection-popover
             className="fixed z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl p-2 flex gap-1"
             style={{
               left: `${textSelection.x}px`,
@@ -1321,33 +2090,18 @@ Natural Language Processing has seen remarkable advances in recent years, primar
 
       case 'mindmaps':
         return (
-          <div className="space-y-4">
-            <Card className="p-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-3">
-                <h5 className="font-medium text-sm text-slate-900 dark:text-slate-100">React Ecosystem</h5>
-                <Badge variant="secondary" className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
-                  12 nodes
-                </Badge>
-              </div>
-              <div className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 rounded-lg p-6 mb-3">
-                <div className="flex items-center justify-center text-slate-500 dark:text-slate-400">
-                  <Map className="h-8 w-8 mb-2" />
-                </div>
-                <p className="text-xs text-center text-slate-600 dark:text-slate-400">Mind map preview</p>
-              </div>
-              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                <span>3 hours ago</span>
-                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                  <Eye className="h-3 w-3 mr-1" />
-                  View
-                </Button>
-              </div>
-            </Card>
-            
-            <Button variant="outline" size="sm" className="w-full justify-start text-slate-600 dark:text-slate-400">
-              <Plus className="h-4 w-4 mr-2" />
-              Generate Mind Map
-            </Button>
+          <div className="h-full">
+            <StudyMindMapViewer
+              selectedContent={getSelectedContent()}
+              selectedText={textSelection ? { text: textSelection.text, source: 'Study Material' } : undefined}
+              currentNotes={notes}
+              baseClassId={selectedCourse?.base_class_id}
+              shouldAutoGenerate={shouldAutoGenerateMindMap}
+              onMindMapCreated={(mindMapData) => {
+                console.log('Mind map created:', mindMapData);
+                setShouldAutoGenerateMindMap(false); // Reset the flag after creation
+              }}
+            />
           </div>
         );
 
@@ -1357,17 +2111,17 @@ Natural Language Processing has seen remarkable advances in recent years, primar
         return (
           <div className="space-y-4">
             <Card className="p-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-3">
-                <h5 className="font-medium text-sm text-slate-900 dark:text-slate-100">Audio Summary</h5>
+              <div className="flex items-center justify-between mb-3" data-source-content>
+                <h5 className="font-medium text-sm text-slate-900 dark:text-slate-100 select-text">Audio Summary</h5>
                 <Badge variant="secondary" className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300">
                   Ready
                 </Badge>
               </div>
-              <div className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 rounded-lg p-6 mb-3">
+              <div className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 rounded-lg p-6 mb-3" data-source-content>
                 <div className="flex items-center justify-center text-slate-500 dark:text-slate-400">
                   <Headphones className="h-8 w-8 mb-2" />
                 </div>
-                <p className="text-xs text-center text-slate-600 dark:text-slate-400">React Hooks Overview - 5 min</p>
+                <p className="text-xs text-center text-slate-600 dark:text-slate-400 select-text">React Hooks Overview - 5 min</p>
               </div>
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" className="flex-1">
@@ -1446,29 +2200,51 @@ Natural Language Processing has seen remarkable advances in recent years, primar
             <div className="flex items-center gap-3">
               <Select 
                 value={selectedCourse?.id || selectedSpace?.id || ''} 
-                onValueChange={(value) => {
+                onValueChange={async (value) => {
                   const course = courses.find(c => c.id === value);
                   const space = studySpaces.find(s => s.id === value);
                   
                   if (course) {
                     setSelectedCourse(course);
                     setSelectedSpace(null);
+                    // Create study session when course is selected
+                    if (currentUser) {
+                      await createStudySession(currentUser.id, course.base_class_id);
+                    }
                   } else if (space) {
                     setSelectedSpace(space);
                     setSelectedCourse(null);
+                    // Create study session when space is selected
+                    if (currentUser) {
+                      await createStudySession(currentUser.id);
+                    }
                   }
                 }}
+                disabled={isLoadingCourses}
               >
                 <SelectTrigger className="w-64 bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700">
+                  {isLoadingCourses ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Loading courses...</span>
+                    </div>
+                  ) : (
                   <SelectValue placeholder="Select a course or space" />
+                  )}
                 </SelectTrigger>
                 <SelectContent>
                   <div className="p-2">
                     <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                       <GraduationCap className="h-3 w-3" />
                       Active Courses
+                      {isLoadingCourses && <Loader2 className="h-3 w-3 animate-spin" />}
                     </div>
-                    {courses.map((course) => (
+                    {isLoadingCourses ? (
+                      <div className="pl-6 py-2 text-sm text-slate-500">Loading courses...</div>
+                    ) : courses.length === 0 ? (
+                      <div className="pl-6 py-2 text-sm text-slate-500">No enrolled courses found</div>
+                    ) : (
+                      courses.map((course) => (
                       <SelectItem key={course.id} value={course.id} className="pl-6">
                         <div className="flex items-center gap-3">
                           <div className={cn("w-2 h-2 rounded-full", course.color)} />
@@ -1478,7 +2254,8 @@ Natural Language Processing has seen remarkable advances in recent years, primar
                           </div>
                         </div>
                       </SelectItem>
-                    ))}
+                      ))
+                    )}
                   </div>
                   
                   <div className="border-t">
@@ -1623,59 +2400,149 @@ Natural Language Processing has seen remarkable advances in recent years, primar
                           </div>
                         </div>
                         
-                        {/* Individual Sources */}
-                        {contentItems
-                          .filter(item => 
-                            item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            item.description?.toLowerCase().includes(searchQuery.toLowerCase())
-                          )
-                          .map((item) => (
-                            <div key={item.id} className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                              <div className="flex items-start space-x-3">
-                                <Checkbox
-                                  id={item.id}
-                                  checked={selectedSources.has(item.id)}
-                                  onCheckedChange={(checked) => {
-                                    const newSelected = new Set(selectedSources);
-                                    if (checked) {
-                                      newSelected.add(item.id);
-                                    } else {
-                                      newSelected.delete(item.id);
-                                    }
-                                    setSelectedSources(newSelected);
-                                  }}
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <div className="p-1 rounded bg-slate-100 dark:bg-slate-700">
-                                      {item.type === 'lesson' && <BookOpen className="h-3 w-3 text-blue-500" />}
-                                      {item.type === 'document' && <FileText className="h-3 w-3 text-emerald-500" />}
-                                      {item.type === 'video' && <Video className="h-3 w-3 text-red-500" />}
-                                      {item.type === 'assignment' && <Target className="h-3 w-3 text-orange-500" />}
-                                      {item.type === 'resource' && <Library className="h-3 w-3 text-purple-500" />}
+                        {/* Hierarchical Content Tree */}
+                        {(() => {
+                          // Group content by paths
+                          const paths = contentItems.filter(item => item.type === 'lesson' && item.id.startsWith('path-'));
+                          const lessons = contentItems.filter(item => item.type === 'lesson' && item.id.startsWith('lesson-'));
+                          const sections = contentItems.filter(item => item.type === 'section');
+                          
+                          return paths
+                            .filter(path => 
+                              searchQuery === '' || 
+                              path.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              lessons.some(lesson => lesson.path_id === path.id.replace('path-', '') && 
+                                lesson.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                              sections.some(section => section.path_id === path.id.replace('path-', '') && 
+                                section.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                            )
+                            .map((path) => {
+                              const pathId = path.id.replace('path-', '');
+                              const pathLessons = lessons.filter(lesson => lesson.path_id === pathId);
+                              const isPathSelected = selectedPaths.has(pathId);
+                              
+                              return (
+                                <div key={path.id} className="border-b border-slate-100 dark:border-slate-700 last:border-b-0">
+                                  {/* Path Header */}
+                                  <div className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                    <div className="flex items-start space-x-3">
+                                      <Checkbox
+                                        id={path.id}
+                                        checked={isPathSelected}
+                                        onCheckedChange={(checked) => handlePathSelection(pathId, !!checked)}
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <div className="p-1 rounded bg-blue-100 dark:bg-blue-900">
+                                            <BookOpen className="h-4 w-4 text-blue-600" />
+                                          </div>
+                                          <label
+                                            htmlFor={path.id}
+                                            className="text-sm font-semibold text-slate-900 dark:text-slate-100 cursor-pointer"
+                                          >
+                                            {path.title}
+                                          </label>
+                                          <span className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">
+                                            Path
+                                          </span>
+                                        </div>
+                                        {path.description && (
+                                          <p className="text-xs text-slate-600 dark:text-slate-400 ml-7">
+                                            {path.description}
+                                          </p>
+                                        )}
+                                      </div>
                                     </div>
-                                    <label
-                                      htmlFor={item.id}
-                                      className="text-sm font-medium text-slate-900 dark:text-slate-100 cursor-pointer truncate"
-                                    >
-                                      {item.title}
-                                    </label>
                                   </div>
-                                  {item.description && (
-                                    <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 ml-5">
-                                      {item.description}
-                                    </p>
-                                  )}
-                                  {item.duration && (
-                                    <div className="flex items-center gap-1 mt-1 ml-5">
-                                      <Clock className="h-3 w-3 text-slate-400" />
-                                      <span className="text-xs text-slate-500 dark:text-slate-400">{item.duration}</span>
-                                    </div>
-                                  )}
+                                  
+                                  {/* Path Lessons */}
+                                  {pathLessons.map((lesson) => {
+                                    const lessonSections = sections.filter(section => section.lesson_id === lesson.lesson_id);
+                                    const isLessonSelected = selectedLessons.has(lesson.id);
+                                    
+                                    return (
+                                      <div key={lesson.id} className="ml-6 border-l border-slate-200 dark:border-slate-600">
+                                        {/* Lesson Header */}
+                                        <div className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                          <div className="flex items-start space-x-3">
+                                            <Checkbox
+                                              id={lesson.id}
+                                              checked={isLessonSelected}
+                                              onCheckedChange={(checked) => handleLessonSelection(lesson.id, pathId, !!checked)}
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                              <div className="flex items-center gap-2 mb-1">
+                                                <div className="p-1 rounded bg-emerald-100 dark:bg-emerald-900">
+                                                  <FileText className="h-3 w-3 text-emerald-600" />
+                                                </div>
+                                                <label
+                                                  htmlFor={lesson.id}
+                                                  className="text-sm font-medium text-slate-900 dark:text-slate-100 cursor-pointer"
+                                                >
+                                                  {lesson.title}
+                                                </label>
+                                                <span className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">
+                                                  Lesson
+                                                </span>
+                                              </div>
+                                              {lesson.description && (
+                                                <p className="text-xs text-slate-600 dark:text-slate-400 ml-5">
+                                                  {lesson.description}
+                                                </p>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Lesson Sections */}
+                                        {lessonSections.map((section) => {
+                                          const isSectionSelected = selectedSections.has(section.id);
+                                          
+                                          return (
+                                            <div key={section.id} className="ml-6 border-l border-slate-100 dark:border-slate-500">
+                                              <div className="p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                <div className="flex items-start space-x-3">
+                                                  <Checkbox
+                                                    id={section.id}
+                                                    checked={isSectionSelected}
+                                                    onCheckedChange={(checked) => handleSectionSelection(section.id, lesson.id, pathId, !!checked)}
+                                                  />
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                      <div className="p-1 rounded bg-slate-100 dark:bg-slate-700">
+                                                        {section.section_type === 'video' && <Video className="h-3 w-3 text-red-500" />}
+                                                        {section.section_type === 'audio' && <Video className="h-3 w-3 text-purple-500" />}
+                                                        {section.section_type === 'image' && <FileText className="h-3 w-3 text-orange-500" />}
+                                                        {(section.section_type === 'text' || !section.section_type) && <FileText className="h-3 w-3 text-slate-500" />}
+                                                      </div>
+                                                      <label
+                                                        htmlFor={section.id}
+                                                        className="text-xs font-medium text-slate-800 dark:text-slate-200 cursor-pointer"
+                                                      >
+                                                        {section.title}
+                                                      </label>
+                                                      <span className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px]">
+                                                        {section.section_type || 'text'}
+                                                      </span>
+                                                    </div>
+                                                    {section.description && (
+                                                      <p className="text-xs text-slate-500 dark:text-slate-400 ml-5 line-clamp-1">
+                                                        {section.description}
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
-                              </div>
-                            </div>
-                          ))}
+                              );
+                            });
+                        })()}
                       </div>
                     </PopoverContent>
                   </Popover>
