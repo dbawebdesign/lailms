@@ -89,6 +89,7 @@ import {
   ChevronLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { NotionEditorWrapper } from '@/components/tiptap-templates/notion-like/notion-editor-wrapper';
 
 interface Course {
   id: string;
@@ -150,7 +151,7 @@ export default function UnifiedStudySpace() {
   const searchParams = useSearchParams();
   const spaceId = searchParams?.get('space');
   const contentRef = useRef<HTMLDivElement>(null);
-  const noteEditorRef = useRef<HTMLDivElement>(null);
+  const noteEditorRef = useRef<any>(null);
 
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [selectedSpace, setSelectedSpace] = useState<StudySpace | null>(null);
@@ -690,8 +691,8 @@ Natural Language Processing has seen remarkable advances in recent years, primar
       size="sm"
       onClick={() => togglePanelExpansion(panel)}
       className={cn(
-        "h-8 w-8 p-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-all duration-200",
-        "hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg",
+        "h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-all duration-200",
+        "hover:bg-muted rounded-lg",
         position === 'left' ? 'order-first' : 'order-last'
       )}
     >
@@ -745,16 +746,45 @@ Natural Language Processing has seen remarkable advances in recent years, primar
     setIsEditingNote(false);
   };
 
+  useEffect(() => {
+    if (noteView === 'editor' && noteEditorRef.current && currentNote) {
+      const editor = noteEditorRef.current;
+      const handleUpdate = () => {
+        if (editor.isFocused) {
+          setNoteContent(editor.getHTML());
+        }
+      };
+
+      if (editor.isDestroyed) return;
+
+      editor.commands.setContent(currentNote.content, false);
+      
+      editor.on('transaction', handleUpdate);
+
+      return () => {
+        editor.off('transaction', handleUpdate);
+      };
+    }
+  }, [noteView, currentNote, noteEditorRef.current]);
+  
   const createNewNote = () => {
     setCurrentNote(null);
     setNoteTitle('');
     setNoteContent('');
     setNoteView('editor');
     setIsEditingNote(true);
+    if (noteEditorRef.current) {
+      noteEditorRef.current.commands.setContent('');
+    }
   };
 
   const saveNote = async () => {
-    if (!noteTitle.trim() || !noteContent.trim()) return;
+    if (!noteTitle.trim()) return;
+    
+    let contentToSave = noteContent;
+    if (noteEditorRef.current) {
+      contentToSave = noteEditorRef.current.getHTML();
+    }
     
     setIsSaving(true);
     
@@ -766,7 +796,7 @@ Natural Language Processing has seen remarkable advances in recent years, primar
         // Update existing note
         const updatedNotes = notes.map(note => 
           note.id === currentNote.id 
-            ? { ...note, title: noteTitle, content: noteContent, updated_at: now }
+            ? { ...note, title: noteTitle, content: contentToSave, updated_at: now }
             : note
         );
         setNotes(updatedNotes);
@@ -775,7 +805,7 @@ Natural Language Processing has seen remarkable advances in recent years, primar
         const newNote: Note = {
           id: Date.now().toString(),
           title: noteTitle,
-          content: noteContent,
+          content: contentToSave,
           created_at: now,
           updated_at: now,
           tags: [],
@@ -1089,11 +1119,15 @@ Natural Language Processing has seen remarkable advances in recent years, primar
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3">
             {notes.map((note) => (
-              <Card key={note.id} className="p-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm hover:shadow-md transition-shadow cursor-pointer group">
+              <Card key={note.id} className="p-4 bg-surface/80 backdrop-blur-sm hover:shadow-md transition-shadow cursor-pointer group">
                 <div className="flex items-start justify-between mb-3">
                   <h5 
-                    className="font-medium text-sm text-slate-900 dark:text-slate-100 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                    onClick={() => openNote(note)}
+                    className="font-medium text-sm text-foreground cursor-pointer hover:text-primary transition-colors"
+                    onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openNote(note);
+            }}
                   >
                     {note.title}
                   </h5>
@@ -1122,10 +1156,10 @@ Natural Language Processing has seen remarkable advances in recent years, primar
                     </Button>
                   </div>
                 </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-3 mb-3">
-                  {note.content}
-                </p>
-                <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                                                    <p className="text-xs text-muted-foreground line-clamp-3 mb-3">
+                    {note.content}
+                  </p>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>{new Date(note.updated_at).toLocaleDateString()}</span>
                   <div className="flex items-center gap-2">
                     {note.source && (
@@ -1144,7 +1178,11 @@ Natural Language Processing has seen remarkable advances in recent years, primar
             variant="outline" 
             size="sm" 
             className="w-full justify-start text-slate-600 dark:text-slate-400"
-            onClick={createNewNote}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              createNewNote();
+            }}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add New Note
@@ -1197,7 +1235,7 @@ Natural Language Processing has seen remarkable advances in recent years, primar
                 <Button
                   size="sm"
                   onClick={saveNote}
-                  disabled={!noteTitle.trim() || !noteContent.trim() || isSaving}
+                  disabled={!noteTitle.trim() || isSaving}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   {isSaving ? (
@@ -1232,136 +1270,14 @@ Natural Language Processing has seen remarkable advances in recent years, primar
             className="text-lg font-semibold border-none px-0 bg-transparent focus:ring-0 focus:border-none placeholder:text-slate-400"
           />
         </div>
-
-        {/* Formatting Toolbar */}
-        {isEditingNote && (
-          <div className="flex items-center gap-1 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => formatText('bold')}
-              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-            >
-              <Bold className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => formatText('italic')}
-              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-            >
-              <Italic className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => formatText('underline')}
-              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-            >
-              <Underline className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => formatText('highlight')}
-              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-            >
-              <Highlighter className="h-4 w-4" />
-            </Button>
-            
-            <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-2" />
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-            >
-              <ListOrdered className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-            >
-              <Link className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-            >
-              <Code className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
+        
         {/* Content Editor */}
-        <div className="flex-1 relative" ref={noteEditorRef}>
-          <Textarea
-            data-note-editor
-            value={noteContent}
-            onChange={(e) => setNoteContent(e.target.value)}
-            placeholder="Start writing your notes..."
-            disabled={!isEditingNote}
-            className="h-full resize-none border-none bg-transparent focus:ring-0 focus:border-none text-sm leading-relaxed placeholder:text-slate-400"
+        <div className="flex-1 relative">
+          <NotionEditorWrapper 
+            ref={noteEditorRef}
+            room={currentNote ? `note-${currentNote.id}` : 'new-note'}
+            placeholder="Start writing your amazing notes..."
           />
-
-                     {/* Note Text Selection Actions */}
-           {showNoteActions && noteSelection && typeof document !== 'undefined' && createPortal(
-             <div
-               className="fixed z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl p-2 flex gap-1"
-               style={{
-                 left: `${noteSelection.x}px`,
-                 top: `${noteSelection.y}px`,
-                 transform: 'translateX(-50%)',
-               }}
-             >
-               <Button
-                 size="sm"
-                 variant="ghost"
-                 onClick={() => handleNoteAction('enhance')}
-                 className="h-8 px-3 text-xs bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
-               >
-                 <Wand2 className="h-3 w-3 mr-1" />
-                 Enhance
-               </Button>
-               <Button
-                 size="sm"
-                 variant="ghost"
-                 onClick={() => handleNoteAction('summarize')}
-                 className="h-8 px-3 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300"
-               >
-                 <Target className="h-3 w-3 mr-1" />
-                 Summarize
-               </Button>
-               <Button
-                 size="sm"
-                 variant="ghost"
-                 onClick={() => handleNoteAction('expand')}
-                 className="h-8 px-3 text-xs bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300"
-               >
-                 <Plus className="h-3 w-3 mr-1" />
-                 Expand
-               </Button>
-               <Button
-                 size="sm"
-                 variant="ghost"
-                 onClick={() => handleNoteAction('format')}
-                 className="h-8 px-3 text-xs bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20 dark:hover:bg-orange-900/40 text-orange-700 dark:text-orange-300"
-               >
-                 <Type className="h-3 w-3 mr-1" />
-                 Format
-               </Button>
-             </div>,
-             document.body
-           )}
         </div>
       </div>
     );
@@ -1508,10 +1424,10 @@ Natural Language Processing has seen remarkable advances in recent years, primar
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div className="h-full flex flex-col bg-gradient-to-br from-background via-surface to-background">
       
       {/* Sophisticated Header */}
-      <div className="border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm">
+      <div className="border-b border-border bg-surface/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm">
         <div className="flex items-center justify-between p-6">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
@@ -1519,10 +1435,10 @@ Natural Language Processing has seen remarkable advances in recent years, primar
                 <Sparkles className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-slate-100 dark:to-slate-400 bg-clip-text text-transparent">
+                <h1 className="text-xl font-semibold text-foreground">
                   AI Study Space
                 </h1>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Intelligent learning workspace</p>
+                <p className="text-xs text-muted-foreground">Intelligent learning workspace</p>
               </div>
             </div>
 
@@ -1642,12 +1558,12 @@ Natural Language Processing has seen remarkable advances in recent years, primar
             
             {/* LEFT PANEL - Sources & Content */}
             <ResizablePanel defaultSize={50} minSize={30} maxSize={70}>
-              <div className="h-full flex flex-col bg-white/50 dark:bg-slate-900/50 border-r border-slate-200/60 dark:border-slate-700/60">
+              <div className="h-full flex flex-col bg-surface/50 border-r border-border/60">
                 
-                {/* Sources Header with Multi-Select Dropdown */}
-                <div className="p-4 border-b border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/80">
+                                  {/* Sources Header with Multi-Select Dropdown */}
+                <div className="p-4 border-b border-border/60 bg-surface/80">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-slate-900 dark:text-slate-100">Sources</h3>
+                                          <h3 className="font-semibold text-foreground">Sources</h3>
                     {renderExpandButton('sources')}
                   </div>
                   
@@ -1780,17 +1696,17 @@ Natural Language Processing has seen remarkable advances in recent years, primar
 
             {/* RIGHT PANEL - Study Tools with Tabbed Interface */}
             <ResizablePanel defaultSize={50} minSize={30} maxSize={70}>
-              <div className="h-full flex flex-col bg-white/50 dark:bg-slate-900/50 border-l border-slate-200/60 dark:border-slate-700/60 relative">
+              <div className="h-full flex flex-col bg-surface/50 border-l border-border/60 relative">
                 
                 {/* Tools Header with Tabs */}
-                <div className="p-4 border-b border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/80">
+                <div className="p-4 border-b border-border/60 bg-surface/80">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-slate-900 dark:text-slate-100">Study Tools</h3>
+                                          <h3 className="font-semibold text-foreground">Study Tools</h3>
                     {renderExpandButton('tools')}
                   </div>
                   
                   <Tabs value={activeToolTab} onValueChange={setActiveToolTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-5 bg-slate-100 dark:bg-slate-800">
+                    <TabsList className="grid w-full grid-cols-5 bg-muted">
                       <TabsTrigger value="chat" className="text-xs">
                         <MessageSquare className="h-3 w-3 mr-1" />
                         Chat
@@ -1816,23 +1732,23 @@ Natural Language Processing has seen remarkable advances in recent years, primar
                 </div>
 
                 {/* Tool Content Area */}
-                <div className="flex-1 overflow-hidden flex flex-col">
-                  <div className="flex-1 overflow-hidden">
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <div className="flex-1 min-h-0 overflow-hidden">
                     <ScrollArea className="h-full">
-                      <div className="p-4 pb-24">
+                      <div className="p-4 pb-32">
                         {renderToolContent()}
                       </div>
                     </ScrollArea>
                   </div>
 
                   {/* Luna Chat - Always Pinned at Bottom */}
-                  <div className="absolute bottom-0 left-0 right-0 shrink-0 border-t border-slate-200/60 dark:border-slate-700/60 bg-gradient-to-r from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 p-4">
+                  <div className="flex-shrink-0 border-t border-border/60 bg-gradient-to-r from-surface to-background p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shadow-sm">
                         <Sparkles className="h-3 w-3 text-white" />
                       </div>
-                      <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Luna AI</span>
-                      <Badge variant="secondary" className="text-xs bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 text-blue-700 dark:text-blue-300">
+                      <span className="text-xs font-medium text-foreground">Luna AI</span>
+                                              <Badge variant="secondary" className="text-xs">
                         Context Aware
                       </Badge>
                     </div>

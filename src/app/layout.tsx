@@ -6,7 +6,7 @@ import { UIContextProvider } from "@/context/UIContext";
 import { LunaContextRegistration } from "@/components/providers/LunaContextRegistration";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
-import { Analytics } from "@vercel/analytics/next";
+import { Analytics } from "@vercel/analytics/react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

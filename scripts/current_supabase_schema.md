@@ -2,6 +2,21 @@
 
 ## Recent Updates
 
+### User Notes Content Storage RLS Policies (2025-01-21)
+Added Row-Level Security policies for the `user-notes-content` storage bucket to support media uploads in the notes editor:
+
+- **Policies Added:**
+  - `Users can upload to user-notes-content bucket`: Allows authenticated users to upload files
+  - `Users can view user-notes-content files`: Public read access for all uploaded files
+  - `Users can update their own user-notes-content files`: Users can update files they uploaded
+  - `Users can delete their own user-notes-content files`: Users can delete files they uploaded
+
+- **Security Model:**
+  - Files are organized by user ID in folder structure: `/{user_id}/filename`
+  - Users can only modify/delete files in their own folder
+  - All files are publicly readable (bucket is public)
+  - Upload requires authentication
+
 ### Class Instance Status Automation (2025-01-21)
 Added automatic status management for class instances based on start and end dates:
 

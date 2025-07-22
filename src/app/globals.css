@@ -1,6 +1,9 @@
+/* CSS Linter: Ignore Tailwind CSS directives */
+/* stylelint-disable at-rule-no-unknown */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "../styles/animations.css";
+@import "../styles/_variables.scss";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -371,7 +374,9 @@
     font-size: 16px !important;
     transform-origin: left top;
     -webkit-appearance: none;
+    appearance: none; /* Standard property */
     -webkit-border-radius: 0;
+    border-radius: 0; /* Standard property */
   }
 
   /* Full screen mobile modal */
@@ -398,6 +403,7 @@
   .line-clamp-1 {
     display: -webkit-box;
     -webkit-line-clamp: 1;
+    line-clamp: 1; /* Standard property */
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
@@ -405,6 +411,7 @@
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2; /* Standard property */
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
@@ -412,6 +419,7 @@
   .line-clamp-3 {
     display: -webkit-box;
     -webkit-line-clamp: 3;
+    line-clamp: 3; /* Standard property */
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
@@ -419,7 +427,41 @@
   .line-clamp-4 {
     display: -webkit-box;
     -webkit-line-clamp: 4;
+    line-clamp: 4; /* Standard property */
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+}
+
+/* Global text selection styles for better highlighting */
+::selection {
+  background-color: var(--tt-selection-color, rgba(157, 138, 255, 0.4));
+  color: inherit;
+}
+
+/* Tiptap-specific selection styles */
+.ProseMirror ::selection {
+  background-color: var(--tt-selection-color, rgba(157, 138, 255, 0.4));
+  color: inherit;
+}
+
+.notion-like-editor ::selection {
+  background-color: var(--tt-selection-color, rgba(157, 138, 255, 0.4));
+  color: inherit;
+}
+
+/* Dark mode selection styles */
+.dark ::selection {
+  background-color: var(--tt-selection-color, rgba(122, 82, 255, 0.5));
+  color: inherit;
+}
+
+.dark .ProseMirror ::selection {
+  background-color: var(--tt-selection-color, rgba(122, 82, 255, 0.5));
+  color: inherit;
+}
+
+.dark .notion-like-editor ::selection {
+  background-color: var(--tt-selection-color, rgba(122, 82, 255, 0.5));
+  color: inherit;
 }
