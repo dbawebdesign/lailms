@@ -215,9 +215,14 @@ export default function UnifiedStudySpace() {
   const [expandedPanel, setExpandedPanel] = useState<PanelExpansion>('none');
   const [activeToolTab, setActiveToolTab] = useState('chat');
 
-  // Reset auto-generate flag when switching away from mindmaps tab
+  // Reset auto-generate flag when switching away from mindmaps tab (but not when switching TO it)
+  const prevActiveToolTab = useRef(activeToolTab);
   useEffect(() => {
-    if (activeToolTab !== 'mindmaps') {
+    const previousTab = prevActiveToolTab.current;
+    prevActiveToolTab.current = activeToolTab;
+    
+    // Only reset if we're switching AWAY from mindmaps, not TO mindmaps
+    if (previousTab === 'mindmaps' && activeToolTab !== 'mindmaps') {
       setShouldAutoGenerateMindMap(false);
     }
   }, [activeToolTab]);
@@ -225,6 +230,15 @@ export default function UnifiedStudySpace() {
   const [showSelectionPopover, setShowSelectionPopover] = useState(false);
   const [persistedSelection, setPersistedSelection] = useState<Range | null>(null);
   const [shouldAutoGenerateMindMap, setShouldAutoGenerateMindMap] = useState(false);
+  const [currentMindMap, setCurrentMindMap] = useState<any>(null); // Lift mind map state to parent
+
+  // Clear mind map when study space changes
+  useEffect(() => {
+    if (selectedSpace) {
+      console.log('Study space changed, clearing mind map');
+      setCurrentMindMap(null);
+    }
+  }, [selectedSpace?.id]);
 
   // Note-taking states
   const [noteView, setNoteView] = useState<NoteView>('list');
@@ -265,7 +279,7 @@ export default function UnifiedStudySpace() {
           setCurrentUser(user);
           await loadUserCourses(user.id);
           await loadUserStudySpaces(user.id);
-          await loadUserNotes(user.id);
+          // Don't load notes until a study space is selected
           // Don't create study session until user selects a course/space
         }
       } catch (error) {
@@ -352,7 +366,13 @@ export default function UnifiedStudySpace() {
     try {
       const { data: spaces, error } = await supabase
         .from('study_spaces')
-        .select('*')
+        .select(`
+          *,
+          base_classes!study_spaces_course_id_fkey (
+            id,
+            name
+          )
+        `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
@@ -365,12 +385,14 @@ export default function UnifiedStudySpace() {
         const studySpaceData: StudySpace[] = spaces.map(space => ({
           id: space.id,
           name: space.name,
-          type: 'custom' as const,
+          type: space.course_id ? 'course' : 'custom',
+          course_id: space.course_id,
           description: space.description,
           color: space.color || 'bg-orange-500',
           created_at: space.created_at
         }));
 
+        console.log('Loaded study spaces:', studySpaceData);
         setStudySpaces(studySpaceData);
       }
     } catch (error) {
@@ -379,14 +401,21 @@ export default function UnifiedStudySpace() {
   };
 
   // Load user's notes
-  const loadUserNotes = async (userId: string) => {
+  const loadUserNotes = async (userId: string, studySpaceId?: string) => {
     try {
       setIsLoadingNotes(true);
       
-      const { data: userNotes, error } = await supabase
+      let query = supabase
         .from('study_notes')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', userId);
+
+      // If a specific study space is selected, filter notes by that space
+      if (studySpaceId) {
+        query = query.eq('study_space_id', studySpaceId);
+      }
+
+      const { data: userNotes, error } = await query
         .order('updated_at', { ascending: false });
 
       if (error) {
@@ -417,12 +446,33 @@ export default function UnifiedStudySpace() {
 
     // Load content based on selected course or space
   useEffect(() => {
+    console.log('Loading content for:', { selectedCourse, selectedSpace });
+    
     if (selectedCourse) {
       loadCourseContent(selectedCourse.base_class_id || selectedCourse.id);
-    } else if (selectedSpace && selectedSpace.type === 'custom') {
-      loadCustomContent(selectedSpace.id);
+    } else if (selectedSpace) {
+      if (selectedSpace.type === 'custom') {
+        loadCustomContent(selectedSpace.id);
+      } else if (selectedSpace.type === 'course' && selectedSpace.course_id) {
+        // Load course content for course-linked study spaces
+        console.log('Loading course content for study space:', selectedSpace.course_id);
+        loadCourseContent(selectedSpace.course_id);
+      }
+    } else {
+      // Clear content when nothing is selected
+      setContentItems([]);
     }
   }, [selectedCourse, selectedSpace]);
+
+  // Load notes when a study space is selected
+  useEffect(() => {
+    if (currentUser && selectedSpace) {
+      loadUserNotes(currentUser.id, selectedSpace.id);
+    } else {
+      // Clear notes when no study space is selected - don't show any notes
+      setNotes([]);
+    }
+  }, [currentUser, selectedSpace]);
 
   const loadCourseContent = async (baseClassId: string) => {
     try {
@@ -601,14 +651,22 @@ export default function UnifiedStudySpace() {
     const handleMouseUp = () => {
       const selection = window.getSelection();
       if (selection && selection.toString().trim()) {
-        // Check if selection is within content area or source content display
+        // Check if selection is within the main content area (this should cover all source content)
         const isInContentArea = contentRef.current?.contains(selection.anchorNode);
+        
+        // Also check if selection is within any source content containers
         const isInSourceContent = selection.anchorNode && 
           (selection.anchorNode.nodeType === Node.TEXT_NODE ? 
             selection.anchorNode.parentElement : 
             selection.anchorNode as Element)?.closest('[data-source-content]');
         
-        if (isInContentArea || isInSourceContent) {
+        // Check if selection is within any article or content container (broader check)
+        const isInArticleContent = selection.anchorNode &&
+          (selection.anchorNode.nodeType === Node.TEXT_NODE ? 
+            selection.anchorNode.parentElement : 
+            selection.anchorNode as Element)?.closest('article, .prose, [class*="prose"]');
+        
+        if (isInContentArea || isInSourceContent || isInArticleContent) {
           const range = selection.getRangeAt(0);
           const rect = range.getBoundingClientRect();
           
@@ -1198,10 +1256,90 @@ export default function UnifiedStudySpace() {
         return null;
       }
 
-      // Create a study space if needed (or get existing one)
+      // Get or create a persistent study space for the user-course combination
       let studySpaceId = selectedSpace?.id;
-      if (!studySpaceId) {
-        // Create a default study space for the session
+      
+      // If we already have a selected space, use it and don't create a new one
+      if (studySpaceId && selectedSpace) {
+        console.log('✅ Using already selected study space:', selectedSpace.name);
+      } else if (baseClassId) {
+        // First, check if a study space already exists for this user-course combination
+        const { data: existingSpace, error: existingSpaceError } = await supabase
+          .from('study_spaces')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('course_id', baseClassId)
+          .single();
+
+        if (existingSpaceError && existingSpaceError.code !== 'PGRST116') {
+          console.error('Error checking for existing study space:', existingSpaceError);
+          return null;
+        }
+
+        if (existingSpace) {
+          // Use the existing study space
+          studySpaceId = existingSpace.id;
+          console.log('Using existing study space:', existingSpace.name);
+          
+          // Update the selected space in the UI
+          const studySpaceData: StudySpace = {
+            id: existingSpace.id,
+            name: existingSpace.name,
+            type: 'course',
+            course_id: existingSpace.course_id,
+            description: existingSpace.description,
+            color: existingSpace.color || 'bg-blue-500',
+            created_at: existingSpace.created_at
+          };
+          setSelectedSpace(studySpaceData);
+        } else {
+          // Get the course name for a meaningful study space name
+          const { data: baseClass, error: baseClassError } = await supabase
+            .from('base_classes')
+            .select('name')
+            .eq('id', baseClassId)
+            .single();
+
+          const courseName = baseClass?.name || 'Course';
+
+          // Create a new study space linked to the course
+          const { data: studySpace, error: spaceError } = await supabase
+            .from('study_spaces')
+            .insert({
+              user_id: userId,
+              organisation_id: profile.organisation_id,
+              course_id: baseClassId,
+              name: `${courseName} Study Space`,
+              description: `Study space for ${courseName}`,
+              color: selectedCourse?.color || 'bg-blue-500',
+              is_default: false
+            })
+            .select()
+            .single();
+
+          if (spaceError) {
+            console.error('Error creating study space:', spaceError);
+            return null;
+          }
+          
+          studySpaceId = studySpace.id;
+          console.log('Created new course-linked study space:', studySpace.name);
+          
+          // Update the selected space in the UI and add to study spaces list
+          const studySpaceData: StudySpace = {
+            id: studySpace.id,
+            name: studySpace.name,
+            type: 'course',
+            course_id: studySpace.course_id,
+            description: studySpace.description,
+            color: studySpace.color,
+            created_at: studySpace.created_at
+          };
+          setSelectedSpace(studySpaceData);
+          setStudySpaces(prev => [studySpaceData, ...prev]);
+        }
+      } else if (!studySpaceId) {
+        // Fallback: create a generic study space if no course is specified
         const { data: studySpace, error: spaceError } = await supabase
           .from('study_spaces')
           .insert({
@@ -1228,6 +1366,7 @@ export default function UnifiedStudySpace() {
           organisation_id: profile.organisation_id,
           study_space_id: studySpaceId,
           session_type: 'focus'
+          // Note: linked_path_id should only be set when we have an actual path ID, not base_class_id
         })
         .select()
         .single();
@@ -1541,11 +1680,11 @@ export default function UnifiedStudySpace() {
                           {(!content.section_type || content.section_type === 'text') && <FileText className="h-5 w-5 text-slate-600 dark:text-slate-400" />}
                         </div>
                         <div className="flex-1 min-w-0" data-source-content>
-                          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2 leading-tight select-text">
+                          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2 leading-tight select-text" data-source-content>
                             {content.title}
                           </h2>
                           {content.description && (
-                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed select-text">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed select-text" data-source-content>
                               {content.description}
                             </p>
                           )}
@@ -1659,11 +1798,11 @@ export default function UnifiedStudySpace() {
                           <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div className="flex-1 min-w-0" data-source-content>
-                          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2 leading-tight select-text">
+                          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2 leading-tight select-text" data-source-content>
                             {content.title}
                           </h2>
                           {content.description && (
-                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed select-text">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed select-text" data-source-content>
                               {content.description}
                             </p>
                           )}
@@ -1687,15 +1826,7 @@ export default function UnifiedStudySpace() {
                         );
                         
                         if (lessonSections.length === 0) {
-                          return (
-                            <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-                              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 inline-block mb-4">
-                                <BookOpen className="h-8 w-8 opacity-50" />
-                              </div>
-                              <p className="text-sm">No sections selected for this lesson</p>
-                              <p className="text-xs text-slate-400 mt-1">Select lesson sections from the sources dropdown to view content</p>
-                            </div>
-                          );
+                          return null; // Don't show anything if no sections are selected
                         }
 
                         return (
@@ -1719,7 +1850,7 @@ export default function UnifiedStudySpace() {
                                       {(!section.section_type || section.section_type === 'text') && <FileText className="h-4 w-4 text-slate-600 dark:text-slate-400" />}
                                     </div>
                                     <div>
-                                      <h3 className="font-medium text-slate-900 dark:text-slate-100">{section.title}</h3>
+                                      <h3 className="font-medium text-slate-900 dark:text-slate-100 select-text" data-source-content>{section.title}</h3>
                                       {section.section_type && (
                                         <span className="text-xs text-slate-500 dark:text-slate-400 capitalize">
                                           {section.section_type} content
@@ -2053,6 +2184,23 @@ export default function UnifiedStudySpace() {
   };
 
   const renderToolContent = () => {
+    // If no study space is selected, show a message prompting user to select one
+    if (!selectedSpace) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 px-4">
+          <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 mb-6 inline-block">
+            <BookOpen className="h-12 w-12 text-slate-400 mx-auto" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2 text-slate-900 dark:text-slate-100">
+            Select a Study Space
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 text-center max-w-md leading-relaxed">
+            Choose a course or study space from the dropdown above to access your notes, mind maps, audio summaries, and other study materials.
+          </p>
+        </div>
+      );
+    }
+
     switch (activeToolTab) {
       case 'chat':
         return (
@@ -2090,17 +2238,21 @@ export default function UnifiedStudySpace() {
 
       case 'mindmaps':
         return (
-          <div className="h-full">
+          <div className="h-full min-h-[600px] p-2">
             <StudyMindMapViewer
               selectedContent={getSelectedContent()}
               selectedText={textSelection ? { text: textSelection.text, source: 'Study Material' } : undefined}
               currentNotes={notes}
               baseClassId={selectedCourse?.base_class_id}
+              studySpaceId={selectedSpace?.id} // Pass the current study space ID
               shouldAutoGenerate={shouldAutoGenerateMindMap}
+              currentMindMap={currentMindMap} // Pass mind map state from parent
               onMindMapCreated={(mindMapData) => {
                 console.log('Mind map created:', mindMapData);
+                setCurrentMindMap(mindMapData); // Update parent state
                 setShouldAutoGenerateMindMap(false); // Reset the flag after creation
               }}
+              onMindMapChanged={setCurrentMindMap} // Allow component to update parent state
             />
           </div>
         );
@@ -2204,16 +2356,51 @@ export default function UnifiedStudySpace() {
                   const course = courses.find(c => c.id === value);
                   const space = studySpaces.find(s => s.id === value);
                   
+                  console.log('Selection changed:', { value, course, space, studySpaces });
+                  
                   if (course) {
-                    setSelectedCourse(course);
-                    setSelectedSpace(null);
-                    // Create study session when course is selected
-                    if (currentUser) {
-                      await createStudySession(currentUser.id, course.base_class_id);
+                    // Check if there's already a study space for this course
+                    const existingCourseSpace = studySpaces.find(s => 
+                      s.type === 'course' && s.course_id === course.base_class_id
+                    );
+                    
+                    console.log('Course selection debug:', {
+                      courseId: course.base_class_id,
+                      existingCourseSpace,
+                      allSpaces: studySpaces.map(s => ({ id: s.id, name: s.name, type: s.type, course_id: s.course_id }))
+                    });
+                    
+                    if (existingCourseSpace) {
+                      // Use the existing study space
+                      setSelectedCourse(course);
+                      setSelectedSpace(existingCourseSpace);
+                      console.log('✅ Found existing study space for course:', existingCourseSpace.name);
+                      
+                      // Create a study session for this existing space (but don't create a new space)
+                      if (currentUser) {
+                        await createStudySession(currentUser.id, course.base_class_id);
+                      }
+                    } else {
+                      // No existing space, create one
+                      setSelectedCourse(course);
+                      setSelectedSpace(null);
+                      console.log('❌ No existing space found, creating new one for course:', course.name);
+                      // Create or get study session when course is selected
+                      // This will automatically set the selectedSpace to the course's study space
+                      if (currentUser) {
+                        await createStudySession(currentUser.id, course.base_class_id);
+                      }
                     }
                   } else if (space) {
+                    // If it's a course-linked space, also set the course
+                    if (space.type === 'course' && space.course_id) {
+                      const linkedCourse = courses.find(c => c.base_class_id === space.course_id);
+                      setSelectedCourse(linkedCourse || null);
+                    } else {
+                      setSelectedCourse(null);
+                    }
                     setSelectedSpace(space);
-                    setSelectedCourse(null);
+                    
                     // Create study session when space is selected
                     if (currentUser) {
                       await createStudySession(currentUser.id);
@@ -2615,9 +2802,6 @@ export default function UnifiedStudySpace() {
                         <Sparkles className="h-3 w-3 text-white" />
                       </div>
                       <span className="text-xs font-medium text-foreground">Luna AI</span>
-                                              <Badge variant="secondary" className="text-xs">
-                        Context Aware
-                      </Badge>
                     </div>
                     
                     <div className="flex gap-2">

@@ -2,6 +2,20 @@
 
 ## Recent Updates
 
+### Study Spaces Course Linking (2025-01-21)
+Added course_id column to study_spaces table to enable persistent study spaces per user-course combination:
+
+- **Schema Changes:**
+  - Added `course_id UUID` column referencing `base_classes(id)`
+  - Added index `idx_study_spaces_user_course` on `(user_id, course_id)`
+  - Added unique constraint `unique_user_course_study_space` to ensure one study space per user per course
+
+- **Purpose:**
+  - Enables persistent study spaces that are linked to specific courses
+  - Prevents creation of multiple study spaces for the same user-course combination
+  - Allows users to return to the same study space with all their notes, mindmaps, and content preserved
+  - **Study Materials Isolation:** Mind maps, notes, and other study materials are now properly filtered by study_space_id, ensuring each study space shows only its own content
+
 ### User Notes Content Storage RLS Policies (2025-01-21)
 Added Row-Level Security policies for the `user-notes-content` storage bucket to support media uploads in the notes editor:
 

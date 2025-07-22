@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Download, Edit3, Check, RefreshCw, Plus, Minus, Expand, Eye, List, Grid, X, Trash2, ZoomIn, ZoomOut, Move, RotateCcw, Loader2, ArrowLeft, Save } from 'lucide-react';
+import { Copy, Download, Edit3, Check, RefreshCw, Plus, Minus, Expand, Eye, List, Grid, X, Trash2, ZoomIn, ZoomOut, Move, RotateCcw, Loader2, ArrowLeft, Save, Map } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -65,8 +65,11 @@ interface StudyMindMapViewerProps {
   selectedText?: { text: string; source: string };
   currentNotes?: any[];
   baseClassId?: string;
+  studySpaceId?: string; // Add study space ID prop
   onMindMapCreated?: (mindMapData: any) => void;
   shouldAutoGenerate?: boolean; // New prop to trigger auto-generation
+  currentMindMap?: any; // Mind map state from parent
+  onMindMapChanged?: (mindMapData: any) => void; // Callback to update parent state
 }
 
 interface MindMapDisplayProps {
@@ -102,10 +105,18 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
 
   // Convert mind map data to node structure with unique IDs
   useEffect(() => {
+    // Add defensive checks for mindMapData structure
+    if (!mindMapData || !mindMapData.center) {
+      console.error('Invalid mind map data:', mindMapData);
+      return;
+    }
+
+    console.log('Processing mind map data:', JSON.stringify(mindMapData, null, 2));
+
     const centerNode: MindMapNode = {
       id: 'center',
-      label: mindMapData.center.label,
-      description: mindMapData.center.description,
+      label: mindMapData.center.label || 'Untitled Topic',
+      description: mindMapData.center.description || '',
       level: 0,
       x: 0,
       y: 0,
@@ -113,16 +124,16 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
       isExpanded: true
     };
 
-    const branchNodes: MindMapNode[] = mindMapData.branches.map((branch, branchIndex) => {
-      const totalBranches = mindMapData.branches.length;
+    const branchNodes: MindMapNode[] = (mindMapData.branches || []).map((branch, branchIndex) => {
+      const totalBranches = mindMapData.branches?.length || 1;
       const angle = (branchIndex * 2 * Math.PI) / totalBranches;
       const radius = Math.max(350, totalBranches * 50);
       
       const branchNode: MindMapNode = {
         id: branch.id || generateUniqueId('branch'),
-        label: branch.label,
-        description: branch.description,
-        color: branch.color,
+        label: branch.label || 'Untitled Branch',
+        description: branch.description || '',
+        color: branch.color || '#3B82F6',
         level: 1,
         x: centerNode.x + radius * Math.cos(angle),
         y: centerNode.y + radius * Math.sin(angle),
@@ -131,7 +142,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
         parentId: 'center'
       };
 
-      if (branch.concepts) {
+      if (branch.concepts && Array.isArray(branch.concepts)) {
         branchNode.children = branch.concepts.map((concept, conceptIndex) => {
           const conceptCount = branch.concepts!.length;
           const conceptAngle = angle + (conceptIndex - (conceptCount - 1) / 2) * 0.3;
@@ -139,9 +150,9 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
           
           const conceptNode: MindMapNode = {
             id: concept.id || generateUniqueId(`concept-${branchIndex}`),
-            label: concept.label,
-            description: concept.description,
-            color: branch.color,
+            label: concept.label || 'Untitled Concept',
+            description: concept.description || '',
+            color: branch.color || '#3B82F6',
             level: 2,
             x: branchNode.x + conceptRadius * Math.cos(conceptAngle),
             y: branchNode.y + conceptRadius * Math.sin(conceptAngle),
@@ -150,7 +161,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
             parentId: branchNode.id
           };
 
-          if (concept.points) {
+          if (concept.points && Array.isArray(concept.points)) {
             conceptNode.children = concept.points.map((point, pointIndex) => {
               const pointCount = concept.points!.length;
               const pointAngle = conceptAngle + (pointIndex - (pointCount - 1) / 2) * 0.4;
@@ -158,9 +169,9 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
               
               const pointNode: MindMapNode = {
                 id: point.id || generateUniqueId(`point-${branchIndex}-${conceptIndex}`),
-                label: point.label,
-                description: point.description,
-                color: branch.color,
+                label: point.label || 'Untitled Point',
+                description: point.description || '',
+                color: branch.color || '#3B82F6',
                 level: 3,
                 x: conceptNode.x + pointRadius * Math.cos(pointAngle),
                 y: conceptNode.y + pointRadius * Math.sin(pointAngle),
@@ -169,7 +180,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
                 parentId: conceptNode.id
               };
 
-              if (point.details) {
+              if (point.details && Array.isArray(point.details)) {
                 pointNode.children = point.details.map((detail, detailIndex) => {
                   const detailCount = point.details!.length;
                   const detailAngle = pointAngle + (detailIndex - (detailCount - 1) / 2) * 0.5;
@@ -177,9 +188,9 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
                   
                   return {
                     id: detail.id || generateUniqueId(`detail-${pointNode.id}`),
-                    label: detail.label,
-                    description: detail.description,
-                    color: branch.color,
+                    label: detail.label || 'Untitled Detail',
+                    description: detail.description || '',
+                    color: branch.color || '#3B82F6',
                     level: 4,
                     x: pointNode.x + detailRadius * Math.cos(detailAngle),
                     y: pointNode.y + detailRadius * Math.sin(detailAngle),
@@ -376,6 +387,12 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
   };
 
   const renderNode = (node: MindMapNode, index: number = 0) => {
+    // Add error boundary for node rendering
+    if (!node) {
+      console.error('Attempting to render null/undefined node');
+      return null;
+    }
+
     const isSelected = selectedNodeId === node.id;
     const isHovered = hoveredNodeId === node.id;
     const isExpanding = expandingNodes.has(node.id);
@@ -383,7 +400,8 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
     const textSize = node.level === 0 ? 11 : node.level === 1 ? 9 : node.level === 2 ? 8 : node.level === 3 ? 7 : 6;
     
     const maxLength = node.level === 0 ? 15 : node.level === 1 ? 12 : node.level === 2 ? 10 : 8;
-    const displayText = node.label.length > maxLength ? node.label.substring(0, maxLength) + '...' : node.label;
+    const nodeLabel = node.label || 'Untitled';
+    const displayText = nodeLabel.length > maxLength ? nodeLabel.substring(0, maxLength) + '...' : nodeLabel;
 
     return (
       <g key={`node-${node.id}-${index}`}>
@@ -463,7 +481,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
               className="cursor-pointer transition-all duration-100 hover:fill-blue-600"
               onClick={(e) => {
                 e.stopPropagation();
-                openEditModal(node.id, node.label, node.description || '');
+                openEditModal(node.id, node.label || 'Untitled', node.description || '');
               }}
             />
             <text
@@ -588,9 +606,10 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
   return (
     <div 
       ref={containerRef}
-      className="relative w-full h-[800px] bg-white dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50 shadow-sm"
+      className="relative w-full h-full min-h-[400px] bg-white dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50 shadow-sm"
     >
-      <div className="absolute top-4 right-4 flex gap-1 z-10">
+      <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
+        {/* Zoom Controls */}
         <div className="flex bg-white/90 dark:bg-slate-800/90 rounded-lg p-1 shadow-sm border border-slate-200/50 dark:border-slate-700/50">
           <Button
             variant="ghost"
@@ -617,15 +636,16 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
             <RotateCcw className="h-4 w-4" />
           </Button>
         </div>
-      </div>
-
-      <div className="absolute top-4 left-4 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-lg p-3 shadow-sm border border-slate-200 dark:border-slate-700 max-w-xs">
-        <h3 className="font-medium text-sm text-slate-700 dark:text-slate-300 mb-1">Study Mind Map</h3>
-        <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
-          <div>• <strong>Drag</strong> to pan around</div>
-          <div>• <strong>Hover</strong> nodes for actions</div>
-          <div>• <strong>Click ✨</strong> to AI-expand nodes</div>
-          <div>• <strong>Click ±</strong> to show/hide children</div>
+        
+        {/* Instructions */}
+        <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-lg p-3 shadow-sm border border-slate-200 dark:border-slate-700 max-w-xs">
+          <h3 className="font-medium text-sm text-slate-700 dark:text-slate-300 mb-1">Study Mind Map</h3>
+          <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
+            <div>• <strong>Drag</strong> to pan around</div>
+            <div>• <strong>Hover</strong> nodes for actions</div>
+            <div>• <strong>Click ✨</strong> to AI-expand nodes</div>
+            <div>• <strong>Click ±</strong> to show/hide children</div>
+          </div>
         </div>
       </div>
 
@@ -651,7 +671,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
 
       {/* Selected node info panel */}
       {selectedNodeId && (
-        <div className="absolute bottom-4 left-4 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-lg p-4 shadow-lg border border-slate-200 dark:border-slate-700 max-w-sm">
+        <div className="absolute top-4 left-4 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-lg p-4 shadow-lg border border-slate-200 dark:border-slate-700 max-w-sm z-10">
           {(() => {
             const findSelectedNode = (nodes: MindMapNode[]): MindMapNode | null => {
               for (const node of nodes) {
@@ -670,7 +690,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
             return (
               <>
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium text-slate-800 dark:text-slate-200">{node.label}</h4>
+                  <h4 className="font-medium text-slate-800 dark:text-slate-200">{node.label || 'Untitled'}</h4>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -943,14 +963,16 @@ export function MindMapDisplay({ content, metadata, onCopy, copiedItems, onRefin
         </div>
       </CardHeader>
       
-      <CardContent className="p-0">
+      <CardContent className="p-4 h-[calc(100vh-200px)] min-h-[500px]">
         {viewMode === 'visual' ? (
-          <InteractiveMindMapCanvas
-            mindMapData={currentMindMap}
-            onExpandNode={handleExpandNode}
-            onEditNode={handleEditNode}
-            onDeleteNode={handleDeleteNode}
-          />
+          <div className="h-full w-full">
+            <InteractiveMindMapCanvas
+              mindMapData={currentMindMap}
+              onExpandNode={handleExpandNode}
+              onEditNode={handleEditNode}
+              onDeleteNode={handleDeleteNode}
+            />
+          </div>
         ) : (
           <div className="p-6 max-h-[700px] overflow-y-auto">
             <div className="space-y-6">
@@ -985,16 +1007,37 @@ export function MindMapDisplay({ content, metadata, onCopy, copiedItems, onRefin
   );
     }
 
-export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes, baseClassId, onMindMapCreated, shouldAutoGenerate }: StudyMindMapViewerProps) {
+export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes, baseClassId, studySpaceId, onMindMapCreated, shouldAutoGenerate, currentMindMap: parentMindMap, onMindMapChanged }: StudyMindMapViewerProps) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [currentMindMap, setCurrentMindMap] = useState<MindMapData | null>(null);
+  // Use parent state if provided, otherwise fall back to local state
+  const [localMindMap, setLocalMindMap] = useState<MindMapData | null>(null);
+  const currentMindMap = parentMindMap || localMindMap;
+  const setCurrentMindMap = onMindMapChanged || setLocalMindMap;
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [mindMapTitle, setMindMapTitle] = useState('');
   const [savedMindMaps, setSavedMindMaps] = useState<any[]>([]);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
   const [hasAutoGenerated, setHasAutoGenerated] = useState(false);
+  const generationInProgress = useRef(false); // Track generation state across re-renders
 
   const supabase = createClient();
+
+  // If no study space is selected, show a message
+  if (!studySpaceId) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4">
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 mb-6 inline-block">
+          <Map className="h-12 w-12 text-slate-400 mx-auto" />
+        </div>
+        <h3 className="text-lg font-semibold mb-2 text-slate-900 dark:text-slate-100">
+          No Study Space Selected
+        </h3>
+        <p className="text-slate-600 dark:text-slate-400 text-center max-w-md leading-relaxed">
+          Select a study space to view and create mind maps. Mind maps are saved to specific study spaces to keep your work organized.
+        </p>
+      </div>
+    );
+  }
 
   // Load saved mind maps
   const loadSavedMindMaps = async () => {
@@ -1003,15 +1046,23 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: mindMaps, error } = await supabase
+      let query = supabase
         .from('mind_maps')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id);
+
+      // Filter by study space if one is selected
+      if (studySpaceId) {
+        query = query.eq('study_space_id', studySpaceId);
+      }
+
+      const { data: mindMaps, error } = await query
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error loading saved mind maps:', error);
       } else {
+        console.log('Loaded mind maps for study space:', studySpaceId, mindMaps);
         setSavedMindMaps(mindMaps || []);
       }
     } catch (error) {
@@ -1021,17 +1072,20 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
     }
   };
 
-  // Load saved mind maps on component mount
+  // Load saved mind maps on component mount and when study space changes
   React.useEffect(() => {
     loadSavedMindMaps();
-  }, []);
+  }, [studySpaceId]); // Re-load when study space changes
 
   // Auto-generate mind map when user clicks "Map" button
   React.useEffect(() => {
     const autoGenerateFromSelectedText = async () => {
-      if (shouldAutoGenerate && selectedText && !currentMindMap && !isGenerating && !hasAutoGenerated) {
+      if (shouldAutoGenerate && selectedText && !currentMindMap && !generationInProgress.current && !hasAutoGenerated) {
+        console.log('🚀 Starting auto-generation with selected text:', selectedText.text.substring(0, 50) + '...');
         setHasAutoGenerated(true);
+        generationInProgress.current = true; // Set ref immediately to prevent interference
         setIsGenerating(true); // Set loading state immediately
+        console.log('🔄 Generation state set - isGenerating: true, generationInProgress: true');
         
         // Set a default title based on the selected text
         const defaultTitle = `Mind Map: ${selectedText.text.substring(0, 30)}${selectedText.text.length > 30 ? '...' : ''}`;
@@ -1049,6 +1103,7 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
             title: defaultTitle
           };
 
+          console.log('Sending mind map generation request...');
           const response = await fetch('/api/study-space/mind-map/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1060,35 +1115,46 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
           }
 
           const data = await response.json();
+          console.log('✅ Mind map generation completed');
           
           if (data.mindMapData) {
+            console.log('📊 Setting mind map data and clearing loading state');
             setCurrentMindMap(data.mindMapData);
             onMindMapCreated?.(data.mindMapData);
             // Clear loading state only after mind map is set
             setIsGenerating(false);
+            generationInProgress.current = false;
+          } else {
+            console.error('❌ No mind map data received');
+            setIsGenerating(false);
+            generationInProgress.current = false;
           }
         } catch (error) {
           console.error('Error auto-generating mind map:', error);
           // Don't show alert for auto-generation, just log the error
           setIsGenerating(false); // Clear loading state on error
+          generationInProgress.current = false;
         }
         // Don't use finally block - only clear loading state when we have a result or error
       }
     };
 
-    autoGenerateFromSelectedText();
-  }, [shouldAutoGenerate, selectedText, currentMindMap, isGenerating, currentNotes, baseClassId, onMindMapCreated, hasAutoGenerated]);
+    // Add a small delay to prevent immediate execution during rapid state changes
+    const timeoutId = setTimeout(autoGenerateFromSelectedText, 100);
+    return () => clearTimeout(timeoutId);
+  }, [shouldAutoGenerate, selectedText, currentMindMap, currentNotes, baseClassId, onMindMapCreated, hasAutoGenerated]); // Remove isGenerating from dependencies to prevent re-runs
 
-  // Reset auto-generation flag when selectedText changes or shouldAutoGenerate becomes true
+  // Reset auto-generation flag when selectedText changes (but not when shouldAutoGenerate changes)
   React.useEffect(() => {
     setHasAutoGenerated(false);
-  }, [selectedText, shouldAutoGenerate]);
+  }, [selectedText]); // Remove shouldAutoGenerate from dependencies to prevent premature resets
 
   // Remove the immediate loading state useEffect - let the main auto-generation handle it
 
   const handleBack = () => {
     setCurrentMindMap(null);
     setHasAutoGenerated(false); // Allow auto-generation again if user selects new text
+    generationInProgress.current = false; // Clear generation ref
   };
 
   const handleSave = async (mindMapData: MindMapData, title: string) => {
@@ -1106,33 +1172,43 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
         throw new Error('No organisation found for user');
       }
 
-      // Find or create a default study space for the user
-      let { data: studySpace, error: studySpaceError } = await supabase
-        .from('study_spaces')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('is_default', true)
-        .single();
-
-      if (studySpaceError || !studySpace) {
-        // Create a default study space
-        const { data: newStudySpace, error: createError } = await supabase
+      // Use the current study space or find/create a default one
+      let studySpace;
+      
+      if (studySpaceId) {
+        // Use the current study space
+        studySpace = { id: studySpaceId };
+      } else {
+        // Find or create a default study space for the user
+        let { data: defaultStudySpace, error: studySpaceError } = await supabase
           .from('study_spaces')
-          .insert({
-            user_id: user.id,
-            organisation_id: profile.organisation_id,
-            name: 'My Study Space',
-            description: 'Default study space for mind maps',
-            is_default: true
-          })
           .select('id')
+          .eq('user_id', user.id)
+          .eq('is_default', true)
           .single();
 
-        if (createError) {
-          console.error('Error creating study space:', createError);
-          throw new Error('Failed to create study space');
+        if (studySpaceError || !defaultStudySpace) {
+          // Create a default study space
+          const { data: newStudySpace, error: createError } = await supabase
+            .from('study_spaces')
+            .insert({
+              user_id: user.id,
+              organisation_id: profile.organisation_id,
+              name: 'My Study Space',
+              description: 'Default study space for mind maps',
+              is_default: true
+            })
+            .select('id')
+            .single();
+
+          if (createError) {
+            console.error('Error creating study space:', createError);
+            throw new Error('Failed to create study space');
+          }
+          studySpace = newStudySpace;
+        } else {
+          studySpace = defaultStudySpace;
         }
-        studySpace = newStudySpace;
       }
 
       const { error } = await supabase
@@ -1247,14 +1323,32 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
   }
 
   // Show loading state when generating or about to generate (only if no mind map)
-  if ((isGenerating || (shouldAutoGenerate && selectedText && !hasAutoGenerated)) && selectedText) {
+  // Make the loading state more persistent and robust
+  const shouldShowLoading = (
+    isGenerating || 
+    generationInProgress.current ||
+    (shouldAutoGenerate && selectedText && !hasAutoGenerated && !currentMindMap)
+  );
+  
+  console.log('Loading check:', { 
+    isGenerating, 
+    generationInProgress: generationInProgress.current,
+    shouldAutoGenerate, 
+    hasAutoGenerated, 
+    currentMindMap: !!currentMindMap,
+    selectedText: !!selectedText,
+    shouldShowLoading 
+  });
+  
+  if (shouldShowLoading) {
+    console.log('🔄 Showing loading state for mind map generation');
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12">
           <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
           <h3 className="text-lg font-semibold mb-2">Generating Mind Map</h3>
           <p className="text-muted-foreground text-center mb-4">
-            Creating a mind map from your selected text: "{selectedText.text.substring(0, 50)}..."
+            Creating a mind map from your selected text: "{selectedText?.text.substring(0, 50)}..."
           </p>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
