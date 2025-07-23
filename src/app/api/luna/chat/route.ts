@@ -21,6 +21,7 @@ interface ChatRequest {
   highlightedText?: string;
   sources?: any[];
   quickAction?: string;
+  context?: 'study-tools' | 'study-tools-isolated' | 'main-app';
 }
 
 export async function POST(request: NextRequest) {
@@ -40,7 +41,8 @@ export async function POST(request: NextRequest) {
       responseFormat = 'text',
       highlightedText,
       sources = [],
-      quickAction
+      quickAction,
+      context = 'main-app'
     } = body;
 
     if (!message?.trim()) {
@@ -82,7 +84,8 @@ export async function POST(request: NextRequest) {
         .insert({
           user_id: user.id,
           title: message.slice(0, 50) + (message.length > 50 ? '...' : ''),
-          persona: 'luna'
+          persona: 'luna',
+          metadata: { context } // Store the context to distinguish conversations
         })
         .select()
         .single();
@@ -131,31 +134,35 @@ export async function POST(request: NextRequest) {
     }
 
     // Build system prompt based on response format and quick action
-    let systemPrompt = `You are Luna, an AI study partner designed to help students learn effectively. You provide clear, structured, and engaging responses.
+    let systemPrompt = (context === 'study-tools' || context === 'study-tools-isolated')
+      ? `You are Luna, an AI study partner integrated into the study tools environment. You help students understand their study materials, create summaries, explain concepts, and provide structured learning support.
+
+Key characteristics:
+- Friendly, encouraging, and supportive tone
+- Focus on the specific study materials and sources provided
+- Break down complex concepts into digestible parts
+- Use examples and analogies when helpful
+- Provide structured, well-formatted responses optimized for study sessions
+- When highlighting text is provided, focus your response on that specific content
+
+${contextParts.length > 0 ? `Study Context:\n${contextParts.join('\n\n')}` : ''}`
+      : `You are Luna, an AI assistant designed to help with various tasks and conversations. You provide clear, structured, and engaging responses.
 
 Key characteristics:
 - Friendly, encouraging, and supportive tone
 - Break down complex concepts into digestible parts
 - Use examples and analogies when helpful
-- Encourage active learning and critical thinking
 - Provide structured, well-formatted responses
 
 ${contextParts.length > 0 ? `Context:\n${contextParts.join('\n\n')}` : ''}`;
 
-    // Adjust prompt based on response format
-    switch (responseFormat) {
-      case 'mindmap':
-        systemPrompt += '\n\nFormat your response as a structured mindmap using markdown with clear hierarchical organization, bullet points, and logical connections between concepts.';
-        break;
-      case 'structured':
-        systemPrompt += '\n\nFormat your response with clear headings, bullet points, numbered lists, and structured sections for maximum readability and comprehension.';
-        break;
-      case 'summary':
-        systemPrompt += '\n\nProvide a concise, well-organized summary with key points highlighted and essential information clearly presented.';
-        break;
-      default:
-        systemPrompt += '\n\nProvide a clear, well-formatted response with good structure and readability.';
-    }
+    // Add intelligent format selection
+    systemPrompt += '\n\nChoose the most appropriate response format based on the user\'s request:\n' +
+      '- Use MINDMAP format for: concept mapping, visual organization, brainstorming, showing relationships between ideas\n' +
+      '- Use STRUCTURED format for: step-by-step instructions, detailed explanations, complex topics with multiple parts\n' +
+      '- Use SUMMARY format for: condensing information, highlighting key points, quick overviews\n' +
+      '- Use TEXT format for: conversational responses, simple explanations, direct answers\n\n' +
+      'Always choose the format that best serves the user\'s learning needs and the nature of their question.';
 
     // Handle quick actions
     if (quickAction) {
@@ -196,6 +203,9 @@ ${contextParts.length > 0 ? `Context:\n${contextParts.join('\n\n')}` : ''}`;
 
     const assistantResponse = completion.choices[0]?.message?.content || 'I apologize, but I encountered an error generating a response.';
 
+    // Detect the format Luna chose based on response content
+    const detectedFormat = detectResponseFormat(assistantResponse);
+
     // Save assistant message
     const { data: savedMessage } = await supabase
       .from('luna_messages')
@@ -205,7 +215,7 @@ ${contextParts.length > 0 ? `Context:\n${contextParts.join('\n\n')}` : ''}`;
         content: assistantResponse,
         persona: 'luna',
         metadata: { 
-          response_format: responseFormat,
+          response_format: detectedFormat,
           model: 'gpt-4o-mini',
           tokens_used: completion.usage?.total_tokens || 0
         }
@@ -220,13 +230,13 @@ ${contextParts.length > 0 ? `Context:\n${contextParts.join('\n\n')}` : ''}`;
       .eq('id', currentConversationId);
 
     // Generate quick action buttons based on the response
-    const quickActions = generateQuickActions(assistantResponse, responseFormat);
+    const quickActions = generateQuickActions(assistantResponse, detectedFormat);
 
     return NextResponse.json({
       message: assistantResponse,
       conversationId: currentConversationId,
       messageId: savedMessage?.id,
-      responseFormat,
+      responseFormat: detectedFormat,
       quickActions,
       sources: sources
     });
@@ -238,6 +248,38 @@ ${contextParts.length > 0 ? `Context:\n${contextParts.join('\n\n')}` : ''}`;
       { status: 500 }
     );
   }
+}
+
+function detectResponseFormat(response: string): 'text' | 'mindmap' | 'structured' | 'summary' {
+  const content = response.toLowerCase();
+  
+  // Check for mindmap indicators
+  if (content.includes('mind map') || 
+      content.includes('mindmap') ||
+      (content.includes('##') && content.includes('###') && content.includes('-')) ||
+      content.match(/^\s*[\-\*]\s+.*\n\s*[\-\*]\s+/m)) {
+    return 'mindmap';
+  }
+  
+  // Check for structured format indicators
+  if (content.includes('step 1') || 
+      content.includes('1.') ||
+      content.includes('## ') ||
+      content.includes('### ') ||
+      (content.match(/\n\s*[\-\*]\s+/g)?.length || 0) > 3) {
+    return 'structured';
+  }
+  
+  // Check for summary indicators
+  if (content.includes('summary') ||
+      content.includes('key points') ||
+      content.includes('in summary') ||
+      content.includes('to summarize')) {
+    return 'summary';
+  }
+  
+  // Default to text format
+  return 'text';
 }
 
 function generateQuickActions(response: string, format: string) {

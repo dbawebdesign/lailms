@@ -97,7 +97,7 @@ import { NotionEditorWrapper } from '@/components/tiptap-templates/notion-like/n
 import { lunaAIService, type StudyContext, type LunaConversation } from '@/lib/services/luna-ai-service';
 import { StudyMindMapViewer } from '@/components/study-space/MindMapViewer';
 import { LessonContentRenderer } from '@/components/study-space/LessonContentRenderer';
-import { LunaChat } from '@/components/study-space/LunaChat';
+import { LunaChat, LunaChatRef } from '@/components/study-space/LunaChat';
 
 interface Course {
   id: string;
@@ -196,6 +196,7 @@ export default function UnifiedStudySpace() {
   const spaceId = searchParams?.get('space');
   const contentRef = useRef<HTMLDivElement>(null);
   const noteEditorRef = useRef<any>(null);
+  const lunaChatRef = useRef<LunaChatRef>(null);
   const supabase = createClient();
 
   // UI State
@@ -1018,52 +1019,18 @@ export default function UnifiedStudySpace() {
   };
 
   const handleSendMessage = async () => {
-    if (!chatMessage.trim()) return;
+    if (!chatMessage.trim() || !lunaChatRef.current) return;
     
     setIsGenerating(true);
     
     try {
-      const response = await fetch('/api/luna/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: chatMessage,
-          conversationId: currentConversation?.id,
-          responseFormat: 'text',
-          highlightedText: highlightedTextForLuna,
-          sources: getSelectedContent(),
-          quickAction: undefined
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
-
-      const data = await response.json();
-      
-      // Update conversation if new one was created
-      if (data.conversationId && !currentConversation) {
-        setCurrentConversation({
-          id: data.conversationId,
-          title: chatMessage.slice(0, 50) + (chatMessage.length > 50 ? '...' : ''),
-          persona: 'luna',
-          user_id: currentUser?.id || '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          is_pinned: false,
-          is_archived: false,
-          message_count: 1,
-          tags: []
-        });
-      }
-
-      // Show success notification or handle response
-      console.log('Luna response:', data.message);
-      
-      // Switch to chat tab to show the full conversation
+      // Switch to chat tab to show the conversation
       setActiveToolTab('chat');
       
+      // Use the Luna chat's internal sendMessage function
+      await lunaChatRef.current.sendMessage(chatMessage);
+      
+      // Clear the input
       setChatMessage('');
       
       // Clear highlighted text after using it
@@ -2257,6 +2224,7 @@ export default function UnifiedStudySpace() {
       case 'chat':
         return (
           <LunaChat
+            ref={lunaChatRef}
             selectedSources={getSelectedContent()}
             highlightedText={highlightedTextForLuna}
             onHighlightedTextUsed={() => setHighlightedTextForLuna(null)}
@@ -2967,6 +2935,7 @@ export default function UnifiedStudySpace() {
                   <div className="max-w-5xl mx-auto h-full">
                     {activeToolTab === 'chat' ? (
                       <LunaChat 
+                        ref={lunaChatRef}
                         selectedSources={Array.from(selectedSources).map(id => contentItems.find(item => item.id === id)).filter(Boolean)}
                         highlightedText={highlightedTextForLuna}
                         onHighlightedTextUsed={() => {

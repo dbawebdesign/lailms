@@ -15,11 +15,12 @@ import { CourseOutlineMessage } from '@/components/luna/CourseOutlineMessage';
 import KBSourceCollectionMessage from '@/components/luna/KBSourceCollectionMessage';
 import EnhancedCourseGenerationMessage from '@/components/luna/EnhancedCourseGenerationMessage';
 import { createClient } from '@/lib/supabase/client';
+import ReactMarkdown from 'react-markdown';
 import { 
   Menu, Send, Search, Plus, Bot, User, Star, Trash2, Loader2, ArrowLeft,
   MessageSquare, ClipboardCheck, Wand2, Brain, Wrench, BarChart3, Users,
   SlidersHorizontal, CreditCard, ShieldCheck, MoreHorizontal, ExternalLink,
-  Paperclip, X, FileText, Link2
+  Paperclip, X, FileText, Link2, Map, BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
@@ -48,6 +49,13 @@ interface ExtendedChatMessage extends ChatMessage {
   isKBSourceCollection?: boolean;
   kbAnalysis?: any;
   availableModes?: string[];
+  // Message metadata for formatting
+  metadata?: {
+    response_format?: 'text' | 'mindmap' | 'structured' | 'summary';
+    model?: string;
+    tokens_used?: number;
+    [key: string]: any;
+  };
   recommendedMode?: string;
   
   // Enhanced Course Generation properties
@@ -79,6 +87,96 @@ interface AttachedUrl {
   url: string;
   id: string;
 }
+
+// Premium message formatting function
+const formatMessageContent = (content: string, format?: string) => {
+  const markdownComponents = {
+    h1: ({ children }: any) => <h1 className="text-xl font-bold mb-3 text-slate-900 dark:text-slate-100">{children}</h1>,
+    h2: ({ children }: any) => <h2 className="text-lg font-semibold mb-2 text-slate-800 dark:text-slate-200">{children}</h2>,
+    h3: ({ children }: any) => <h3 className="text-base font-medium mb-2 text-slate-700 dark:text-slate-300">{children}</h3>,
+    h4: ({ children }: any) => <h4 className="text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">{children}</h4>,
+    p: ({ children }: any) => <p className="mb-3 leading-relaxed">{children}</p>,
+    ul: ({ children }: any) => <ul className="mb-3 space-y-1 list-disc list-inside">{children}</ul>,
+    ol: ({ children }: any) => <ol className="mb-3 space-y-1 list-decimal list-inside">{children}</ol>,
+    li: ({ children }: any) => <li className="ml-2 leading-relaxed">{children}</li>,
+    strong: ({ children }: any) => <strong className="font-semibold text-slate-900 dark:text-slate-100">{children}</strong>,
+    em: ({ children }: any) => <em className="italic text-slate-700 dark:text-slate-300">{children}</em>,
+    code: ({ children }: any) => <code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>,
+    pre: ({ children }: any) => <pre className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg overflow-x-auto text-sm font-mono mb-3">{children}</pre>,
+    blockquote: ({ children }: any) => <blockquote className="border-l-4 border-slate-300 dark:border-slate-600 pl-4 italic my-3 text-slate-600 dark:text-slate-400">{children}</blockquote>,
+    table: ({ children }: any) => <table className="w-full border-collapse border border-slate-300 dark:border-slate-600 mb-3">{children}</table>,
+    thead: ({ children }: any) => <thead className="bg-slate-50 dark:bg-slate-800">{children}</thead>,
+    tbody: ({ children }: any) => <tbody>{children}</tbody>,
+    tr: ({ children }: any) => <tr className="border-b border-slate-200 dark:border-slate-700">{children}</tr>,
+    th: ({ children }: any) => <th className="border border-slate-300 dark:border-slate-600 px-3 py-2 text-left font-semibold">{children}</th>,
+    td: ({ children }: any) => <td className="border border-slate-300 dark:border-slate-600 px-3 py-2">{children}</td>,
+  };
+
+  if (format === 'mindmap') {
+    return (
+      <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-5 border border-purple-200 dark:border-purple-700/50 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 shadow-sm">
+            <Map className="h-4 w-4 text-white" />
+          </div>
+          <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">Mind Map</span>
+        </div>
+        <ReactMarkdown 
+          className="prose prose-sm prose-purple dark:prose-invert max-w-none"
+          components={markdownComponents}
+        >
+          {content}
+        </ReactMarkdown>
+      </div>
+    );
+  }
+
+  if (format === 'structured') {
+    return (
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-5 border border-blue-200 dark:border-blue-700/50 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 shadow-sm">
+            <FileText className="h-4 w-4 text-white" />
+          </div>
+          <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Structured Response</span>
+        </div>
+        <ReactMarkdown 
+          className="prose prose-sm prose-blue dark:prose-invert max-w-none"
+          components={markdownComponents}
+        >
+          {content}
+        </ReactMarkdown>
+      </div>
+    );
+  }
+
+  if (format === 'summary') {
+    return (
+      <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl p-5 border border-emerald-200 dark:border-emerald-700/50 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 shadow-sm">
+            <BookOpen className="h-4 w-4 text-white" />
+          </div>
+          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Summary</span>
+        </div>
+        <ReactMarkdown 
+          className="prose prose-sm prose-emerald dark:prose-invert max-w-none"
+          components={markdownComponents}
+        >
+          {content}
+        </ReactMarkdown>
+      </div>
+    );
+  }
+
+  return (
+    <div className="prose prose-sm dark:prose-invert max-w-none">
+      <ReactMarkdown components={markdownComponents}>
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+};
 
 export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> = ({
   userRole,
@@ -738,7 +836,37 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
 
 
   const sendDirectResponseToLuna = async (responseText: string) => {
-    if (!currentConversation?.id || !responseText.trim()) return;
+    if (!responseText.trim()) return;
+    
+    // Ensure we have a conversation - reuse existing or create new one
+    let conversationToUse = currentConversation;
+    if (!conversationToUse) {
+      console.log('🆕 No current conversation for direct response, creating new one');
+      const newConversation: LunaConversation = {
+        id: uuidv4(),
+        title: 'New Conversation',
+        persona: currentPersona,
+        user_id: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_pinned: false,
+        message_count: 0,
+      };
+
+      const { data, error } = await supabase
+        .from('luna_conversations')
+        .insert(newConversation)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Failed to create conversation for direct response:', error);
+        return;
+      }
+
+      conversationToUse = data;
+      setCurrentConversation(data);
+    }
 
     try {
       setIsLoading(true);
@@ -768,9 +896,9 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
       setMessages(tempMessages);
 
       // Save user message to database - using exact pattern from handleSendMessage
-      if (currentConversation) {
+      if (conversationToUse) {
         console.log('💾 Attempting to save action button response message:', {
-          conversationId: currentConversation.id,
+          conversationId: conversationToUse.id,
           messageId: userMsg.id,
           role: 'user',
           persona: currentPersona,
@@ -779,7 +907,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
         
         const messageData = {
           id: userMsg.id,
-          conversation_id: currentConversation.id,
+          conversation_id: conversationToUse.id,
           role: 'user' as const,
           content: responseText,
           persona: currentPersona,
@@ -932,12 +1060,12 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
       }
 
       // Save assistant message to database - using pattern from handleSendMessage
-      if (currentConversation) {
+      if (conversationToUse) {
         console.log('💾 Saving assistant message to database');
         
         const assistantMessageData = {
           id: finalAssistantMsg.id,
-          conversation_id: currentConversation.id,
+          conversation_id: conversationToUse.id,
           role: 'assistant' as const,
           content: finalAssistantMsg.content,
           persona: currentPersona,
@@ -974,7 +1102,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
             updated_at: new Date().toISOString(),
             message_count: messages.length + 2,
           })
-          .eq('id', currentConversation.id);
+          .eq('id', conversationToUse.id);
           
         if (updateError) {
           console.error('❌ Failed to update conversation:', updateError);
@@ -1190,13 +1318,38 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     setMessages(newMessages);
     messageHistory.current.push({ role: 'user', content: messageToSend });
 
-    // Ensure we have a conversation (should exist from "New Chat" button)
+    // Ensure we have a conversation - reuse existing or create new one
     let conversationToUse = currentConversation;
     if (!conversationToUse) {
-      console.error('❌ No conversation available - this should not happen if user clicked "New Chat" first');
-      setError('Please start a new conversation first');
-      setIsLoading(false);
-      return;
+      console.log('🆕 No current conversation, creating new one for message');
+      // Create a new conversation inline
+      const newConversation: LunaConversation = {
+        id: uuidv4(),
+        title: 'New Conversation',
+        persona: currentPersona,
+        user_id: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_pinned: false,
+        message_count: 0,
+      };
+
+      // Save to database first
+      const { data, error } = await supabase
+        .from('luna_conversations')
+        .insert(newConversation)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Failed to create conversation:', error);
+        setError(`Failed to create conversation: ${error.message}`);
+        setIsLoading(false);
+        return;
+      }
+
+      conversationToUse = data;
+      setCurrentConversation(data);
     }
 
     try {
@@ -1950,7 +2103,9 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
                           }}
                         />
                       ) : (
-                        <div className="whitespace-pre-wrap break-words overflow-wrap-anywhere">{msg.content}</div>
+                        <div className="break-words">
+                          {formatMessageContent(msg.content, msg.metadata?.response_format)}
+                        </div>
                       )}
                     </div>
                   )}
