@@ -1367,7 +1367,7 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
           const studyContext = {
             selectedContent: [], // Don't use selected content when we have selected text
             selectedText: selectedText, // Selected text takes priority when available
-            currentNotes: currentNotes || [], // Notes are always included as additional context
+            currentNotes: [], // Notes are excluded from mind map generation
             title: defaultTitle
           };
 
@@ -1626,7 +1626,7 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
       const studyContext = {
         selectedContent: selectedText ? [] : (selectedContent || []), // Don't use selected content if we have selected text
         selectedText: selectedText || null, // Selected text takes priority when available
-        currentNotes: currentNotes || [], // Notes are always included as additional context
+        currentNotes: [], // Notes are excluded from mind map generation
         title: mindMapTitle || 'Study Mind Map'
       };
 
@@ -1757,9 +1757,7 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
                       <div className="text-blue-600 dark:text-blue-400 font-medium">
                         • Primary: Text selection: "{selectedText.text.substring(0, 50)}..."
                       </div>
-                      {currentNotes && currentNotes.length > 0 && (
-                        <div>• Additional: {currentNotes.length} note(s) included</div>
-                      )}
+
                       {selectedContent && selectedContent.length > 0 && (
                         <div className="text-slate-400 line-through">
                           • {selectedContent.length} content item(s) (will be ignored)
@@ -1772,12 +1770,10 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
                       {selectedContent && selectedContent.length > 0 && (
                         <div>• {selectedContent.length} content item(s) selected</div>
                       )}
-                      {currentNotes && currentNotes.length > 0 && (
-                        <div>• {currentNotes.length} note(s) included</div>
-                      )}
+
                     </>
                   )}
-                  {!selectedContent && !selectedText && !currentNotes?.length && (
+                  {!selectedContent && !selectedText && (
                     <div className="text-amber-600">⚠️ No source material selected</div>
                   )}
               </div>

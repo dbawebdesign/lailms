@@ -26,27 +26,39 @@ export async function POST(request: NextRequest) {
     let contextText = '';
     
     if (studyContext?.selectedContent && studyContext.selectedContent.length > 0) {
-      contextText += 'AVAILABLE STUDY CONTENT:\n';
-      studyContext.selectedContent.forEach((item: any, index: number) => {
-        contextText += `${index + 1}. ${item.title}\n`;
-        if (item.description) contextText += `   Description: ${item.description}\n`;
-        if (item.content) contextText += `   Content: ${item.content.substring(0, 300)}...\n`;
-        contextText += '\n';
-      });
+      // Filter out notes from content
+      const contentWithoutNotes = studyContext.selectedContent.filter((item: any) => 
+        !item.tags?.includes('note') && item.type !== 'note'
+      );
+      
+      if (contentWithoutNotes.length > 0) {
+        contextText += 'AVAILABLE STUDY CONTENT:\n';
+        contentWithoutNotes.forEach((item: any, index: number) => {
+          contextText += `${index + 1}. ${item.title}\n`;
+          if (item.description) contextText += `   Description: ${item.description}\n`;
+          
+          // Handle different content types safely
+          if (item.content) {
+            let contentText = '';
+            if (typeof item.content === 'string') {
+              contentText = item.content;
+            } else if (typeof item.content === 'object') {
+              contentText = JSON.stringify(item.content);
+            } else {
+              contentText = String(item.content);
+            }
+            contextText += `   Content: ${contentText.substring(0, 300)}...\n`;
+          }
+          contextText += '\n';
+        });
+      }
     }
 
     if (studyContext?.selectedText) {
       contextText += `HIGHLIGHTED TEXT:\n"${studyContext.selectedText.text}"\n\n`;
     }
 
-    if (studyContext?.currentNotes && studyContext.currentNotes.length > 0) {
-      contextText += 'STUDY NOTES:\n';
-      studyContext.currentNotes.forEach((note: any, index: number) => {
-        contextText += `${index + 1}. ${note.title}\n`;
-        if (note.content) contextText += `   ${note.content.substring(0, 200)}...\n`;
-        contextText += '\n';
-      });
-    }
+    // Notes are excluded from mind map expansion
 
     const expansionPrompt = `You are expanding a study mind map node based on educational content. Generate 2-4 new child nodes with actual educational content, not meta-descriptions.
 

@@ -233,7 +233,7 @@ ${contextParts.length > 0 ? `Context:\n${contextParts.join('\n\n')}` : ''}`;
     const quickActions = generateQuickActions(assistantResponse, detectedFormat);
 
     return NextResponse.json({
-      message: assistantResponse,
+      response: assistantResponse,
       conversationId: currentConversationId,
       messageId: savedMessage?.id,
       responseFormat: detectedFormat,

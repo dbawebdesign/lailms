@@ -31,15 +31,34 @@ export async function POST(request: NextRequest) {
     // Build context from study materials
     let contextText = '';
     
-    // Add selected content
+    // Add selected content (excluding notes)
     if (studyContext.selectedContent && studyContext.selectedContent.length > 0) {
-      contextText += 'SELECTED CONTENT:\n';
-      studyContext.selectedContent.forEach((item: any, index: number) => {
-        contextText += `${index + 1}. ${item.title}\n`;
-        if (item.description) contextText += `   Description: ${item.description}\n`;
-        if (item.content) contextText += `   Content: ${item.content.substring(0, 500)}...\n`;
-        contextText += '\n';
-      });
+      const contentWithoutNotes = studyContext.selectedContent.filter((item: any) => 
+        !item.tags?.includes('note') && item.type !== 'note'
+      );
+      
+      if (contentWithoutNotes.length > 0) {
+        contextText += 'SELECTED CONTENT:\n';
+        contentWithoutNotes.forEach((item: any, index: number) => {
+          contextText += `${index + 1}. ${item.title}\n`;
+          if (item.description) contextText += `   Description: ${item.description}\n`;
+          
+          // Handle different content types
+          if (item.content) {
+            let contentText = '';
+            if (typeof item.content === 'string') {
+              contentText = item.content;
+            } else if (typeof item.content === 'object') {
+              // Handle Tiptap JSON or other object content
+              contentText = JSON.stringify(item.content);
+            } else {
+              contentText = String(item.content);
+            }
+            contextText += `   Content: ${contentText.substring(0, 500)}...\n`;
+          }
+          contextText += '\n';
+        });
+      }
     }
 
     // Add selected text
@@ -47,15 +66,7 @@ export async function POST(request: NextRequest) {
       contextText += `HIGHLIGHTED TEXT:\n"${studyContext.selectedText.text}"\nSource: ${studyContext.selectedText.source}\n\n`;
     }
 
-    // Add current notes
-    if (studyContext.currentNotes && studyContext.currentNotes.length > 0) {
-      contextText += 'STUDY NOTES:\n';
-      studyContext.currentNotes.forEach((note: any, index: number) => {
-        contextText += `${index + 1}. ${note.title}\n`;
-        if (note.content) contextText += `   ${note.content.substring(0, 300)}...\n`;
-        contextText += '\n';
-      });
-    }
+    // Notes are excluded from mind map generation
 
     if (!contextText.trim()) {
       return NextResponse.json({ error: 'No study content provided' }, { status: 400 });

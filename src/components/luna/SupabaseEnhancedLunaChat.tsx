@@ -115,12 +115,6 @@ const formatMessageContent = (content: string, format?: string) => {
   if (format === 'mindmap') {
     return (
       <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-5 border border-purple-200 dark:border-purple-700/50 shadow-sm">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 shadow-sm">
-            <Map className="h-4 w-4 text-white" />
-          </div>
-          <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">Mind Map</span>
-        </div>
         <ReactMarkdown 
           className="prose prose-sm prose-purple dark:prose-invert max-w-none"
           components={markdownComponents}
@@ -134,12 +128,6 @@ const formatMessageContent = (content: string, format?: string) => {
   if (format === 'structured') {
     return (
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-5 border border-blue-200 dark:border-blue-700/50 shadow-sm">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 shadow-sm">
-            <FileText className="h-4 w-4 text-white" />
-          </div>
-          <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Structured Response</span>
-        </div>
         <ReactMarkdown 
           className="prose prose-sm prose-blue dark:prose-invert max-w-none"
           components={markdownComponents}
@@ -153,12 +141,6 @@ const formatMessageContent = (content: string, format?: string) => {
   if (format === 'summary') {
     return (
       <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl p-5 border border-emerald-200 dark:border-emerald-700/50 shadow-sm">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 shadow-sm">
-            <BookOpen className="h-4 w-4 text-white" />
-          </div>
-          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Summary</span>
-        </div>
         <ReactMarkdown 
           className="prose prose-sm prose-emerald dark:prose-invert max-w-none"
           components={markdownComponents}
