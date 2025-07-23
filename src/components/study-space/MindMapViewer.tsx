@@ -862,7 +862,6 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
             <div>• <strong>Hover</strong> nodes for actions</div>
             <div>• <strong>Click ✨</strong> to AI-expand nodes</div>
             <div>• <strong>Click ±</strong> to show/hide children</div>
-            <div className="text-green-600 dark:text-green-400 font-medium">• Enhanced: No node overlaps!</div>
           </div>
         </div>
       </div>

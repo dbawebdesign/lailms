@@ -316,9 +316,8 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
                       <div className="flex items-center space-x-4 w-full">
                         <div className={cn(
                           "p-2.5 rounded-lg transition-airy",
-                          activeTab === tab.id 
-                            ? "bg-brand-gradient text-white shadow-sm" 
-                            : "bg-muted text-muted-foreground"
+                          activeTab === tab.id && "bg-brand-gradient text-white shadow-sm",
+                          activeTab !== tab.id && "bg-muted text-muted-foreground"
                         )}>
                           <IconComponent className="h-4 w-4" />
                         </div>
