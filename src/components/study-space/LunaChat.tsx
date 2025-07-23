@@ -631,4 +631,6 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
 
     </div>
   );
-}); 
+});
+
+LunaChat.displayName = 'LunaChat'; 
