@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import ContentRenderer from './ContentRenderer';
 
 // Tiptap imports
-import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
-import Table from '@tiptap/extension-table';
+import { Table } from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
@@ -175,13 +176,13 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
         
         // Only set content if it's different, to avoid cursor jumps and unnecessary re-renders
         if (JSON.stringify(currentContent) !== JSON.stringify(newContent)) {
-          editor.commands.setContent(newContent || '', false);
+          editor.commands.setContent(newContent || '');
         }
       } catch (e) {
         // If parsing fails or content is not structured, set as plain text or handle error
         console.warn("Failed to parse section content for Tiptap:", section.content, e);
         // For safety, initialize with empty content if content is invalid for Tiptap
-        editor.commands.setContent('', false);
+        editor.commands.setContent('');
       }
       
       editor.setEditable(isEditing);
@@ -414,7 +415,7 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
               <EditorToolbar editor={editor} />
               <EditorContent editor={editor} className="mt-0 border border-input rounded-b-md min-h-[200px] p-2 focus:outline-none focus:ring-2 focus:ring-ring prose dark:prose-invert max-w-full" />
               {editor && (
-                <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }} className="bg-background border border-input rounded-md shadow-xl p-1 flex gap-1">
+                <BubbleMenu editor={editor} className="bg-background border border-input rounded-md shadow-xl p-1 flex gap-1">
                   <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()} className={editor.isActive('bold') ? 'is-active bg-muted' : ''}><Bold className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleItalic().run()} className={editor.isActive('italic') ? 'is-active bg-muted' : ''}><Italic className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="sm" onClick={setLinkBubble}><LinkIcon className="h-4 w-4" /></Button>

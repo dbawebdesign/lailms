@@ -26,12 +26,12 @@ type User = { clientId: number; id: string; name: string; color: string }
 export function CollaborationUsers() {
   const { editor } = useTiptapEditor()
 
-  if (!editor || !editor.storage.collaborationCaret) {
+  if (!editor || !(editor.storage as any).collaborationCaret) {
     return null
   }
 
   const collaborationUsers: User[] =
-    editor.storage.collaborationCaret.users.map((user) => ({
+    (editor.storage as any).collaborationCaret.users.map((user: any) => ({
       clientId: user.clientId,
       id: String(user.clientId),
       name: user.name || "Anonymous",

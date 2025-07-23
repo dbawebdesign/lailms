@@ -1022,23 +1022,6 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
 
   const supabase = createClient();
 
-  // If no study space is selected, show a message
-  if (!studySpaceId) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 px-4">
-        <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 mb-6 inline-block">
-          <Map className="h-12 w-12 text-slate-400 mx-auto" />
-        </div>
-        <h3 className="text-lg font-semibold mb-2 text-slate-900 dark:text-slate-100">
-          No Study Space Selected
-        </h3>
-        <p className="text-slate-600 dark:text-slate-400 text-center max-w-md leading-relaxed">
-          Select a study space to view and create mind maps. Mind maps are saved to specific study spaces to keep your work organized.
-        </p>
-      </div>
-    );
-  }
-
   // Load saved mind maps
   const loadSavedMindMaps = async () => {
     setIsLoadingSaved(true);
@@ -1150,6 +1133,23 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
   }, [selectedText]); // Remove shouldAutoGenerate from dependencies to prevent premature resets
 
   // Remove the immediate loading state useEffect - let the main auto-generation handle it
+
+  // If no study space is selected, show a message
+  if (!studySpaceId) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4">
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 mb-6 inline-block">
+          <Map className="h-12 w-12 text-slate-400 mx-auto" />
+        </div>
+        <h3 className="text-lg font-semibold mb-2 text-slate-900 dark:text-slate-100">
+          No Study Space Selected
+        </h3>
+        <p className="text-slate-600 dark:text-slate-400 text-center max-w-md leading-relaxed">
+          Select a study space to view and create mind maps. Mind maps are saved to specific study spaces to keep your work organized.
+        </p>
+      </div>
+    );
+  }
 
   const handleBack = () => {
     setCurrentMindMap(null);

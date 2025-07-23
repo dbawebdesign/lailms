@@ -135,6 +135,7 @@ export const MenuButton = React.forwardRef<
     className={cn("tiptap-menu-button", className)}
   />
 ))
+MenuButton.displayName = "MenuButton"
 
 export const MenuButtonArrow = React.forwardRef<
   React.ComponentRef<typeof Ariakit.MenuButtonArrow>,
@@ -146,6 +147,7 @@ export const MenuButtonArrow = React.forwardRef<
     className={cn("tiptap-menu-button-arrow", className)}
   />
 ))
+MenuButtonArrow.displayName = "MenuButtonArrow"
 
 export const MenuGroup = React.forwardRef<
   React.ComponentRef<typeof Ariakit.MenuGroup>,
@@ -157,11 +159,13 @@ export const MenuGroup = React.forwardRef<
     className={cn("tiptap-menu-group", className)}
   />
 ))
+MenuGroup.displayName = "MenuGroup"
 
 export const MenuGroupLabel = React.forwardRef<
   React.ComponentRef<typeof Ariakit.MenuGroupLabel>,
   React.ComponentPropsWithoutRef<typeof Ariakit.MenuGroupLabel>
 >((props, ref) => <Label ref={ref} {...props} />)
+MenuGroupLabel.displayName = "MenuGroupLabel"
 
 export const MenuItemCheck = React.forwardRef<
   React.ComponentRef<typeof Ariakit.MenuItemCheck>,
@@ -173,6 +177,7 @@ export const MenuItemCheck = React.forwardRef<
     className={cn("tiptap-menu-item-check", className)}
   />
 ))
+MenuItemCheck.displayName = "MenuItemCheck"
 
 export const MenuItemRadio = React.forwardRef<
   React.ComponentRef<typeof Ariakit.MenuItemRadio>,
@@ -184,6 +189,7 @@ export const MenuItemRadio = React.forwardRef<
     className={cn("tiptap-menu-item-radio", className)}
   />
 ))
+MenuItemRadio.displayName = "MenuItemRadio"
 
 export const MenuItem = function MenuItem({
   name,

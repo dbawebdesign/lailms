@@ -131,7 +131,7 @@ Avatar.displayName = "Avatar"
 export const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
   ({ onLoadingStatusChange, src, className = "", ...props }, ref) => {
     const { onImageLoadingStatusChange } = useAvatarContext()
-    const imageLoadingStatus = useImageLoadingStatus(src, props.referrerPolicy)
+    const imageLoadingStatus = useImageLoadingStatus(typeof src === 'string' ? src : undefined, props.referrerPolicy)
 
     React.useLayoutEffect(() => {
       if (imageLoadingStatus !== "idle") {
