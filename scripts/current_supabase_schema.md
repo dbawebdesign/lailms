@@ -8,7 +8,7 @@ Added course_id column to study_spaces table to enable persistent study spaces p
 - **Schema Changes:**
   - Added `course_id UUID` column referencing `base_classes(id)`
   - Added index `idx_study_spaces_user_course` on `(user_id, course_id)`
-  - Added unique constraint `unique_user_course_study_space` to ensure one study space per user per course
+  - Added unique constraint `unique_study_space_per_user_course` to ensure one study space per user per course (partial index where course_id IS NOT NULL)
 
 - **Purpose:**
   - Enables persistent study spaces that are linked to specific courses

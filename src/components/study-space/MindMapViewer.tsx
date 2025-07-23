@@ -33,6 +33,7 @@ interface MindMapNode {
 }
 
 interface MindMapData {
+  savedId?: string; // Add optional ID for tracking saved mind maps
   center: {
     label: string;
     description?: string;
@@ -83,6 +84,108 @@ interface MindMapDisplayProps {
   onSave?: (mindMapData: MindMapData, title: string) => void;
 }
 
+// Collision detection utilities
+interface NodePosition {
+  id: string;
+  x: number;
+  y: number;
+  radius: number;
+}
+
+const COLLISION_BUFFER = 15; // Minimum space between nodes
+const MAX_COLLISION_ATTEMPTS = 30; // Maximum attempts to find non-colliding position
+
+function checkCollision(
+  x: number, 
+  y: number, 
+  radius: number, 
+  existingNodes: NodePosition[], 
+  excludeId?: string
+): boolean {
+  for (const node of existingNodes) {
+    if (excludeId && node.id === excludeId) continue;
+    
+    const distance = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2);
+    const minDistance = radius + node.radius + COLLISION_BUFFER;
+    
+    if (distance < minDistance) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function findNonCollidingPosition(
+  baseX: number,
+  baseY: number,
+  baseAngle: number,
+  radius: number,
+  existingNodes: NodePosition[],
+  excludeId?: string
+): { x: number; y: number; angle: number } {
+  // First try the base position
+  if (!checkCollision(baseX, baseY, radius, existingNodes, excludeId)) {
+    return { x: baseX, y: baseY, angle: baseAngle };
+  }
+
+  // Try positions in a spiral pattern around the base position
+  for (let attempt = 1; attempt <= MAX_COLLISION_ATTEMPTS; attempt++) {
+    const spiralRadius = attempt * 25; // Spiral outward
+    const angleVariations = Math.max(8, attempt * 2); // More positions per ring as we go out
+    
+    for (let angleIndex = 0; angleIndex < angleVariations; angleIndex++) {
+      const angle = baseAngle + (angleIndex / angleVariations) * 2 * Math.PI;
+      const x = baseX + Math.cos(angle) * spiralRadius;
+      const y = baseY + Math.sin(angle) * spiralRadius;
+      
+      if (!checkCollision(x, y, radius, existingNodes, excludeId)) {
+        return { x, y, angle };
+      }
+    }
+  }
+
+  // Fallback: return original position with a warning
+  console.warn('Could not find non-colliding position for node, using original position');
+  return { x: baseX, y: baseY, angle: baseAngle };
+}
+
+function adjustPositionsForCollisions(nodes: MindMapNode[]): MindMapNode[] {
+  const adjustedNodes: MindMapNode[] = [];
+  const nodePositions: NodePosition[] = [];
+  
+  for (const node of nodes) {
+    const nodeRadius = node.level === 0 ? 50 : node.level === 1 ? 40 : node.level === 2 ? 32 : node.level === 3 ? 24 : 18;
+    
+    // Calculate base position based on existing logic
+    const baseX = node.x;
+    const baseY = node.y;
+    
+    // Find non-colliding position
+    const { x, y } = findNonCollidingPosition(
+      baseX,
+      baseY,
+      0, // We don't have angle info here, so use 0
+      nodeRadius,
+      nodePositions,
+      node.id
+    );
+    
+    // Create adjusted node
+    const adjustedNode = { ...node, x, y };
+    adjustedNodes.push(adjustedNode);
+    
+    // Add to positions for collision checking of subsequent nodes
+    nodePositions.push({
+      id: node.id,
+      x,
+      y,
+      radius: nodeRadius
+    });
+  }
+  
+  return adjustedNodes;
+}
+
 function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDeleteNode }: { 
   mindMapData: MindMapData;
   onExpandNode: (nodeId: string, nodeData: any) => void;
@@ -103,16 +206,12 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
   const svgRef = useRef<SVGSVGElement>(null);
   const viewInitialized = useRef(false);
 
-  // Convert mind map data to node structure with unique IDs
-  useEffect(() => {
-    // Add defensive checks for mindMapData structure
-    if (!mindMapData || !mindMapData.center) {
-      console.error('Invalid mind map data:', mindMapData);
-      return;
-    }
+  // Enhanced positioning algorithm with collision avoidance
+  const calculateNodePositions = (mindMapData: MindMapData) => {
+    const allNodes: MindMapNode[] = [];
+    const nodePositions: NodePosition[] = [];
 
-    console.log('Processing mind map data:', JSON.stringify(mindMapData, null, 2));
-
+    // Center node
     const centerNode: MindMapNode = {
       id: 'center',
       label: mindMapData.center.label || 'Untitled Topic',
@@ -124,10 +223,22 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
       isExpanded: true
     };
 
-    const branchNodes: MindMapNode[] = (mindMapData.branches || []).map((branch, branchIndex) => {
-      const totalBranches = mindMapData.branches?.length || 1;
+    allNodes.push(centerNode);
+    nodePositions.push({ id: 'center', x: 0, y: 0, radius: 50 });
+
+    // Process branches with enhanced spacing
+    const branches = mindMapData.branches || [];
+    const branchNodes: MindMapNode[] = branches.map((branch, branchIndex) => {
+      const totalBranches = branches.length;
       const angle = (branchIndex * 2 * Math.PI) / totalBranches;
-      const radius = Math.max(350, totalBranches * 50);
+      // Increased base radius to provide more room
+      const baseRadius = Math.max(450, totalBranches * 70);
+      
+      const baseX = centerNode.x + baseRadius * Math.cos(angle);
+      const baseY = centerNode.y + baseRadius * Math.sin(angle);
+      
+      // Find non-colliding position for branch
+      const { x, y } = findNonCollidingPosition(baseX, baseY, angle, 40, nodePositions);
       
       const branchNode: MindMapNode = {
         id: branch.id || generateUniqueId('branch'),
@@ -135,18 +246,45 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
         description: branch.description || '',
         color: branch.color || '#3B82F6',
         level: 1,
-        x: centerNode.x + radius * Math.cos(angle),
-        y: centerNode.y + radius * Math.sin(angle),
+        x,
+        y,
         children: [],
         isExpanded: true,
         parentId: 'center'
       };
 
+      allNodes.push(branchNode);
+      nodePositions.push({ id: branchNode.id, x, y, radius: 40 });
+
+      // Process concepts with collision avoidance
       if (branch.concepts && Array.isArray(branch.concepts)) {
         branchNode.children = branch.concepts.map((concept, conceptIndex) => {
           const conceptCount = branch.concepts!.length;
-          const conceptAngle = angle + (conceptIndex - (conceptCount - 1) / 2) * 0.3;
-          const conceptRadius = 200;
+          
+          // Create systematic positioning for concepts in the branch's sector
+          const branchSectorAngle = (2 * Math.PI) / totalBranches;
+          const conceptStartAngle = angle - (branchSectorAngle * 0.4);
+          const conceptEndAngle = angle + (branchSectorAngle * 0.4);
+          
+          let conceptAngle;
+          if (conceptCount === 1) {
+            conceptAngle = angle;
+          } else {
+            conceptAngle = conceptStartAngle + (conceptIndex / (conceptCount - 1)) * (conceptEndAngle - conceptStartAngle);
+          }
+          
+          // Increased radius for better spacing
+          const conceptRadius = Math.max(280, conceptCount * 50);
+          const baseConceptX = branchNode.x + conceptRadius * Math.cos(conceptAngle);
+          const baseConceptY = branchNode.y + conceptRadius * Math.sin(conceptAngle);
+          
+          const { x: conceptX, y: conceptY } = findNonCollidingPosition(
+            baseConceptX, 
+            baseConceptY, 
+            conceptAngle, 
+            32, 
+            nodePositions
+          );
           
           const conceptNode: MindMapNode = {
             id: concept.id || generateUniqueId(`concept-${branchIndex}`),
@@ -154,18 +292,48 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
             description: concept.description || '',
             color: branch.color || '#3B82F6',
             level: 2,
-            x: branchNode.x + conceptRadius * Math.cos(conceptAngle),
-            y: branchNode.y + conceptRadius * Math.sin(conceptAngle),
+            x: conceptX,
+            y: conceptY,
             children: [],
             isExpanded: true,
             parentId: branchNode.id
           };
 
+          allNodes.push(conceptNode);
+          nodePositions.push({ id: conceptNode.id, x: conceptX, y: conceptY, radius: 32 });
+
+          // Process points with collision avoidance
           if (concept.points && Array.isArray(concept.points)) {
             conceptNode.children = concept.points.map((point, pointIndex) => {
               const pointCount = concept.points!.length;
-              const pointAngle = conceptAngle + (pointIndex - (pointCount - 1) / 2) * 0.4;
-              const pointRadius = 120;
+              
+              // Distribute points in rings around the concept
+              const maxPointsPerRing = 4;
+              const ringIndex = Math.floor(pointIndex / maxPointsPerRing);
+              const positionInRing = pointIndex % maxPointsPerRing;
+              const pointsInThisRing = Math.min(maxPointsPerRing, pointCount - (ringIndex * maxPointsPerRing));
+              
+              const ringRadius = Math.max(180, 80 + (ringIndex * 90));
+              const ringSpread = Math.min(Math.PI * 0.8, pointsInThisRing * 0.5);
+              const startAngle = conceptAngle - ringSpread / 2;
+              
+              let pointAngle;
+              if (pointsInThisRing === 1) {
+                pointAngle = conceptAngle;
+              } else {
+                pointAngle = startAngle + (positionInRing / (pointsInThisRing - 1)) * ringSpread;
+              }
+              
+              const basePointX = conceptNode.x + ringRadius * Math.cos(pointAngle);
+              const basePointY = conceptNode.y + ringRadius * Math.sin(pointAngle);
+              
+              const { x: pointX, y: pointY } = findNonCollidingPosition(
+                basePointX, 
+                basePointY, 
+                pointAngle, 
+                24, 
+                nodePositions
+              );
               
               const pointNode: MindMapNode = {
                 id: point.id || generateUniqueId(`point-${branchIndex}-${conceptIndex}`),
@@ -173,31 +341,66 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
                 description: point.description || '',
                 color: branch.color || '#3B82F6',
                 level: 3,
-                x: conceptNode.x + pointRadius * Math.cos(pointAngle),
-                y: conceptNode.y + pointRadius * Math.sin(pointAngle),
+                x: pointX,
+                y: pointY,
                 children: [],
                 isExpanded: true,
                 parentId: conceptNode.id
               };
 
+              allNodes.push(pointNode);
+              nodePositions.push({ id: pointNode.id, x: pointX, y: pointY, radius: 24 });
+
+              // Process details with collision avoidance
               if (point.details && Array.isArray(point.details)) {
                 pointNode.children = point.details.map((detail, detailIndex) => {
                   const detailCount = point.details!.length;
-                  const detailAngle = pointAngle + (detailIndex - (detailCount - 1) / 2) * 0.5;
-                  const detailRadius = 80;
                   
-                  return {
+                  // Tight clustering for details
+                  const maxDetailsPerRing = 3;
+                  const detailRingIndex = Math.floor(detailIndex / maxDetailsPerRing);
+                  const detailPositionInRing = detailIndex % maxDetailsPerRing;
+                  const detailsInThisRing = Math.min(maxDetailsPerRing, detailCount - (detailRingIndex * maxDetailsPerRing));
+                  
+                  const detailRingRadius = Math.max(120, 60 + (detailRingIndex * 70));
+                  const detailRingSpread = Math.min(Math.PI * 0.6, detailsInThisRing * 0.6);
+                  const detailStartAngle = pointAngle - detailRingSpread / 2;
+                  
+                  let detailAngle;
+                  if (detailsInThisRing === 1) {
+                    detailAngle = pointAngle;
+                  } else {
+                    detailAngle = detailStartAngle + (detailPositionInRing / (detailsInThisRing - 1)) * detailRingSpread;
+                  }
+                  
+                  const baseDetailX = pointNode.x + detailRingRadius * Math.cos(detailAngle);
+                  const baseDetailY = pointNode.y + detailRingRadius * Math.sin(detailAngle);
+                  
+                  const { x: detailX, y: detailY } = findNonCollidingPosition(
+                    baseDetailX, 
+                    baseDetailY, 
+                    detailAngle, 
+                    18, 
+                    nodePositions
+                  );
+                  
+                  const detailNode: MindMapNode = {
                     id: detail.id || generateUniqueId(`detail-${pointNode.id}`),
                     label: detail.label || 'Untitled Detail',
                     description: detail.description || '',
                     color: branch.color || '#3B82F6',
                     level: 4,
-                    x: pointNode.x + detailRadius * Math.cos(detailAngle),
-                    y: pointNode.y + detailRadius * Math.sin(detailAngle),
+                    x: detailX,
+                    y: detailY,
                     children: [],
                     isExpanded: true,
                     parentId: pointNode.id
                   };
+
+                  allNodes.push(detailNode);
+                  nodePositions.push({ id: detailNode.id, x: detailX, y: detailY, radius: 18 });
+
+                  return detailNode;
                 });
               }
 
@@ -213,7 +416,21 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
     });
 
     centerNode.children = branchNodes;
-    setNodes([centerNode, ...getAllNodes(branchNodes)]);
+    return allNodes;
+  };
+
+  // Convert mind map data to node structure with enhanced collision avoidance
+  useEffect(() => {
+    // Add defensive checks for mindMapData structure
+    if (!mindMapData || !mindMapData.center) {
+      console.error('Invalid mind map data:', mindMapData);
+      return;
+    }
+
+    console.log('Processing mind map data with collision avoidance:', JSON.stringify(mindMapData, null, 2));
+
+    const calculatedNodes = calculateNodePositions(mindMapData);
+    setNodes(calculatedNodes);
   }, [mindMapData]);
 
   // Auto-zoom to fit the whole map on initial load
@@ -645,6 +862,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
             <div>• <strong>Hover</strong> nodes for actions</div>
             <div>• <strong>Click ✨</strong> to AI-expand nodes</div>
             <div>• <strong>Click ±</strong> to show/hide children</div>
+            <div className="text-green-600 dark:text-green-400 font-medium">• Enhanced: No node overlaps!</div>
           </div>
         </div>
       </div>
@@ -826,6 +1044,11 @@ export function MindMapDisplay({ content, metadata, onCopy, copiedItems, onRefin
         const data = await response.json();
         if (data.success && data.expandedNodes) {
           const updatedMindMap = addNodesToMindMap(currentMindMap, nodeId, data.expandedNodes);
+          console.log('🔄 Mind map updated with new nodes:', {
+            nodeId,
+            newNodesCount: data.expandedNodes.length,
+            totalBranches: updatedMindMap.branches.length
+          });
           setEditedMindMap(updatedMindMap);
           onMindMapUpdate?.(updatedMindMap);
         }
@@ -932,8 +1155,9 @@ export function MindMapDisplay({ content, metadata, onCopy, copiedItems, onRefin
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const title = prompt('Enter a title for this mind map:');
-                  if (title && currentMindMap) {
+                  if (currentMindMap) {
+                    // Use the center node label as the title automatically
+                    const title = currentMindMap.center.label || 'Untitled Mind Map';
                     onSave(currentMindMap, title);
                   }
                 }}
@@ -974,24 +1198,86 @@ export function MindMapDisplay({ content, metadata, onCopy, copiedItems, onRefin
             />
           </div>
         ) : (
-          <div className="p-6 max-h-[700px] overflow-y-auto">
+          <div className="p-6 max-h-[700px] overflow-y-auto" key={`list-view-${JSON.stringify(currentMindMap.branches.map(b => b.id)).slice(0, 50)}`}>
             <div className="space-y-6">
-              {currentMindMap.branches.map((branch, index) => (
+              {/* Center Topic */}
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                  {currentMindMap.center.label}
+                </h2>
+                {currentMindMap.center.description && (
+                  <p className="text-slate-600 dark:text-slate-400">
+                    {currentMindMap.center.description}
+                  </p>
+                )}
+              </div>
+              
+              {/* Hierarchical Content */}
+              {currentMindMap.branches.map((branch, branchIndex) => (
                 <div key={branch.id} className="border-l-4 pl-4" style={{ borderColor: branch.color }}>
                   <h3 className="font-semibold text-lg mb-3" style={{ color: branch.color }}>
-                    {index + 1}. {branch.label}
+                    {branchIndex + 1}. {branch.label}
                   </h3>
+                  {branch.description && branch.description !== branch.label && (
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 pl-4">
+                      {branch.description}
+                    </p>
+                  )}
+                  
+                  {/* Concepts Level */}
                   {branch.concepts && branch.concepts.length > 0 && (
-                    <div className="space-y-2">
-                      {branch.concepts.map((concept) => (
+                    <div className="space-y-3 ml-4">
+                      {branch.concepts.map((concept, conceptIndex) => (
                         <div key={concept.id} className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3">
                           <h4 className="font-medium text-slate-800 dark:text-slate-200">
-                            {concept.label}
+                            {branchIndex + 1}.{conceptIndex + 1} {concept.label}
                           </h4>
                           {concept.description && concept.description !== concept.label && (
                             <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                               {concept.description}
                             </p>
+                          )}
+                          
+                          {/* Points Level */}
+                          {concept.points && concept.points.length > 0 && (
+                            <div className="mt-3 space-y-2 ml-4">
+                              <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium">
+                                📋 Expanded Content ({concept.points.length} items)
+                              </div>
+                              {concept.points.map((point, pointIndex) => (
+                                <div key={point.id} className="bg-slate-100 dark:bg-slate-700 rounded p-2 border-l-2 border-blue-400">
+                                  <h5 className="font-medium text-sm text-slate-700 dark:text-slate-300">
+                                    {branchIndex + 1}.{conceptIndex + 1}.{pointIndex + 1} {point.label}
+                                  </h5>
+                                  {point.description && point.description !== point.label && (
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                                      {point.description}
+                                    </p>
+                                  )}
+                                  
+                                  {/* Details Level */}
+                                  {point.details && point.details.length > 0 && (
+                                    <div className="mt-2 space-y-1 ml-4">
+                                      <div className="text-xs text-slate-400 dark:text-slate-500 mb-1 font-medium">
+                                        🔍 Detailed Content ({point.details.length} items)
+                                      </div>
+                                      {point.details.map((detail, detailIndex) => (
+                                        <div key={detail.id} className="bg-slate-200 dark:bg-slate-600 rounded p-2 border-l-2 border-green-400">
+                                          <h6 className="font-medium text-xs text-slate-600 dark:text-slate-400">
+                                            {branchIndex + 1}.{conceptIndex + 1}.{pointIndex + 1}.{detailIndex + 1} {detail.label}
+                                          </h6>
+                                          {detail.description && detail.description !== detail.label && (
+                                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                                              {detail.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
                       ))}
@@ -1211,24 +1497,96 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
         }
       }
 
-      const { error } = await supabase
-        .from('mind_maps')
-        .insert({
-          title,
-          description: 'Saved from study space',
-          map_data: mindMapData,
-          user_id: user.id,
-          organisation_id: profile.organisation_id,
-          study_space_id: studySpace.id,
-          is_shared: false,
-          is_template: false
-        });
+      // Check if this is an update to an existing mind map
+      const isUpdate = mindMapData.savedId;
+      let error;
+      let operation = 'created';
+
+      if (isUpdate) {
+        // Update existing mind map
+        console.log('🔄 Updating existing mind map:', title, 'ID:', mindMapData.savedId);
+        
+        const { error: updateError } = await supabase
+          .from('mind_maps')
+          .update({
+            title,
+            description: 'Updated from study space',
+            map_data: mindMapData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', mindMapData.savedId)
+          .eq('user_id', user.id); // Security: ensure user owns the mind map
+
+        error = updateError;
+        operation = 'updated';
+      } else {
+        // Check if a mind map with this title already exists in this study space
+        const { data: existingMindMap, error: checkError } = await supabase
+          .from('mind_maps')
+          .select('id, title')
+          .eq('user_id', user.id)
+          .eq('study_space_id', studySpace.id)
+          .eq('title', title)
+          .single();
+
+        if (checkError && checkError.code !== 'PGRST116') {
+          // Error other than "not found"
+          console.error('Error checking for existing mind map:', checkError);
+          error = checkError;
+        } else if (existingMindMap) {
+          // Update existing mind map with same title
+          console.log('🔄 Updating mind map with same title:', title, 'ID:', existingMindMap.id);
+          
+          const { error: updateError } = await supabase
+            .from('mind_maps')
+            .update({
+              description: 'Updated from study space',
+              map_data: { ...mindMapData, savedId: existingMindMap.id },
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingMindMap.id);
+
+          error = updateError;
+          operation = 'updated';
+          
+          // Update the current mind map with the saved ID
+          if (!error) {
+            setCurrentMindMap({ ...mindMapData, savedId: existingMindMap.id });
+          }
+        } else {
+          // Create new mind map
+          console.log('✨ Creating new mind map:', title);
+          
+          const { data: newMindMap, error: insertError } = await supabase
+            .from('mind_maps')
+            .insert({
+              title,
+              description: 'Saved from study space',
+              map_data: mindMapData,
+              user_id: user.id,
+              organisation_id: profile.organisation_id,
+              study_space_id: studySpace.id,
+              is_shared: false,
+              is_template: false
+            })
+            .select('id')
+            .single();
+
+          error = insertError;
+          
+          // Update the current mind map with the new saved ID
+          if (!error && newMindMap) {
+            setCurrentMindMap({ ...mindMapData, savedId: newMindMap.id });
+          }
+        }
+      }
 
       if (error) {
         console.error('Error saving mind map:', error);
         alert('Failed to save mind map. Please try again.');
       } else {
-        alert('Mind map saved successfully!');
+        console.log(`✅ Mind map ${operation} successfully:`, title);
+        alert(`Mind map "${title}" ${operation} successfully!`);
         loadSavedMindMaps(); // Reload the saved mind maps list
       }
     } catch (error) {
@@ -1238,7 +1596,13 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
   };
 
   const loadMindMap = (mindMap: any) => {
-    setCurrentMindMap(mindMap.map_data);
+    // Include the saved ID when loading an existing mind map
+    const mindMapWithId = {
+      ...mindMap.map_data,
+      savedId: mindMap.id
+    };
+    setCurrentMindMap(mindMapWithId);
+    console.log('📖 Loaded existing mind map:', mindMap.title, 'ID:', mindMap.id);
   };
 
   const generateMindMap = async () => {

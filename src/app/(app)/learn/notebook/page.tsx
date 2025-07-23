@@ -276,6 +276,7 @@ export default function UnifiedStudySpace() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          console.log('🔐 User authenticated:', user.id);
           setCurrentUser(user);
           await loadUserCourses(user.id);
           await loadUserStudySpaces(user.id);
@@ -364,6 +365,8 @@ export default function UnifiedStudySpace() {
   // Load user's study spaces
   const loadUserStudySpaces = async (userId: string) => {
     try {
+      console.log('📚 Loading study spaces for user:', userId);
+      
       const { data: spaces, error } = await supabase
         .from('study_spaces')
         .select(`
@@ -392,7 +395,11 @@ export default function UnifiedStudySpace() {
           created_at: space.created_at
         }));
 
-        console.log('Loaded study spaces:', studySpaceData);
+        console.log(`📚 Loaded ${studySpaceData.length} study spaces:`, studySpaceData.map(s => ({ 
+          name: s.name, 
+          type: s.type, 
+          course_id: s.course_id 
+        })));
         setStudySpaces(studySpaceData);
       }
     } catch (error) {
@@ -400,28 +407,31 @@ export default function UnifiedStudySpace() {
     }
   };
 
-  // Load user's notes
+  // Load user's notes - FIXED: Always require study space ID to prevent cross-contamination
   const loadUserNotes = async (userId: string, studySpaceId?: string) => {
     try {
       setIsLoadingNotes(true);
       
-      let query = supabase
-        .from('study_notes')
-        .select('*')
-        .eq('user_id', userId);
-
-      // If a specific study space is selected, filter notes by that space
-      if (studySpaceId) {
-        query = query.eq('study_space_id', studySpaceId);
+      // FIXED: Only load notes if we have a study space ID to prevent cross-contamination
+      if (!studySpaceId) {
+        console.log('🚫 No study space selected, clearing notes');
+        setNotes([]);
+        return;
       }
 
-      const { data: userNotes, error } = await query
+      const { data: userNotes, error } = await supabase
+        .from('study_notes')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('study_space_id', studySpaceId) // FIXED: Always filter by study space
         .order('updated_at', { ascending: false });
 
       if (error) {
         console.error('Error loading notes:', error);
         return;
       }
+
+      console.log(`📝 Loaded ${userNotes?.length || 0} notes for study space:`, studySpaceId);
 
       if (userNotes) {
         const noteData: Note[] = userNotes.map(note => ({
@@ -444,23 +454,32 @@ export default function UnifiedStudySpace() {
     }
   };
 
-    // Load content based on selected course or space
+    // Load content based on selected course or space - FIXED: Ensure sources load properly
   useEffect(() => {
-    console.log('Loading content for:', { selectedCourse, selectedSpace });
+    console.log('🔄 Loading content for:', { 
+      selectedCourse: selectedCourse?.name, 
+      selectedSpace: selectedSpace?.name,
+      courseBaseClassId: selectedCourse?.base_class_id,
+      spaceCourseId: selectedSpace?.course_id
+    });
     
-    if (selectedCourse) {
-      loadCourseContent(selectedCourse.base_class_id || selectedCourse.id);
-    } else if (selectedSpace) {
-      if (selectedSpace.type === 'custom') {
-        loadCustomContent(selectedSpace.id);
-      } else if (selectedSpace.type === 'course' && selectedSpace.course_id) {
-        // Load course content for course-linked study spaces
-        console.log('Loading course content for study space:', selectedSpace.course_id);
-        loadCourseContent(selectedSpace.course_id);
-      }
+    // Always clear content first to show loading state
+    setContentItems([]);
+    
+    if (selectedSpace?.type === 'course' && selectedSpace.course_id) {
+      // FIXED: For course-linked study spaces, always load the course content
+      console.log('📚 Loading course content for study space:', selectedSpace.name, 'Course ID:', selectedSpace.course_id);
+      loadCourseContent(selectedSpace.course_id);
+    } else if (selectedCourse && selectedCourse.base_class_id) {
+      // Load content directly from selected course
+      console.log('📚 Loading course content directly:', selectedCourse.name, 'Base class ID:', selectedCourse.base_class_id);
+      loadCourseContent(selectedCourse.base_class_id);
+    } else if (selectedSpace?.type === 'custom') {
+      console.log('📁 Loading custom content for space:', selectedSpace.name);
+      loadCustomContent(selectedSpace.id);
     } else {
-      // Clear content when nothing is selected
-      setContentItems([]);
+      // Keep content cleared when nothing is selected
+      console.log('🚫 No valid selection, content cleared');
     }
   }, [selectedCourse, selectedSpace]);
 
@@ -1242,10 +1261,12 @@ export default function UnifiedStudySpace() {
     console.log('Switching to mind map tab with content:', content);
   };
 
+  // Create or get study session
   const createStudySession = async (userId: string, baseClassId?: string) => {
     try {
-      // Get user's organization first
-      const { data: profile } = await supabase
+      console.log('🔄 createStudySession called with:', { userId, baseClassId });
+      
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('organisation_id')
         .eq('user_id', userId)
@@ -1259,11 +1280,17 @@ export default function UnifiedStudySpace() {
       // Get or create a persistent study space for the user-course combination
       let studySpaceId = selectedSpace?.id;
       
+      console.log('📍 Current state:', { 
+        currentSelectedSpace: selectedSpace?.name,
+        currentSelectedCourse: selectedCourse?.name,
+        baseClassIdProvided: baseClassId
+      });
+      
       // If we already have a selected space, use it and don't create a new one
       if (studySpaceId && selectedSpace) {
         console.log('✅ Using already selected study space:', selectedSpace.name);
       } else if (baseClassId) {
-        // First, check if a study space already exists for this user-course combination
+        // FIXED: Always check for existing study space for this user-course combination
         const { data: existingSpace, error: existingSpaceError } = await supabase
           .from('study_spaces')
           .select('*')
@@ -1279,7 +1306,7 @@ export default function UnifiedStudySpace() {
         if (existingSpace) {
           // Use the existing study space
           studySpaceId = existingSpace.id;
-          console.log('Using existing study space:', existingSpace.name);
+          console.log('✅ Found and using existing study space:', existingSpace.name);
           
           // Update the selected space in the UI
           const studySpaceData: StudySpace = {
@@ -1292,6 +1319,15 @@ export default function UnifiedStudySpace() {
             created_at: existingSpace.created_at
           };
           setSelectedSpace(studySpaceData);
+          
+          // FIXED: Add to study spaces list if not already there
+          setStudySpaces(prev => {
+            const exists = prev.find(s => s.id === studySpaceData.id);
+            if (!exists) {
+              return [studySpaceData, ...prev];
+            }
+            return prev;
+          });
         } else {
           // Get the course name for a meaningful study space name
           const { data: baseClass, error: baseClassError } = await supabase
@@ -1303,27 +1339,31 @@ export default function UnifiedStudySpace() {
           const courseName = baseClass?.name || 'Course';
 
           // Create a new study space linked to the course
+          const insertData = {
+            user_id: userId,
+            organisation_id: profile.organisation_id,
+            course_id: baseClassId,
+            name: `${courseName} Study Space`,
+            description: `Study space for ${courseName}`,
+            color: selectedCourse?.color || 'bg-blue-500',
+            is_default: false
+          };
+          
+          console.log('🆕 Creating new study space with data:', insertData);
+          
           const { data: studySpace, error: spaceError } = await supabase
             .from('study_spaces')
-            .insert({
-              user_id: userId,
-              organisation_id: profile.organisation_id,
-              course_id: baseClassId,
-              name: `${courseName} Study Space`,
-              description: `Study space for ${courseName}`,
-              color: selectedCourse?.color || 'bg-blue-500',
-              is_default: false
-            })
+            .insert(insertData)
             .select()
             .single();
 
           if (spaceError) {
-            console.error('Error creating study space:', spaceError);
+            console.error('❌ Error creating study space:', spaceError);
             return null;
           }
           
           studySpaceId = studySpace.id;
-          console.log('Created new course-linked study space:', studySpace.name);
+          console.log('✅ Created new course-linked study space:', studySpace.name, 'with course_id:', studySpace.course_id);
           
           // Update the selected space in the UI and add to study spaces list
           const studySpaceData: StudySpace = {
@@ -1340,6 +1380,8 @@ export default function UnifiedStudySpace() {
         }
       } else if (!studySpaceId) {
         // Fallback: create a generic study space if no course is specified
+        console.log('⚠️ FALLBACK: Creating generic study space (no baseClassId provided)');
+        
         const { data: studySpace, error: spaceError } = await supabase
           .from('study_spaces')
           .insert({
@@ -1348,15 +1390,17 @@ export default function UnifiedStudySpace() {
             name: 'Study Session',
             description: 'Auto-created for study session',
             is_default: false
+            // NOTE: No course_id set here - this creates an unlinked study space
           })
           .select()
           .single();
 
         if (spaceError) {
-          console.error('Error creating study space:', spaceError);
+          console.error('❌ Error creating generic study space:', spaceError);
           return null;
         }
         studySpaceId = studySpace.id;
+        console.log('⚠️ Created generic study space (not linked to course):', studySpace.name);
       }
 
       const { data, error } = await supabase
@@ -2359,51 +2403,43 @@ export default function UnifiedStudySpace() {
                   console.log('Selection changed:', { value, course, space, studySpaces });
                   
                   if (course) {
-                    // Check if there's already a study space for this course
-                    const existingCourseSpace = studySpaces.find(s => 
-                      s.type === 'course' && s.course_id === course.base_class_id
-                    );
+                    // FIXED: Clear previous selections and content first
+                    console.log('🎯 Course selected:', course.name, 'Base class ID:', course.base_class_id);
                     
-                    console.log('Course selection debug:', {
-                      courseId: course.base_class_id,
-                      existingCourseSpace,
-                      allSpaces: studySpaces.map(s => ({ id: s.id, name: s.name, type: s.type, course_id: s.course_id }))
-                    });
+                    // Clear content immediately to show loading state
+                    setContentItems([]);
+                    setSelectedCourse(course);
+                    setSelectedSpace(null); // Clear previous space selection
                     
-                    if (existingCourseSpace) {
-                      // Use the existing study space
-                      setSelectedCourse(course);
-                      setSelectedSpace(existingCourseSpace);
-                      console.log('✅ Found existing study space for course:', existingCourseSpace.name);
-                      
-                      // Create a study session for this existing space (but don't create a new space)
-                      if (currentUser) {
-                        await createStudySession(currentUser.id, course.base_class_id);
-                      }
+                    if (currentUser && course.base_class_id) {
+                      // This will find existing study space or create new one if needed
+                      await createStudySession(currentUser.id, course.base_class_id);
                     } else {
-                      // No existing space, create one
-                      setSelectedCourse(course);
-                      setSelectedSpace(null);
-                      console.log('❌ No existing space found, creating new one for course:', course.name);
-                      // Create or get study session when course is selected
-                      // This will automatically set the selectedSpace to the course's study space
-                      if (currentUser) {
-                        await createStudySession(currentUser.id, course.base_class_id);
-                      }
+                      console.error('❌ Missing base_class_id for course:', course);
                     }
                   } else if (space) {
+                    console.log('🏠 Space selected:', space.name, 'Type:', space.type, 'Course ID:', space.course_id);
+                    
+                    // Clear content immediately to show loading state
+                    setContentItems([]);
+                    
                     // If it's a course-linked space, also set the course
                     if (space.type === 'course' && space.course_id) {
                       const linkedCourse = courses.find(c => c.base_class_id === space.course_id);
+                      console.log('🔗 Found linked course:', linkedCourse?.name);
                       setSelectedCourse(linkedCourse || null);
                     } else {
                       setSelectedCourse(null);
                     }
                     setSelectedSpace(space);
                     
-                    // Create study session when space is selected
+                    // Create study session when space is selected - pass course_id if it's a course-linked space
                     if (currentUser) {
-                      await createStudySession(currentUser.id);
+                      if (space.type === 'course' && space.course_id) {
+                        await createStudySession(currentUser.id, space.course_id);
+                      } else {
+                        await createStudySession(currentUser.id);
+                      }
                     }
                   }
                 }}
