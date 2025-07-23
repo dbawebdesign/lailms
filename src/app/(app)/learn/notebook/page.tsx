@@ -101,6 +101,7 @@ import { LunaChat, LunaChatRef } from '@/components/study-space/LunaChat';
 import { useToast } from '@/components/ui/use-toast';
 import { useDebounce } from '@/hooks/use-debounce';
 import { v4 as uuidv4 } from 'uuid';
+import LunaContextElement from '@/components/luna/LunaContextElement';
 
 interface Course {
   id: string;
@@ -2621,7 +2622,62 @@ export default function UnifiedStudySpace() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-background via-surface to-background">
+    <LunaContextElement
+      type="study-space"
+      role="main-interface"
+      content={{
+        selectedCourse: selectedCourse ? {
+          id: selectedCourse.id,
+          name: selectedCourse.name,
+          description: selectedCourse.description,
+          baseClassId: selectedCourse.base_class_id
+        } : null,
+        selectedSpace: selectedSpace ? {
+          id: selectedSpace.id,
+          name: selectedSpace.name,
+          type: selectedSpace.type,
+          description: selectedSpace.description
+        } : null,
+        contentItems: contentItems.map(item => ({
+          id: item.id,
+          title: item.title,
+          type: item.type,
+          description: item.description,
+          content: typeof item.content === 'string' ? item.content.substring(0, 500) + '...' : 'Structured content'
+        })),
+        selectedSources: Array.from(selectedSources),
+        highlightedText: highlightedTextForLuna,
+        notes: notes.map(note => ({
+          id: note.id,
+          title: note.title,
+          content: note.content.substring(0, 200) + '...'
+        })),
+        activeToolTab,
+        totalContentItems: contentItems.length,
+        totalNotes: notes.length
+      }}
+      state={{
+        isLoadingContent,
+        isLoadingNotes,
+        hasSelectedCourse: !!selectedCourse,
+        hasSelectedSpace: !!selectedSpace,
+        hasContentItems: contentItems.length > 0,
+        hasNotes: notes.length > 0,
+        hasSelectedSources: selectedSources.size > 0,
+        hasHighlightedText: !!highlightedTextForLuna,
+        activeTab: activeToolTab,
+        expandedPanel
+      }}
+      metadata={{
+        pageType: 'study-space',
+        courseId: selectedCourse?.id,
+        spaceId: selectedSpace?.id,
+        userId: currentUser?.id,
+        contextDescription: 'AI-powered study space with course content, note-taking, mind mapping, and Luna AI chat integration'
+      }}
+      actionable={true}
+    >
+      <div className="h-screen flex flex-col bg-gradient-to-br from-background via-surface to-background overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
       
       {/* Sophisticated Header */}
       <div className="border-b border-border bg-surface/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm">
@@ -2706,7 +2762,7 @@ export default function UnifiedStudySpace() {
                   <div className="p-2">
                     <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                       <GraduationCap className="h-3 w-3" />
-                      Active Courses
+                      ACTIVE COURSES
                       {isLoadingCourses && <Loader2 className="h-3 w-3 animate-spin" />}
                     </div>
                     {isLoadingCourses ? (
@@ -2732,7 +2788,7 @@ export default function UnifiedStudySpace() {
                     <div className="p-2">
                       <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                         <Library className="h-3 w-3" />
-                        Custom Spaces
+                        CUSTOM SPACES
                       </div>
                       {studySpaces.map((space) => (
                         <SelectItem key={space.id} value={space.id} className="pl-6">
@@ -3072,7 +3128,7 @@ export default function UnifiedStudySpace() {
                 <div className="flex-1 min-h-0 flex flex-col">
                   <div className="flex-1 min-h-0 overflow-hidden">
                     <ScrollArea className="h-full">
-                      <div className="p-4 pb-32">
+                      <div className="p-4">
                         {renderToolContent()}
                       </div>
                     </ScrollArea>
@@ -3398,5 +3454,6 @@ export default function UnifiedStudySpace() {
         )}
       </div>
     </div>
+    </LunaContextElement>
   );
 } 

@@ -208,6 +208,152 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
   const { context, isReady } = useLunaContext();
   const supabase = createClient();
 
+  // Listen for Ask Luna events from text selection
+  useEffect(() => {
+    const handleAskLunaEvent = (event: CustomEvent) => {
+      const { selectedText, question, quickAction } = event.detail;
+      
+      console.log('🎯 Received Ask Luna event:', { selectedText: selectedText.substring(0, 100) + '...', question, quickAction });
+      
+      // Directly send the message instead of setting state and waiting
+      sendDirectMessageToLuna(question);
+    };
+
+    const sendDirectMessageToLuna = async (messageText: string) => {
+      if (!messageText.trim() || isLoading) return;
+
+      const messageToSend = messageText.trim();
+      setMessage(''); // Clear any existing message
+      setError(null);
+      setIsLoading(true);
+
+      const userMsg: ChatMessage = {
+        id: uuidv4(),
+        role: 'user',
+        content: messageToSend,
+        timestamp: new Date(),
+        persona: currentPersona,
+      };
+
+      const loadingMsg: ChatMessage = {
+        id: uuidv4(),
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        isLoading: true,
+        persona: currentPersona,
+      };
+
+      const newMessages = [...messages, userMsg, loadingMsg];
+      setMessages(newMessages);
+      messageHistory.current.push({ role: 'user', content: messageToSend });
+
+      // Use existing conversation or create new one
+      let conversationToUse = currentConversation;
+      if (!conversationToUse) {
+        const newConversation: LunaConversation = {
+          id: uuidv4(),
+          title: 'New Conversation',
+          persona: currentPersona,
+          user_id: userId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          is_pinned: false,
+          message_count: 0,
+        };
+
+        const { data, error } = await supabase
+          .from('luna_conversations')
+          .insert(newConversation)
+          .select()
+          .single();
+
+        if (!error && data) {
+          conversationToUse = data;
+          setCurrentConversation(data);
+        }
+      }
+
+      try {
+        // Save user message and call API (simplified version of handleSendMessage)
+        if (conversationToUse) {
+          await supabase
+            .from('luna_messages')
+            .insert({
+              id: userMsg.id,
+              conversation_id: conversationToUse.id,
+              role: 'user',
+              content: messageToSend,
+              persona: currentPersona,
+              created_at: new Date().toISOString(),
+            });
+        }
+
+        const response = await fetch('/api/luna/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: messageToSend,
+            persona: currentPersona,
+            userRole: userRole,
+            context: isReady ? context : undefined,
+            history: messageHistory.current.slice(-20),
+            timestamp: new Date().toISOString(),
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        const assistantMsg: ChatMessage = {
+          id: uuidv4(),
+          role: 'assistant',
+          content: result.response || 'Sorry, I encountered an error.',
+          timestamp: new Date(),
+          persona: currentPersona,
+          citations: result.citations,
+        };
+
+        const finalMessages = [...messages, userMsg, assistantMsg];
+        setMessages(finalMessages);
+        messageHistory.current.push({ role: 'assistant', content: assistantMsg.content });
+
+        // Save assistant message
+        if (conversationToUse) {
+          await supabase
+            .from('luna_messages')
+            .insert({
+              id: assistantMsg.id,
+              conversation_id: conversationToUse.id,
+              role: 'assistant',
+              content: assistantMsg.content,
+              persona: currentPersona,
+              created_at: new Date().toISOString(),
+            });
+        }
+
+      } catch (error) {
+        console.error('Failed to send Ask Luna message:', error);
+        setError('Failed to send message. Please try again.');
+        setMessages(prev => prev.slice(0, -1));
+        messageHistory.current.pop();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    window.addEventListener('askLunaWithContext', handleAskLunaEvent as EventListener);
+    document.addEventListener('askLunaWithContext', handleAskLunaEvent as EventListener);
+
+    return () => {
+      window.removeEventListener('askLunaWithContext', handleAskLunaEvent as EventListener);
+      document.removeEventListener('askLunaWithContext', handleAskLunaEvent as EventListener);
+    };
+      }, [messages, currentConversation, currentPersona, userRole, userId, isLoading, context, isReady, supabase]);
+
   // Define personas for each user role
   const studentPersonas = [
     { id: 'lunaChat', name: 'Luna Chat', icon: <MessageSquare size={14} /> },

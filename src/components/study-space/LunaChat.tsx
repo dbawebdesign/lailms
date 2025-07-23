@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -25,7 +26,12 @@ import {
   History,
   ChevronDown,
   Trash2,
-  NotebookPen
+  NotebookPen,
+  Plus,
+  ChevronLeft,
+  Clock,
+  Send,
+  Loader2
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import ReactMarkdown from 'react-markdown';
@@ -91,6 +97,8 @@ interface StudyChatHistory {
   lastUpdated: string;
 }
 
+type ChatView = 'list' | 'chat';
+
 export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({ 
   selectedSources = [], 
   highlightedText, 
@@ -103,10 +111,13 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<StudyChatHistory[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [chatView, setChatView] = useState<ChatView>('list'); // New state for view mode
+
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const conversationIdRef = useRef<string | null>(null);
   const isInitialLoad = useRef<boolean>(true);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -124,13 +135,13 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
         const parsedHistory = JSON.parse(savedHistory);
         setChatHistory(parsedHistory);
         
-        // Load the most recent chat
-        if (parsedHistory.length > 0) {
-          const mostRecent = parsedHistory[0];
-          setCurrentChatId(mostRecent.id);
-          setMessages(mostRecent.messages);
-          conversationIdRef.current = mostRecent.id;
-        }
+        // Don't auto-load the most recent chat anymore - stay in list view
+        // if (parsedHistory.length > 0) {
+        //   const mostRecent = parsedHistory[0];
+        //   setCurrentChatId(mostRecent.id);
+        //   setMessages(mostRecent.messages);
+        //   conversationIdRef.current = mostRecent.id;
+        // }
       } catch (error) {
         console.error('Error loading saved chat history:', error);
       }
@@ -233,7 +244,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.message,
+        content: data.response || data.message,
         response_format: data.responseFormat,
         created_at: new Date().toISOString(),
         quickActions: data.quickActions || []
@@ -281,24 +292,35 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
   };
 
   const startNewConversation = () => {
-    isInitialLoad.current = true; // Prevent save effect during reset
+    // Clear current chat
     setMessages([]);
     setCurrentChatId(null);
     conversationIdRef.current = null;
+    setChatView('chat'); // Switch to chat view for new conversation
     
-    // Re-enable saving after a brief delay
+    // Clear highlighted text if it was used
+    if (highlightedText && onHighlightedTextUsed) {
+      onHighlightedTextUsed();
+    }
+
+    // Focus input after a brief delay
     setTimeout(() => {
-      isInitialLoad.current = false;
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
     }, 100);
   };
 
   const loadChat = (chatId: string) => {
     const chat = chatHistory.find(c => c.id === chatId);
     if (chat) {
-      isInitialLoad.current = true; // Prevent save effect during load
+      // Temporarily disable saving to prevent loops
+      isInitialLoad.current = true;
+      
       setCurrentChatId(chatId);
       setMessages(chat.messages);
       conversationIdRef.current = chatId;
+      setChatView('chat'); // Switch to chat view when loading a conversation
       
       // Re-enable saving after a brief delay
       setTimeout(() => {
@@ -312,9 +334,12 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
     setChatHistory(updatedHistory);
     localStorage.setItem('study-tools-luna-history', JSON.stringify(updatedHistory));
     
-    // If we're deleting the current chat, start a new one
+    // If we're deleting the current chat, go back to list view
     if (chatId === currentChatId) {
-      startNewConversation();
+      setMessages([]);
+      setCurrentChatId(null);
+      conversationIdRef.current = null;
+      setChatView('list');
     }
   };
 
@@ -423,214 +448,276 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
     );
   };
 
-  return (
-    <div className={cn("flex flex-col h-full bg-white dark:bg-slate-900", className)}>
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-10 flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <LunaAvatar />
-          <div>
-            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Luna</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">AI Study Partner</p>
+
+
+  // Render conversations list similar to notes interface
+  const renderConversationsList = () => {
+    return (
+      <div className="h-full flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95">
+          <div className="flex items-center gap-2 mb-4">
+            <LunaAvatar />
+            <div>
+              <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Luna</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">AI Study Partner</p>
+            </div>
           </div>
         </div>
-        
-        <div className="flex items-center gap-1">
-          {/* Chat History Dropdown */}
-          {chatHistory.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
-                >
-                  <History className="h-3 w-3 mr-1" />
-                  <ChevronDown className="h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                {chatHistory.map((chat) => (
-                  <DropdownMenuItem
-                    key={chat.id}
-                    className="flex items-center justify-between p-3 cursor-pointer"
-                    onClick={() => loadChat(chat.id)}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
-                        {chat.title}
-                      </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {formatChatDate(chat.lastUpdated)} • {chat.messages.length} messages
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 w-6 p-0 ml-2 text-slate-400 hover:text-red-500"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteChat(chat.id);
-                      }}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuItem>
-                ))}
-                {chatHistory.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-xs text-slate-500 dark:text-slate-400 cursor-default"
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      {chatHistory.length} chat{chatHistory.length !== 1 ? 's' : ''} saved
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          
-          {/* New Chat Button */}
-          <Button
-            size="sm"
-            variant="outline"
+
+        {/* Content */}
+        <div className="flex-1 p-4 space-y-4">
+          {/* Start New Conversation Button */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full justify-start text-slate-600 dark:text-slate-400"
             onClick={startNewConversation}
-            className="h-7 px-2 text-xs"
           >
-            <MessageCircle className="h-3 w-3 mr-1" />
-            New
+            <Plus className="h-4 w-4 mr-2" />
+            Start New Conversation
           </Button>
+
+          {/* Conversations List */}
+          <div className="grid grid-cols-1 gap-3">
+            {chatHistory.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden">
+                  <img 
+                    src="/web-app-manifest-512x512.png" 
+                    alt="Luna AI" 
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                </div>
+                <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+                  No conversations yet
+                </h4>
+                <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+                  Start your first conversation with Luna to get help with your studies.
+                </p>
+              </div>
+            ) : (
+              chatHistory.map((chat) => (
+                <Card 
+                  key={chat.id} 
+                  className="p-4 bg-surface/80 backdrop-blur-sm hover:shadow-md transition-shadow cursor-pointer group"
+                  onClick={() => loadChat(chat.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h5 className="font-medium text-sm text-foreground group-hover:text-primary transition-colors truncate">
+                        {chat.title}
+                      </h5>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {formatChatDate(chat.lastUpdated)}
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <MessageCircle className="h-3 w-3" />
+                          {chat.messages.length} messages
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteChat(chat.id);
+                        }}
+                        className="h-6 w-6 p-0 text-red-400 hover:text-red-600"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
         </div>
       </div>
+    );
+  };
 
-      {/* Context Indicators */}
-      {(selectedSources.length > 0 || highlightedText) && (
-        <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-            <Sparkles className="h-3 w-3" />
-            <span>Context:</span>
-            {selectedSources.length > 0 && (
-              <Badge variant="secondary" className="text-xs">
-                {selectedSources.length} source{selectedSources.length !== 1 ? 's' : ''}
-              </Badge>
-            )}
+  // Render full chat interface
+  const renderChatInterface = () => {
+    return (
+      <div className={cn("flex flex-col h-full bg-white dark:bg-slate-900", className)}>
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-10 flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setChatView('list')}
+              className="h-7 w-7 p-0 text-slate-600 dark:text-slate-400"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <LunaAvatar />
+            <div>
+              <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Luna</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">AI Study Partner</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            {/* New Chat Button */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={startNewConversation}
+              className="h-7 px-2 text-xs"
+            >
+              <MessageCircle className="h-3 w-3 mr-1" />
+              New
+            </Button>
+          </div>
+        </div>
+
+        {/* Context Indicators */}
+        {(selectedSources.length > 0 || highlightedText) && (
+          <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+              <Sparkles className="h-3 w-3" />
+              <span>Context:</span>
+              {selectedSources.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {selectedSources.length} source{selectedSources.length !== 1 ? 's' : ''}
+                </Badge>
+              )}
+              {highlightedText && (
+                <Badge variant="secondary" className="text-xs">
+                  Selected text
+                </Badge>
+              )}
+            </div>
             {highlightedText && (
-              <Badge variant="secondary" className="text-xs">
-                Selected text
-              </Badge>
+              <div className="mt-2 p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-700 dark:text-slate-300 italic">
+                  "{highlightedText.length > 100 ? highlightedText.slice(0, 100) + '...' : highlightedText}"
+                </p>
+              </div>
             )}
           </div>
-          {highlightedText && (
-            <div className="mt-2 p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
-              <p className="text-xs text-slate-700 dark:text-slate-300 italic">
-                "{highlightedText.length > 100 ? highlightedText.slice(0, 100) + '...' : highlightedText}"
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+        )}
 
-      {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        <div className="space-y-4">
-          {messages.length === 0 && (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden">
-                <img 
-                  src="/web-app-manifest-512x512.png" 
-                  alt="Luna AI" 
-                  className="w-full h-full rounded-full object-cover"
-                />
-              </div>
-              <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-                Hi! I'm Luna, your AI study partner
-              </h4>
-              <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-                Use the sticky input at the bottom to ask me questions. I'll automatically choose the best format for my responses - whether that's structured text, mind maps, summaries, or detailed explanations.
-              </p>
-              {selectedSources.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2 justify-center">
-                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                    Ready to help with your {selectedSources.length} selected source{selectedSources.length !== 1 ? 's' : ''}
-                  </div>
+        {/* Messages */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4">
+          <div className="space-y-4">
+            {messages.length === 0 && (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden">
+                  <img 
+                    src="/web-app-manifest-512x512.png" 
+                    alt="Luna AI" 
+                    className="w-full h-full rounded-full object-cover"
+                  />
                 </div>
-              )}
-            </div>
-          )}
+                <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+                  Hi! I'm Luna, your AI study partner
+                </h4>
+                <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+                  Ask me anything about your study materials, or I can help you create summaries, mind maps, and more.
+                </p>
+              </div>
+            )}
 
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                "flex gap-3",
-                message.role === 'user' ? 'justify-end' : 'justify-start'
-              )}
-            >
-              {message.role === 'assistant' && <LunaAvatar />}
-              
+            {messages.map((message) => (
               <div
+                key={message.id}
                 className={cn(
-                  "max-w-[80%] rounded-lg px-4 py-3",
-                  message.role === 'user'
-                    ? 'bg-blue-500 text-white ml-auto'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
+                  "flex gap-3",
+                  message.role === 'user' ? 'justify-end' : 'justify-start'
                 )}
               >
-                {message.highlighted_text && message.role === 'user' && (
-                  <div className="mb-2 p-2 bg-white/20 rounded text-xs italic">
-                    Selected: "{message.highlighted_text.slice(0, 50)}..."
-                  </div>
-                )}
+                {message.role === 'assistant' && <LunaAvatar />}
                 
-                <div className="text-sm">
-                  {message.role === 'assistant' 
-                    ? formatMessageContent(message.content, message.response_format)
-                    : message.content
-                  }
-                </div>
+                <div
+                  className={cn(
+                    "max-w-[80%] rounded-lg px-4 py-3",
+                    message.role === 'user'
+                      ? 'bg-blue-500 text-white ml-auto'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
+                  )}
+                >
+                  {message.highlighted_text && message.role === 'user' && (
+                    <div className="mb-2 p-2 bg-white/20 rounded text-xs italic">
+                      Selected: "{message.highlighted_text.slice(0, 50)}..."
+                    </div>
+                  )}
+                  
+                  <div className="text-sm">
+                    {message.role === 'assistant' 
+                      ? formatMessageContent(message.content, message.response_format)
+                      : message.content
+                    }
+                  </div>
 
-                {message.role === 'assistant' && (
-                  <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                    {onAddToNotes && (
+                  {message.role === 'assistant' && (
+                    <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                      {onAddToNotes && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => addToNotes(message.content, message.id)}
+                          className="h-7 px-2 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-700/50 rounded transition-all"
+                          title="Add to notes"
+                        >
+                          <NotebookPen className="h-3 w-3 mr-1" />
+                          Add to notes
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => addToNotes(message.content, message.id)}
-                        className="h-7 px-2 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-700/50 rounded transition-all"
-                        title="Add to notes"
+                        onClick={() => copyMessage(message.id, message.content)}
+                        className="h-7 w-7 p-0"
+                        title="Copy message"
                       >
-                        <NotebookPen className="h-3 w-3 mr-1" />
-                        Add to notes
+                        {copiedMessageId === message.id ? (
+                          <Check className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <Copy className="h-3 w-3" />
+                        )}
                       </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => copyMessage(message.id, message.content)}
-                      className="h-7 w-7 p-0"
-                      title="Copy message"
-                    >
-                      {copiedMessageId === message.id ? (
-                        <Check className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
-                    </Button>
-                  </div>
-                )}
+                    </div>
+                  )}
+                </div>
+
+                {message.role === 'user' && <UserAvatar />}
               </div>
+            ))}
 
-              {message.role === 'user' && <UserAvatar />}
-            </div>
-          ))}
+            {isLoading && (
+              <div className="flex gap-3 justify-start">
+                <LunaAvatar />
+                <div className="bg-slate-100 dark:bg-slate-800 rounded-lg px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm text-slate-600 dark:text-slate-400">Luna is thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <div ref={messagesEndRef} />
         </div>
-        <div ref={messagesEndRef} />
-      </div>
 
-    </div>
-  );
+
+      </div>
+    );
+  };
+
+  // Main render - choose between list and chat view
+  if (chatView === 'list') {
+    return renderConversationsList();
+  } else {
+    return renderChatInterface();
+  }
 });
 
 LunaChat.displayName = 'LunaChat'; 

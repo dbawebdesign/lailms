@@ -10,6 +10,7 @@ import {
   Sparkles,
   CheckCircle2
 } from 'lucide-react';
+import LunaContextElement from '@/components/luna/LunaContextElement';
 
 interface LessonSectionContent {
   introduction?: string;
@@ -43,7 +44,35 @@ interface LessonContentRendererProps {
 
 export function LessonContentRenderer({ content, className = "" }: LessonContentRendererProps) {
   return (
-    <div className={`space-y-6 ${className}`}>
+    <LunaContextElement
+      type="lesson-content"
+      role="educational-content"
+      content={{
+        introduction: content.introduction,
+        sectionTitle: content.sectionTitle,
+        expertSummary: content.expertSummary,
+        conceptIntroduction: content.expertTeachingContent?.conceptIntroduction,
+        detailedExplanation: content.expertTeachingContent?.detailedExplanation,
+        practicalExamples: content.expertTeachingContent?.practicalExamples?.map(ex => ({
+          title: ex.title,
+          context: ex.context,
+          keyTakeaways: ex.keyTakeaways
+        })),
+        checkForUnderstanding: content.checkForUnderstanding,
+        realWorldConnections: content.expertTeachingContent?.realWorldConnections,
+        expertInsights: content.expertTeachingContent?.expertInsights
+      }}
+      metadata={{
+        contentType: 'lesson-section',
+        hasIntroduction: !!content.introduction,
+        hasExpertContent: !!content.expertTeachingContent,
+        hasExamples: !!(content.expertTeachingContent?.practicalExamples?.length),
+        hasCheckForUnderstanding: !!(content.checkForUnderstanding?.length),
+        contextDescription: 'Structured lesson content with expert teaching materials, examples, and understanding checks'
+      }}
+      actionable={true}
+    >
+      <div className={`space-y-6 ${className}`}>
       {/* Introduction */}
       {content.introduction && (
         <div className="prose prose-slate dark:prose-invert max-w-none">
@@ -169,5 +198,6 @@ export function LessonContentRenderer({ content, className = "" }: LessonContent
         </div>
       )}
     </div>
+    </LunaContextElement>
   );
 } 

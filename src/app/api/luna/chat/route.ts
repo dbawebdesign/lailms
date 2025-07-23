@@ -21,7 +21,8 @@ interface ChatRequest {
   highlightedText?: string;
   sources?: any[];
   quickAction?: string;
-  context?: 'study-tools' | 'study-tools-isolated' | 'main-app';
+  context?: any; // Rich UI context object from useLunaContext
+  contextType?: 'study-tools' | 'study-tools-isolated' | 'main-app'; // Simple context type for backward compatibility
 }
 
 export async function POST(request: NextRequest) {
@@ -42,7 +43,8 @@ export async function POST(request: NextRequest) {
       highlightedText,
       sources = [],
       quickAction,
-      context = 'main-app'
+      context,
+      contextType = 'main-app'
     } = body;
 
     if (!message?.trim()) {
@@ -85,7 +87,7 @@ export async function POST(request: NextRequest) {
           user_id: user.id,
           title: message.slice(0, 50) + (message.length > 50 ? '...' : ''),
           persona: 'luna',
-          metadata: { context } // Store the context to distinguish conversations
+          metadata: { contextType } // Store the context type to distinguish conversations
         })
         .select()
         .single();
@@ -118,6 +120,14 @@ export async function POST(request: NextRequest) {
       contextParts.push(`Selected text from study material: "${highlightedText}"`);
     }
 
+    // Check if the message contains selected text context (from Ask Luna popover)
+    const selectedTextMatch = message.match(/Selected text: "([^"]+)"/);
+    if (selectedTextMatch && selectedTextMatch[1]) {
+      const extractedText = selectedTextMatch[1];
+      contextParts.push(`Student highlighted text: "${extractedText}"`);
+      console.log('📝 Extracted highlighted text from message:', extractedText.substring(0, 100) + '...');
+    }
+
     // Add sources context
     if (sources.length > 0) {
       const sourceContext = sources.map(source => {
@@ -133,8 +143,80 @@ export async function POST(request: NextRequest) {
       contextParts.push(`Active study sources:\n${sourceContext}`);
     }
 
+    // Process rich UI context from useLunaContext
+    if (context && typeof context === 'object') {
+      console.log('🔍 Processing rich UI context:', JSON.stringify(context, null, 2));
+      
+      // Build comprehensive context from UI components
+      const uiContextParts: string[] = [];
+      
+      // Process registered components
+      if (context.components && Array.isArray(context.components)) {
+        context.components.forEach((component: any) => {
+          let componentContext = `**${component.type} (${component.role})**`;
+          
+          if (component.content) {
+            // Course player context
+            if (component.type === 'course-player') {
+              if (component.content.courseId) {
+                componentContext += `\n- Course ID: ${component.content.courseId}`;
+              }
+              if (component.content.selectedItem) {
+                componentContext += `\n- Currently viewing: ${component.content.selectedItem.type} (ID: ${component.content.selectedItem.id})`;
+              }
+              if (component.content.currentView) {
+                componentContext += `\n- View mode: ${component.content.currentView}`;
+              }
+            }
+            
+            // Lesson content context
+            if (component.type === 'lesson-content' || component.type === 'lesson-content-renderer') {
+              if (component.content.introduction) {
+                componentContext += `\n- Lesson Introduction: ${component.content.introduction.substring(0, 200)}...`;
+              }
+              if (component.content.sectionTitle) {
+                componentContext += `\n- Current Section: ${component.content.sectionTitle}`;
+              }
+              if (component.content.expertSummary) {
+                componentContext += `\n- Expert Summary: ${component.content.expertSummary.substring(0, 200)}...`;
+              }
+              if (component.content.detailedExplanation) {
+                componentContext += `\n- Detailed Explanation Available: ${component.content.detailedExplanation.substring(0, 150)}...`;
+              }
+            }
+            
+            // Content player context
+            if (component.type === 'content-player') {
+              if (component.content.selectedItemType && component.content.selectedItemId) {
+                componentContext += `\n- Displaying: ${component.content.selectedItemType} (${component.content.selectedItemId})`;
+              }
+              if (component.content.contentType) {
+                componentContext += `\n- Content type: ${component.content.contentType}`;
+              }
+            }
+            
+            // Navigation tree context
+            if (component.type === 'course-navigation') {
+              if (component.content.courseStructure) {
+                componentContext += `\n- Course structure with ${component.content.lessonCount || 0} lessons`;
+              }
+              if (component.content.currentProgress) {
+                componentContext += `\n- Progress: ${component.content.currentProgress}%`;
+              }
+            }
+          }
+          
+          uiContextParts.push(componentContext);
+        });
+      }
+      
+      if (uiContextParts.length > 0) {
+        contextParts.push(`Current Page Context:\n${uiContextParts.join('\n\n')}`);
+      }
+    }
+
     // Build system prompt based on response format and quick action
-    let systemPrompt = (context === 'study-tools' || context === 'study-tools-isolated')
+    let systemPrompt = (contextType === 'study-tools' || contextType === 'study-tools-isolated')
       ? `You are Luna, an AI study partner integrated into the study tools environment. You help students understand their study materials, create summaries, explain concepts, and provide structured learning support.
 
 Key characteristics:
@@ -143,7 +225,8 @@ Key characteristics:
 - Break down complex concepts into digestible parts
 - Use examples and analogies when helpful
 - Provide structured, well-formatted responses optimized for study sessions
-- When highlighting text is provided, focus your response on that specific content
+- When highlighted text is provided, focus your response on that specific content
+- Pay special attention to any text the student has selected or highlighted - this indicates their current focus area
 
 ${contextParts.length > 0 ? `Study Context:\n${contextParts.join('\n\n')}` : ''}`
       : `You are Luna, an AI assistant designed to help with various tasks and conversations. You provide clear, structured, and engaging responses.

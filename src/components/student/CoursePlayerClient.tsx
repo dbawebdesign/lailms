@@ -13,6 +13,9 @@ import LessonContentRenderer from './LessonContentRenderer';
 import { LessonContent } from '@/lib/types/lesson';
 import LunaContextElement from '@/components/luna/LunaContextElement';
 import { NewSchemaAssessmentTaker } from '@/components/assessments/v2/NewSchemaAssessmentTaker';
+import { useTextSelection } from '@/hooks/useTextSelection';
+import { AskLunaPopover } from './AskLunaPopover';
+import { useAskLuna } from '@/context/AskLunaContext';
 
 // A more detailed content player
 const ContentPlayer = ({ 
@@ -29,6 +32,23 @@ const ContentPlayer = ({
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null); // Supabase user
   const [progressService, setProgressService] = useState<ProgressService | null>(null);
+  
+  // Text selection for Ask Luna functionality
+  const containerId = `content-player-${selectedItemId || 'empty'}`;
+  const { selection, isVisible, clearSelection } = useTextSelection(containerId);
+  const { sendToLuna } = useAskLuna();
+
+  const handleAskLuna = (selectedText: string, question: string, quickAction?: string) => {
+    // Add context about the current content being viewed
+    const contextualQuestion = `Regarding the ${selectedItemType} content "${selectedItemId}":
+
+Selected text: "${selectedText}"
+
+${question}`;
+
+    sendToLuna(selectedText, contextualQuestion, quickAction);
+    clearSelection();
+  };
 
   useEffect(() => {
     const getUser = async () => {
@@ -159,8 +179,24 @@ const ContentPlayer = ({
       }}
       actionable={true}
     >
-      <div className="p-4 h-full">
-        {renderContent()}
+      <div className="p-4 h-full relative">
+        <div id={containerId} className="h-full">
+          {renderContent()}
+        </div>
+        
+        {/* Ask Luna Popover */}
+        {selection && (
+          <AskLunaPopover
+            selectedText={selection.text}
+            position={{
+              x: selection.rect.left + selection.rect.width / 2,
+              y: selection.rect.bottom
+            }}
+            isVisible={isVisible}
+            onAskLuna={handleAskLuna}
+            onClose={clearSelection}
+          />
+        )}
       </div>
     </LunaContextElement>
   );

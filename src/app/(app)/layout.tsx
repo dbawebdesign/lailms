@@ -2,6 +2,7 @@ import React from 'react';
 import AppShell from "@/components/layout/AppShell";
 import { UIContextProvider } from "@/context/UIContext";
 import { LunaContextRegistration } from "@/components/providers/LunaContextRegistration";
+import { AskLunaProvider } from "@/context/AskLunaContext";
 import { SurveyIntegration } from "@/components/onboarding/SurveyIntegration";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from 'next/navigation';
@@ -74,10 +75,12 @@ export default async function AppPagesLayout({
   return (
     <UIContextProvider>
       <LunaContextRegistration>
-        <AppShell userRole={userRole}>
-          {children}
-          <SurveyIntegration userRole={userRole} profile={profile} />
-        </AppShell>
+        <AskLunaProvider>
+          <AppShell userRole={userRole}>
+            {children}
+            <SurveyIntegration userRole={userRole} profile={profile} />
+          </AppShell>
+        </AskLunaProvider>
       </LunaContextRegistration>
     </UIContextProvider>
   );
