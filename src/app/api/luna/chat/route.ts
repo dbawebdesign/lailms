@@ -27,7 +27,7 @@ interface ChatRequest {
 export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
-    
+
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {

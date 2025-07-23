@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -98,6 +98,9 @@ import { lunaAIService, type StudyContext, type LunaConversation } from '@/lib/s
 import { StudyMindMapViewer } from '@/components/study-space/MindMapViewer';
 import { LessonContentRenderer } from '@/components/study-space/LessonContentRenderer';
 import { LunaChat, LunaChatRef } from '@/components/study-space/LunaChat';
+import { useToast } from '@/components/ui/use-toast';
+import { useDebounce } from '@/hooks/use-debounce';
+import { v4 as uuidv4 } from 'uuid';
 
 interface Course {
   id: string;
@@ -178,13 +181,16 @@ interface TextSelection {
 interface Note {
   id: string;
   title: string;
-  content: string;
+  content: any;
   created_at: string;
   updated_at: string;
   tags: string[];
   source?: string;
   isStarred: boolean;
   study_space_id?: string;
+  isNew?: boolean;
+  user_id?: string;
+  organisation_id?: string;
 }
 
 type PanelExpansion = 'none' | 'sources' | 'tools';
@@ -198,6 +204,7 @@ export default function UnifiedStudySpace() {
   const noteEditorRef = useRef<any>(null);
   const lunaChatRef = useRef<LunaChatRef>(null);
   const supabase = createClient();
+  const { toast } = useToast();
 
   // UI State
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -272,6 +279,9 @@ export default function UnifiedStudySpace() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [currentConversation, setCurrentConversation] = useState<LunaConversation | null>(null);
+  const [activeNote, setActiveNote] = useState<Note | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [activeStudySpace, setActiveStudySpace] = useState<StudySpace | null>(null);
 
   // Initialize user and load data
   useEffect(() => {
@@ -445,7 +455,10 @@ export default function UnifiedStudySpace() {
           updated_at: note.updated_at,
           tags: note.tags || [],
           isStarred: note.is_favorite || false,
-          study_space_id: note.study_space_id
+          study_space_id: note.study_space_id,
+          isNew: note.is_new || false,
+          user_id: note.user_id,
+          organisation_id: note.organisation_id,
         }));
 
         setNotes(noteData);
@@ -807,12 +820,14 @@ export default function UnifiedStudySpace() {
   useEffect(() => {
     const handleNoteSelection = () => {
       const selection = window.getSelection();
-      if (selection && selection.toString().trim() && noteEditorRef.current?.contains(selection.anchorNode)) {
+      if (selection && selection.toString().trim() && noteEditorRef.current?.view?.dom?.contains(selection.anchorNode)) {
         const range = selection.getRangeAt(0);
         const rect = range.getBoundingClientRect();
         
         // Get the position relative to the note editor container
-        const editorRect = noteEditorRef.current.getBoundingClientRect();
+        const editorRect = noteEditorRef.current?.view?.dom?.getBoundingClientRect();
+        
+        if (!editorRect) return;
         
         // Calculate position relative to the editor container, not the viewport
         const relativeX = rect.left + rect.width / 2;
@@ -869,13 +884,27 @@ export default function UnifiedStudySpace() {
     }
   }, [noteView, currentNote, noteEditorRef.current]);
 
+  // Helper function to extract text from Tiptap JSON content
+  const extractTextFromTiptapJSON = (content: any): string => {
+    if (!content || typeof content !== 'object') return '';
+    
+    if (typeof content === 'string') return content;
+    
+    if (content.type === 'text') {
+      return content.text || '';
+    }
+    
+    if (content.content && Array.isArray(content.content)) {
+      return content.content.map(extractTextFromTiptapJSON).join(' ');
+    }
+    
+    return '';
+  };
+
   const getSelectedContent = () => {
-    return contentItems.filter(item => selectedSources.has(item.id)).map(item => ({
-      ...item,
-      content: typeof item.content === 'object' 
-        ? `${item.content.introduction || ''}\n\n${item.content.expertTeachingContent?.detailedExplanation || ''}\n\n${item.content.expertSummary || ''}`.trim()
-        : item.content
-    }));
+    return Array.from(selectedSources)
+      .map(id => contentItems.find(item => item.id === id))
+      .filter(Boolean);
   };
 
   // Helper functions for hierarchical selection
@@ -1087,12 +1116,66 @@ export default function UnifiedStudySpace() {
     setNewSpaceName('');
   };
 
-  const openNewNoteWithText = (text: string) => {
-    setNoteView('editor');
-    setCurrentNote(null);
-    setNoteTitle('New Note');
-    setNoteContent(text);
-    setIsEditingNote(true);
+  const openNewNoteWithText = async (text: string, title?: string) => {
+    if (!selectedSpace) {
+      toast({
+        title: "Error",
+        description: "Please select a study space first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!currentUser) {
+      toast({
+        title: "Error",
+        description: "User not ready. Please try again in a moment.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Get organisation_id, fetch from profile if needed
+    let organisationId = currentUser.organisation_id;
+    if (!organisationId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organisation_id')
+        .eq('user_id', currentUser.id)
+        .single();
+      organisationId = profile?.organisation_id;
+    }
+
+    const newNoteId = uuidv4();
+    const newTitle = title || 'New Note from Luna';
+
+    const tiptapJSON = {
+      type: 'doc',
+      content: text.split('\n').filter(line => line.trim() !== '').map(line => ({
+        type: 'paragraph',
+        content: [{ type: 'text', text: line }],
+      })),
+    };
+
+    if (tiptapJSON.content.length === 0) {
+      tiptapJSON.content.push({ type: 'paragraph', content: [] });
+    }
+
+    const newNote = {
+      id: newNoteId,
+      title: newTitle,
+      content: tiptapJSON,
+      isNew: true, // This is a new, unsaved note
+      study_space_id: selectedSpace.id,
+      // Temporary values for local state
+      user_id: currentUser?.id,
+      organisation_id: organisationId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setNotes(prev => [newNote as any, ...prev]);
+    setActiveNote(newNote as any);
     setActiveToolTab('notes');
   };
 
@@ -1101,107 +1184,232 @@ export default function UnifiedStudySpace() {
     setNoteTitle(note.title);
     setNoteContent(note.content);
     setNoteView('editor');
-    setIsEditingNote(false);
+    setIsEditingNote(true); // Enable editing when opening a note
+    
+    // Set editor content after a brief delay to ensure editor is ready
+    setTimeout(() => {
+      if (noteEditorRef.current) {
+        noteEditorRef.current.commands.setContent(note.content);
+      }
+    }, 100);
   };
 
-  const createNewNote = () => {
-    setCurrentNote(null);
-    setNoteTitle('');
-    setNoteContent('');
+  const createNewNote = async () => {
+    if (!selectedSpace) {
+      toast({
+        title: "Error",
+        description: "Please select a study space to create a new note.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!currentUser) {
+      toast({
+        title: "Error",
+        description: "User not ready. Please try again in a moment.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Get organisation_id, fetch from profile if needed
+    let organisationId = currentUser.organisation_id;
+    if (!organisationId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organisation_id')
+        .eq('user_id', currentUser.id)
+        .single();
+      organisationId = profile?.organisation_id;
+    }
+    
+    const newNoteId = uuidv4();
+    
+    const newNote = {
+      id: newNoteId,
+      title: 'Untitled Note',
+      content: { type: 'doc', content: [{ type: 'paragraph', content: [] }] },
+      isNew: true, // Flag to indicate it's a new, unsaved note
+      study_space_id: selectedSpace.id,
+      // Temporary values for local state
+      user_id: currentUser?.id,
+      organisation_id: organisationId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    // Add to notes list and set as current
+    setNotes(prev => [newNote as any, ...prev]);
+    setActiveNote(newNote as any);
+    setCurrentNote(newNote as any);
+    setNoteTitle(newNote.title);
+    setNoteContent(newNote.content as any);
     setNoteView('editor');
-    setIsEditingNote(true);
+    setIsEditingNote(true); // Enable editing for new notes
+    
+    // Set editor content after a brief delay to ensure editor is ready
+    setTimeout(() => {
     if (noteEditorRef.current) {
-      noteEditorRef.current.commands.setContent('');
-    }
+        noteEditorRef.current.commands.setContent(newNote.content);
+        noteEditorRef.current.commands.focus();
+      }
+    }, 100);
   };
 
-  const saveNote = async () => {
-    if (!noteTitle.trim() || !currentUser) return;
-    
-    let contentToSave = noteContent;
-    if (noteEditorRef.current) {
-      contentToSave = noteEditorRef.current.getHTML();
+  const saveNote = async (noteId: string, title: string, content: any) => {
+    if (!noteId) {
+      console.error('No note selected to save');
+      return;
+    }
+
+    if (!title || title.trim() === '') {
+      toast({
+        title: "Error",
+        description: "Note title cannot be empty",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('User not authenticated');
+      return;
+    }
+
+    if (!currentUser) {
+      toast({
+        title: "Error",
+        description: "User not ready. Please try again in a moment.",
+        variant: "destructive"
+      });
+      console.error('Save attempt failed: User not loaded yet.');
+      return;
+    }
+
+    // If organisation_id is missing, try to fetch it from the profile
+    let organisationId = currentUser.organisation_id;
+    if (!organisationId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organisation_id')
+        .eq('user_id', currentUser.id)
+        .single();
+      
+      organisationId = profile?.organisation_id;
+    }
+
+    if (!organisationId) {
+      toast({
+        title: "Error",
+        description: "Unable to determine organization. Please try refreshing the page.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Ensure we have a selected space
+    if (!selectedSpace) {
+      toast({
+        title: "Error",
+        description: "No study space selected",
+        variant: "destructive"
+      });
+      return;
     }
     
-    setIsSaving(true);
+    // Find the note in the local state
+    const noteToSave = notes.find(n => n.id === noteId);
     
-    try {
-      const now = new Date().toISOString();
-      
-      if (currentNote) {
+    // Determine if it's an existing note or a new one. A note is new if it has the `isNew` flag.
+    const isExistingNote = noteToSave && !noteToSave.isNew;
+
+    if (isExistingNote) {
         // Update existing note
-        const { data: updatedNote, error } = await supabase
+      const { error } = await supabase
           .from('study_notes')
           .update({
-            title: noteTitle,
-            content: contentToSave,
-            updated_at: now
-          })
-          .eq('id', currentNote.id)
-          .select()
-          .single();
+          title,
+          content,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', noteId);
 
         if (error) {
-          console.error('Error updating note:', error);
+        console.error('Error updating note:', JSON.stringify(error, null, 2));
+        toast({
+          title: "Error",
+          description: `Failed to update note: ${error.message}`,
+          variant: "destructive"
+        });
           return;
-        }
-
-        if (updatedNote) {
-          const updatedNotes = notes.map(note => 
-            note.id === currentNote.id 
-              ? { ...note, title: noteTitle, content: contentToSave, updated_at: now }
-              : note
-          );
-          setNotes(updatedNotes);
         }
       } else {
         // Create new note
+      const newNoteData = {
+        id: noteId,
+        study_space_id: selectedSpace.id,
+        user_id: currentUser.id,
+        organisation_id: organisationId,
+        title,
+        content,
+      };
+
         const { data: newNote, error } = await supabase
           .from('study_notes')
-          .insert({
-            title: noteTitle,
-            content: contentToSave,
-            user_id: currentUser.id,
-            study_space_id: selectedSpace?.id || null,
-            organisation_id: null,
-            tags: [],
-            is_favorite: false
-          })
+        .insert(newNoteData)
           .select()
           .single();
 
         if (error) {
-          console.error('Error creating note:', error);
+        console.error('Error creating note:', JSON.stringify(error, null, 2));
+        toast({
+          title: "Error",
+          description: `Failed to create note: ${error.message}`,
+          variant: "destructive"
+        });
           return;
-        }
-
-        if (newNote) {
-          const noteData: Note = {
-            id: newNote.id,
-            title: newNote.title,
-            content: newNote.content,
-            created_at: newNote.created_at,
-            updated_at: newNote.updated_at,
-            tags: newNote.tags || [],
-            isStarred: newNote.is_favorite || false,
-            study_space_id: newNote.study_space_id
-          };
-
-          setNotes([noteData, ...notes]);
-          setCurrentNote(noteData);
-        }
       }
-      
-      setIsEditingNote(false);
-    } catch (error) {
-      console.error('Error saving note:', error);
-    } finally {
-      setIsSaving(false);
     }
+
+    // After saving, refresh the notes list to get the latest state from DB
+    const { data: updatedNotes } = await supabase
+      .from('study_notes')
+      .select('*')
+      .eq('study_space_id', selectedSpace.id)
+      .order('updated_at', { ascending: false });
+    
+    if (updatedNotes) {
+      setNotes(updatedNotes);
+      // Make sure the just-saved note is active and current
+      const savedNote = updatedNotes.find(n => n.id === noteId) || null;
+      setActiveNote(savedNote);
+      setCurrentNote(savedNote);
+      
+      // Remove the isNew flag since it's now saved
+      if (savedNote) {
+        delete (savedNote as any).isNew;
+      }
+    }
+          toast({
+        title: "Success",
+        description: `Note '${title}' saved successfully!`,
+      });
   };
 
   const deleteNote = async (noteId: string) => {
-    try {
+    if (!noteId) return;
+
+    // Optimistically remove from UI
+    const originalNotes = [...notes];
+    const notesAfterDelete = notes.filter(n => n.id !== noteId);
+    setNotes(notesAfterDelete);
+    
+    if (activeNote?.id === noteId) {
+      setActiveNote(notesAfterDelete.length > 0 ? notesAfterDelete[0] : null);
+    }
+
       const { error } = await supabase
         .from('study_notes')
         .delete()
@@ -1209,18 +1417,104 @@ export default function UnifiedStudySpace() {
 
       if (error) {
         console.error('Error deleting note:', error);
-        return;
-      }
-
-      setNotes(notes.filter(note => note.id !== noteId));
-      if (currentNote?.id === noteId) {
-        setNoteView('list');
-        setCurrentNote(null);
-      }
-    } catch (error) {
-      console.error('Error deleting note:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete note.",
+        variant: "destructive"
+      });
+      // Revert UI change on error
+      setNotes(originalNotes);
+    } else {
+      toast({
+        title: "Success",
+        description: "Note deleted.",
+      });
     }
   };
+
+  const debouncedSaveNote = useDebounce(saveNote, 2000);
+  
+  useEffect(() => {
+    if (activeNote && noteEditorRef.current) {
+      // Check if content is different before setting it to avoid loops
+      if (JSON.stringify(noteEditorRef.current.getJSON()) !== JSON.stringify(activeNote.content)) {
+        noteEditorRef.current.commands.setContent(activeNote.content, false);
+      }
+      setNoteTitle(activeNote.title);
+      setNoteContent(activeNote.content);
+    } else if (!activeNote && noteEditorRef.current) {
+      noteEditorRef.current.commands.clearContent();
+      setNoteTitle('');
+      setNoteContent('');
+    }
+  }, [activeNote]);
+
+  const handleNoteContentChange = (newContent: any) => {
+    setNoteContent(newContent);
+    
+    // Update the note in the notes list immediately
+    if (currentNote) {
+      setNotes(prev => prev.map(note => 
+        note.id === currentNote.id 
+          ? { ...note, content: newContent, updated_at: new Date().toISOString() }
+          : note
+      ));
+      
+      // Trigger debounced save
+      debouncedSaveNote(currentNote.id, noteTitle, newContent);
+    }
+  };
+
+  const handleNoteTitleChange = (newTitle: string) => {
+    setNoteTitle(newTitle);
+    
+    // Update the note in the notes list immediately
+    if (currentNote) {
+      setNotes(prev => prev.map(note => 
+        note.id === currentNote.id 
+          ? { ...note, title: newTitle, updated_at: new Date().toISOString() }
+          : note
+      ));
+      
+      // Trigger debounced save
+      debouncedSaveNote(currentNote.id, newTitle, noteContent);
+    }
+  };
+
+  const handleAddToNotes = async (content: string, title?: string) => {
+    if (!selectedSpace) {
+      toast({
+        title: "Error",
+        description: "Please select a study space first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newNoteId = uuidv4();
+    const noteTitle = title || 'Luna Response';
+
+    // Convert content to Tiptap JSON format
+    const tiptapJSON = {
+      type: 'doc',
+      content: content.split('\n').filter(line => line.trim() !== '').map(line => ({
+        type: 'paragraph',
+        content: [{ type: 'text', text: line }],
+      })),
+    };
+
+    if (tiptapJSON.content.length === 0) {
+      tiptapJSON.content.push({ type: 'paragraph', content: [] });
+    }
+
+    // Create and save the note immediately
+    await saveNote(newNoteId, noteTitle, tiptapJSON);
+    
+    // Switch to notes tab to show the new note
+    setActiveToolTab('notes');
+  };
+
+
 
   const createMindMap = async (content: string) => {
     if (!currentUser) return;
@@ -1594,7 +1888,7 @@ export default function UnifiedStudySpace() {
 
     return (
       <div className="space-y-8 relative" ref={contentRef} data-source-content style={{ position: 'relative' }}>
-        {contentToShow.map((content, index) => {
+        {contentToShow.filter(content => content).map((content, index) => {
           if (!content) return null;
           
           switch (content.type) {
@@ -1836,7 +2130,7 @@ export default function UnifiedStudySpace() {
                       {(() => {
                         // Find all sections for this lesson
                         const lessonSections = contentToShow.filter(item => 
-                          item.type === 'section' && 
+                          item && item.type === 'section' && 
                           item.lesson_id === content.lesson_id &&
                           selectedSources.has(item.id)
                         );
@@ -1848,6 +2142,7 @@ export default function UnifiedStudySpace() {
                         return (
                           <div className="space-y-8">
                             {lessonSections
+                              .filter((section): section is NonNullable<typeof section> => section != null)
                               .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
                               .map((section, sectionIndex) => (
                                 <div key={section.id} className="border-l-2 border-slate-200 dark:border-slate-700 pl-6">
@@ -1997,33 +2292,33 @@ export default function UnifiedStudySpace() {
                 Ask Luna
               </Button>
               <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => handleSelectionAction('note')}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => handleSelectionAction('note')}
                 className="h-9 px-3 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-700/50 rounded-lg transition-all duration-200 hover:scale-105"
-              >
-                <NotebookPen className="h-3 w-3 mr-1" />
-                Note
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => handleSelectionAction('mindmap')}
+            >
+              <NotebookPen className="h-3 w-3 mr-1" />
+              Note
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => handleSelectionAction('mindmap')}
                 className="h-9 px-3 text-xs bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-700/50 rounded-lg transition-all duration-200 hover:scale-105"
-              >
-                <Map className="h-3 w-3 mr-1" />
-                Map
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => handleSelectionAction('quote')}
+            >
+              <Map className="h-3 w-3 mr-1" />
+              Map
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => handleSelectionAction('quote')}
                 className="h-9 px-3 text-xs bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-700/50 rounded-lg transition-all duration-200 hover:scale-105"
-              >
-                <Quote className="h-3 w-3 mr-1" />
-                Quote
-              </Button>
+            >
+              <Quote className="h-3 w-3 mr-1" />
+              Quote
+            </Button>
             </div>
           </div>,
           document.body
@@ -2036,18 +2331,31 @@ export default function UnifiedStudySpace() {
     if (noteView === 'list') {
       return (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-3">
-            {notes.map((note) => (
-              <Card key={note.id} className="p-4 bg-surface/80 backdrop-blur-sm hover:shadow-md transition-shadow cursor-pointer group">
-                <div className="flex items-start justify-between mb-3">
-                  <h5 
-                    className="font-medium text-sm text-foreground cursor-pointer hover:text-primary transition-colors"
-                    onClick={(e) => {
+          {/* Add New Note Button at the top */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full justify-start text-slate-600 dark:text-slate-400"
+            onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              openNote(note);
+              createNewNote();
             }}
-                  >
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add New Note
+          </Button>
+
+          {/* Notes List */}
+          <div className="grid grid-cols-1 gap-3">
+            {notes.map((note) => (
+              <Card 
+                key={note.id} 
+                className="p-4 bg-surface/80 backdrop-blur-sm hover:shadow-md transition-shadow cursor-pointer group"
+                onClick={() => openNote(note)}
+              >
+                <div className="flex items-center justify-between">
+                  <h5 className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
                     {note.title}
                   </h5>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2075,37 +2383,14 @@ export default function UnifiedStudySpace() {
                     </Button>
                   </div>
                 </div>
-                                                    <p className="text-xs text-muted-foreground line-clamp-3 mb-3">
-                    {note.content}
-                  </p>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{new Date(note.updated_at).toLocaleDateString()}</span>
-                  <div className="flex items-center gap-2">
-                    {note.source && (
-                      <Badge variant="secondary" className="text-xs">From: {note.source}</Badge>
-                    )}
-                    <Badge variant="secondary" className="text-xs">
-                      {note.id === notes.find(n => n.id === note.id)?.id ? 'Auto-generated' : 'Manual'}
-                    </Badge>
-                  </div>
+                <div className="mt-2">
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(note.updated_at).toLocaleDateString()}
+                  </span>
                 </div>
               </Card>
             ))}
           </div>
-          
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full justify-start text-slate-600 dark:text-slate-400"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              createNewNote();
-            }}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add New Note
-          </Button>
         </div>
       );
     }
@@ -2153,8 +2438,13 @@ export default function UnifiedStudySpace() {
                 </Button>
                 <Button
                   size="sm"
-                  onClick={saveNote}
-                  disabled={!noteTitle.trim() || isSaving}
+                  onClick={async () => {
+                    if (currentNote?.id && noteTitle.trim()) {
+                      await saveNote(currentNote.id, noteTitle, noteContent);
+                      setIsEditingNote(false);
+                    }
+                  }}
+                  disabled={!noteTitle.trim() || isSaving || !currentNote?.id}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   {isSaving ? (
@@ -2183,7 +2473,7 @@ export default function UnifiedStudySpace() {
         <div>
           <Input
             value={noteTitle}
-            onChange={(e) => setNoteTitle(e.target.value)}
+            onChange={(e) => handleNoteTitleChange(e.target.value)}
             placeholder="Note title..."
             disabled={!isEditingNote}
             className="text-lg font-semibold border-none px-0 bg-transparent focus:ring-0 focus:border-none placeholder:text-slate-400"
@@ -2196,6 +2486,7 @@ export default function UnifiedStudySpace() {
             ref={noteEditorRef}
             room={currentNote ? `note-${currentNote.id}` : 'new-note'}
             placeholder="Start writing your amazing notes..."
+            onUpdate={handleNoteContentChange}
           />
         </div>
       </div>
@@ -2228,6 +2519,7 @@ export default function UnifiedStudySpace() {
             selectedSources={getSelectedContent()}
             highlightedText={highlightedTextForLuna}
             onHighlightedTextUsed={() => setHighlightedTextForLuna(null)}
+            onAddToNotes={handleAddToNotes}
             className="h-full"
           />
         );
@@ -2243,7 +2535,7 @@ export default function UnifiedStudySpace() {
               selectedText={textSelection ? { text: textSelection.text, source: 'Study Material' } : undefined}
               currentNotes={notes}
               baseClassId={selectedCourse?.base_class_id}
-              studySpaceId={selectedSpace?.id} // Pass the current study space ID
+              studySpaceId={selectedSpace?.id || ''} // Pass the current study space ID
               shouldAutoGenerate={shouldAutoGenerateMindMap}
               currentMindMap={currentMindMap} // Pass mind map state from parent
               onMindMapCreated={(mindMapData) => {
@@ -2901,51 +3193,143 @@ export default function UnifiedStudySpace() {
             {expandedPanel === 'tools' && (
               <div className="h-full flex flex-col">
                 <div className="flex-shrink-0 p-8 pb-4">
-                  <h2 className="text-2xl font-bold mb-6 text-slate-900 dark:text-slate-100">Study Tools</h2>
-                  <div className="max-w-5xl mx-auto">
-                    <Tabs value={activeToolTab} onValueChange={setActiveToolTab} className="w-full">
+                <h2 className="text-2xl font-bold mb-6 text-slate-900 dark:text-slate-100">Study Tools</h2>
+                <div className="max-w-5xl mx-auto">
+                  <Tabs value={activeToolTab} onValueChange={setActiveToolTab} className="w-full">
                       <TabsList className="grid w-full grid-cols-5 bg-slate-100 dark:bg-slate-800">
-                        <TabsTrigger value="chat">
-                          <MessageSquare className="h-4 w-4 mr-2" />
-                          Chat
-                        </TabsTrigger>
-                        <TabsTrigger value="notes">
-                          <NotebookPen className="h-4 w-4 mr-2" />
-                          Notes
-                        </TabsTrigger>
-                        <TabsTrigger value="mindmaps">
-                          <Map className="h-4 w-4 mr-2" />
-                          Mind Maps
-                        </TabsTrigger>
-                        <TabsTrigger value="audio">
-                          <Headphones className="h-4 w-4 mr-2" />
-                          Audio
-                        </TabsTrigger>
-                        <TabsTrigger value="quiz">
-                          <CheckSquare className="h-4 w-4 mr-2" />
-                          Quiz
-                        </TabsTrigger>
-                      </TabsList>
+                      <TabsTrigger value="chat">
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Chat
+                      </TabsTrigger>
+                      <TabsTrigger value="notes">
+                        <NotebookPen className="h-4 w-4 mr-2" />
+                        Notes
+                      </TabsTrigger>
+                      <TabsTrigger value="mindmaps">
+                        <Map className="h-4 w-4 mr-2" />
+                        Mind Maps
+                      </TabsTrigger>
+                      <TabsTrigger value="audio">
+                        <Headphones className="h-4 w-4 mr-2" />
+                        Audio
+                      </TabsTrigger>
+                      <TabsTrigger value="quiz">
+                        <CheckSquare className="h-4 w-4 mr-2" />
+                        Quiz
+                      </TabsTrigger>
+                    </TabsList>
                     </Tabs>
                   </div>
                 </div>
                 
                 {/* Tool Content Area - Scrollable */}
                 <div className="flex-1 min-h-0 overflow-hidden px-8">
-                  <div className="max-w-5xl mx-auto h-full">
+                  <div className="max-w-5xl mx-auto h-full flex flex-col">
                     {activeToolTab === 'chat' ? (
-                      <LunaChat 
-                        ref={lunaChatRef}
-                        selectedSources={Array.from(selectedSources).map(id => contentItems.find(item => item.id === id)).filter(Boolean)}
-                        highlightedText={highlightedTextForLuna}
-                        onHighlightedTextUsed={() => {
-                          setHighlightedTextForLuna(null);
-                          setTextSelection(null);
-                          setPersistedSelection(null);
-                          removeCustomHighlight();
-                        }}
-                        className="h-full"
-                      />
+                      <>
+                        {/* Chat Messages Area */}
+                        <div className="flex-1 min-h-0 overflow-hidden border border-slate-200 dark:border-slate-700 rounded-t-lg bg-white dark:bg-slate-900">
+                          <LunaChat 
+                            ref={lunaChatRef}
+                            selectedSources={Array.from(selectedSources).map(id => contentItems.find(item => item.id === id)).filter(Boolean)}
+                            highlightedText={highlightedTextForLuna}
+                            onHighlightedTextUsed={() => {
+                              setHighlightedTextForLuna(null);
+                              setTextSelection(null);
+                              setPersistedSelection(null);
+                              removeCustomHighlight();
+                            }}
+                            onAddToNotes={handleAddToNotes}
+                            className="h-full w-full"
+                          />
+                      </div>
+                        
+                        {/* Sticky Chat Input - Similar to panel mode */}
+                        <div className="flex-shrink-0 border-t border-slate-200 dark:border-slate-700 border-l border-r border-b bg-white dark:bg-slate-900 p-6 rounded-b-lg">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shadow-sm">
+                              <Sparkles className="h-3 w-3 text-white" />
+                    </div>
+                            <span className="text-sm font-medium text-foreground">Luna AI</span>
+                            {(selectedSources.size > 0 || highlightedTextForLuna) && (
+                              <div className="flex items-center gap-1 ml-auto">
+                                {selectedSources.size > 0 && (
+                                  <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                                    {selectedSources.size} source{selectedSources.size !== 1 ? 's' : ''}
+                                  </Badge>
+                                )}
+                                {highlightedTextForLuna && (
+                                  <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                                    Selected text
+                                  </Badge>
+                                )}
+                </div>
+                            )}
+                          </div>
+                          
+                          {highlightedTextForLuna && (
+                            <div className="mb-3 p-3 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-700/50">
+                              <p className="text-sm text-purple-700 dark:text-purple-300 italic">
+                                Selected: "{highlightedTextForLuna.length > 100 ? highlightedTextForLuna.slice(0, 100) + '...' : highlightedTextForLuna}"
+                              </p>
+              </div>
+            )}
+                          
+                          <div className="flex gap-3">
+                            <div className="flex-1 relative">
+                              <Input
+                                placeholder={
+                                  highlightedTextForLuna
+                                    ? "Ask Luna about the selected text..."
+                                    : selectedSources.size > 0
+                                    ? `Ask Luna about ${selectedSources.size === 1 ? 'this source' : `${selectedSources.size} sources`}...`
+                                    : "Select sources to start chatting with Luna..."
+                                }
+                                value={chatMessage}
+                                onChange={(e) => setChatMessage(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                                disabled={selectedSources.size === 0 && !highlightedTextForLuna || isGenerating}
+                                className="pr-12 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 h-12"
+                              />
+                              
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="absolute right-12 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                              >
+                                <Mic className="h-4 w-4" />
+                              </Button>
+          </div>
+                            <Button 
+                              onClick={handleSendMessage}
+                              disabled={!chatMessage.trim() || (selectedSources.size === 0 && !highlightedTextForLuna) || isGenerating}
+                              size="lg"
+                              className="px-6 bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md hover:shadow-lg transition-all h-12"
+                            >
+                              {isGenerating ? (
+                                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              ) : (
+                                <Send className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                          
+                          {isGenerating && (
+                            <div className="mt-4 p-4 bg-white/60 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-700">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="p-1 rounded bg-gradient-to-br from-blue-500 to-purple-600">
+                                  <Sparkles className="h-3 w-3 text-white animate-pulse" />
+                                </div>
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Luna is thinking...</span>
+                              </div>
+                              <div className="space-y-2">
+                                <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+                                <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-3/4"></div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
                     ) : (
                       <ScrollArea className="h-full">
                         <div className="pb-8">
@@ -2957,7 +3341,7 @@ export default function UnifiedStudySpace() {
                                 selectedText={textSelection ? { text: textSelection.text, source: 'Study Material' } : undefined}
                                 currentNotes={notes}
                                 baseClassId={selectedCourse?.base_class_id}
-                                studySpaceId={selectedSpace?.id}
+                                studySpaceId={selectedSpace?.id || ''}
                                 shouldAutoGenerate={shouldAutoGenerateMindMap}
                                 currentMindMap={currentMindMap}
                                 onMindMapCreated={(mindMapData) => {

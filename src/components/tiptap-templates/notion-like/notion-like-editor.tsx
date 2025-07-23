@@ -67,6 +67,7 @@ export interface NotionEditorProps {
   room: string
   placeholder?: string
   editorRef?: React.ForwardedRef<any>
+  onUpdate?: (content: any) => void
 }
 
 export interface EditorProviderProps {
@@ -148,13 +149,14 @@ export function EditorProvider(props: EditorProviderProps) {
 export function NotionEditor({
   room,
   placeholder = "Start writing...",
-  editorRef
+  editorRef,
+  onUpdate
 }: NotionEditorProps) {
   return (
     <UserProvider>
       <AppProvider>
         <CollabProvider room={room}>
-            <NotionEditorContent placeholder={placeholder} editorRef={editorRef} />
+            <NotionEditorContent placeholder={placeholder} editorRef={editorRef} onUpdate={onUpdate} />
         </CollabProvider>
       </AppProvider>
     </UserProvider>
@@ -164,13 +166,18 @@ export function NotionEditor({
 /**
  * Internal component that handles the editor loading state
  */
-export function NotionEditorContent({ placeholder, editorRef }: { placeholder?: string, editorRef?: React.ForwardedRef<any> }) {
+export function NotionEditorContent({ placeholder, editorRef, onUpdate }: { placeholder?: string, editorRef?: React.ForwardedRef<any>, onUpdate?: (content: any) => void }) {
   const { provider, ydoc } = useCollab()
   const { user } = useUser()
 
   const editor = useEditor({
     immediatelyRender: false,
     shouldRerenderOnTransaction: false,
+    onUpdate: ({ editor }) => {
+      if (onUpdate) {
+        onUpdate(editor.getJSON());
+      }
+    },
     editorProps: {
       attributes: {
         class: "notion-like-editor",

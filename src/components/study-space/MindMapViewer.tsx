@@ -1832,19 +1832,22 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
         </Card>
       )}
 
+      {/* Empty State - Only show when no saved mind maps exist */}
+      {savedMindMaps.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-          <Eye className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No mind map generated yet</h3>
+            <Eye className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No mind map generated yet</h3>
             <p className="text-muted-foreground text-center mb-4">
-            Highlight specific text for focused mind maps, or select content sources for broader coverage. Selected text takes priority when available.
+              Highlight specific text for focused mind maps, or select content sources for broader coverage. Selected text takes priority when available.
             </p>
-              <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-                Generate First Mind Map
-              </Button>
-              </CardContent>
-            </Card>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Generate First Mind Map
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 } 

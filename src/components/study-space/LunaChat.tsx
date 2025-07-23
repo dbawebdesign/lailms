@@ -24,7 +24,8 @@ import {
   Brain,
   History,
   ChevronDown,
-  Trash2
+  Trash2,
+  NotebookPen
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import ReactMarkdown from 'react-markdown';
@@ -75,6 +76,7 @@ interface LunaChatProps {
   selectedSources?: any[];
   highlightedText?: string | null;
   onHighlightedTextUsed?: () => void;
+  onAddToNotes?: (content: string, title?: string) => void;
   className?: string;
 }
 
@@ -93,6 +95,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
   selectedSources = [], 
   highlightedText, 
   onHighlightedTextUsed,
+  onAddToNotes,
   className 
 }, ref) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -262,6 +265,18 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
       setTimeout(() => setCopiedMessageId(null), 2000);
     } catch (error) {
       console.error('Failed to copy message:', error);
+    }
+  };
+
+  const addToNotes = (content: string, messageId: string) => {
+    if (onAddToNotes) {
+      // Generate a title from the first line or first 50 characters
+      const title = content.split('\n')[0].slice(0, 50).replace(/[#*]/g, '').trim();
+      const noteTitle = title ? `Luna: ${title}` : "Luna Response";
+      onAddToNotes(content, noteTitle);
+      
+      // Optional: Add visual feedback that note was added
+      // e.g., setAddedToNotesId(messageId); setTimeout(() => setAddedToNotesId(null), 2000);
     }
   };
 
@@ -518,7 +533,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
       )}
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <div className="space-y-4">
           {messages.length === 0 && (
             <div className="text-center py-8">
@@ -577,12 +592,25 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
                 </div>
 
                 {message.role === 'assistant' && (
-                  <div className="flex items-center justify-end mt-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                    {onAddToNotes && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => addToNotes(message.content, message.id)}
+                        className="h-7 px-2 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-700/50 rounded transition-all"
+                        title="Add to notes"
+                      >
+                        <NotebookPen className="h-3 w-3 mr-1" />
+                        Add to notes
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => copyMessage(message.id, message.content)}
                       className="h-7 w-7 p-0"
+                      title="Copy message"
                     >
                       {copiedMessageId === message.id ? (
                         <Check className="h-3 w-3 text-green-500" />
@@ -599,8 +627,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
           ))}
         </div>
         <div ref={messagesEndRef} />
-      </ScrollArea>
-
+      </div>
 
     </div>
   );
