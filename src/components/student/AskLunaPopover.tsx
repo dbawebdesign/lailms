@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
+
 import { 
   Bot, 
   MessageSquare, 
@@ -79,9 +79,7 @@ export function AskLunaPopover({
     }
   };
 
-  const truncatedText = selectedText.length > 100 
-    ? selectedText.substring(0, 100) + '...' 
-    : selectedText;
+
 
   return (
     <AnimatePresence>
@@ -118,15 +116,7 @@ export function AskLunaPopover({
                 </Button>
               </div>
 
-              {/* Selected Text Preview */}
-              <div className="mb-4">
-                <Badge variant="secondary" className="text-xs mb-2">
-                  Selected Text
-                </Badge>
-                <div className="text-sm text-muted-foreground bg-muted/50 rounded-md p-2 border">
-                  "{truncatedText}"
-                </div>
-              </div>
+
 
               {/* Quick Actions */}
               {!showCustomInput && (

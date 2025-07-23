@@ -128,6 +128,12 @@ export async function POST(request: NextRequest) {
       console.log('📝 Extracted highlighted text from message:', extractedText.substring(0, 100) + '...');
     }
 
+    // Also check if we have highlighted text passed directly (from the new Ask Luna system)
+    if (body.highlightedText) {
+      contextParts.push(`Selected content: "${body.highlightedText}"`);
+      console.log('📝 Direct highlighted text provided:', body.highlightedText.substring(0, 100) + '...');
+    }
+
     // Add sources context
     if (sources.length > 0) {
       const sourceContext = sources.map(source => {

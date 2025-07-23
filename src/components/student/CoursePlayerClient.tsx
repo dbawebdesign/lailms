@@ -39,14 +39,15 @@ const ContentPlayer = ({
   const { sendToLuna } = useAskLuna();
 
   const handleAskLuna = (selectedText: string, question: string, quickAction?: string) => {
-    // Add context about the current content being viewed
-    const contextualQuestion = `Regarding the ${selectedItemType} content "${selectedItemId}":
-
-Selected text: "${selectedText}"
-
-${question}`;
-
-    sendToLuna(selectedText, contextualQuestion, quickAction);
+    // For quick actions, send the action directly without showing the full question
+    if (quickAction) {
+      // Send just the question without the contextual wrapper for quick actions
+      sendToLuna(selectedText, question, quickAction);
+    } else {
+      // For custom questions, the question is already what the user typed
+      sendToLuna(selectedText, question, quickAction);
+    }
+    
     clearSelection();
   };
 

@@ -31,6 +31,8 @@ import {
   shouldGenerateTitle, 
   generateFallbackTitle 
 } from '@/lib/utils/conversationTitleGenerator';
+import { useAskLuna } from '@/context/AskLunaContext';
+import { SelectedTextContext } from '@/components/student/SelectedTextContext';
 
 interface LunaConversation {
   id: string;
@@ -206,6 +208,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
   
   // Hooks
   const { context, isReady } = useLunaContext();
+  const { selectedTextContext, clearSelectedText, setIsLunaOpen } = useAskLuna();
   const supabase = createClient();
 
   // Listen for Ask Luna events from text selection
@@ -214,6 +217,11 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
       const { selectedText, question, quickAction } = event.detail;
       
       console.log('🎯 Received Ask Luna event:', { selectedText: selectedText.substring(0, 100) + '...', question, quickAction });
+      
+      // Switch to chat view if we're in sidebar mode
+      if (viewMode === 'sidebar') {
+        setViewMode('chat');
+      }
       
       // Directly send the message instead of setting state and waiting
       sendDirectMessageToLuna(question);
@@ -299,6 +307,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
             context: isReady ? context : undefined,
             history: messageHistory.current.slice(-20),
             timestamp: new Date().toISOString(),
+            highlightedText: selectedTextContext?.text, // Pass selected text as context
           }),
         });
 
@@ -333,6 +342,11 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
               persona: currentPersona,
               created_at: new Date().toISOString(),
             });
+        }
+
+        // Clear selected text after successful response
+        if (selectedTextContext) {
+          clearSelectedText();
         }
 
       } catch (error) {
@@ -1566,6 +1580,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
           context: isReady ? context : undefined,
           history: messageHistory.current.slice(-20), // Increased history for better context
           timestamp: new Date().toISOString(),
+          highlightedText: selectedTextContext?.text, // Pass selected text as context
         }),
       });
 
@@ -1671,6 +1686,11 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
       const finalMessages = [...messages, userMsg, assistantMsg];
       setMessages(finalMessages);
       messageHistory.current.push({ role: 'assistant', content: assistantMsg.content });
+
+      // Clear selected text after successful response
+      if (selectedTextContext) {
+        clearSelectedText();
+      }
 
       // Enhanced update detection with better logging
       const content = assistantMsg.content.toLowerCase();
@@ -2039,6 +2059,18 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
       <div className="flex-1 min-h-0">
         <ScrollArea className="h-full">
           <div className="px-3 pt-3 pb-3 space-y-3">
+          
+          {/* Selected Text Context */}
+          {selectedTextContext && (
+            <div className="mb-3">
+              <SelectedTextContext
+                selectedText={selectedTextContext.text}
+                source={selectedTextContext.source}
+                onRemove={clearSelectedText}
+              />
+            </div>
+          )}
+          
           {messages.length === 0 && (
             <div className="text-center text-muted-foreground py-8">
               <Image 
