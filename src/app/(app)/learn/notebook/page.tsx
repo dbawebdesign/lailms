@@ -97,6 +97,7 @@ import { NotionEditorWrapper } from '@/components/tiptap-templates/notion-like/n
 import { lunaAIService, type StudyContext, type LunaConversation } from '@/lib/services/luna-ai-service';
 import { StudyMindMapViewer } from '@/components/study-space/MindMapViewer';
 import { LessonContentRenderer } from '@/components/study-space/LessonContentRenderer';
+import { LunaChat } from '@/components/study-space/LunaChat';
 
 interface Course {
   id: string;
@@ -214,6 +215,7 @@ export default function UnifiedStudySpace() {
   const [newSpaceName, setNewSpaceName] = useState('');
   const [expandedPanel, setExpandedPanel] = useState<PanelExpansion>('none');
   const [activeToolTab, setActiveToolTab] = useState('chat');
+  const [highlightedTextForLuna, setHighlightedTextForLuna] = useState<string | null>(null);
 
   // Reset auto-generate flag when switching away from mindmaps tab (but not when switching TO it)
   const prevActiveToolTab = useRef(activeToolTab);
@@ -1016,56 +1018,59 @@ export default function UnifiedStudySpace() {
   };
 
   const handleSendMessage = async () => {
-    if (!chatMessage.trim() || !currentUser) return;
+    if (!chatMessage.trim()) return;
     
     setIsGenerating(true);
     
     try {
-      // Get or create conversation
-      if (!currentConversation) {
-        const newConversation = await lunaAIService.createConversation(
-          currentUser.id,
-          'lunaChat',
-          'Study Session'
-        );
-        setCurrentConversation(newConversation);
+      const response = await fetch('/api/luna/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: chatMessage,
+          conversationId: currentConversation?.id,
+          responseFormat: 'text',
+          highlightedText: highlightedTextForLuna,
+          sources: getSelectedContent(),
+          quickAction: undefined
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send message');
       }
 
-      // Build study context
-      const studyContext: StudyContext = {
-        selectedCourse: selectedCourse ? {
-          id: selectedCourse.id,
-          title: selectedCourse.title,
-          type: 'course'
-        } : selectedSpace ? {
-          id: selectedSpace.id,
-          title: selectedSpace.name,
-          type: 'space'
-        } : undefined,
-        selectedContent: getSelectedContent(),
-        selectedText: textSelection ? {
-          text: textSelection.text,
-          source: 'Study Material'
-        } : undefined,
-        currentNotes: notes.map(note => ({
-          id: note.id,
-          title: note.title,
-          content: note.content
-        }))
-      };
+      const data = await response.json();
+      
+      // Update conversation if new one was created
+      if (data.conversationId && !currentConversation) {
+        setCurrentConversation({
+          id: data.conversationId,
+          title: chatMessage.slice(0, 50) + (chatMessage.length > 50 ? '...' : ''),
+          persona: 'luna',
+          user_id: currentUser?.id || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          is_pinned: false,
+          is_archived: false,
+          message_count: 1,
+          tags: []
+        });
+      }
 
-      // Generate AI response
-      const response = await lunaAIService.generateResponse(
-        currentConversation!.id,
-        chatMessage,
-        studyContext,
-        'lunaChat'
-      );
-
-      // Handle the response (this would integrate with your chat UI)
-      console.log('Luna response:', response);
+      // Show success notification or handle response
+      console.log('Luna response:', data.message);
+      
+      // Switch to chat tab to show the full conversation
+      setActiveToolTab('chat');
       
       setChatMessage('');
+      
+      // Clear highlighted text after using it
+      if (highlightedTextForLuna) {
+        setHighlightedTextForLuna(null);
+      }
+
     } catch (error) {
       console.error('Error sending message to Luna:', error);
     } finally {
@@ -1493,8 +1498,8 @@ export default function UnifiedStudySpace() {
         // Don't clear the selection immediately, let the mind map viewer handle it
         break;
       case 'explain':
-        // Ask Luna to explain
-        setChatMessage(`Can you explain this: "${selectedText}"`);
+        // Ask Luna to explain - set the highlighted text for Luna
+        setHighlightedTextForLuna(selectedText);
         setActiveToolTab('chat'); // Switch to chat tab
         // Keep selection for potential further actions
         restoreSelection();
@@ -2003,53 +2008,56 @@ export default function UnifiedStudySpace() {
           }
         })}
 
-        {/* Text Selection Popover */}
+        {/* Enhanced Text Selection Popover */}
         {showSelectionPopover && textSelection && typeof document !== 'undefined' && createPortal(
           <div
             data-selection-popover
-            className="fixed z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl p-2 flex gap-1"
+            className="fixed z-50 bg-white/95 dark:bg-slate-800/95 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl p-3 flex gap-2 backdrop-blur-sm"
             style={{
               left: `${textSelection.x}px`,
               top: `${textSelection.y}px`,
               transform: 'translateX(-50%)',
             }}
           >
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => handleSelectionAction('note')}
-              className="h-8 px-3 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300"
-            >
-              <NotebookPen className="h-3 w-3 mr-1" />
-              Note
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => handleSelectionAction('mindmap')}
-              className="h-8 px-3 text-xs bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300"
-            >
-              <Map className="h-3 w-3 mr-1" />
-              Map
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => handleSelectionAction('explain')}
-              className="h-8 px-3 text-xs bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
-            >
-              <Sparkles className="h-3 w-3 mr-1" />
-              Ask Luna
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => handleSelectionAction('quote')}
-              className="h-8 px-3 text-xs bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20 dark:hover:bg-orange-900/40 text-orange-700 dark:text-orange-300"
-            >
-              <Quote className="h-3 w-3 mr-1" />
-              Quote
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleSelectionAction('explain')}
+                className="h-9 px-4 text-xs font-medium bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 dark:hover:from-purple-900/40 dark:hover:to-pink-900/40 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-700/50 rounded-lg transition-all duration-200 hover:scale-105"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Ask Luna
+              </Button>
+              <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleSelectionAction('note')}
+                className="h-9 px-3 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-700/50 rounded-lg transition-all duration-200 hover:scale-105"
+              >
+                <NotebookPen className="h-3 w-3 mr-1" />
+                Note
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleSelectionAction('mindmap')}
+                className="h-9 px-3 text-xs bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-700/50 rounded-lg transition-all duration-200 hover:scale-105"
+              >
+                <Map className="h-3 w-3 mr-1" />
+                Map
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleSelectionAction('quote')}
+                className="h-9 px-3 text-xs bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-700/50 rounded-lg transition-all duration-200 hover:scale-105"
+              >
+                <Quote className="h-3 w-3 mr-1" />
+                Quote
+              </Button>
+            </div>
           </div>,
           document.body
         )}
@@ -2248,33 +2256,12 @@ export default function UnifiedStudySpace() {
     switch (activeToolTab) {
       case 'chat':
         return (
-          <div className="space-y-4">
-            <div className="text-center py-12">
-              <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 mb-6 inline-block">
-                <MessageSquare className="h-12 w-12 text-blue-500 dark:text-blue-400 mx-auto" />
-              </div>
-              <h3 className="text-lg font-semibold mb-4 text-slate-900 dark:text-slate-100">
-                Chat with Luna AI
-              </h3>
-              <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto leading-relaxed">
-                Luna is your AI study companion. She can help explain concepts, summarize content, create study materials, and answer questions about your sources.
-              </p>
-              <div className="flex flex-col gap-3 max-w-sm mx-auto">
-                <Button variant="outline" size="sm" className="justify-start text-slate-600 dark:text-slate-400">
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Explain this concept
-                </Button>
-                <Button variant="outline" size="sm" className="justify-start text-slate-600 dark:text-slate-400">
-                  <Target className="h-4 w-4 mr-2" />
-                  Summarize key points
-                </Button>
-                <Button variant="outline" size="sm" className="justify-start text-slate-600 dark:text-slate-400">
-                  <CheckSquare className="h-4 w-4 mr-2" />
-                  Create practice questions
-                </Button>
-              </div>
-            </div>
-          </div>
+          <LunaChat
+            selectedSources={getSelectedContent()}
+            highlightedText={highlightedTextForLuna}
+            onHighlightedTextUsed={() => setHighlightedTextForLuna(null)}
+            className="h-full"
+          />
         );
 
       case 'notes':
@@ -2838,20 +2825,44 @@ export default function UnifiedStudySpace() {
                         <Sparkles className="h-3 w-3 text-white" />
                       </div>
                       <span className="text-xs font-medium text-foreground">Luna AI</span>
+                      {(selectedSources.size > 0 || highlightedTextForLuna) && (
+                        <div className="flex items-center gap-1 ml-auto">
+                          {selectedSources.size > 0 && (
+                            <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                              {selectedSources.size} source{selectedSources.size !== 1 ? 's' : ''}
+                            </Badge>
+                          )}
+                          {highlightedTextForLuna && (
+                            <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                              Selected text
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     </div>
+                    
+                    {highlightedTextForLuna && (
+                      <div className="mb-3 p-2 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-700/50">
+                        <p className="text-xs text-purple-700 dark:text-purple-300 italic">
+                          Selected: "{highlightedTextForLuna.length > 60 ? highlightedTextForLuna.slice(0, 60) + '...' : highlightedTextForLuna}"
+                        </p>
+                      </div>
+                    )}
                     
                     <div className="flex gap-2">
                       <div className="flex-1 relative">
                         <Input
                           placeholder={
-                            selectedSources.size > 0
+                            highlightedTextForLuna
+                              ? "Ask Luna about the selected text..."
+                              : selectedSources.size > 0
                               ? `Ask Luna about ${selectedSources.size === 1 ? 'this source' : `${selectedSources.size} sources`}...`
                               : "Select sources to start chatting with Luna..."
                           }
                           value={chatMessage}
                           onChange={(e) => setChatMessage(e.target.value)}
                           onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                          disabled={selectedSources.size === 0 || isGenerating}
+                          disabled={selectedSources.size === 0 && !highlightedTextForLuna || isGenerating}
                           className="pr-10 text-xs bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                         />
                         <Button
@@ -2864,7 +2875,7 @@ export default function UnifiedStudySpace() {
                       </div>
                       <Button 
                         onClick={handleSendMessage}
-                        disabled={!chatMessage.trim() || selectedSources.size === 0 || isGenerating}
+                        disabled={!chatMessage.trim() || (selectedSources.size === 0 && !highlightedTextForLuna) || isGenerating}
                         size="sm"
                         className="px-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md hover:shadow-lg transition-all"
                       >
@@ -2920,39 +2931,113 @@ export default function UnifiedStudySpace() {
             )}
 
             {expandedPanel === 'tools' && (
-              <div className="h-full p-8">
-                <h2 className="text-2xl font-bold mb-6 text-slate-900 dark:text-slate-100">Study Tools</h2>
-                <div className="max-w-5xl mx-auto">
-                  <Tabs value={activeToolTab} onValueChange={setActiveToolTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-5 bg-slate-100 dark:bg-slate-800 mb-8">
-                      <TabsTrigger value="chat">
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Chat
-                      </TabsTrigger>
-                      <TabsTrigger value="notes">
-                        <NotebookPen className="h-4 w-4 mr-2" />
-                        Notes
-                      </TabsTrigger>
-                      <TabsTrigger value="mindmaps">
-                        <Map className="h-4 w-4 mr-2" />
-                        Mind Maps
-                      </TabsTrigger>
-                      <TabsTrigger value="audio">
-                        <Headphones className="h-4 w-4 mr-2" />
-                        Audio
-                      </TabsTrigger>
-                      <TabsTrigger value="quiz">
-                        <CheckSquare className="h-4 w-4 mr-2" />
-                        Quiz
-                      </TabsTrigger>
-                    </TabsList>
-                    
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="col-span-2">
-                        {renderToolContent()}
-                      </div>
-                    </div>
-                  </Tabs>
+              <div className="h-full flex flex-col">
+                <div className="flex-shrink-0 p-8 pb-4">
+                  <h2 className="text-2xl font-bold mb-6 text-slate-900 dark:text-slate-100">Study Tools</h2>
+                  <div className="max-w-5xl mx-auto">
+                    <Tabs value={activeToolTab} onValueChange={setActiveToolTab} className="w-full">
+                      <TabsList className="grid w-full grid-cols-5 bg-slate-100 dark:bg-slate-800">
+                        <TabsTrigger value="chat">
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Chat
+                        </TabsTrigger>
+                        <TabsTrigger value="notes">
+                          <NotebookPen className="h-4 w-4 mr-2" />
+                          Notes
+                        </TabsTrigger>
+                        <TabsTrigger value="mindmaps">
+                          <Map className="h-4 w-4 mr-2" />
+                          Mind Maps
+                        </TabsTrigger>
+                        <TabsTrigger value="audio">
+                          <Headphones className="h-4 w-4 mr-2" />
+                          Audio
+                        </TabsTrigger>
+                        <TabsTrigger value="quiz">
+                          <CheckSquare className="h-4 w-4 mr-2" />
+                          Quiz
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </div>
+                </div>
+                
+                {/* Tool Content Area - Scrollable */}
+                <div className="flex-1 min-h-0 overflow-hidden px-8">
+                  <div className="max-w-5xl mx-auto h-full">
+                    {activeToolTab === 'chat' ? (
+                      <LunaChat 
+                        selectedSources={Array.from(selectedSources).map(id => contentItems.find(item => item.id === id)).filter(Boolean)}
+                        highlightedText={highlightedTextForLuna}
+                        onHighlightedTextUsed={() => {
+                          setHighlightedTextForLuna(null);
+                          setTextSelection(null);
+                          setPersistedSelection(null);
+                          removeCustomHighlight();
+                        }}
+                        className="h-full"
+                      />
+                    ) : (
+                      <ScrollArea className="h-full">
+                        <div className="pb-8">
+                          {activeToolTab === 'notes' && renderNoteTakingInterface()}
+                          {activeToolTab === 'mindmaps' && (
+                            <div className="h-full min-h-[600px] p-2">
+                              <StudyMindMapViewer
+                                selectedContent={getSelectedContent()}
+                                selectedText={textSelection ? { text: textSelection.text, source: 'Study Material' } : undefined}
+                                currentNotes={notes}
+                                baseClassId={selectedCourse?.base_class_id}
+                                studySpaceId={selectedSpace?.id}
+                                shouldAutoGenerate={shouldAutoGenerateMindMap}
+                                currentMindMap={currentMindMap}
+                                onMindMapCreated={(mindMapData) => {
+                                  console.log('Mind map created:', mindMapData);
+                                  setCurrentMindMap(mindMapData);
+                                  setShouldAutoGenerateMindMap(false);
+                                }}
+                                onMindMapChanged={setCurrentMindMap}
+                              />
+                            </div>
+                          )}
+                          {activeToolTab === 'audio' && (
+                            <div className="text-center py-12">
+                              <div className="p-6 rounded-2xl bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 mb-6 inline-block">
+                                <Headphones className="h-12 w-12 text-orange-500 dark:text-orange-400 mx-auto" />
+                              </div>
+                              <h3 className="text-lg font-semibold mb-4 text-slate-900 dark:text-slate-100">
+                                Audio Study Tools
+                              </h3>
+                              <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto leading-relaxed">
+                                Convert your study materials to audio, create voice notes, and practice with AI-powered pronunciation guides.
+                              </p>
+                              <Button variant="outline" className="bg-white dark:bg-slate-800">
+                                <Volume2 className="h-4 w-4 mr-2" />
+                                Coming Soon
+                              </Button>
+                            </div>
+                          )}
+                          {activeToolTab === 'quiz' && (
+                            <div className="text-center py-12">
+                              <div className="p-6 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 mb-6 inline-block">
+                                <CheckSquare className="h-12 w-12 text-green-500 dark:text-green-400 mx-auto" />
+                              </div>
+                              <h3 className="text-lg font-semibold mb-4 text-slate-900 dark:text-slate-100">
+                                Interactive Quizzes
+                              </h3>
+                              <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto leading-relaxed">
+                                Test your knowledge with AI-generated quizzes, flashcards, and practice questions based on your study materials.
+                              </p>
+                              <Button variant="outline" className="bg-white dark:bg-slate-800">
+                                <Brain className="h-4 w-4 mr-2" />
+                                Coming Soon
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
