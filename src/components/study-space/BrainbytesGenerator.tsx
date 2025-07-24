@@ -18,7 +18,8 @@ import {
   FileText,
   Brain,
   Clock,
-  Wand2
+  Wand2,
+  Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -126,9 +127,10 @@ export function BrainbytesGenerator({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      // Build context like mind map does - prioritize selected text
       const studyContext = {
-        selectedContent: selectedContent || [],
-        selectedText: selectedText
+        selectedContent: selectedText ? [] : (selectedContent || []), // Don't use selected content if we have selected text
+        selectedText: selectedText || null // Selected text takes priority when available
       };
 
       const response = await fetch('/api/study-space/brainbytes/generate', {
@@ -155,7 +157,7 @@ export function BrainbytesGenerator({
         id: result.id || 'temp-' + Date.now(),
         audioUrl: result.audioUrl,
         script: result.script,
-        title: 'New Brainbytes Podcast',
+        title: result.title || 'New Brainbytes Podcast',
         duration: 180, // 3 minutes
         createdAt: new Date().toISOString()
       };
@@ -200,6 +202,33 @@ export function BrainbytesGenerator({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const deleteBrainbytes = async (brainbytesData: BrainbytesData) => {
+    if (!confirm(`Are you sure you want to delete "${brainbytesData.title}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await (supabase as any)
+        .from('study_space_brainbytes')
+        .delete()
+        .eq('id', brainbytesData.id);
+
+      if (error) throw error;
+
+      // Remove from state
+      setPreviousBrainbytes(prev => prev.filter(item => item.id !== brainbytesData.id));
+      
+      // If this was the currently playing brainbytes, clear it
+      if (currentBrainbytes?.id === brainbytesData.id) {
+        setCurrentBrainbytes(null);
+      }
+
+    } catch (err) {
+      console.error('Error deleting brainbytes:', err);
+      alert('Failed to delete the podcast. Please try again.');
+    }
   };
 
   const hasContent = selectedContent.length > 0 || selectedText;
@@ -395,6 +424,14 @@ export function BrainbytesGenerator({
                         className="h-6 w-6 p-0"
                       >
                         <Download className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => deleteBrainbytes(brainbytes)}
+                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                      >
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>

@@ -2357,13 +2357,31 @@ export default function UnifiedStudySpace() {
             {notes.map((note) => (
               <Card 
                 key={note.id} 
-                className="p-4 bg-surface/80 backdrop-blur-sm hover:shadow-md transition-shadow cursor-pointer group"
+                className="p-4 bg-card hover:bg-card/80 hover:shadow-md transition-all cursor-pointer group border border-border"
                 onClick={() => openNote(note)}
               >
                 <div className="flex items-center justify-between">
-                  <h5 className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
-                    {note.title}
-                  </h5>
+                  <div className="flex-1 min-w-0">
+                    <h5 className="font-medium text-sm text-foreground group-hover:text-primary transition-colors truncate">
+                      {note.title}
+                    </h5>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {new Date(note.updated_at).toLocaleDateString()}
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <NotebookPen className="h-3 w-3" />
+                        Note
+                      </div>
+                      {note.isStarred && (
+                        <div className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
+                          <Star className="h-3 w-3 fill-current" />
+                          Starred
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
                       variant="ghost"
@@ -2388,11 +2406,6 @@ export default function UnifiedStudySpace() {
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
-                </div>
-                <div className="mt-2">
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(note.updated_at).toLocaleDateString()}
-                  </span>
                 </div>
               </Card>
             ))}

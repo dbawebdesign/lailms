@@ -22,51 +22,52 @@ interface StudySpaceBrainbytesRequest {
 
 const LUNA_VOICE_ID = 'shimmer'; // Consistent voice for Luna across all podcasts
 
-// Helper function to extract text from various content formats
-function extractTextFromContent(content: any): string {
-  if (!content) return '';
-  
-  if (typeof content === 'string') {
-    return content;
-  }
-  
-  if (content.text) {
-    return content.text;
-  }
-  
-  if (content.content) {
-    if (typeof content.content === 'string') {
-      return content.content;
-    }
-    if (Array.isArray(content.content)) {
-      return content.content.map((item: any) => extractTextFromContent(item)).join(' ');
-    }
-  }
-  
-  if (content.children && Array.isArray(content.children)) {
-    return content.children.map((child: any) => extractTextFromContent(child)).join(' ');
-  }
-  
-  return '';
-}
+// Content processing functions (following mind map approach)
 
 function buildContentContext(studyContext: any): string {
   let context = '';
   
-  // Add selected content
+  // Add selected content (filter out notes like mind map does)
   if (studyContext.selectedContent && studyContext.selectedContent.length > 0) {
-    context += "Selected Source Materials:\n";
-    studyContext.selectedContent.forEach((content: any, index: number) => {
-      const text = extractTextFromContent(content);
-      if (text.trim()) {
-        context += `Source ${index + 1}: ${text.trim()}\n\n`;
-      }
-    });
+    const contentWithoutNotes = studyContext.selectedContent.filter((item: any) => 
+      !item.tags?.includes('note') && item.type !== 'note'
+    );
+    
+    if (contentWithoutNotes.length > 0) {
+      context += 'SELECTED STUDY MATERIALS:\n';
+      contentWithoutNotes.forEach((item: any, index: number) => {
+        context += `${index + 1}. ${item.title || 'Untitled Content'}\n`;
+        
+        if (item.description) {
+          context += `   Description: ${item.description}\n`;
+        }
+        
+        // Handle different content types like mind map does
+        if (item.content) {
+          let contentText = '';
+          if (typeof item.content === 'string') {
+            contentText = item.content;
+          } else if (typeof item.content === 'object') {
+            // Handle Tiptap JSON or other object content
+            contentText = JSON.stringify(item.content);
+          } else {
+            contentText = String(item.content);
+          }
+          
+          // Include substantial content for comprehensive podcast generation
+          const truncatedContent = contentText.length > 10000 ? 
+            contentText.substring(0, 10000) + '...' : contentText;
+          context += `   Content: ${truncatedContent}\n`;
+        }
+        
+        context += '\n';
+      });
+    }
   }
   
-  // Add specifically selected text
+  // Add specifically selected text (prioritize this like mind map does)
   if (studyContext.selectedText && studyContext.selectedText.text) {
-    context += `Selected Text from ${studyContext.selectedText.source}:\n${studyContext.selectedText.text}\n\n`;
+    context += `HIGHLIGHTED TEXT:\n"${studyContext.selectedText.text}"\nSource: ${studyContext.selectedText.source}\n\n`;
   }
   
   return context;
@@ -112,31 +113,69 @@ Description: ${baseClass.description || ''}
       }
     }
 
-    // Generate script using AI
+    // First, generate a title for the podcast based on main topic
+    const titlePrompt = `
+Based on the following selected study materials, create a short, focused podcast title (maximum 8 words) that captures the MAIN TOPIC or central concept being studied:
+
+${contentContext}
+
+${instructions ? `Focus: ${instructions}` : ''}
+
+REQUIREMENTS:
+- Focus on the primary subject matter or main concept from the content
+- Make it educational and specific to what's being taught
+- Avoid generic terms like "Study Guide" or "Educational Content"
+- Capture the essence of what students will learn about
+
+Example good titles: "Understanding Photosynthesis Process", "World War II Causes", "Quadratic Equations Explained"
+    `;
+
+    const titleResponse = await openai.chat.completions.create({
+      model: 'gpt-4.1-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful assistant that creates concise, educational podcast titles.'
+        },
+        {
+          role: 'user',
+          content: titlePrompt
+        }
+      ],
+      max_tokens: 50,
+      temperature: 0.3,
+    });
+
+    const podcastTitle = titleResponse.choices[0]?.message?.content?.replace(/['"]/g, '').trim() || 'Brainbytes Podcast';
+
+    // Generate script using AI with emphasis on selected content
     const scriptPrompt = `
-You are Luna, an AI tutor creating an educational Brainbytes podcast. Create a conversational, engaging 3-minute educational podcast script based on the provided content.
+You are Luna, an AI tutor creating an educational Brainbytes podcast. Create a conversational, engaging 3-minute educational podcast script.
+
+IMPORTANT: Base your content EXCLUSIVELY on the selected source material below. Do not add general course information beyond what's provided in the selected content.
 
 ${courseContext}
 
-Content to Cover:
+SELECTED SOURCE MATERIAL (This is your PRIMARY focus):
 ${contentContext}
 
 ${instructions ? `Special Instructions: ${instructions}` : ''}
 
 Guidelines:
 - Keep it exactly 3 minutes long (approximately 450-500 words)
-- Make it educational and engaging for the specified grade level
+- Focus ONLY on concepts, examples, and information from the selected source material above
 - Use a conversational, friendly tone as Luna
-- Focus on the key concepts and make them easy to understand
-- Include concrete examples and analogies when helpful
-- Structure it with a clear introduction, main content, and conclusion
+- Explain the specific concepts from the selected content clearly
+- Use examples and analogies directly related to the selected material
+- Structure: brief intro → dive deep into the selected content → practical conclusion
 - Make it sound natural when spoken aloud
+- Stay focused on the selected material - do not generalize to broader course topics
 
 Format the response as a single cohesive script for Luna to speak. Do not include any speaker labels or formatting - just the raw text that will be converted to speech.
     `;
 
     const scriptResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini',
       messages: [
         {
           role: 'system',
@@ -156,10 +195,10 @@ Format the response as a single cohesive script for Luna to speak. Do not includ
       throw new Error('Failed to generate podcast script');
     }
 
-    // Convert script to audio using TTS
+    // Convert script to audio using TTS (explicitly using shimmer voice)
     const ttsResponse = await openai.audio.speech.create({
       model: 'tts-1',
-      voice: LUNA_VOICE_ID,
+      voice: 'shimmer',  // Explicitly set to shimmer
       input: script,
       response_format: 'mp3',
     });
@@ -197,7 +236,7 @@ Format the response as a single cohesive script for Luna to speak. Do not includ
         user_id: user.id,
         base_class_id: baseClassId || null,
         study_space_id: studySpaceId || null,
-        title: 'Brainbytes Podcast',
+        title: podcastTitle,
         script: script,
         audio_url: publicUrl,
         instructions: instructions || null,
@@ -217,6 +256,7 @@ Format the response as a single cohesive script for Luna to speak. Do not includ
       success: true,
       audioUrl: publicUrl,
       script: script,
+      title: podcastTitle,
       id: brainbytesRecord?.id,
       message: 'Brainbytes podcast generated successfully!'
     });

@@ -1605,6 +1605,35 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
     console.log('📖 Loaded existing mind map:', mindMap.title, 'ID:', mindMap.id);
   };
 
+  const deleteMindMap = async (mindMap: any, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent triggering the load action
+    
+    if (!confirm(`Are you sure you want to delete "${mindMap.title}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('mind_maps')
+        .delete()
+        .eq('id', mindMap.id);
+
+      if (error) throw error;
+
+      // Remove from state
+      setSavedMindMaps(prev => prev.filter(item => item.id !== mindMap.id));
+      
+      // If this was the currently loaded mind map, clear it
+      if (currentMindMap?.savedId === mindMap.id) {
+        setCurrentMindMap(null);
+      }
+
+    } catch (err) {
+      console.error('Error deleting mind map:', err);
+      alert('Failed to delete the mind map. Please try again.');
+    }
+  };
+
   const generateMindMap = async () => {
     if (!selectedContent && !selectedText && !currentNotes?.length) {
       alert('Please select some content, text, or notes to generate a mind map from.');
@@ -1846,10 +1875,18 @@ export function StudyMindMapViewer({ selectedContent, selectedText, currentNotes
               {savedMindMaps.map((mindMap) => (
                 <div
                   key={mindMap.id}
-                  className="border rounded-lg p-4 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                  className="border rounded-lg p-4 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors relative group"
                   onClick={() => loadMindMap(mindMap)}
                 >
-                  <h4 className="font-medium mb-2">{mindMap.title}</h4>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => deleteMindMap(mindMap, e)}
+                    className="absolute top-2 right-2 h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                  <h4 className="font-medium mb-2 pr-8">{mindMap.title}</h4>
                   <p className="text-sm text-muted-foreground mb-3">
                     {mindMap.description || 'No description'}
                   </p>
