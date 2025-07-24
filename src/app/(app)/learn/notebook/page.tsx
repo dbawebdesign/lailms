@@ -2781,7 +2781,6 @@ export default function UnifiedStudySpace() {
                           <div className={cn("w-2 h-2 rounded-full", course.color)} />
                           <div>
                             <div className="font-medium">{course.name}</div>
-                            <div className="text-xs text-muted-foreground">{course.progress}% complete</div>
                           </div>
                         </div>
                       </SelectItem>
@@ -2807,7 +2806,15 @@ export default function UnifiedStudySpace() {
                         </SelectItem>
                       ))}
                       
-                      <Dialog open={showCreateSpace} onOpenChange={setShowCreateSpace}>
+                      <Dialog 
+                        open={showCreateSpace} 
+                        onOpenChange={(open) => {
+                          setShowCreateSpace(open);
+                          if (!open) {
+                            setNewSpaceName(''); // Clear input when dialog closes
+                          }
+                        }}
+                      >
                         <DialogTrigger asChild>
                           <Button variant="ghost" size="sm" className="w-full justify-start mt-2 text-muted-foreground">
                             <Plus className="h-3 w-3 mr-2" />
@@ -2826,6 +2833,7 @@ export default function UnifiedStudySpace() {
                           </DialogHeader>
                           <div className="space-y-4">
                             <Input
+                              key="create-space-name-input"
                               placeholder="Enter space name..."
                               value={newSpaceName}
                               onChange={(e) => setNewSpaceName(e.target.value)}
