@@ -98,6 +98,7 @@ import { lunaAIService, type StudyContext, type LunaConversation } from '@/lib/s
 import { StudyMindMapViewer } from '@/components/study-space/MindMapViewer';
 import { LessonContentRenderer } from '@/components/study-space/LessonContentRenderer';
 import { LunaChat, LunaChatRef } from '@/components/study-space/LunaChat';
+import { BrainbytesGenerator } from '@/components/study-space/BrainbytesGenerator';
 import { useToast } from '@/components/ui/use-toast';
 import { useDebounce } from '@/hooks/use-debounce';
 import { v4 as uuidv4 } from 'uuid';
@@ -1860,19 +1861,19 @@ export default function UnifiedStudySpace() {
   const renderSourceContent = () => {
     const contentToShow = getSelectedContent();
 
-    if (contentToShow.length === 0) {
+          if (contentToShow.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center py-16">
-          <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 mb-6">
-            <BookOpen className="h-12 w-12 text-slate-400 mx-auto" />
+          <div className="p-6 rounded-2xl bg-muted mb-6">
+            <BookOpen className="h-12 w-12 text-muted-foreground mx-auto" />
           </div>
-          <h3 className="text-xl font-semibold mb-4 text-slate-900 dark:text-slate-100">
+          <h3 className="text-xl font-semibold mb-4 text-foreground">
             Select Sources to Study
           </h3>
-          <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md leading-relaxed">
+          <p className="text-muted-foreground mb-6 max-w-md leading-relaxed">
             Choose from your course materials or custom sources using the dropdown above. You can select multiple sources to study together.
           </p>
-          <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800">
+          <Button variant="outline" size="sm">
             <ArrowRight className="h-4 w-4 mr-2" />
             Get Started
           </Button>
@@ -1885,7 +1886,7 @@ export default function UnifiedStudySpace() {
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-slate-600 dark:text-slate-400">Loading content...</p>
+            <p className="text-muted-foreground">Loading content...</p>
           </div>
         </div>
       );
@@ -1978,34 +1979,34 @@ export default function UnifiedStudySpace() {
             case 'section':
               return (
                 <article key={content.id} className="max-w-none">
-                  <div className="bg-white dark:bg-slate-900/50 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-700/60 overflow-hidden backdrop-blur-sm">
+                  <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
                     {/* Content Header */}
-                    <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800">
+                    <div className="px-8 py-6 border-b border-border">
                       <div className="flex items-start gap-4">
                         <div className={cn(
                           "p-3 rounded-xl shrink-0",
-                          content.section_type === 'video' ? "bg-red-50 dark:bg-red-900/20" :
-                          content.section_type === 'audio' ? "bg-purple-50 dark:bg-purple-900/20" :
-                          content.section_type === 'image' ? "bg-orange-50 dark:bg-orange-900/20" :
-                          "bg-slate-50 dark:bg-slate-800/50"
+                          content.section_type === 'video' ? "bg-red-500/10" :
+                          content.section_type === 'audio' ? "bg-purple-500/10" :
+                          content.section_type === 'image' ? "bg-orange-500/10" :
+                          "bg-muted"
                         )}>
-                          {content.section_type === 'video' && <Video className="h-5 w-5 text-red-600 dark:text-red-400" />}
-                          {content.section_type === 'audio' && <Volume2 className="h-5 w-5 text-purple-600 dark:text-purple-400" />}
-                          {content.section_type === 'image' && <Image className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
-                          {(!content.section_type || content.section_type === 'text') && <FileText className="h-5 w-5 text-slate-600 dark:text-slate-400" />}
+                          {content.section_type === 'video' && <Video className="h-5 w-5 text-red-600" />}
+                          {content.section_type === 'audio' && <Volume2 className="h-5 w-5 text-purple-600" />}
+                          {content.section_type === 'image' && <Image className="h-5 w-5 text-orange-600" />}
+                          {(!content.section_type || content.section_type === 'text') && <FileText className="h-5 w-5 text-muted-foreground" />}
                         </div>
                         <div className="flex-1 min-w-0" data-source-content>
-                          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2 leading-tight select-text" data-source-content>
+                          <h2 className="text-xl font-semibold text-foreground mb-2 leading-tight select-text" data-source-content>
                             {content.title}
                           </h2>
                           {content.description && (
-                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed select-text" data-source-content>
+                            <p className="text-sm text-muted-foreground leading-relaxed select-text" data-source-content>
                               {content.description}
                             </p>
                           )}
                           <div className="flex items-center gap-2 mt-3">
                             {content.section_type && (
-                              <Badge variant="secondary" className="text-xs px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                              <Badge variant="secondary" className="text-xs px-2 py-1">
                                 {content.section_type}
                               </Badge>
                             )}
@@ -2105,19 +2106,19 @@ export default function UnifiedStudySpace() {
             case 'lesson':
               return (
                 <article key={content.id} className="max-w-none">
-                  <div className="bg-white dark:bg-slate-900/50 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-700/60 overflow-hidden backdrop-blur-sm">
+                  <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
                     {/* Lesson Header */}
-                    <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800">
+                    <div className="px-8 py-6 border-b border-border">
                       <div className="flex items-start gap-4">
-                        <div className="p-3 rounded-xl shrink-0 bg-blue-50 dark:bg-blue-900/20">
-                          <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        <div className="p-3 rounded-xl shrink-0 bg-primary/10">
+                          <BookOpen className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1 min-w-0" data-source-content>
-                          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2 leading-tight select-text" data-source-content>
+                          <h2 className="text-xl font-semibold text-foreground mb-2 leading-tight select-text" data-source-content>
                             {content.title}
                           </h2>
                           {content.description && (
-                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed select-text" data-source-content>
+                            <p className="text-sm text-muted-foreground leading-relaxed select-text" data-source-content>
                               {content.description}
                             </p>
                           )}
@@ -2150,25 +2151,25 @@ export default function UnifiedStudySpace() {
                               .filter((section): section is NonNullable<typeof section> => section != null)
                               .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
                               .map((section, sectionIndex) => (
-                                <div key={section.id} className="border-l-2 border-slate-200 dark:border-slate-700 pl-6">
+                                <div key={section.id} className="border-l-2 border-border pl-6">
                                   {/* Section Header */}
                                   <div className="flex items-center gap-3 mb-4">
                                     <div className={cn(
                                       "p-2 rounded-lg",
-                                      section.section_type === 'video' ? "bg-red-100 dark:bg-red-900/20" :
-                                      section.section_type === 'audio' ? "bg-purple-100 dark:bg-purple-900/20" :
-                                      section.section_type === 'image' ? "bg-orange-100 dark:bg-orange-900/20" :
-                                      "bg-slate-100 dark:bg-slate-800"
+                                      section.section_type === 'video' ? "bg-red-500/10" :
+                                      section.section_type === 'audio' ? "bg-purple-500/10" :
+                                      section.section_type === 'image' ? "bg-orange-500/10" :
+                                      "bg-muted"
                                     )}>
-                                      {section.section_type === 'video' && <Video className="h-4 w-4 text-red-600 dark:text-red-400" />}
-                                      {section.section_type === 'audio' && <Volume2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />}
-                                      {section.section_type === 'image' && <Image className="h-4 w-4 text-orange-600 dark:text-orange-400" />}
-                                      {(!section.section_type || section.section_type === 'text') && <FileText className="h-4 w-4 text-slate-600 dark:text-slate-400" />}
+                                      {section.section_type === 'video' && <Video className="h-4 w-4 text-red-600" />}
+                                      {section.section_type === 'audio' && <Volume2 className="h-4 w-4 text-purple-600" />}
+                                      {section.section_type === 'image' && <Image className="h-4 w-4 text-orange-600" />}
+                                      {(!section.section_type || section.section_type === 'text') && <FileText className="h-4 w-4 text-muted-foreground" />}
                                     </div>
                                     <div>
-                                      <h3 className="font-medium text-slate-900 dark:text-slate-100 select-text" data-source-content>{section.title}</h3>
+                                      <h3 className="font-medium text-foreground select-text" data-source-content>{section.title}</h3>
                                       {section.section_type && (
-                                        <span className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+                                        <span className="text-xs text-muted-foreground capitalize">
                                           {section.section_type} content
                                         </span>
                                       )}
@@ -2194,10 +2195,10 @@ export default function UnifiedStudySpace() {
                                     
                                     {/* Audio */}
                                     {section.section_type === 'audio' && section.audio_url && (
-                                      <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                                      <div className="bg-muted rounded-xl p-4 border border-border">
                                         <audio 
                                           controls 
-                                          className="w-full h-10 bg-white dark:bg-slate-700 rounded-lg"
+                                          className="w-full h-10 bg-background rounded-lg"
                                           preload="metadata"
                                         >
                                           <source src={section.audio_url} type="audio/mpeg" />
@@ -2210,7 +2211,7 @@ export default function UnifiedStudySpace() {
                                     
                                     {/* Image */}
                                     {section.section_type === 'image' && section.image_url && (
-                                      <div className="rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-700">
+                                      <div className="rounded-xl overflow-hidden shadow-sm border border-border">
                                         <img
                                           src={section.image_url}
                                           alt={section.title}
@@ -2222,29 +2223,29 @@ export default function UnifiedStudySpace() {
                                     
                                     {/* Text Content */}
                                     {section.content && typeof section.content === 'string' && section.content.trim() && (
-                                      <div className="prose prose-slate dark:prose-invert max-w-none prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-code:text-slate-800 dark:prose-code:text-slate-200">
+                                      <div className="prose prose-slate dark:prose-invert max-w-none">
                                         <ReactMarkdown 
                                           className="text-base leading-relaxed select-text"
                                           components={{
-                                            h1: ({children}) => <h1 className="text-2xl font-bold mb-4 mt-6 first:mt-0 text-slate-900 dark:text-slate-100">{children}</h1>,
-                                            h2: ({children}) => <h2 className="text-xl font-semibold mb-3 mt-5 first:mt-0 text-slate-800 dark:text-slate-200">{children}</h2>,
-                                            h3: ({children}) => <h3 className="text-lg font-medium mb-2 mt-4 first:mt-0 text-slate-700 dark:text-slate-300">{children}</h3>,
-                                            h4: ({children}) => <h4 className="text-base font-medium mb-2 mt-3 first:mt-0 text-slate-700 dark:text-slate-300">{children}</h4>,
-                                            p: ({children}) => <p className="mb-3 text-slate-700 dark:text-slate-300 leading-relaxed">{children}</p>,
+                                            h1: ({children}) => <h1 className="text-2xl font-bold mb-4 mt-6 first:mt-0 text-foreground">{children}</h1>,
+                                            h2: ({children}) => <h2 className="text-xl font-semibold mb-3 mt-5 first:mt-0 text-foreground">{children}</h2>,
+                                            h3: ({children}) => <h3 className="text-lg font-medium mb-2 mt-4 first:mt-0 text-foreground">{children}</h3>,
+                                            h4: ({children}) => <h4 className="text-base font-medium mb-2 mt-3 first:mt-0 text-foreground">{children}</h4>,
+                                            p: ({children}) => <p className="mb-3 text-foreground leading-relaxed">{children}</p>,
                                             ul: ({children}) => <ul className="mb-3 space-y-1">{children}</ul>,
                                             ol: ({children}) => <ol className="mb-3 space-y-1">{children}</ol>,
-                                            li: ({children}) => <li className="text-slate-700 dark:text-slate-300 ml-4">{children}</li>,
+                                            li: ({children}) => <li className="text-foreground ml-4">{children}</li>,
                                             code: ({children, className}) => {
                                               const isInline = !className;
                                               if (isInline) {
-                                                return <code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-sm font-mono border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200">{children}</code>
+                                                return <code className="bg-muted px-2 py-1 rounded text-sm font-mono border border-border text-foreground">{children}</code>
                                               }
-                                              return <code className="text-sm font-mono text-slate-800 dark:text-slate-200">{children}</code>
+                                              return <code className="text-sm font-mono text-foreground">{children}</code>
                                             },
-                                            pre: ({children}) => <pre className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg overflow-x-auto my-4 border border-slate-200 dark:border-slate-700 shadow-sm">{children}</pre>,
-                                            strong: ({children}) => <strong className="font-semibold text-slate-900 dark:text-slate-100">{children}</strong>,
-                                            em: ({children}) => <em className="italic text-slate-800 dark:text-slate-200">{children}</em>,
-                                            blockquote: ({children}) => <blockquote className="border-l-4 border-slate-300 dark:border-slate-600 pl-4 my-3 italic text-slate-600 dark:text-slate-400">{children}</blockquote>
+                                            pre: ({children}) => <pre className="bg-muted p-4 rounded-lg overflow-x-auto my-4 border border-border shadow-sm">{children}</pre>,
+                                            strong: ({children}) => <strong className="font-semibold text-foreground">{children}</strong>,
+                                            em: ({children}) => <em className="italic text-foreground">{children}</em>,
+                                            blockquote: ({children}) => <blockquote className="border-l-4 border-border pl-4 my-3 italic text-muted-foreground">{children}</blockquote>
                                           }}
                                         >
                                           {section.content}
@@ -2557,36 +2558,13 @@ export default function UnifiedStudySpace() {
 
       case 'audio':
         return (
-          <div className="space-y-4">
-            <Card className="p-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-3" data-source-content>
-                <h5 className="font-medium text-sm text-slate-900 dark:text-slate-100 select-text">Audio Summary</h5>
-                <Badge variant="secondary" className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300">
-                  Ready
-                </Badge>
-              </div>
-              <div className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 rounded-lg p-6 mb-3" data-source-content>
-                <div className="flex items-center justify-center text-slate-500 dark:text-slate-400">
-                  <Headphones className="h-8 w-8 mb-2" />
-                </div>
-                <p className="text-xs text-center text-slate-600 dark:text-slate-400 select-text">React Hooks Overview - 5 min</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" className="flex-1">
-                  <Play className="h-3 w-3 mr-2" />
-                  Play
-                </Button>
-                <Button size="sm" variant="outline">
-                  <Download className="h-3 w-3" />
-                </Button>
-              </div>
-            </Card>
-            
-            <Button variant="outline" size="sm" className="w-full justify-start text-slate-600 dark:text-slate-400">
-              <Plus className="h-4 w-4 mr-2" />
-              Generate Audio Summary
-            </Button>
-          </div>
+          <BrainbytesGenerator
+            selectedContent={getSelectedContent()}
+            selectedText={textSelection ? { text: textSelection.text, source: 'Study Material' } : undefined}
+            baseClassId={selectedCourse?.base_class_id}
+            studySpaceId={selectedSpace?.id || ''}
+            className="h-full"
+          />
         );
 
       case 'quiz':
@@ -2681,15 +2659,15 @@ export default function UnifiedStudySpace() {
       }}
       actionable={true}
     >
-      <div className="h-screen flex flex-col bg-gradient-to-br from-background via-surface to-background overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
+      <div className="h-screen flex flex-col bg-background overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
       
       {/* Sophisticated Header */}
-      <div className="border-b border-border bg-surface/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm">
+      <div className="border-b border-border bg-background/95 backdrop-blur-xl sticky top-0 z-50 shadow-sm">
         <div className="flex items-center justify-between p-6">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg">
-                <Sparkles className="h-5 w-5 text-white" />
+              <div className="p-2 rounded-xl bg-gradient-to-br from-primary/80 to-accent/80 shadow-lg">
+                <Sparkles className="h-5 w-5 text-primary-foreground" />
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-foreground">
@@ -2752,7 +2730,7 @@ export default function UnifiedStudySpace() {
                 }}
                 disabled={isLoadingCourses}
               >
-                <SelectTrigger className="w-64 bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700">
+                <SelectTrigger className="w-64 bg-background border-border">
                   {isLoadingCourses ? (
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -2764,15 +2742,15 @@ export default function UnifiedStudySpace() {
                 </SelectTrigger>
                 <SelectContent>
                   <div className="p-2">
-                    <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                    <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       <GraduationCap className="h-3 w-3" />
                       ACTIVE COURSES
                       {isLoadingCourses && <Loader2 className="h-3 w-3 animate-spin" />}
                     </div>
                     {isLoadingCourses ? (
-                      <div className="pl-6 py-2 text-sm text-slate-500">Loading courses...</div>
+                      <div className="pl-6 py-2 text-sm text-muted-foreground">Loading courses...</div>
                     ) : courses.length === 0 ? (
-                      <div className="pl-6 py-2 text-sm text-slate-500">No enrolled courses found</div>
+                      <div className="pl-6 py-2 text-sm text-muted-foreground">No enrolled courses found</div>
                     ) : (
                       courses.map((course) => (
                       <SelectItem key={course.id} value={course.id} className="pl-6">
@@ -2780,7 +2758,7 @@ export default function UnifiedStudySpace() {
                           <div className={cn("w-2 h-2 rounded-full", course.color)} />
                           <div>
                             <div className="font-medium">{course.name}</div>
-                            <div className="text-xs text-slate-500">{course.progress}% complete</div>
+                            <div className="text-xs text-muted-foreground">{course.progress}% complete</div>
                           </div>
                         </div>
                       </SelectItem>
@@ -2790,7 +2768,7 @@ export default function UnifiedStudySpace() {
                   
                   <div className="border-t">
                     <div className="p-2">
-                      <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                      <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                         <Library className="h-3 w-3" />
                         CUSTOM SPACES
                       </div>
@@ -2800,7 +2778,7 @@ export default function UnifiedStudySpace() {
                             <div className={cn("w-2 h-2 rounded-full", space.color)} />
                             <div>
                               <div className="font-medium">{space.name}</div>
-                              <div className="text-xs text-slate-500">{space.type === 'custom' ? 'Personal' : 'Course'}</div>
+                              <div className="text-xs text-muted-foreground">{space.type === 'custom' ? 'Personal' : 'Course'}</div>
                             </div>
                           </div>
                         </SelectItem>
@@ -2808,7 +2786,7 @@ export default function UnifiedStudySpace() {
                       
                       <Dialog open={showCreateSpace} onOpenChange={setShowCreateSpace}>
                         <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="w-full justify-start mt-2 text-slate-600 dark:text-slate-400">
+                          <Button variant="ghost" size="sm" className="w-full justify-start mt-2 text-muted-foreground">
                             <Plus className="h-3 w-3 mr-2" />
                             Create New Space
                           </Button>
@@ -2848,10 +2826,10 @@ export default function UnifiedStudySpace() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="text-slate-600 dark:text-slate-400">
+            <Button variant="ghost" size="sm" className="text-muted-foreground">
               <Settings className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="text-slate-600 dark:text-slate-400">
+            <Button variant="ghost" size="sm" className="text-muted-foreground">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </div>
@@ -2865,10 +2843,10 @@ export default function UnifiedStudySpace() {
             
             {/* LEFT PANEL - Sources & Content */}
             <ResizablePanel defaultSize={50} minSize={30} maxSize={70}>
-              <div className="h-full flex flex-col bg-surface/50 border-r border-border/60">
+              <div className="h-full flex flex-col bg-background border-r border-border">
                 
                                   {/* Sources Header with Multi-Select Dropdown */}
-                <div className="p-4 border-b border-border/60 bg-surface/80">
+                <div className="p-4 border-b border-border bg-background">
                   <div className="flex items-center justify-between mb-4">
                                           <h3 className="font-semibold text-foreground">Sources</h3>
                     {renderExpandButton('sources')}
@@ -2881,7 +2859,7 @@ export default function UnifiedStudySpace() {
                         variant="outline"
                         role="combobox"
                         aria-expanded={sourceDropdownOpen}
-                        className="w-full justify-between bg-white/60 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
+                        className="w-full justify-between"
                       >
                         {selectedSources.size === 0 ? (
                           "Select sources..."
@@ -2894,21 +2872,21 @@ export default function UnifiedStudySpace() {
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-full p-0" align="start">
-                      <div className="p-3 border-b border-slate-200 dark:border-slate-700">
+                      <div className="p-3 border-b border-border">
                         <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input
                             placeholder="Search sources..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 h-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                            className="pl-10 h-9"
                           />
                         </div>
                       </div>
                       
                       <div className="max-h-80 overflow-y-auto">
                         {/* Select All Option */}
-                        <div className="p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                        <div className="p-3 border-b border-border bg-muted/50">
                           <div className="flex items-center space-x-3">
                             <Checkbox
                               id="select-all"
@@ -2923,7 +2901,7 @@ export default function UnifiedStudySpace() {
                             />
                             <label
                               htmlFor="select-all"
-                              className="text-sm font-medium text-slate-900 dark:text-slate-100 cursor-pointer"
+                              className="text-sm font-medium text-foreground cursor-pointer"
                             >
                               Select All ({contentItems.length})
                             </label>
@@ -2952,9 +2930,9 @@ export default function UnifiedStudySpace() {
                               const isPathSelected = selectedPaths.has(pathId);
                               
                               return (
-                                <div key={path.id} className="border-b border-slate-100 dark:border-slate-700 last:border-b-0">
+                                <div key={path.id} className="border-b border-border last:border-b-0">
                                   {/* Path Header */}
-                                  <div className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                  <div className="p-3 hover:bg-muted/50 transition-colors">
                                     <div className="flex items-start space-x-3">
                                       <Checkbox
                                         id={path.id}
@@ -2963,21 +2941,21 @@ export default function UnifiedStudySpace() {
                                       />
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                          <div className="p-1 rounded bg-blue-100 dark:bg-blue-900">
-                                            <BookOpen className="h-4 w-4 text-blue-600" />
+                                          <div className="p-1 rounded bg-primary/10">
+                                            <BookOpen className="h-4 w-4 text-primary" />
                                           </div>
                                           <label
                                             htmlFor={path.id}
-                                            className="text-sm font-semibold text-slate-900 dark:text-slate-100 cursor-pointer"
+                                            className="text-sm font-semibold text-foreground cursor-pointer"
                                           >
                                             {path.title}
                                           </label>
-                                          <span className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">
+                                          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                                             Path
                                           </span>
                                         </div>
                                         {path.description && (
-                                          <p className="text-xs text-slate-600 dark:text-slate-400 ml-7">
+                                          <p className="text-xs text-muted-foreground ml-7">
                                             {path.description}
                                           </p>
                                         )}
@@ -2991,9 +2969,9 @@ export default function UnifiedStudySpace() {
                                     const isLessonSelected = selectedLessons.has(lesson.id);
                                     
                                     return (
-                                      <div key={lesson.id} className="ml-6 border-l border-slate-200 dark:border-slate-600">
+                                      <div key={lesson.id} className="ml-6 border-l border-border">
                                         {/* Lesson Header */}
-                                        <div className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                        <div className="p-3 hover:bg-muted/50 transition-colors">
                                           <div className="flex items-start space-x-3">
                                             <Checkbox
                                               id={lesson.id}
@@ -3002,21 +2980,21 @@ export default function UnifiedStudySpace() {
                                             />
                                             <div className="flex-1 min-w-0">
                                               <div className="flex items-center gap-2 mb-1">
-                                                <div className="p-1 rounded bg-emerald-100 dark:bg-emerald-900">
-                                                  <FileText className="h-3 w-3 text-emerald-600" />
+                                                <div className="p-1 rounded bg-secondary/50">
+                                                  <FileText className="h-3 w-3 text-secondary-foreground" />
                                                 </div>
                                                 <label
                                                   htmlFor={lesson.id}
-                                                  className="text-sm font-medium text-slate-900 dark:text-slate-100 cursor-pointer"
+                                                  className="text-sm font-medium text-foreground cursor-pointer"
                                                 >
                                                   {lesson.title}
                                                 </label>
-                                                <span className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">
+                                                <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                                                   Lesson
                                                 </span>
                                               </div>
                                               {lesson.description && (
-                                                <p className="text-xs text-slate-600 dark:text-slate-400 ml-5">
+                                                <p className="text-xs text-muted-foreground ml-5">
                                                   {lesson.description}
                                                 </p>
                                               )}
@@ -3029,8 +3007,8 @@ export default function UnifiedStudySpace() {
                                           const isSectionSelected = selectedSections.has(section.id);
                                           
                                           return (
-                                            <div key={section.id} className="ml-6 border-l border-slate-100 dark:border-slate-500">
-                                              <div className="p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                            <div key={section.id} className="ml-6 border-l border-border/50">
+                                              <div className="p-2 hover:bg-muted/50 transition-colors">
                                                 <div className="flex items-start space-x-3">
                                                   <Checkbox
                                                     id={section.id}
@@ -3039,24 +3017,24 @@ export default function UnifiedStudySpace() {
                                                   />
                                                   <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                      <div className="p-1 rounded bg-slate-100 dark:bg-slate-700">
+                                                      <div className="p-1 rounded bg-muted">
                                                         {section.section_type === 'video' && <Video className="h-3 w-3 text-red-500" />}
                                                         {section.section_type === 'audio' && <Video className="h-3 w-3 text-purple-500" />}
                                                         {section.section_type === 'image' && <FileText className="h-3 w-3 text-orange-500" />}
-                                                        {(section.section_type === 'text' || !section.section_type) && <FileText className="h-3 w-3 text-slate-500" />}
+                                                        {(section.section_type === 'text' || !section.section_type) && <FileText className="h-3 w-3 text-muted-foreground" />}
                                                       </div>
                                                       <label
                                                         htmlFor={section.id}
-                                                        className="text-xs font-medium text-slate-800 dark:text-slate-200 cursor-pointer"
+                                                        className="text-xs font-medium text-foreground cursor-pointer"
                                                       >
                                                         {section.title}
                                                       </label>
-                                                      <span className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px]">
+                                                      <span className="text-xs text-muted-foreground bg-muted/50 px-1 py-0.5 rounded text-[10px]">
                                                         {section.section_type || 'text'}
                                                       </span>
                                                     </div>
                                                     {section.description && (
-                                                      <p className="text-xs text-slate-500 dark:text-slate-400 ml-5 line-clamp-1">
+                                                      <p className="text-xs text-muted-foreground ml-5 line-clamp-1">
                                                         {section.description}
                                                       </p>
                                                     )}
@@ -3093,10 +3071,10 @@ export default function UnifiedStudySpace() {
 
             {/* RIGHT PANEL - Study Tools with Tabbed Interface */}
             <ResizablePanel defaultSize={50} minSize={30} maxSize={70}>
-              <div className="h-full flex flex-col bg-surface/50 border-l border-border/60 relative">
+              <div className="h-full flex flex-col bg-background border-l border-border/60 relative">
                 
                 {/* Tools Header with Tabs */}
-                <div className="p-4 border-b border-border/60 bg-surface/80">
+                <div className="p-4 border-b border-border/60 bg-background/80">
                   <div className="flex items-center justify-between mb-4">
                                           <h3 className="font-semibold text-foreground">Study Tools</h3>
                     {renderExpandButton('tools')}
@@ -3146,13 +3124,13 @@ export default function UnifiedStudySpace() {
           </ResizablePanelGroup>
         ) : (
           // Full Screen Panel Views
-          <div className="h-full bg-white dark:bg-slate-900 relative">
+          <div className="h-full bg-background relative">
             <div className="absolute top-4 right-4 z-50">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setExpandedPanel('none')}
-                className="h-8 w-8 p-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-lg rounded-lg"
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground bg-background/80 backdrop-blur-sm shadow-lg rounded-lg"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -3160,7 +3138,7 @@ export default function UnifiedStudySpace() {
 
             {expandedPanel === 'sources' && (
               <div className="h-full p-8">
-                <h2 className="text-2xl font-bold mb-6 text-slate-900 dark:text-slate-100">Source Content</h2>
+                <h2 className="text-2xl font-bold mb-6 text-foreground">Source Content</h2>
                 <div className="h-full max-w-5xl mx-auto">
                   {renderSourceContent()}
                 </div>
@@ -3170,10 +3148,10 @@ export default function UnifiedStudySpace() {
             {expandedPanel === 'tools' && (
               <div className="h-full flex flex-col">
                 <div className="flex-shrink-0 p-8 pb-4">
-                <h2 className="text-2xl font-bold mb-6 text-slate-900 dark:text-slate-100">Study Tools</h2>
+                <h2 className="text-2xl font-bold mb-6 text-foreground">Study Tools</h2>
                 <div className="max-w-5xl mx-auto">
                   <Tabs value={activeToolTab} onValueChange={setActiveToolTab} className="w-full">
-                      <TabsList className="grid w-full grid-cols-5 bg-slate-100 dark:bg-slate-800">
+                      <TabsList className="grid w-full grid-cols-5 bg-muted">
                       <TabsTrigger value="chat">
                         <MessageSquare className="h-4 w-4 mr-2" />
                         Chat
@@ -3203,7 +3181,7 @@ export default function UnifiedStudySpace() {
                 <div className="flex-1 min-h-0 overflow-hidden px-8">
                   <div className="max-w-5xl mx-auto h-full flex flex-col">
                     {activeToolTab === 'chat' ? (
-                      <div className="flex-1 min-h-0 overflow-hidden border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900">
+                      <div className="flex-1 min-h-0 overflow-hidden border border-border rounded-lg bg-background">
                         <LunaChat 
                           ref={lunaChatRef}
                           selectedSources={Array.from(selectedSources).map(id => contentItems.find(item => item.id === id)).filter(Boolean)}
@@ -3246,34 +3224,25 @@ export default function UnifiedStudySpace() {
                             </div>
                           )}
                           {activeToolTab === 'audio' && (
-                            <div className="text-center py-12">
-                              <div className="p-6 rounded-2xl bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 mb-6 inline-block">
-                                <Headphones className="h-12 w-12 text-orange-500 dark:text-orange-400 mx-auto" />
-                              </div>
-                              <h3 className="text-lg font-semibold mb-4 text-slate-900 dark:text-slate-100">
-                                Audio Study Tools
-                              </h3>
-                              <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto leading-relaxed">
-                                Convert your study materials to audio, create voice notes, and practice with AI-powered pronunciation guides.
-                              </p>
-                              <Button variant="outline" className="bg-white dark:bg-slate-800">
-                                <Volume2 className="h-4 w-4 mr-2" />
-                                Coming Soon
-                              </Button>
-                            </div>
+                                                         <BrainbytesGenerator
+                               selectedContent={getSelectedContent()}
+                               selectedText={textSelection ? { text: textSelection.text, source: 'Study Material' } : undefined}
+                               baseClassId={selectedCourse?.base_class_id}
+                               studySpaceId={selectedSpace?.id || ''}
+                             />
                           )}
                           {activeToolTab === 'quiz' && (
                             <div className="text-center py-12">
-                              <div className="p-6 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 mb-6 inline-block">
-                                <CheckSquare className="h-12 w-12 text-green-500 dark:text-green-400 mx-auto" />
+                              <div className="p-6 rounded-2xl bg-green-500/10 mb-6 inline-block">
+                                <CheckSquare className="h-12 w-12 text-green-500 mx-auto" />
                               </div>
-                              <h3 className="text-lg font-semibold mb-4 text-slate-900 dark:text-slate-100">
+                              <h3 className="text-lg font-semibold mb-4 text-foreground">
                                 Interactive Quizzes
                               </h3>
-                              <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto leading-relaxed">
+                              <p className="text-muted-foreground mb-6 max-w-md mx-auto leading-relaxed">
                                 Test your knowledge with AI-generated quizzes, flashcards, and practice questions based on your study materials.
                               </p>
-                              <Button variant="outline" className="bg-white dark:bg-slate-800">
+                              <Button variant="outline">
                                 <Brain className="h-4 w-4 mr-2" />
                                 Coming Soon
                               </Button>

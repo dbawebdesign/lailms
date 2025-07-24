@@ -681,8 +681,8 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
             y={node.y}
             textAnchor="middle"
             dominantBaseline="middle"
-            className="pointer-events-none font-medium select-none"
-            fill={node.level === 0 || node.level === 1 ? 'white' : '#1F2937'}
+            className="pointer-events-none font-medium select-none text-white dark:text-white"
+            fill="white"
             fontSize={textSize}
           >
             {displayText}

@@ -106,6 +106,22 @@ export interface StudyContentIndex {
   indexed_at: string;
 }
 
+export interface StudySpaceBrainbytes {
+  id: string;
+  user_id: string;
+  base_class_id?: string;
+  study_space_id?: string;
+  title: string;
+  script: string;
+  audio_url: string;
+  instructions?: string;
+  content_context?: string;
+  duration_minutes: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Enums and Constants
 export const StudySessionType = {
   READING: 'reading',
@@ -208,6 +224,20 @@ export interface StartStudySessionData {
   linked_lesson_id?: string;
   linked_lesson_section_id?: string;
   linked_path_id?: string;
+}
+
+export interface CreateStudySpaceBrainbytesData {
+  studyContext: {
+    selectedContent: any[];
+    selectedText?: {
+      text: string;
+      source: string;
+    };
+  };
+  baseClassId?: string;
+  studySpaceId?: string;
+  instructions?: string;
+  gradeLevel?: string;
 }
 
 // API Response Types

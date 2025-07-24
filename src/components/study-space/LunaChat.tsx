@@ -384,30 +384,30 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
 
   const formatMessageContent = (content: string, format?: string) => {
     const markdownComponents = {
-      h1: ({ children }: any) => <h1 className="text-xl font-bold mb-3 text-slate-900 dark:text-slate-100">{children}</h1>,
-      h2: ({ children }: any) => <h2 className="text-lg font-semibold mb-2 text-slate-800 dark:text-slate-200">{children}</h2>,
-      h3: ({ children }: any) => <h3 className="text-base font-medium mb-2 text-slate-700 dark:text-slate-300">{children}</h3>,
-      h4: ({ children }: any) => <h4 className="text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">{children}</h4>,
+      h1: ({ children }: any) => <h1 className="text-xl font-bold mb-3 text-foreground">{children}</h1>,
+      h2: ({ children }: any) => <h2 className="text-lg font-semibold mb-2 text-foreground">{children}</h2>,
+      h3: ({ children }: any) => <h3 className="text-base font-medium mb-2 text-foreground">{children}</h3>,
+      h4: ({ children }: any) => <h4 className="text-sm font-medium mb-1 text-foreground">{children}</h4>,
       p: ({ children }: any) => <p className="mb-3 leading-relaxed">{children}</p>,
       ul: ({ children }: any) => <ul className="mb-3 space-y-1 list-disc list-inside">{children}</ul>,
       ol: ({ children }: any) => <ol className="mb-3 space-y-1 list-decimal list-inside">{children}</ol>,
       li: ({ children }: any) => <li className="ml-2 leading-relaxed">{children}</li>,
-      strong: ({ children }: any) => <strong className="font-semibold text-slate-900 dark:text-slate-100">{children}</strong>,
-      em: ({ children }: any) => <em className="italic text-slate-700 dark:text-slate-300">{children}</em>,
-      code: ({ children }: any) => <code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>,
-      pre: ({ children }: any) => <pre className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg overflow-x-auto text-sm font-mono mb-3">{children}</pre>,
-      blockquote: ({ children }: any) => <blockquote className="border-l-4 border-slate-300 dark:border-slate-600 pl-4 italic my-3 text-slate-600 dark:text-slate-400">{children}</blockquote>,
-      table: ({ children }: any) => <table className="w-full border-collapse border border-slate-300 dark:border-slate-600 mb-3">{children}</table>,
-      thead: ({ children }: any) => <thead className="bg-slate-50 dark:bg-slate-800">{children}</thead>,
+      strong: ({ children }: any) => <strong className="font-semibold text-foreground">{children}</strong>,
+      em: ({ children }: any) => <em className="italic text-foreground">{children}</em>,
+      code: ({ children }: any) => <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>,
+      pre: ({ children }: any) => <pre className="bg-muted p-3 rounded-lg overflow-x-auto text-sm font-mono mb-3">{children}</pre>,
+      blockquote: ({ children }: any) => <blockquote className="border-l-4 border-border pl-4 italic my-3 text-muted-foreground">{children}</blockquote>,
+      table: ({ children }: any) => <table className="w-full border-collapse border border-border mb-3">{children}</table>,
+      thead: ({ children }: any) => <thead className="bg-muted">{children}</thead>,
       tbody: ({ children }: any) => <tbody>{children}</tbody>,
-      tr: ({ children }: any) => <tr className="border-b border-slate-200 dark:border-slate-700">{children}</tr>,
-      th: ({ children }: any) => <th className="border border-slate-300 dark:border-slate-600 px-3 py-2 text-left font-semibold">{children}</th>,
-      td: ({ children }: any) => <td className="border border-slate-300 dark:border-slate-600 px-3 py-2">{children}</td>,
+      tr: ({ children }: any) => <tr className="border-b border-border">{children}</tr>,
+      th: ({ children }: any) => <th className="border border-border px-3 py-2 text-left font-semibold">{children}</th>,
+      td: ({ children }: any) => <td className="border border-border px-3 py-2">{children}</td>,
     };
 
     if (format === 'mindmap') {
       return (
-        <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-5 border border-purple-200 dark:border-purple-700/50 shadow-sm">
+        <div className="bg-purple-500/10 rounded-xl p-5 border border-purple-500/20 shadow-sm">
           <ReactMarkdown 
             className="prose prose-sm prose-purple dark:prose-invert max-w-none"
             components={markdownComponents}
@@ -420,7 +420,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
 
     if (format === 'structured') {
       return (
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-5 border border-blue-200 dark:border-blue-700/50 shadow-sm">
+        <div className="bg-blue-500/10 rounded-xl p-5 border border-blue-500/20 shadow-sm">
           <ReactMarkdown 
             className="prose prose-sm prose-blue dark:prose-invert max-w-none"
             components={markdownComponents}
@@ -433,7 +433,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
 
     if (format === 'summary') {
       return (
-        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl p-5 border border-emerald-200 dark:border-emerald-700/50 shadow-sm">
+        <div className="bg-emerald-500/10 rounded-xl p-5 border border-emerald-500/20 shadow-sm">
           <ReactMarkdown 
             className="prose prose-sm prose-emerald dark:prose-invert max-w-none"
             components={markdownComponents}
@@ -460,12 +460,12 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
     return (
       <div className="h-full flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95">
+        <div className="p-4 border-b border-border bg-surface/80 backdrop-blur-sm">
           <div className="flex items-center gap-2 mb-4">
             <LunaAvatar />
             <div>
-              <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Luna</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">AI Study Partner</p>
+              <h3 className="font-semibold text-foreground text-sm">Luna</h3>
+              <p className="text-xs text-muted-foreground">AI Study Partner</p>
             </div>
           </div>
         </div>
@@ -476,7 +476,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
           <Button 
             variant="outline" 
             size="sm" 
-            className="w-full justify-start text-slate-600 dark:text-slate-400"
+            className="w-full justify-start text-muted-foreground"
             onClick={startNewConversation}
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -494,10 +494,10 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
                     className="w-full h-full rounded-full object-cover"
                   />
                 </div>
-                <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+                <h4 className="text-lg font-semibold text-foreground mb-2">
                   No conversations yet
                 </h4>
-                <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+                <p className="text-muted-foreground max-w-md mx-auto">
                   Start your first conversation with Luna to get help with your studies.
                 </p>
               </div>
@@ -505,7 +505,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
               chatHistory.map((chat) => (
                 <Card 
                   key={chat.id} 
-                  className="p-4 bg-surface/80 backdrop-blur-sm hover:shadow-md transition-shadow cursor-pointer group"
+                  className="p-4 bg-card hover:bg-card/80 hover:shadow-md transition-all cursor-pointer group border border-border"
                   onClick={() => loadChat(chat.id)}
                 >
                   <div className="flex items-center justify-between">
@@ -550,10 +550,10 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
   // Render full chat interface
   const renderChatInterface = () => {
     return (
-      <div className={cn("flex flex-col w-full min-w-0 bg-white dark:bg-slate-900", className)} style={{ height: 'calc(100vh - 300px)', minHeight: 'calc(100vh - 300px)' }}>
+      <div className={cn("flex flex-col w-full min-w-0 bg-background", className)} style={{ height: 'calc(100vh - 300px)', minHeight: 'calc(100vh - 300px)' }}>
         {/* Header - Fixed */}
         <div className="flex-shrink-0 bg-background border-b">
-          <div className="flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
+          <div className="flex items-center justify-between p-3 border-b border-border bg-surface/80 backdrop-blur-sm">
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
@@ -562,14 +562,14 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
                   setChatView('list');
                   onChatViewChange?.(false); // Notify parent that chat interface is closed
                 }}
-                className="h-7 w-7 p-0 text-slate-600 dark:text-slate-400"
+                className="h-7 w-7 p-0 text-muted-foreground"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <LunaAvatar />
               <div>
-                <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Luna</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">AI Study Partner</p>
+                <h3 className="font-semibold text-foreground text-sm">Luna</h3>
+                <p className="text-xs text-muted-foreground">AI Study Partner</p>
               </div>
             </div>
             
@@ -589,8 +589,8 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
 
           {/* Context Indicators */}
           {(selectedSources.length > 0 || highlightedText) && (
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+            <div className="p-3 bg-surface/80 backdrop-blur-sm border-b border-border">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Sparkles className="h-3 w-3" />
                 <span>Context:</span>
                 {selectedSources.length > 0 && (
@@ -605,8 +605,8 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
                 )}
               </div>
               {highlightedText && (
-                <div className="mt-2 p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
-                  <p className="text-xs text-slate-700 dark:text-slate-300 italic">
+                <div className="mt-2 p-2 bg-surface rounded border border-border">
+                  <p className="text-xs text-muted-foreground italic">
                     "{highlightedText.length > 100 ? highlightedText.slice(0, 100) + '...' : highlightedText}"
                   </p>
                 </div>
@@ -628,10 +628,10 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
                       className="w-full h-full rounded-full object-cover"
                     />
                   </div>
-                  <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+                  <h4 className="text-lg font-semibold text-foreground mb-2">
                     Hi! I'm Luna, your AI study partner
                   </h4>
-                  <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+                  <p className="text-muted-foreground max-w-md mx-auto">
                     Ask me anything about your study materials, or I can help you create summaries, mind maps, and more.
                   </p>
                 </div>
@@ -652,7 +652,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
                       "max-w-[80%] rounded-lg px-4 py-3",
                       message.role === 'user'
                         ? 'bg-blue-500 text-white ml-auto'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
+                        : 'bg-surface text-foreground'
                     )}
                   >
                     {message.highlighted_text && message.role === 'user' && (
@@ -669,7 +669,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
                     </div>
 
                     {message.role === 'assistant' && (
-                      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-border">
                         {onAddToNotes && (
                           <Button
                             size="sm"
@@ -706,10 +706,10 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
               {isLoading && (
                 <div className="flex gap-3 justify-start">
                   <LunaAvatar />
-                  <div className="bg-slate-100 dark:bg-slate-800 rounded-lg px-4 py-3">
+                  <div className="bg-surface rounded-lg px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm text-slate-600 dark:text-slate-400">Luna is thinking...</span>
+                      <span className="text-sm text-muted-foreground">Luna is thinking...</span>
                     </div>
                   </div>
                 </div>
@@ -720,12 +720,12 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
         </div>
 
         {/* Input - Fixed at bottom */}
-        <div className="p-3 border-t flex-shrink-0">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shadow-sm">
-              <Sparkles className="h-3 w-3 text-white" />
-            </div>
-            <span className="text-sm font-medium text-foreground">Luna AI</span>
+                  <div className="p-3 border-t flex-shrink-0">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="p-1.5 rounded-lg bg-gradient-to-br from-primary/80 to-accent/80 shadow-sm">
+                <Sparkles className="h-3 w-3 text-primary-foreground" />
+              </div>
+              <span className="text-sm font-medium text-foreground">Luna AI</span>
             {(selectedSources.length > 0 || highlightedText) && (
               <div className="flex items-center gap-1 ml-auto">
                 {selectedSources.length > 0 && (
@@ -742,13 +742,13 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
             )}
           </div>
           
-          {highlightedText && (
-            <div className="mb-3 p-3 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-700/50">
-              <p className="text-sm text-purple-700 dark:text-purple-300 italic">
-                Selected: "{highlightedText.length > 100 ? highlightedText.slice(0, 100) + '...' : highlightedText}"
-              </p>
-            </div>
-          )}
+                      {highlightedText && (
+              <div className="mb-3 p-3 bg-purple-500/10 rounded border border-purple-500/20">
+                <p className="text-sm text-purple-600 dark:text-purple-400 italic">
+                  Selected: "{highlightedText.length > 100 ? highlightedText.slice(0, 100) + '...' : highlightedText}"
+                </p>
+              </div>
+            )}
           
           <div className="flex gap-3">
             <div className="flex-1 relative">
@@ -764,13 +764,13 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
                 value={currentMessage}
                 onChange={(e) => setCurrentMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                className="pr-12 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 h-12"
+                className="pr-12 text-sm bg-background border-border focus:ring-2 focus:ring-primary h-12"
               />
               
               <Button
                 size="sm"
                 variant="ghost"
-                className="absolute right-12 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                className="absolute right-12 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
               >
                 <Mic className="h-4 w-4" />
               </Button>
@@ -779,7 +779,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
               onClick={handleSendMessage}
               disabled={!currentMessage.trim() || isGenerating}
               size="lg"
-              className="px-6 bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md hover:shadow-lg transition-all h-12"
+              className="px-6 bg-primary text-primary-foreground shadow-md hover:shadow-lg transition-all h-12"
             >
               {isGenerating ? (
                 <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -789,20 +789,20 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
             </Button>
           </div>
           
-          {isGenerating && (
-            <div className="mt-4 p-4 bg-white/60 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-1 rounded bg-gradient-to-br from-blue-500 to-purple-600">
-                  <Sparkles className="h-3 w-3 text-white animate-pulse" />
+                      {isGenerating && (
+              <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1 rounded bg-gradient-to-br from-primary/80 to-accent/80">
+                    <Sparkles className="h-3 w-3 text-primary-foreground animate-pulse" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground">Luna is thinking...</span>
                 </div>
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Luna is thinking...</span>
+                <div className="space-y-2">
+                  <div className="h-2 bg-muted rounded animate-pulse"></div>
+                  <div className="h-2 bg-muted rounded animate-pulse w-3/4"></div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
-                <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-3/4"></div>
-              </div>
-            </div>
-          )}
+            )}
         </div>
 
       </div>
