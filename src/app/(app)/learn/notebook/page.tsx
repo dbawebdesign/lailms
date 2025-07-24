@@ -280,6 +280,7 @@ export default function UnifiedStudySpace() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [currentConversation, setCurrentConversation] = useState<LunaConversation | null>(null);
+  const [isChatInterfaceOpen, setIsChatInterfaceOpen] = useState(false);
   const [activeNote, setActiveNote] = useState<Note | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [activeStudySpace, setActiveStudySpace] = useState<StudySpace | null>(null);
@@ -1056,6 +1057,9 @@ export default function UnifiedStudySpace() {
     try {
       // Switch to chat tab to show the conversation
       setActiveToolTab('chat');
+      
+      // Mark that the chat interface is open
+      setIsChatInterfaceOpen(true);
       
       // Use the Luna chat's internal sendMessage function
       await lunaChatRef.current.sendMessage(chatMessage);
@@ -3134,90 +3138,7 @@ export default function UnifiedStudySpace() {
                     </ScrollArea>
                   </div>
 
-                  {/* Luna Chat - Always Pinned at Bottom */}
-                  <div className="flex-shrink-0 border-t border-border/60 bg-gradient-to-r from-surface to-background p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shadow-sm">
-                        <Sparkles className="h-3 w-3 text-white" />
-                      </div>
-                      <span className="text-xs font-medium text-foreground">Luna AI</span>
-                      {(selectedSources.size > 0 || highlightedTextForLuna) && (
-                        <div className="flex items-center gap-1 ml-auto">
-                          {selectedSources.size > 0 && (
-                            <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                              {selectedSources.size} source{selectedSources.size !== 1 ? 's' : ''}
-                            </Badge>
-                          )}
-                          {highlightedTextForLuna && (
-                            <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                              Selected text
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    
-                    {highlightedTextForLuna && (
-                      <div className="mb-3 p-2 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-700/50">
-                        <p className="text-xs text-purple-700 dark:text-purple-300 italic">
-                          Selected: "{highlightedTextForLuna.length > 60 ? highlightedTextForLuna.slice(0, 60) + '...' : highlightedTextForLuna}"
-                        </p>
-                      </div>
-                    )}
-                    
-                    <div className="flex gap-2">
-                      <div className="flex-1 relative">
-                        <Input
-                          placeholder={
-                            highlightedTextForLuna
-                              ? "Ask Luna about the selected text..."
-                              : selectedSources.size > 0
-                              ? `Ask Luna about ${selectedSources.size === 1 ? 'this source' : `${selectedSources.size} sources`}...`
-                              : "Select sources to start chatting with Luna..."
-                          }
-                          value={chatMessage}
-                          onChange={(e) => setChatMessage(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                          disabled={selectedSources.size === 0 && !highlightedTextForLuna || isGenerating}
-                          className="pr-10 text-xs bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                        />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                        >
-                          <Mic className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <Button 
-                        onClick={handleSendMessage}
-                        disabled={!chatMessage.trim() || (selectedSources.size === 0 && !highlightedTextForLuna) || isGenerating}
-                        size="sm"
-                        className="px-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md hover:shadow-lg transition-all"
-                      >
-                        {isGenerating ? (
-                          <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        ) : (
-                          <Send className="h-3 w-3" />
-                        )}
-                      </Button>
-                    </div>
-                    
-                    {isGenerating && (
-                      <div className="mt-3 p-3 bg-white/60 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-700">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="p-1 rounded bg-gradient-to-br from-blue-500 to-purple-600">
-                            <Sparkles className="h-2 w-2 text-white animate-pulse" />
-                          </div>
-                          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Luna is thinking...</span>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
-                          <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-3/4"></div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+
                 </div>
               </div>
             </ResizablePanel>
@@ -3282,110 +3203,25 @@ export default function UnifiedStudySpace() {
                 <div className="flex-1 min-h-0 overflow-hidden px-8">
                   <div className="max-w-5xl mx-auto h-full flex flex-col">
                     {activeToolTab === 'chat' ? (
-                      <>
-                        {/* Chat Messages Area */}
-                        <div className="flex-1 min-h-0 overflow-hidden border border-slate-200 dark:border-slate-700 rounded-t-lg bg-white dark:bg-slate-900">
-                          <LunaChat 
-                            ref={lunaChatRef}
-                            selectedSources={Array.from(selectedSources).map(id => contentItems.find(item => item.id === id)).filter(Boolean)}
-                            highlightedText={highlightedTextForLuna}
-                            onHighlightedTextUsed={() => {
-                              setHighlightedTextForLuna(null);
-                              setTextSelection(null);
-                              setPersistedSelection(null);
-                              removeCustomHighlight();
-                            }}
-                            onAddToNotes={handleAddToNotes}
-                            className="h-full w-full"
-                          />
+                      <div className="flex-1 min-h-0 overflow-hidden border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900">
+                        <LunaChat 
+                          ref={lunaChatRef}
+                          selectedSources={Array.from(selectedSources).map(id => contentItems.find(item => item.id === id)).filter(Boolean)}
+                          highlightedText={highlightedTextForLuna}
+                          onHighlightedTextUsed={() => {
+                            setHighlightedTextForLuna(null);
+                            setTextSelection(null);
+                            setPersistedSelection(null);
+                            removeCustomHighlight();
+                          }}
+                          onAddToNotes={handleAddToNotes}
+                          onChatViewChange={setIsChatInterfaceOpen}
+                          chatMessage={chatMessage}
+                          setChatMessage={setChatMessage}
+                          isGenerating={isGenerating}
+                          className="h-full w-full"
+                        />
                       </div>
-                        
-                        {/* Sticky Chat Input - Similar to panel mode */}
-                        <div className="flex-shrink-0 border-t border-slate-200 dark:border-slate-700 border-l border-r border-b bg-white dark:bg-slate-900 p-6 rounded-b-lg">
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shadow-sm">
-                              <Sparkles className="h-3 w-3 text-white" />
-                    </div>
-                            <span className="text-sm font-medium text-foreground">Luna AI</span>
-                            {(selectedSources.size > 0 || highlightedTextForLuna) && (
-                              <div className="flex items-center gap-1 ml-auto">
-                                {selectedSources.size > 0 && (
-                                  <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                                    {selectedSources.size} source{selectedSources.size !== 1 ? 's' : ''}
-                                  </Badge>
-                                )}
-                                {highlightedTextForLuna && (
-                                  <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                                    Selected text
-                                  </Badge>
-                                )}
-                </div>
-                            )}
-                          </div>
-                          
-                          {highlightedTextForLuna && (
-                            <div className="mb-3 p-3 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-700/50">
-                              <p className="text-sm text-purple-700 dark:text-purple-300 italic">
-                                Selected: "{highlightedTextForLuna.length > 100 ? highlightedTextForLuna.slice(0, 100) + '...' : highlightedTextForLuna}"
-                              </p>
-              </div>
-            )}
-                          
-                          <div className="flex gap-3">
-                            <div className="flex-1 relative">
-                              <Input
-                                placeholder={
-                                  highlightedTextForLuna
-                                    ? "Ask Luna about the selected text..."
-                                    : selectedSources.size > 0
-                                    ? `Ask Luna about ${selectedSources.size === 1 ? 'this source' : `${selectedSources.size} sources`}...`
-                                    : "Select sources to start chatting with Luna..."
-                                }
-                                value={chatMessage}
-                                onChange={(e) => setChatMessage(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                                disabled={selectedSources.size === 0 && !highlightedTextForLuna || isGenerating}
-                                className="pr-12 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 h-12"
-                              />
-                              
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="absolute right-12 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                              >
-                                <Mic className="h-4 w-4" />
-                              </Button>
-          </div>
-                            <Button 
-                              onClick={handleSendMessage}
-                              disabled={!chatMessage.trim() || (selectedSources.size === 0 && !highlightedTextForLuna) || isGenerating}
-                              size="lg"
-                              className="px-6 bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md hover:shadow-lg transition-all h-12"
-                            >
-                              {isGenerating ? (
-                                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                              ) : (
-                                <Send className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
-                          
-                          {isGenerating && (
-                            <div className="mt-4 p-4 bg-white/60 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-700">
-                              <div className="flex items-center gap-2 mb-2">
-                                <div className="p-1 rounded bg-gradient-to-br from-blue-500 to-purple-600">
-                                  <Sparkles className="h-3 w-3 text-white animate-pulse" />
-                                </div>
-                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Luna is thinking...</span>
-                              </div>
-                              <div className="space-y-2">
-                                <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
-                                <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-3/4"></div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </>
                     ) : (
                       <ScrollArea className="h-full">
                         <div className="pb-8">

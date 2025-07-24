@@ -31,7 +31,8 @@ import {
   ChevronLeft,
   Clock,
   Send,
-  Loader2
+  Loader2,
+  Mic
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import ReactMarkdown from 'react-markdown';
@@ -83,6 +84,10 @@ interface LunaChatProps {
   highlightedText?: string | null;
   onHighlightedTextUsed?: () => void;
   onAddToNotes?: (content: string, title?: string) => void;
+  onChatViewChange?: (isOpen: boolean) => void;
+  chatMessage?: string;
+  setChatMessage?: (message: string) => void;
+  isGenerating?: boolean;
   className?: string;
 }
 
@@ -104,6 +109,10 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
   highlightedText, 
   onHighlightedTextUsed,
   onAddToNotes,
+  onChatViewChange,
+  chatMessage = '',
+  setChatMessage,
+  isGenerating = false,
   className 
 }, ref) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -112,12 +121,27 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
   const [chatHistory, setChatHistory] = useState<StudyChatHistory[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [chatView, setChatView] = useState<ChatView>('list'); // New state for view mode
+  const [localChatMessage, setLocalChatMessage] = useState('');
 
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const conversationIdRef = useRef<string | null>(null);
   const isInitialLoad = useRef<boolean>(true);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Use local state if no external state provided
+  const currentMessage = chatMessage || localChatMessage;
+  const setCurrentMessage = setChatMessage || setLocalChatMessage;
+
+  const handleSendMessage = async () => {
+    if (!currentMessage.trim()) return;
+    
+    // Use the existing sendMessage function
+    await sendMessage(currentMessage);
+    
+    // Clear the input
+    setCurrentMessage('');
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -297,6 +321,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
     setCurrentChatId(null);
     conversationIdRef.current = null;
     setChatView('chat'); // Switch to chat view for new conversation
+    onChatViewChange?.(true); // Notify parent that chat interface is open
     
     // Clear highlighted text if it was used
     if (highlightedText && onHighlightedTextUsed) {
@@ -321,6 +346,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
       setMessages(chat.messages);
       conversationIdRef.current = chatId;
       setChatView('chat'); // Switch to chat view when loading a conversation
+    onChatViewChange?.(true); // Notify parent that chat interface is open
       
       // Re-enable saving after a brief delay
       setTimeout(() => {
@@ -545,168 +571,260 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
   // Render full chat interface
   const renderChatInterface = () => {
     return (
-      <div className={cn("flex flex-col h-full bg-white dark:bg-slate-900", className)}>
-        {/* Sticky Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setChatView('list')}
-              className="h-7 w-7 p-0 text-slate-600 dark:text-slate-400"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <LunaAvatar />
-            <div>
-              <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Luna</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">AI Study Partner</p>
+      <div className={cn("flex flex-col w-full min-w-0 bg-white dark:bg-slate-900", className)} style={{ height: 'calc(100vh - 300px)', minHeight: 'calc(100vh - 300px)' }}>
+        {/* Header - Fixed */}
+        <div className="flex-shrink-0 bg-background border-b">
+          <div className="flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setChatView('list');
+                  onChatViewChange?.(false); // Notify parent that chat interface is closed
+                }}
+                className="h-7 w-7 p-0 text-slate-600 dark:text-slate-400"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <LunaAvatar />
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Luna</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">AI Study Partner</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-1">
+              {/* New Chat Button */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={startNewConversation}
+                className="h-7 px-2 text-xs"
+              >
+                <MessageCircle className="h-3 w-3 mr-1" />
+                New
+              </Button>
             </div>
           </div>
-          
-          <div className="flex items-center gap-1">
-            {/* New Chat Button */}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={startNewConversation}
-              className="h-7 px-2 text-xs"
-            >
-              <MessageCircle className="h-3 w-3 mr-1" />
-              New
-            </Button>
-          </div>
+
+          {/* Context Indicators */}
+          {(selectedSources.length > 0 || highlightedText) && (
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                <Sparkles className="h-3 w-3" />
+                <span>Context:</span>
+                {selectedSources.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    {selectedSources.length} source{selectedSources.length !== 1 ? 's' : ''}
+                  </Badge>
+                )}
+                {highlightedText && (
+                  <Badge variant="secondary" className="text-xs">
+                    Selected text
+                  </Badge>
+                )}
+              </div>
+              {highlightedText && (
+                <div className="mt-2 p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                  <p className="text-xs text-slate-700 dark:text-slate-300 italic">
+                    "{highlightedText.length > 100 ? highlightedText.slice(0, 100) + '...' : highlightedText}"
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Context Indicators */}
-        {(selectedSources.length > 0 || highlightedText) && (
-          <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
-            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-              <Sparkles className="h-3 w-3" />
-              <span>Context:</span>
-              {selectedSources.length > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  {selectedSources.length} source{selectedSources.length !== 1 ? 's' : ''}
-                </Badge>
-              )}
-              {highlightedText && (
-                <Badge variant="secondary" className="text-xs">
-                  Selected text
-                </Badge>
-              )}
-            </div>
-            {highlightedText && (
-              <div className="mt-2 p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
-                <p className="text-xs text-slate-700 dark:text-slate-300 italic">
-                  "{highlightedText.length > 100 ? highlightedText.slice(0, 100) + '...' : highlightedText}"
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Messages */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4">
-          <div className="space-y-4">
-            {messages.length === 0 && (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden">
-                  <img 
-                    src="/web-app-manifest-512x512.png" 
-                    alt="Luna AI" 
-                    className="w-full h-full rounded-full object-cover"
-                  />
+        {/* Messages - Takes remaining space */}
+        <div className="flex-1 min-h-0">
+          <ScrollArea className="h-full">
+            <div className="px-3 pt-3 pb-3 space-y-3">
+              {messages.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden">
+                    <img 
+                      src="/web-app-manifest-512x512.png" 
+                      alt="Luna AI" 
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  </div>
+                  <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+                    Hi! I'm Luna, your AI study partner
+                  </h4>
+                  <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+                    Ask me anything about your study materials, or I can help you create summaries, mind maps, and more.
+                  </p>
                 </div>
-                <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-                  Hi! I'm Luna, your AI study partner
-                </h4>
-                <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-                  Ask me anything about your study materials, or I can help you create summaries, mind maps, and more.
-                </p>
-              </div>
-            )}
+              )}
 
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex gap-3",
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
-                )}
-              >
-                {message.role === 'assistant' && <LunaAvatar />}
-                
+              {messages.map((message) => (
                 <div
+                  key={message.id}
                   className={cn(
-                    "max-w-[80%] rounded-lg px-4 py-3",
-                    message.role === 'user'
-                      ? 'bg-blue-500 text-white ml-auto'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
+                    "flex gap-3",
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
                   )}
                 >
-                  {message.highlighted_text && message.role === 'user' && (
-                    <div className="mb-2 p-2 bg-white/20 rounded text-xs italic">
-                      Selected: "{message.highlighted_text.slice(0, 50)}..."
-                    </div>
-                  )}
+                  {message.role === 'assistant' && <LunaAvatar />}
                   
-                  <div className="text-sm">
-                    {message.role === 'assistant' 
-                      ? formatMessageContent(message.content, message.response_format)
-                      : message.content
-                    }
-                  </div>
+                  <div
+                    className={cn(
+                      "max-w-[80%] rounded-lg px-4 py-3",
+                      message.role === 'user'
+                        ? 'bg-blue-500 text-white ml-auto'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
+                    )}
+                  >
+                    {message.highlighted_text && message.role === 'user' && (
+                      <div className="mb-2 p-2 bg-white/20 rounded text-xs italic">
+                        Selected: "{message.highlighted_text.slice(0, 50)}..."
+                      </div>
+                    )}
+                    
+                    <div className="text-sm">
+                      {message.role === 'assistant' 
+                        ? formatMessageContent(message.content, message.response_format)
+                        : message.content
+                      }
+                    </div>
 
-                  {message.role === 'assistant' && (
-                    <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                      {onAddToNotes && (
+                    {message.role === 'assistant' && (
+                      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                        {onAddToNotes && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => addToNotes(message.content, message.id)}
+                            className="h-7 px-2 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-700/50 rounded transition-all"
+                            title="Add to notes"
+                          >
+                            <NotebookPen className="h-3 w-3 mr-1" />
+                            Add to notes
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => addToNotes(message.content, message.id)}
-                          className="h-7 px-2 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-700/50 rounded transition-all"
-                          title="Add to notes"
+                          onClick={() => copyMessage(message.id, message.content)}
+                          className="h-7 w-7 p-0"
+                          title="Copy message"
                         >
-                          <NotebookPen className="h-3 w-3 mr-1" />
-                          Add to notes
+                          {copiedMessageId === message.id ? (
+                            <Check className="h-3 w-3 text-green-500" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
                         </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => copyMessage(message.id, message.content)}
-                        className="h-7 w-7 p-0"
-                        title="Copy message"
-                      >
-                        {copiedMessageId === message.id ? (
-                          <Check className="h-3 w-3 text-green-500" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                      </Button>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
+
+                  {message.role === 'user' && <UserAvatar />}
                 </div>
+              ))}
 
-                {message.role === 'user' && <UserAvatar />}
-              </div>
-            ))}
-
-            {isLoading && (
-              <div className="flex gap-3 justify-start">
-                <LunaAvatar />
-                <div className="bg-slate-100 dark:bg-slate-800 rounded-lg px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-slate-600 dark:text-slate-400">Luna is thinking...</span>
+              {isLoading && (
+                <div className="flex gap-3 justify-start">
+                  <LunaAvatar />
+                  <div className="bg-slate-100 dark:bg-slate-800 rounded-lg px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm text-slate-600 dark:text-slate-400">Luna is thinking...</span>
+                    </div>
                   </div>
                 </div>
+              )}
+            </div>
+            <div ref={messagesEndRef} />
+          </ScrollArea>
+        </div>
+
+        {/* Input - Fixed at bottom */}
+        <div className="p-3 border-t flex-shrink-0">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shadow-sm">
+              <Sparkles className="h-3 w-3 text-white" />
+            </div>
+            <span className="text-sm font-medium text-foreground">Luna AI</span>
+            {(selectedSources.length > 0 || highlightedText) && (
+              <div className="flex items-center gap-1 ml-auto">
+                {selectedSources.length > 0 && (
+                  <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                    {selectedSources.length} source{selectedSources.length !== 1 ? 's' : ''}
+                  </Badge>
+                )}
+                {highlightedText && (
+                  <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                    Selected text
+                  </Badge>
+                )}
               </div>
             )}
           </div>
-          <div ref={messagesEndRef} />
+          
+          {highlightedText && (
+            <div className="mb-3 p-3 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-700/50">
+              <p className="text-sm text-purple-700 dark:text-purple-300 italic">
+                Selected: "{highlightedText.length > 100 ? highlightedText.slice(0, 100) + '...' : highlightedText}"
+              </p>
+            </div>
+          )}
+          
+          <div className="flex gap-3">
+            <div className="flex-1 relative">
+              <Input
+                ref={inputRef}
+                placeholder={
+                  highlightedText
+                    ? "Ask Luna about the selected text..."
+                    : selectedSources.length > 0
+                    ? `Ask Luna about ${selectedSources.length === 1 ? 'this source' : `${selectedSources.length} sources`}...`
+                    : "Ask Luna anything..."
+                }
+                value={currentMessage}
+                onChange={(e) => setCurrentMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                className="pr-12 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 h-12"
+              />
+              
+              <Button
+                size="sm"
+                variant="ghost"
+                className="absolute right-12 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              >
+                <Mic className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button 
+              onClick={handleSendMessage}
+              disabled={!currentMessage.trim() || isGenerating}
+              size="lg"
+              className="px-6 bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md hover:shadow-lg transition-all h-12"
+            >
+              {isGenerating ? (
+                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          
+          {isGenerating && (
+            <div className="mt-4 p-4 bg-white/60 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1 rounded bg-gradient-to-br from-blue-500 to-purple-600">
+                  <Sparkles className="h-3 w-3 text-white animate-pulse" />
+                </div>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Luna is thinking...</span>
+              </div>
+              <div className="space-y-2">
+                <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+                <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-3/4"></div>
+              </div>
+            </div>
+          )}
         </div>
-
 
       </div>
     );
