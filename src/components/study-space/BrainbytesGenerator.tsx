@@ -41,6 +41,8 @@ interface BrainbytesGeneratorProps {
   };
   baseClassId?: string;
   studySpaceId: string;
+  shouldAutoGenerate?: boolean;
+  onBrainbytesCreated?: (brainbytesData: BrainbytesData) => void;
   className?: string;
 }
 
@@ -49,6 +51,8 @@ export function BrainbytesGenerator({
   selectedText,
   baseClassId,
   studySpaceId,
+  shouldAutoGenerate = false,
+  onBrainbytesCreated,
   className
 }: BrainbytesGeneratorProps) {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -87,6 +91,14 @@ export function BrainbytesGenerator({
       audio.removeEventListener('ended', handleEnded);
     };
   }, [currentBrainbytes]);
+
+  // Auto-generate effect when shouldAutoGenerate is true
+  useEffect(() => {
+    if (shouldAutoGenerate && (selectedContent.length > 0 || selectedText)) {
+      console.log('Auto-generating Brainbytes podcast based on selected text/content');
+      generateBrainbytes();
+    }
+  }, [shouldAutoGenerate, selectedContent, selectedText]);
 
   const loadPreviousBrainbytes = async () => {
     try {
@@ -164,6 +176,11 @@ export function BrainbytesGenerator({
 
       setCurrentBrainbytes(newBrainbytes);
       setInstructions(''); // Clear instructions after successful generation
+      
+      // Call the callback if provided (for auto-generation)
+      if (onBrainbytesCreated) {
+        onBrainbytesCreated(newBrainbytes);
+      }
       
       // Reload previous brainbytes to include the new one
       await loadPreviousBrainbytes();

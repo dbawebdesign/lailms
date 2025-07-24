@@ -69,7 +69,7 @@ import {
   PenTool,
   Check,
   ChevronsUpDown,
-  Quote,
+
   Bold,
   Italic,
   Underline,
@@ -242,13 +242,16 @@ export default function UnifiedStudySpace() {
   const [showSelectionPopover, setShowSelectionPopover] = useState(false);
   const [persistedSelection, setPersistedSelection] = useState<Range | null>(null);
   const [shouldAutoGenerateMindMap, setShouldAutoGenerateMindMap] = useState(false);
+  const [shouldAutoGenerateAudio, setShouldAutoGenerateAudio] = useState(false);
   const [currentMindMap, setCurrentMindMap] = useState<any>(null); // Lift mind map state to parent
 
   // Clear mind map when study space changes
   useEffect(() => {
     if (selectedSpace) {
-      console.log('Study space changed, clearing mind map');
+      console.log('Study space changed, clearing mind map and resetting auto-generate flags');
       setCurrentMindMap(null);
+      setShouldAutoGenerateMindMap(false);
+      setShouldAutoGenerateAudio(false);
     }
   }, [selectedSpace?.id]);
 
@@ -1745,7 +1748,7 @@ export default function UnifiedStudySpace() {
     </Button>
   );
 
-  const handleSelectionAction = (action: 'note' | 'mindmap' | 'explain' | 'quote') => {
+  const handleSelectionAction = (action: 'note' | 'mindmap' | 'explain' | 'audio') => {
     if (!textSelection) return;
     
     const selectedText = textSelection.text;
@@ -1771,23 +1774,25 @@ export default function UnifiedStudySpace() {
         // Keep selection for potential further actions
         restoreSelection();
         break;
-      case 'quote':
-        // Save as quote
-        console.log('Saving quote:', selectedText);
-        // Keep selection for potential further actions
-        restoreSelection();
+      case 'audio':
+        // Switch to audio tab and trigger auto-generation
+        setActiveToolTab('audio');
+        setShouldAutoGenerateAudio(true);
+        // Keep the text selection available for the audio generator
+        // Don't clear the selection immediately, let the audio generator handle it
         break;
     }
     
-    // Only hide popover, don't clear selection for mind map action
+    // Only hide popover, don't clear selection for mind map or audio actions
     setShowSelectionPopover(false);
     
-    // For non-mindmap actions, clear the selection after a brief delay
-    if (action !== 'mindmap') {
+    // For non-mindmap and non-audio actions, clear the selection after a brief delay
+    if (action !== 'mindmap' && action !== 'audio') {
       setTimeout(() => {
         setTextSelection(null);
         setPersistedSelection(null);
         setShouldAutoGenerateMindMap(false); // Reset auto-generate flag
+        setShouldAutoGenerateAudio(false); // Reset audio auto-generate flag
         removeCustomHighlight();
       }, 100);
     } else {
@@ -2319,11 +2324,11 @@ export default function UnifiedStudySpace() {
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => handleSelectionAction('quote')}
-                className="h-9 px-3 text-xs bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-700/50 rounded-lg transition-all duration-200 hover:scale-105"
+              onClick={() => handleSelectionAction('audio')}
+                className="h-9 px-3 text-xs bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-700/50 rounded-lg transition-all duration-200 hover:scale-105"
             >
-              <Quote className="h-3 w-3 mr-1" />
-              Quote
+              <Headphones className="h-3 w-3 mr-1" />
+              Audio
             </Button>
             </div>
           </div>,
@@ -2576,6 +2581,11 @@ export default function UnifiedStudySpace() {
             selectedText={textSelection ? { text: textSelection.text, source: 'Study Material' } : undefined}
             baseClassId={selectedCourse?.base_class_id}
             studySpaceId={selectedSpace?.id || ''}
+            shouldAutoGenerate={shouldAutoGenerateAudio}
+            onBrainbytesCreated={(brainbytesData) => {
+              console.log('Brainbytes created:', brainbytesData);
+              setShouldAutoGenerateAudio(false); // Reset the flag after creation
+            }}
             className="h-full"
           />
         );
