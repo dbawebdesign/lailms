@@ -2650,7 +2650,7 @@ export default function UnifiedStudySpace() {
         notes: notes.map(note => ({
           id: note.id,
           title: note.title,
-          content: note.content.substring(0, 200) + '...'
+          content: extractTextFromTiptapJSON(note.content).substring(0, 200) + '...'
         })),
         activeToolTab,
         totalContentItems: contentItems.length,
