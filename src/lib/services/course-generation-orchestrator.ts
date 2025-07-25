@@ -845,8 +845,13 @@ What makes this particularly important for ${request.academicLevel || 'college'}
       try {
         console.log(`🧠 Attempt ${retryCount + 1}/${maxRetries} - Generating mind map for lesson: ${task.lessonId}`);
         
-        // Call the existing mind map API directly with internal flag and user ID
-        const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/teach/media/generate/mind-map`, {
+              // Construct the API URL for internal requests
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      
+      // Call the existing mind map API directly with internal flag and user ID
+      const response = await fetch(`${baseUrl}/api/teach/media/generate/mind-map`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -917,8 +922,13 @@ What makes this particularly important for ${request.academicLevel || 'college'}
         // Use academic level from request, default to 'college'
         const gradeLevel = request.academicLevel || 'college';
         
-        // Call the existing brainbytes API directly with internal flag and user ID
-        const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/teach/media/generate/podcast`, {
+              // Construct the API URL for internal requests
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      
+      // Call the existing brainbytes API directly with internal flag and user ID
+      const response = await fetch(`${baseUrl}/api/teach/media/generate/podcast`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
