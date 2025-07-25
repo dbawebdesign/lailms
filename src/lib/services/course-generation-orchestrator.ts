@@ -68,12 +68,75 @@ export class CourseGenerationOrchestrator {
   constructor() {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      timeout: 120000, // 2 minutes timeout
+      maxRetries: 2, // Built-in retry mechanism
     });
     this.assessmentGenerator = new AssessmentGenerationService();
   }
 
+  /**
+   * Wrapper for OpenAI API calls with custom timeout and retry logic
+   */
+  private async callOpenAIWithTimeout<T>(
+    apiCall: () => Promise<T>,
+    operation: string,
+    timeoutMs: number = 180000 // 3 minutes default
+  ): Promise<T> {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`OpenAI API timeout after ${timeoutMs}ms for operation: ${operation}`));
+      }, timeoutMs);
+    });
+
+    try {
+      console.log(`🤖 Starting OpenAI operation: ${operation}`);
+      const result = await Promise.race([apiCall(), timeoutPromise]);
+      console.log(`✅ OpenAI operation completed: ${operation}`);
+      return result;
+    } catch (error) {
+      console.error(`❌ OpenAI operation failed: ${operation}`, error);
+      
+      // If it's a timeout or rate limit, throw a specific error
+      if (error instanceof Error) {
+        if (error.message.includes('timeout') || error.message.includes('rate limit')) {
+          throw new Error(`OpenAI ${operation} failed: ${error.message}`);
+        }
+      }
+      
+      throw error;
+    }
+  }
+
   private getSupabaseClient() {
     return createSupabaseServerClient();
+  }
+
+  /**
+   * Update job status in database
+   */
+  private async updateJobStatusInDatabase(jobId: string, status: string, errorMessage?: string): Promise<void> {
+    try {
+      const supabase = this.getSupabaseClient();
+      const updateData: any = { 
+        status,
+        updated_at: new Date().toISOString()
+      };
+      
+      if (errorMessage) {
+        updateData.error_message = errorMessage;
+      }
+      
+      const { error } = await supabase
+        .from('course_generation_jobs')
+        .update(updateData)
+        .eq('id', jobId);
+
+      if (error) {
+        console.error(`Failed to update job status in database:`, error);
+      }
+    } catch (error) {
+      console.error(`Error updating job status in database:`, error);
+    }
   }
 
   /**
@@ -86,17 +149,78 @@ export class CourseGenerationOrchestrator {
   ): Promise<void> {
     console.log('🚀 Starting orchestrated course generation...');
 
-    // Initialize orchestration state
-    const state = await this.initializeOrchestrationState(jobId, outline, request);
-    this.orchestrationStates.set(jobId, state);
+    try {
+      // Initialize orchestration state
+      const state = await this.initializeOrchestrationState(jobId, outline, request);
+      this.orchestrationStates.set(jobId, state);
 
-    // Pre-cache knowledge base content
-    await this.cacheKnowledgeBaseContent(outline, request);
+      // Update job status to running
+      await this.updateJobStatusInDatabase(jobId, 'running');
 
-    // Start staggered lesson section generation
-    await this.startStaggeredSectionGeneration(state, outline, request);
+      // Pre-cache knowledge base content
+      console.log('🔍 Caching KB content for orchestrated generation...');
+      await this.cacheKnowledgeBaseContent(outline, request);
 
-    console.log('✅ Orchestrated course generation started');
+      // Start staggered lesson section generation
+      await this.startStaggeredSectionGeneration(state, outline, request);
+
+      console.log('✅ Orchestrated course generation started');
+      
+      // Set up periodic progress updates
+      this.setupProgressMonitoring(state);
+      
+    } catch (error) {
+      console.error('❌ Failed to start orchestrated course generation:', error);
+      await this.updateJobStatusInDatabase(jobId, 'failed', error instanceof Error ? error.message : 'Unknown error');
+      throw error;
+    }
+  }
+
+  /**
+   * Set up periodic progress monitoring and state persistence
+   */
+  private setupProgressMonitoring(state: OrchestrationState): void {
+    const progressInterval = setInterval(async () => {
+      try {
+        // Check if orchestration is still active
+        if (!this.orchestrationStates.has(state.jobId)) {
+          clearInterval(progressInterval);
+          return;
+        }
+
+        // Update progress in database
+        await this.updateProgressBasedOnCompletedTasks(state);
+        
+        // Check for completion
+        const allTasksFinished = Array.from(state.tasks.values()).every(task => 
+          task.status === 'completed' || task.status === 'failed'
+        );
+
+        if (allTasksFinished) {
+          console.log(`🎉 All tasks completed for job ${state.jobId}`);
+          await this.updateJobStatusInDatabase(state.jobId, 'completed');
+          clearInterval(progressInterval);
+          
+          // Clean up state after completion
+          setTimeout(() => {
+            this.orchestrationStates.delete(state.jobId);
+            this.kbContentCache.delete(`${state.jobId}-cache`);
+          }, 300000); // Keep for 5 minutes after completion
+        }
+        
+      } catch (error) {
+        console.error('Progress monitoring error:', error);
+      }
+    }, 30000); // Update every 30 seconds
+
+    // Clean up after 2 hours regardless
+    setTimeout(() => {
+      clearInterval(progressInterval);
+      if (this.orchestrationStates.has(state.jobId)) {
+        console.log(`⏰ Cleaning up orchestration state for job ${state.jobId} after timeout`);
+        this.orchestrationStates.delete(state.jobId);
+      }
+    }, 2 * 60 * 60 * 1000); // 2 hours
   }
 
   /**
@@ -375,7 +499,7 @@ export class CourseGenerationOrchestrator {
   }
 
   /**
-   * Start staggered lesson section generation with 5-second intervals
+   * Start staggered lesson section generation with improved reliability
    */
   private async startStaggeredSectionGeneration(
     state: OrchestrationState,
@@ -402,19 +526,73 @@ export class CourseGenerationOrchestrator {
 
     console.log(`🎯 Starting staggered generation of ${sectionTasks.length} lesson sections...`);
 
-    // Start each section task with 5-second stagger
-    for (let i = 0; i < sectionTasks.length; i++) {
+    // Start initial batch of tasks (3 concurrent tasks max to avoid overwhelming OpenAI)
+    const maxConcurrent = 3;
+    const staggerDelayMs = 8000; // 8 seconds between batches
+    
+    for (let i = 0; i < Math.min(maxConcurrent, sectionTasks.length); i++) {
       const task = sectionTasks[i];
+      console.log(`🚀 Starting initial task ${i + 1}/${maxConcurrent}: ${task.sectionTitle}`);
       
-      // Delay for staggered start (5 seconds apart)
-      setTimeout(() => {
-        this.executeTask(state, task);
-      }, i * 5000);
+      // Use Promise-based delay instead of setTimeout for better reliability
+      this.executeTaskWithDelay(state, task, i * 2000); // 2 second stagger within batch
+    }
+
+    // Schedule remaining tasks to start as others complete
+    if (sectionTasks.length > maxConcurrent) {
+      this.scheduleRemainingTasks(state, sectionTasks.slice(maxConcurrent), staggerDelayMs);
     }
   }
 
   /**
-   * Execute a specific generation task
+   * Execute a task with a delay using Promise-based timing
+   */
+  private async executeTaskWithDelay(state: OrchestrationState, task: GenerationTask, delayMs: number): Promise<void> {
+    if (delayMs > 0) {
+      console.log(`⏱️ Delaying task ${task.sectionTitle} by ${delayMs}ms`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+    
+    // Don't await here - let tasks run concurrently
+    this.executeTask(state, task).catch(error => {
+      console.error(`Task execution failed for ${task.id}:`, error);
+    });
+  }
+
+  /**
+   * Schedule remaining tasks to start as capacity becomes available
+   */
+  private scheduleRemainingTasks(state: OrchestrationState, remainingTasks: GenerationTask[], staggerDelayMs: number): void {
+    let taskIndex = 0;
+    
+    const scheduleNext = () => {
+      if (taskIndex >= remainingTasks.length) {
+        console.log(`✅ All ${remainingTasks.length} remaining tasks have been scheduled`);
+        return;
+      }
+      
+      // Check if we have capacity (less than 3 running tasks)
+      if (state.runningTasks.size < 3) {
+        const task = remainingTasks[taskIndex];
+        console.log(`🚀 Scheduling remaining task ${taskIndex + 1}/${remainingTasks.length}: ${task.sectionTitle}`);
+        
+        this.executeTask(state, task).catch(error => {
+          console.error(`Scheduled task execution failed for ${task.id}:`, error);
+        });
+        
+        taskIndex++;
+      }
+      
+      // Schedule next check
+      setTimeout(scheduleNext, staggerDelayMs);
+    };
+    
+    // Start scheduling after initial delay
+    setTimeout(scheduleNext, staggerDelayMs);
+  }
+
+  /**
+   * Execute a specific generation task with timeout monitoring
    */
   private async executeTask(state: OrchestrationState, task: GenerationTask): Promise<void> {
     task.status = 'running';
@@ -422,51 +600,85 @@ export class CourseGenerationOrchestrator {
     state.runningTasks.add(task.id);
     await this.updateProgressBasedOnCompletedTasks(state);
 
+    // Set up task timeout monitoring (10 minutes max per task)
+    const taskTimeoutMs = 10 * 60 * 1000; // 10 minutes
+    const taskTimeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Task timeout: ${task.type} - ${task.sectionTitle || task.id} exceeded ${taskTimeoutMs}ms`));
+      }, taskTimeoutMs);
+    });
+
     while (task.retryCount <= 1) {
       try {
-        switch (task.type) {
-          case 'lesson_section':
-            await this.generateLessonSection(task);
-            break;
-          case 'lesson_assessment':
-            await this.generateLessonAssessment(task);
-            break;
-          case 'lesson_mind_map':
-            await this.generateLessonMindMap(task);
-            break;
-          case 'lesson_brainbytes':
-            await this.generateLessonBrainbytes(task);
-            break;
-          case 'path_quiz':
-            await this.generatePathQuiz(task);
-            break;
-          case 'class_exam':
-            await this.generateClassExam(task);
-            break;
-        }
+        console.log(`🚀 Starting task: ${task.type} - ${task.sectionTitle || task.id} (attempt ${task.retryCount + 1})`);
+        
+        // Race the actual task execution against the timeout
+        await Promise.race([
+          this.executeTaskLogic(task),
+          taskTimeoutPromise
+        ]);
         
         task.status = 'completed';
         task.completeTime = new Date();
         state.completedTasks.add(task.id);
         state.runningTasks.delete(task.id);
-        console.log(`✅ Completed task: ${task.type} - ${task.sectionTitle || task.id}`);
+        
+        const duration = task.completeTime.getTime() - (task.startTime?.getTime() || 0);
+        console.log(`✅ Completed task: ${task.type} - ${task.sectionTitle || task.id} (${Math.round(duration/1000)}s)`);
+        
         this.checkAndTriggerDependentTasks(state, task);
         return;
 
       } catch (error) {
         task.retryCount += 1;
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+        
         if (task.retryCount > 1) {
-          console.error(`❌ Failed task after retry: ${task.id} (${task.type}):`, error);
+          console.error(`❌ Failed task after retry: ${task.id} (${task.type}):`, errorMessage);
           task.status = 'failed';
           task.completeTime = new Date();
-          task.error = error instanceof Error ? error.message : 'An unknown error occurred';
+          task.error = errorMessage;
           state.runningTasks.delete(task.id);
+          
+          // Update job status in database with error
+          await this.updateJobStatusInDatabase(state.jobId, 'failed', errorMessage);
+          
           this.checkAndTriggerDependentTasks(state, task);
           return;
         } else {
-          console.warn(`⚠️ Task failed, retrying: ${task.id} (${task.type}). Attempt: ${task.retryCount}`);
+          console.warn(`⚠️ Task failed, retrying: ${task.id} (${task.type}). Attempt: ${task.retryCount}. Error: ${errorMessage}`);
+          // Wait 5 seconds before retry
+          await new Promise(resolve => setTimeout(resolve, 5000));
         }
       }
+    }
+  }
+
+  /**
+   * Execute the actual task logic (separated for timeout handling)
+   */
+  private async executeTaskLogic(task: GenerationTask): Promise<void> {
+    switch (task.type) {
+      case 'lesson_section':
+        await this.generateLessonSection(task);
+        break;
+      case 'lesson_assessment':
+        await this.generateLessonAssessment(task);
+        break;
+      case 'lesson_mind_map':
+        await this.generateLessonMindMap(task);
+        break;
+      case 'lesson_brainbytes':
+        await this.generateLessonBrainbytes(task);
+        break;
+      case 'path_quiz':
+        await this.generatePathQuiz(task);
+        break;
+      case 'class_exam':
+        await this.generateClassExam(task);
+        break;
+      default:
+        throw new Error(`Unknown task type: ${task.type}`);
     }
   }
 
@@ -614,28 +826,32 @@ Create comprehensive educational content as JSON:
 
 CRITICAL: This content should feel like learning from a master teacher who is passionate about the subject and deeply cares about student understanding. Make it engaging, authoritative, and genuinely educational.`;
 
-    const completion = await this.openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are a master educator creating world-class educational content. Your goal is to teach concepts as clearly and effectively as a renowned expert in the field would in a 1-on-1 setting.
-          
-          Academic Level: ${request.academicLevel || 'college'}
-          Content Depth: ${request.lessonDetailLevel || 'detailed'}
-          Target Audience: ${request.targetAudience || 'Dedicated learners'}
-          
-          Focus on creating content that doesn't just inform, but truly teaches and builds mastery.`
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.7,
-      max_tokens: 16000
-    });
+    const completion = await this.callOpenAIWithTimeout(
+      () => this.openai.chat.completions.create({
+        model: "gpt-4.1-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a master educator creating world-class educational content. Your goal is to teach concepts as clearly and effectively as a renowned expert in the field would in a 1-on-1 setting.
+            
+            Academic Level: ${request.academicLevel || 'college'}
+            Content Depth: ${request.lessonDetailLevel || 'detailed'}
+            Target Audience: ${request.targetAudience || 'Dedicated learners'}
+            
+            Focus on creating content that doesn't just inform, but truly teaches and builds mastery.`
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+        max_tokens: 16000
+      }),
+      `Section Content Generation: ${sectionTitle}`,
+      240000 // 4 minutes for content generation
+    );
 
     const content = completion.choices[0]?.message?.content || '{}';
     
@@ -1257,11 +1473,15 @@ What makes this particularly important for ${request.academicLevel || 'college'}
    * Update progress based on completed tasks with more granular tracking
    */
   private async updateProgressBasedOnCompletedTasks(state: OrchestrationState): Promise<void> {
-    const completedCount = Array.from(state.tasks.values()).filter(t => t.status === 'completed' || t.status === 'failed').length;
+    const tasksArray = Array.from(state.tasks.values());
+    const completedTasks = tasksArray.filter(t => t.status === 'completed').length;
+    const failedTasks = tasksArray.filter(t => t.status === 'failed').length;
+    const runningTasks = state.runningTasks.size;
     const totalCount = state.tasks.size;
-    const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
     
-    state.progress = progress; // Update in-memory state
+    // Progress based on completed tasks only (failed tasks don't count toward progress)
+    const progress = totalCount > 0 ? Math.round((completedTasks / totalCount) * 100) : 0;
+    state.progress = progress;
 
     try {
       const supabase = this.getSupabaseClient();
@@ -1269,15 +1489,32 @@ What makes this particularly important for ${request.academicLevel || 'college'}
         .from('course_generation_jobs')
         .update({
           progress_percentage: progress,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          result_data: {
+            total_tasks: totalCount,
+            completed_tasks: completedTasks,
+            failed_tasks: failedTasks,
+            running_tasks: runningTasks,
+            last_update: new Date().toISOString(),
+            tasks_summary: tasksArray.map(t => ({
+              id: t.id,
+              type: t.type,
+              status: t.status,
+              section_title: t.sectionTitle,
+              retry_count: t.retryCount,
+              error: t.error
+            }))
+          }
         })
         .eq('id', state.jobId);
       
       if (error) {
         console.error('Error updating job progress:', error);
+      } else {
+        console.log(`📊 Progress updated: ${completedTasks}/${totalCount} completed (${progress}%) | Running: ${runningTasks} | Failed: ${failedTasks}`);
       }
     } catch (error) {
-      console.error('Error getting current progress:', error);
+      console.error('Error updating progress in database:', error);
     }
   }
 
