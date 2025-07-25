@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { Tables } from 'packages/types/db';
 
 const openai = new OpenAI({
@@ -38,12 +39,34 @@ function extractFromNodes(nodes: any[]): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { lessonId, baseClassId } = body;
-    const supabase = createSupabaseServerClient();
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { lessonId, baseClassId, userId, internal } = body;
+    
+    let supabase;
+    let user;
+    
+    // Handle internal requests from course generation
+    if (internal && userId) {
+      // Use service role client for internal requests to bypass RLS
+      supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
+      );
+      user = { id: userId };
+      console.log('🔧 Internal mind map request (using service role):', { lessonId, userId, internal });
+    } else {
+      // Handle regular requests with authentication
+      supabase = createSupabaseServerClient();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      user = authUser;
     }
 
     // Determine the type of mind map to generate
@@ -187,31 +210,51 @@ async function generateLessonMindMap(supabase: any, lessonId: string, user: any,
       .eq('asset_type', 'mind_map');
   }
 
-  // Fetch comprehensive lesson content
-  const { data: lesson } = await supabase
+  // Fetch lesson and sections separately to avoid join issues with .single()
+  console.log('🔍 Fetching lesson for mind map:', lessonId);
+  
+  // First, get the lesson
+  const { data: lesson, error: lessonError } = await supabase
     .from('lessons')
-    .select(`
-      title,
-      description,
-      lesson_sections (
-        title,
-        content,
-        section_type,
-        order_index
-      )
-    `)
+    .select('title, description')
     .eq('id', lessonId)
     .single();
 
+  console.log('📊 Lesson query result:', { lesson: !!lesson, error: lessonError });
+
   if (!lesson) {
-    throw new Error('Lesson not found');
+    console.error('❌ Lesson not found for mind map:', { lessonId, error: lessonError });
+    throw new Error(`Lesson not found: ${lessonError?.message || 'Unknown error'}`);
   }
+
+  // Then, get the lesson sections
+  const { data: lessonSections, error: sectionsError } = await supabase
+    .from('lesson_sections')
+    .select('title, content, section_type, order_index')
+    .eq('lesson_id', lessonId)
+    .order('order_index');
+
+  console.log('📊 Lesson sections query result:', { 
+    sectionsCount: lessonSections?.length || 0, 
+    error: sectionsError 
+  });
+
+  if (sectionsError) {
+    console.error('❌ Failed to fetch lesson sections:', { lessonId, error: sectionsError });
+    throw new Error(`Failed to fetch lesson sections: ${sectionsError.message}`);
+  }
+
+  // Combine the data
+  const lessonWithSections = {
+    ...lesson,
+    lesson_sections: lessonSections || []
+  };
 
   // Enhanced content extraction with deeper analysis
   const lessonContent = {
-    title: lesson.title,
-    description: lesson.description || '',
-    sections: lesson.lesson_sections?.sort((a: any, b: any) => a.order_index - b.order_index).map((section: any) => {
+    title: lessonWithSections.title,
+    description: lessonWithSections.description || '',
+    sections: lessonWithSections.lesson_sections?.sort((a: any, b: any) => a.order_index - b.order_index).map((section: any) => {
       const content = extractTextContent(section.content);
       const keyPoints = extractKeyPoints(content);
       const detailedConcepts = extractDetailedConcepts(content);

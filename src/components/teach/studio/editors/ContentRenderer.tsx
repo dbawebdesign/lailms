@@ -82,6 +82,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
     ],
     content: productionContent || '',
     editable: false, // Read-only mode
+    immediatelyRender: false, // Prevent SSR hydration mismatches
     editorProps: {
       attributes: {
         class: 'prose dark:prose-invert max-w-none focus:outline-none',

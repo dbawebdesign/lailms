@@ -140,6 +140,7 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
     ],
     content: getInitialEditorContent(), // Initialize with content from detailedExplanation
     editable: isEditing, // Always editable when in editing mode
+    immediatelyRender: false, // Prevent SSR hydration mismatches
     onUpdate: ({ editor }) => {
       // Debounced save or auto-save logic could go here
       // For now, content is updated on manual save.

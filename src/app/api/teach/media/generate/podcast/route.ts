@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { Tables } from "packages/types/db";
 
 const openai = new OpenAI({
@@ -89,7 +90,8 @@ function extractTextFromNodes(nodes: any[]): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { lessonId, content: fallbackContent, gradeLevel }: PodcastRequest = await request.json();
+    const body = await request.json();
+    const { lessonId, content: fallbackContent, gradeLevel, userId, internal } = body;
 
     if (!lessonId) {
       return NextResponse.json(
@@ -98,16 +100,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Initialize Supabase client
-    const supabase = createSupabaseServerClient();
-
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
+    let supabase;
+    let user;
+    
+    // Handle internal requests from course generation
+    if (internal && userId) {
+      // Use service role client for internal requests to bypass RLS
+      supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
       );
+      user = { id: userId };
+      console.log('🔧 Internal brainbytes request (using service role):', { lessonId, userId, internal });
+    } else {
+      // Handle regular requests with authentication
+      supabase = createSupabaseServerClient();
+      const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+      if (userError || !authUser) {
+        return NextResponse.json(
+          { error: 'Authentication required' },
+          { status: 401 }
+        );
+      }
+      user = authUser;
     }
 
     // Check if regeneration is requested
@@ -160,16 +181,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch lesson details and all its sections
+    console.log('🔍 Fetching lesson for brainbytes:', lessonId);
     const { data: lesson, error: lessonError } = await supabase
       .from('lessons')
       .select('title, description')
       .eq('id', lessonId)
       .single<Tables<"lessons">>();
 
+    console.log('📊 Lesson query result for brainbytes:', { lesson: !!lesson, error: lessonError });
+
     if (lessonError) {
-      console.error('Failed to fetch lesson:', lessonError);
+      console.error('❌ Failed to fetch lesson for brainbytes:', { lessonId, error: lessonError });
       return NextResponse.json(
-        { error: 'Failed to fetch lesson details' },
+        { error: 'Failed to fetch lesson details', details: lessonError },
         { status: 500 }
       );
     }

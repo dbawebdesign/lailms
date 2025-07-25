@@ -88,6 +88,7 @@ const LessonEditor: React.FC<LessonEditorProps> = ({ lessonIdParam, initialSecti
     ],
     content: '<p>Select or create a section to start editing.</p>',
     editable: false,
+    immediatelyRender: false, // Prevent SSR hydration mismatches
     onUpdate: ({ editor: currentEditor }: { editor: Editor }) => {
       // Auto-save logic or manual save trigger
       // For now, let's handle saving via a button

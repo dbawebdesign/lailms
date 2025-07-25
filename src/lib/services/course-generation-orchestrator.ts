@@ -6,7 +6,7 @@ import type { CourseGenerationRequest, CourseOutline, ModuleLesson } from './cou
 
 export interface GenerationTask {
   id: string;
-  type: 'lesson_section' | 'lesson_assessment' | 'path_quiz' | 'class_exam';
+  type: 'lesson_section' | 'lesson_assessment' | 'lesson_mind_map' | 'lesson_brainbytes' | 'path_quiz' | 'class_exam';
   status: 'pending' | 'running' | 'completed' | 'failed';
   lessonId?: string;
   pathId?: string;
@@ -39,6 +39,8 @@ export interface LessonWorkflow {
   moduleLesson: ModuleLesson;
   sectionTasks: string[];
   assessmentTask?: string;
+  mindMapTask?: string;
+  brainbytesTask?: string;
   allSectionsComplete: boolean;
 }
 
@@ -214,6 +216,32 @@ export class CourseGenerationOrchestrator {
         retryCount: 0
       });
 
+      // Create mind map task (will be triggered at the very end)
+      const mindMapTaskId = `mindmap-${lesson.id}`;
+      tasks.set(mindMapTaskId, {
+        id: mindMapTaskId,
+        type: 'lesson_mind_map',
+        status: 'pending',
+        lessonId: lesson.id,
+        pathId: lesson.path_id,
+        dependencies: [], // No dependencies - triggered manually at the end
+        data: { moduleLesson, outline, request },
+        retryCount: 0
+      });
+
+      // Create brainbytes task (will be triggered at the very end)
+      const brainbytesTaskId = `brainbytes-${lesson.id}`;
+      tasks.set(brainbytesTaskId, {
+        id: brainbytesTaskId,
+        type: 'lesson_brainbytes',
+        status: 'pending',
+        lessonId: lesson.id,
+        pathId: lesson.path_id,
+        dependencies: [], // No dependencies - triggered manually at the end
+        data: { moduleLesson, outline, request },
+        retryCount: 0
+      });
+
       lessonWorkflows.push({
         lessonId: lesson.id,
         pathId: lesson.path_id,
@@ -221,6 +249,8 @@ export class CourseGenerationOrchestrator {
         moduleLesson,
         sectionTasks,
         assessmentTask: assessmentTaskId,
+        mindMapTask: mindMapTaskId,
+        brainbytesTask: brainbytesTaskId,
         allSectionsComplete: false
       });
     }
@@ -400,6 +430,12 @@ export class CourseGenerationOrchestrator {
             break;
           case 'lesson_assessment':
             await this.generateLessonAssessment(task);
+            break;
+          case 'lesson_mind_map':
+            await this.generateLessonMindMap(task);
+            break;
+          case 'lesson_brainbytes':
+            await this.generateLessonBrainbytes(task);
             break;
           case 'path_quiz':
             await this.generatePathQuiz(task);
@@ -709,6 +745,230 @@ What makes this particularly important for ${request.academicLevel || 'college'}
   }
 
   /**
+   * Trigger media generation for all lessons at the very end of course generation
+   */
+  private async triggerFinalMediaGeneration(state: OrchestrationState): Promise<void> {
+    console.log('🎬 Starting final media generation for all lessons...');
+    
+    // Get all lessons that have completed assessments
+    const lessonsWithCompletedAssessments = state.lessons.filter(lesson => 
+      lesson.assessmentTask && this.isTaskFinished(state, lesson.assessmentTask)
+    );
+    
+    console.log(`📊 Found ${lessonsWithCompletedAssessments.length} lessons ready for media generation`);
+    
+    // Trigger all media generation tasks with staggered delays
+    let delayOffset = 0;
+    
+    for (const lessonWorkflow of lessonsWithCompletedAssessments) {
+      // Trigger mind map generation
+      if (lessonWorkflow.mindMapTask) {
+        const mindMapTask = state.tasks.get(lessonWorkflow.mindMapTask);
+        if (mindMapTask && mindMapTask.status === 'pending') {
+          console.log(`🧠 Scheduling mind map generation for lesson: ${lessonWorkflow.title} (delay: ${delayOffset}ms)`);
+          setTimeout(() => this.executeTask(state, mindMapTask), delayOffset);
+          delayOffset += 2000; // 2 second stagger
+        }
+      }
+      
+      // Trigger brainbytes generation
+      if (lessonWorkflow.brainbytesTask) {
+        const brainbytesTask = state.tasks.get(lessonWorkflow.brainbytesTask);
+        if (brainbytesTask && brainbytesTask.status === 'pending') {
+          console.log(`🎧 Scheduling brainbytes generation for lesson: ${lessonWorkflow.title} (delay: ${delayOffset}ms)`);
+          setTimeout(() => this.executeTask(state, brainbytesTask), delayOffset);
+          delayOffset += 2000; // 2 second stagger
+        }
+      }
+    }
+    
+    // Schedule final completion check after all media generation is triggered
+    const finalCompletionDelay = delayOffset + 10000; // Extra 10 seconds for processing
+    console.log(`⏰ Scheduling final completion check in ${finalCompletionDelay}ms`);
+    
+    setTimeout(async () => {
+      // Check if all media generation is complete
+      const allMediaComplete = state.lessons.every(lesson => {
+        const mindMapComplete = !lesson.mindMapTask || this.isTaskFinished(state, lesson.mindMapTask);
+        const brainbytesComplete = !lesson.brainbytesTask || this.isTaskFinished(state, lesson.brainbytesTask);
+        return mindMapComplete && brainbytesComplete;
+      });
+      
+      if (allMediaComplete) {
+        console.log('🎉 All media generation completed! Course generation finished successfully!');
+        const taskSummary = this.generateTaskSummary(state);
+        await this.updateJobStatus(state.jobId, 'completed', 100, taskSummary);
+      } else {
+        console.log('⏳ Media generation still in progress, will check again...');
+        // Schedule another check in 30 seconds
+        setTimeout(() => this.checkFinalCompletion(state), 30000);
+      }
+    }, finalCompletionDelay);
+  }
+
+  /**
+   * Check if course generation is fully complete including media generation
+   */
+  private async checkFinalCompletion(state: OrchestrationState): Promise<void> {
+    const allMediaComplete = state.lessons.every(lesson => {
+      const mindMapComplete = !lesson.mindMapTask || this.isTaskFinished(state, lesson.mindMapTask);
+      const brainbytesComplete = !lesson.brainbytesTask || this.isTaskFinished(state, lesson.brainbytesTask);
+      return mindMapComplete && brainbytesComplete;
+    });
+    
+    if (allMediaComplete) {
+      console.log('🎉 Course generation completed successfully with all media assets!');
+      const taskSummary = this.generateTaskSummary(state);
+      await this.updateJobStatus(state.jobId, 'completed', 100, taskSummary);
+    } else {
+      console.log('⏳ Media generation still in progress, scheduling another check...');
+      setTimeout(() => this.checkFinalCompletion(state), 30000);
+    }
+  }
+
+  /**
+   * Generate mind map for lesson after assessment is complete
+   */
+  private async generateLessonMindMap(task: GenerationTask): Promise<void> {
+    if (!task.lessonId) return;
+
+    const { moduleLesson, request } = task.data;
+    console.log(`🧠 Generating mind map for lesson: ${moduleLesson.title}`);
+
+    // Add delay to ensure lesson data is committed to database
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    while (retryCount < maxRetries) {
+      try {
+        console.log(`🧠 Attempt ${retryCount + 1}/${maxRetries} - Generating mind map for lesson: ${task.lessonId}`);
+        
+        // Call the existing mind map API directly with internal flag and user ID
+        const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/teach/media/generate/mind-map`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Internal-Request': 'true', // Flag for internal requests
+          },
+          body: JSON.stringify({
+            lessonId: task.lessonId,
+            userId: request.userId, // Pass user ID for internal requests
+            internal: true
+          })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`🧠 Mind map API error (${response.status}):`, errorText);
+          
+          // If it's a lesson not found error, retry after delay
+          if (response.status === 500 && errorText.includes('Lesson not found')) {
+            retryCount++;
+            if (retryCount < maxRetries) {
+              console.log(`🧠 Lesson not found, retrying in 5 seconds... (${retryCount}/${maxRetries})`);
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              continue;
+            }
+          }
+          
+          throw new Error(`Mind map API returned ${response.status}: ${errorText}`);
+        }
+
+        console.log(`✅ Created mind map for lesson: ${moduleLesson.title}`);
+        break; // Success, exit retry loop
+        
+      } catch (error) {
+        retryCount++;
+        console.error(`🧠 Failed attempt ${retryCount}/${maxRetries} for mind map generation:`, error);
+        
+        if (retryCount >= maxRetries) {
+          console.error(`❌ Failed to generate mind map for lesson ${moduleLesson.title} after ${maxRetries} attempts:`, error);
+          // Don't throw error to prevent course generation from failing
+          break;
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+  }
+
+  /**
+   * Generate brainbytes podcast for lesson after assessment is complete
+   */
+  private async generateLessonBrainbytes(task: GenerationTask): Promise<void> {
+    if (!task.lessonId) return;
+
+    const { moduleLesson, request } = task.data;
+    console.log(`🎧 Generating brainbytes for lesson: ${moduleLesson.title}`);
+
+    // Add delay to ensure lesson data is committed to database
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    while (retryCount < maxRetries) {
+      try {
+        console.log(`🎧 Attempt ${retryCount + 1}/${maxRetries} - Generating brainbytes for lesson: ${task.lessonId}`);
+        
+        // Use academic level from request, default to 'college'
+        const gradeLevel = request.academicLevel || 'college';
+        
+        // Call the existing brainbytes API directly with internal flag and user ID
+        const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/teach/media/generate/podcast`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Internal-Request': 'true', // Flag for internal requests
+          },
+          body: JSON.stringify({
+            lessonId: task.lessonId,
+            gradeLevel: gradeLevel,
+            userId: request.userId, // Pass user ID for internal requests
+            internal: true
+          })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`🎧 Brainbytes API error (${response.status}):`, errorText);
+          
+          // If it's a lesson not found error, retry after delay
+          if (response.status === 500 && (errorText.includes('Failed to fetch lesson') || errorText.includes('Lesson not found'))) {
+            retryCount++;
+            if (retryCount < maxRetries) {
+              console.log(`🎧 Lesson not found, retrying in 5 seconds... (${retryCount}/${maxRetries})`);
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              continue;
+            }
+          }
+          
+          throw new Error(`Brainbytes API returned ${response.status}: ${errorText}`);
+        }
+
+        console.log(`✅ Created brainbytes for lesson: ${moduleLesson.title}`);
+        break; // Success, exit retry loop
+        
+      } catch (error) {
+        retryCount++;
+        console.error(`🎧 Failed attempt ${retryCount}/${maxRetries} for brainbytes generation:`, error);
+        
+        if (retryCount >= maxRetries) {
+          console.error(`❌ Failed to generate brainbytes for lesson ${moduleLesson.title} after ${maxRetries} attempts:`, error);
+          // Don't throw error to prevent course generation from failing
+          break;
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+  }
+
+  /**
    * Generate path quiz after all lesson assessments are complete
    */
   private async generatePathQuiz(task: GenerationTask): Promise<void> {
@@ -841,6 +1101,8 @@ What makes this particularly important for ${request.academicLevel || 'college'}
       }
     }
 
+    // Media generation will be triggered at the very end after all core tasks complete
+
     // Check path completion
     if (completedTask.type === 'lesson_assessment') {
       const pathWorkflow = state.paths.find(p => 
@@ -897,9 +1159,8 @@ What makes this particularly important for ${request.academicLevel || 'college'}
 
     // Check overall completion
     if (completedTask.type === 'class_exam') {
-      console.log('🎉 Course generation completed successfully!');
-      const taskSummary = this.generateTaskSummary(state);
-      await this.updateJobStatus(state.jobId, 'completed', 100, taskSummary);
+      console.log('🎓 Class exam completed! Starting final media generation...');
+      await this.triggerFinalMediaGeneration(state);
     }
   }
 
@@ -957,9 +1218,8 @@ What makes this particularly important for ${request.academicLevel || 'college'}
         console.log(`🎓 Triggering class exam: ${examTask.id}`);
         await this.executeTask(state, examTask);
       } else if (!examTask) {
-        console.log(`✅ No final exam configured - course generation complete`);
-        const taskSummary = this.generateTaskSummary(state);
-        await this.updateJobStatus(state.jobId, 'completed', 100, taskSummary);
+        console.log(`✅ No final exam configured - starting final media generation...`);
+        await this.triggerFinalMediaGeneration(state);
       } else {
         console.log(`⚠️ Class exam task not pending:`, {
           status: examTask?.status,
