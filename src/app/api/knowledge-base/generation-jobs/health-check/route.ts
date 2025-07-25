@@ -44,6 +44,12 @@ export async function GET(request: NextRequest) {
     const healthyJobs: any[] = [];
 
     for (const job of potentiallyStuckJobs || []) {
+      // Skip jobs with invalid dates
+      if (!job.created_at || !job.updated_at) {
+        console.warn(`Skipping job ${job.id} with invalid dates`);
+        continue;
+      }
+      
       const createdAt = new Date(job.created_at);
       const updatedAt = new Date(job.updated_at);
       const now = new Date();
