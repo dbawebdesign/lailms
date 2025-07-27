@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
         if (stuckDurationMinutes >= 30) {
           stuckJobs.push({
             id: job.id,
-            status: job.status,
+            status: job.status || 'unknown',
             created_at: job.created_at,
             updated_at: job.updated_at,
             progress_percentage: job.progress_percentage || 0,
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
         // No live state - definitely stuck
         stuckJobs.push({
           id: job.id,
-          status: job.status,
+          status: job.status || 'unknown',
           created_at: job.created_at,
           updated_at: job.updated_at,
           progress_percentage: job.progress_percentage || 0,

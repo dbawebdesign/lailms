@@ -151,6 +151,14 @@ async function extractAndValidatePdfText(uint8: Uint8Array, filePath: string): P
     const loadingTask = getDocument({ data: uint8 });
     const pdfDoc = await loadingTask.promise;
     
+    if (!pdfDoc) {
+      throw new Error('Failed to load PDF document - pdfDoc is null');
+    }
+    
+    if (!pdfDoc.numPages || typeof pdfDoc.numPages !== 'number' || pdfDoc.numPages <= 0) {
+      throw new Error(`Invalid PDF - numPages is ${pdfDoc.numPages}`);
+    }
+    
     let allText = '';
     let readablePages = 0;
     let totalTextLength = 0;
@@ -160,18 +168,27 @@ async function extractAndValidatePdfText(uint8: Uint8Array, filePath: string): P
     for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
       try {
         const page = await pdfDoc.getPage(pageNum);
+        if (!page) {
+          console.warn(`Page ${pageNum}: Failed to get page object`);
+          continue;
+        }
+        
         const textContent = await page.getTextContent();
         
-        // Extract text with better processing
+        // Extract text with better processing and null safety
         let pageText = '';
-        for (const item of textContent.items) {
-          if ('str' in item && item.str) {
-            // Validate that the text item contains readable content
-            const cleanedStr = item.str.trim();
-            if (isReadableText(cleanedStr)) {
-              pageText += cleanedStr + ' ';
+        if (textContent && textContent.items && Array.isArray(textContent.items)) {
+          for (const item of textContent.items) {
+            if (item && typeof item === 'object' && 'str' in item && item.str && typeof item.str === 'string') {
+              // Validate that the text item contains readable content
+              const cleanedStr = item.str.trim();
+              if (isReadableText(cleanedStr)) {
+                pageText += cleanedStr + ' ';
+              }
             }
           }
+        } else {
+          console.warn(`Page ${pageNum}: textContent or textContent.items is null/invalid`);
         }
         
         pageText = pageText.trim();
@@ -1050,10 +1067,20 @@ const chunkText = async (
   let chunkIndex = 0;
 
   if (documentType === 'pdf') {
+    if (!fullText || typeof fullText !== 'string') {
+      throw new Error('Invalid fullText for PDF chunking - text is null or not a string');
+    }
+    
     const pages = fullText.split('\f'); // Form feed often separates PDF pages in text extraction
     let charOffset = 0;
+    
     for (let i = 0; i < pages.length; i++) {
       const pageText = pages[i];
+      if (!pageText || typeof pageText !== 'string') {
+        console.warn(`Skipping invalid page ${i + 1} - pageText is null or not a string`);
+        continue;
+      }
+      
       const pageNumber = i + 1;
       for (let j = 0; j < pageText.length; j += chunkSize - overlap) {
         const content = pageText.substring(j, j + chunkSize).trim();
@@ -1415,6 +1442,9 @@ serve(async (req: Request) => {
       docMetadata.source_type = 'audio_transcript';
     } else if (fileType === 'application/pdf') {
       extractedText = await extractTextFromPdf(storagePath, supabaseClient, bucketName);
+      if (!extractedText || typeof extractedText !== 'string') {
+        throw new Error('PDF text extraction returned null or invalid text');
+      }
       docMetadata.source_type = 'pdf_extract';
     } else if (fileType === 'text/plain') {
        // This case should ideally be handled by kb-process-textfile,
@@ -1479,6 +1509,15 @@ serve(async (req: Request) => {
       throw new Error(`Unsupported file type: ${fileType} or missing source URL for document ${documentId}`);
     }
     
+    // Final validation of extracted text before chunking
+    if (!extractedText || typeof extractedText !== 'string') {
+      throw new Error(`Text extraction failed - extracted text is null or invalid. Type: ${typeof extractedText}, Length: ${extractedText?.length || 'undefined'}`);
+    }
+    
+    if (extractedText.length === 0) {
+      throw new Error('Text extraction resulted in empty content');
+    }
+
     await updateDocumentStatus(supabaseClient, documentId, 'processing', { 
       extracted_text_length: extractedText.length,
       source_type: docMetadata.source_type,
