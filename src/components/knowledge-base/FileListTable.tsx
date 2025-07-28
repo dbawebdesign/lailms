@@ -37,9 +37,9 @@ import {
 } from '@/components/ui/table'
 import { toast } from 'sonner'
 import type { Database } from '../../../packages/types/db'
-
-// Document status type - updated to match database enum
-export type DocumentStatus = 'queued' | 'processing' | 'completed' | 'error'
+import { DocumentProcessingStatus } from './DocumentProcessingStatus'
+import { useDocumentProcessingStatus } from '@/hooks/useDocumentProcessingStatus'
+import { DocumentStatus, DocumentProcessingMetadata } from '@/types/document-processing'
 
 type Document = Database['public']['Tables']['documents']['Row']
 
@@ -50,17 +50,32 @@ interface FileListTableProps {
 }
 
 export function FileListTable({ organisationId, baseClassId, userOnly = false }: FileListTableProps) {
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [showDetailedStatus, setShowDetailedStatus] = useState<string | null>(null)
+
+  // Use our enhanced document processing status hook with real-time updates
+  const { 
+    documents: documentProcessingData, 
+    loading: isLoading, 
+    error, 
+    refetch,
+    retryProcessing,
+    cancelProcessing 
+  } = useDocumentProcessingStatus({
+    organisationId: userOnly ? undefined : organisationId,
+    autoRefresh: true,
+    refreshInterval: 2000 // Refresh every 2 seconds for active processing
+  })
+
+  // Fallback: fetch documents using the original API if the hook doesn't provide them
+  const [fallbackDocuments, setFallbackDocuments] = useState<Document[]>([])
+  const [fallbackLoading, setFallbackLoading] = useState(false)
 
   useEffect(() => {
     async function fetchDocuments() {
-      if (!organisationId) return;
+      if (!organisationId || documentProcessingData.length > 0) return;
       
-      setIsLoading(true);
-      setError(null);
+      setFallbackLoading(true);
       try {
         let url = `/api/knowledge-base/documents?organisation_id=${organisationId}`;
         if (baseClassId) {
@@ -76,20 +91,25 @@ export function FileListTable({ organisationId, baseClassId, userOnly = false }:
           throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
         const data: Document[] = await response.json();
-        setDocuments(data);
+        setFallbackDocuments(data);
 
       } catch (err) {
         console.error("Failed to fetch documents:", err);
         const message = err instanceof Error ? err.message : "An unknown error occurred";
-        setError(`Failed to load documents: ${message}`);
         toast.error(`Failed to load documents: ${message}`);
       } finally {
-        setIsLoading(false);
+        setFallbackLoading(false);
       }
     }
 
     fetchDocuments();
-  }, [organisationId, baseClassId, userOnly]);
+  }, [organisationId, baseClassId, userOnly, documentProcessingData.length]);
+
+  // Use processing data if available, otherwise fallback to original API
+  const documents = documentProcessingData.length > 0 ? 
+    documentProcessingData.map(doc => ({ ...doc as any, metadata: doc.metadata })) : 
+    fallbackDocuments
+  const loading = isLoading || fallbackLoading
 
   // Get status badge based on document status and processing stage
   const getStatusBadge = (status: DocumentStatus, metadata: any) => {
@@ -207,8 +227,8 @@ export function FileListTable({ organisationId, baseClassId, userOnly = false }:
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
-      // Remove the document from the local state on successful deletion
-      setDocuments((prevDocs) => prevDocs.filter((doc) => doc.id !== docId));
+      // Refresh the documents list after successful deletion
+      await refetch();
       toast.success('Document deleted successfully');
 
     } catch (err) {
@@ -263,7 +283,7 @@ export function FileListTable({ organisationId, baseClassId, userOnly = false }:
     return formatBytes(bytes);
   }
 
-  if (isLoading) return <div className="p-4 text-center">Loading documents...</div>
+  if (loading) return <div className="p-4 text-center">Loading documents...</div>
   if (error) return <div className="p-4 text-center text-red-500">{error}</div>
 
   return (
@@ -298,7 +318,40 @@ export function FileListTable({ organisationId, baseClassId, userOnly = false }:
                   </div>
                 </TableCell>
                 <TableCell>
-                  {getStatusBadge(doc.status as DocumentStatus, doc.metadata)}
+                  <div className="flex items-center gap-2">
+                    <DocumentProcessingStatus
+                      documentId={doc.id}
+                      fileName={doc.file_name || 'Unnamed document'}
+                      status={doc.status as DocumentStatus}
+                      metadata={(doc.metadata as DocumentProcessingMetadata) || {}}
+                      onRetry={() => retryProcessing(doc.id)}
+                      showDetails={false}
+                    />
+                    {(doc.status === 'processing' || doc.status === 'error') && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowDetailedStatus(
+                          showDetailedStatus === doc.id ? null : doc.id
+                        )}
+                        className="h-6 w-6 p-0 text-xs"
+                      >
+                        {showDetailedStatus === doc.id ? '−' : '+'}
+                      </Button>
+                    )}
+                  </div>
+                  {showDetailedStatus === doc.id && (
+                    <div className="mt-2">
+                      <DocumentProcessingStatus
+                        documentId={doc.id}
+                        fileName={doc.file_name || 'Unnamed document'}
+                        status={doc.status as DocumentStatus}
+                        metadata={(doc.metadata as DocumentProcessingMetadata) || {}}
+                        onRetry={() => retryProcessing(doc.id)}
+                        showDetails={true}
+                      />
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell>
                   {getFileTypeDisplay(doc.file_type, doc.file_name)}

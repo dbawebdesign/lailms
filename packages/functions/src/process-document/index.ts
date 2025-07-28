@@ -118,7 +118,12 @@ function sanitizeTextForDatabase(text: string): string {
 }
 
 // --- Text Extraction Functions ---
-async function extractTextFromPdf(filePath: string, supabase: SupabaseClient, bucketName: string): Promise<string> {
+async function extractTextFromPdf(
+  filePath: string, 
+  supabase: SupabaseClient, 
+  bucketName: string,
+  onProgress?: (pagesProcessed: number, totalPages: number, textLength: number) => void
+): Promise<string> {
   console.log(`Attempting to extract text from PDF: ${filePath} in bucket ${bucketName}`);
   try {
     const { data: pdfFileData, error: downloadError } = await supabase.storage
@@ -132,8 +137,12 @@ async function extractTextFromPdf(filePath: string, supabase: SupabaseClient, bu
     const pdfBuffer = await pdfFileData.arrayBuffer();
     const uint8 = new Uint8Array(pdfBuffer);
 
-    // Enhanced PDF text extraction with validation
-    const extractedText = await extractAndValidatePdfText(uint8, filePath);
+    // Enhanced PDF text extraction with validation and progress reporting
+    const extractedText = await extractAndValidatePdfText(uint8, filePath, 
+      (pagesProcessed, totalPages, currentText) => {
+        onProgress?.(pagesProcessed, totalPages, currentText.length);
+      }
+    );
     
     console.log(`Successfully extracted ~${extractedText.length} characters from PDF ${filePath}.`);
     return extractedText;
@@ -143,12 +152,26 @@ async function extractTextFromPdf(filePath: string, supabase: SupabaseClient, bu
   }
 }
 
-async function extractAndValidatePdfText(uint8: Uint8Array, filePath: string): Promise<string> {
+async function extractAndValidatePdfText(
+  uint8: Uint8Array, 
+  filePath: string,
+  onProgress?: (pagesProcessed: number, totalPages: number, currentText: string) => void
+): Promise<string> {
   console.log(`Processing PDF with enhanced text extraction and validation`);
+  
+  const startTime = Date.now();
+  const MAX_PROCESSING_TIME = 8 * 60 * 1000; // 8 minutes max (Edge Functions have 10min limit)
   
   try {
     // @ts-ignore - PDF.js types may not be available but the functionality works
-    const loadingTask = getDocument({ data: uint8 });
+    const loadingTask = getDocument({ 
+      data: uint8,
+      // Optimize for large files
+      maxImageSize: 1024 * 1024, // Limit image size to 1MB
+      disableFontFace: true, // Disable font loading for better performance
+      disableRange: false, // Enable range requests for streaming
+      disableStream: false // Enable streaming
+    });
     const pdfDoc = await loadingTask.promise;
     
     if (!pdfDoc) {
@@ -162,12 +185,32 @@ async function extractAndValidatePdfText(uint8: Uint8Array, filePath: string): P
     let allText = '';
     let readablePages = 0;
     let totalTextLength = 0;
+    const totalPages = pdfDoc.numPages;
     
-    console.log(`PDF has ${pdfDoc.numPages} pages`);
+    console.log(`PDF has ${totalPages} pages`);
     
-    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-      try {
-        const page = await pdfDoc.getPage(pageNum);
+    // Report initial progress
+    onProgress?.(0, totalPages, '');
+    
+    // Process pages in batches for memory efficiency with large documents
+    const BATCH_SIZE = 50; // Process 50 pages at a time to manage memory
+    const batches = Math.ceil(totalPages / BATCH_SIZE);
+    
+    for (let batchIndex = 0; batchIndex < batches; batchIndex++) {
+      const startPage = batchIndex * BATCH_SIZE + 1;
+      const endPage = Math.min((batchIndex + 1) * BATCH_SIZE, totalPages);
+      
+      console.log(`Processing batch ${batchIndex + 1}/${batches}: pages ${startPage}-${endPage}`);
+      
+            for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
+        // Check for timeout
+        if (Date.now() - startTime > MAX_PROCESSING_TIME) {
+          console.warn(`PDF processing timeout reached after ${MAX_PROCESSING_TIME / 1000}s. Processed ${pageNum - 1}/${totalPages} pages.`);
+          break;
+        }
+        
+        try {
+          const page = await pdfDoc.getPage(pageNum);
         if (!page) {
           console.warn(`Page ${pageNum}: Failed to get page object`);
           continue;
@@ -204,21 +247,64 @@ async function extractAndValidatePdfText(uint8: Uint8Array, filePath: string): P
           // Log first 100 chars for debugging
           console.warn(`Page ${pageNum} preview: "${pageText.substring(0, 100)}..."`);
         }
-      } catch (pageError) {
-        console.warn(`Failed to extract text from page ${pageNum}:`, pageError instanceof Error ? pageError.message : String(pageError));
-        continue;
+        
+        // Report progress every 20 pages or on the last page (for large documents)
+        if (pageNum % 20 === 0 || pageNum === totalPages) {
+          onProgress?.(pageNum, totalPages, allText);
+        }
+              } catch (pageError) {
+          console.warn(`Failed to extract text from page ${pageNum}:`, pageError instanceof Error ? pageError.message : String(pageError));
+          continue;
+        }
       }
+      
+      // Memory cleanup after each batch for large documents
+      if (typeof globalThis.gc === 'function') {
+        globalThis.gc();
+      }
+      
+      console.log(`Completed batch ${batchIndex + 1}/${batches}. Total text length: ${allText.length} chars`);
     }
     
-    console.log(`PDF processing complete: ${readablePages}/${pdfDoc.numPages} pages readable, ${totalTextLength} total characters`);
+    const processingTime = Date.now() - startTime;
+    console.log(`PDF processing complete: ${readablePages}/${pdfDoc.numPages} pages readable, ${totalTextLength} total characters in ${processingTime}ms`);
+    
+    // Check if processing was interrupted by timeout
+    if (processingTime > MAX_PROCESSING_TIME * 0.9) {
+      console.warn(`PDF processing approached timeout limit. Consider splitting large documents.`);
+    }
     
     // Final validation of extracted content
     if (allText.length < 50) {
-      throw new Error(`PDF appears to contain no readable text content. This may be a scanned PDF, password-protected, or contain only images. Extracted: "${allText.substring(0, 100)}..."`);
+      const errorDetails = {
+        code: 'PDF_NO_TEXT',
+        message: `PDF appears to contain no readable text content. This may be a scanned PDF, password-protected, or contain only images.`,
+        userFriendlyMessage: 'This PDF appears to be scanned or contains no readable text',
+        suggestedActions: [
+          'Use an OCR tool to convert scanned images to text',
+          'Remove password protection if the PDF is encrypted',
+          'Try uploading a text-based version of the document'
+        ]
+      };
+      throw new Error(JSON.stringify(errorDetails));
     }
     
     if (readablePages === 0) {
-      throw new Error(`No readable pages found in PDF. This may be a scanned document or contain only images/graphics.`);
+      const errorDetails = {
+        code: 'PDF_NO_READABLE_PAGES',
+        message: `No readable pages found in PDF. This may be a scanned document or contain only images/graphics.`,
+        userFriendlyMessage: 'No readable content found in this PDF',
+        suggestedActions: [
+          'Check if this is a scanned document that needs OCR processing',
+          'Verify the PDF is not corrupted',
+          'Try a different PDF viewer to confirm the content is readable'
+        ]
+      };
+      throw new Error(JSON.stringify(errorDetails));
+    }
+    
+    if (allText.length > 10 * 1024 * 1024) { // > 10MB of text
+      console.warn(`Very large text extracted (${Math.round(allText.length / 1024 / 1024)}MB). Processing may be slower.`);
     }
     
     // Check for signs of encoding issues or PDF structure leakage
@@ -232,12 +318,69 @@ async function extractAndValidatePdfText(uint8: Uint8Array, filePath: string): P
     return sanitizedText;
     
   } catch (error) {
-    if (error instanceof Error && error.message.includes('PDF appears to contain no readable text')) {
-      throw error; // Re-throw our custom validation errors
+    // Check if this is a structured error with user-friendly details
+    if (error instanceof Error && error.message.startsWith('{')) {
+      try {
+        JSON.parse(error.message); // Validate it's JSON
+        throw error; // Re-throw structured errors
+      } catch {
+        // Not valid JSON, continue with normal error handling
+      }
     }
     
     console.error(`PDF parsing failed:`, error instanceof Error ? error.message : String(error));
-    throw new Error(`PDF text extraction failed: ${error instanceof Error ? error.message : String(error)}. This PDF may be password-protected, corrupted, or require OCR processing.`);
+    
+    // Determine appropriate error response based on the error type
+    let errorDetails;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    if (errorMessage.includes('timeout') || errorMessage.includes('time')) {
+      errorDetails = {
+        code: 'PROCESSING_TIMEOUT',
+        message: errorMessage,
+        userFriendlyMessage: 'Document processing timed out due to file size or complexity',
+        suggestedActions: [
+          'Try breaking the document into smaller sections',
+          'Reduce document complexity by removing images or media',
+          'Upload during off-peak hours for better performance'
+        ]
+      };
+    } else if (errorMessage.includes('memory') || errorMessage.includes('Memory')) {
+      errorDetails = {
+        code: 'MEMORY_EXCEEDED',
+        message: errorMessage,
+        userFriendlyMessage: 'Document is too large or complex to process in available memory',
+        suggestedActions: [
+          'Try splitting the document into smaller parts',
+          'Remove embedded images or media if possible',
+          'Contact support for assistance with large files'
+        ]
+      };
+    } else if (errorMessage.includes('password') || errorMessage.includes('encrypted')) {
+      errorDetails = {
+        code: 'PDF_ENCRYPTED',
+        message: errorMessage,
+        userFriendlyMessage: 'This PDF is password-protected or encrypted',
+        suggestedActions: [
+          'Remove password protection from the PDF',
+          'Export as an unencrypted version',
+          'Try converting to a different format'
+        ]
+      };
+    } else {
+      errorDetails = {
+        code: 'PDF_PROCESSING_ERROR',
+        message: errorMessage,
+        userFriendlyMessage: 'Failed to process this PDF document',
+        suggestedActions: [
+          'Verify the PDF is not corrupted or password-protected',
+          'Try converting to a different format',
+          'Contact support if the issue persists'
+        ]
+      };
+    }
+    
+    throw new Error(JSON.stringify(errorDetails));
   }
 }
 
@@ -1060,11 +1203,15 @@ const generateCitationKey = (
 const chunkText = async (
   fullText: string,
   documentType: DocumentType,
-  options: ChunkingOptions = {}
+  options: ChunkingOptions = {},
+  onProgress?: (chunksCreated: number, estimatedTotal: number) => void
 ): Promise<Chunk[]> => {
   const { chunkSize = 1500, overlap = 200 } = options; // Adjusted chunkSize
   const chunks: Chunk[] = [];
   let chunkIndex = 0;
+  
+  // Estimate total chunks for large documents
+  const estimatedTotalChunks = Math.ceil(fullText.length / (chunkSize - overlap));
 
   if (documentType === 'pdf') {
     if (!fullText || typeof fullText !== 'string') {
@@ -1092,6 +1239,11 @@ const chunkText = async (
             section_identifier: getSectionIdentifier(documentType, content, charOffset + j, chunkIndex, pageNumber),
           });
           chunkIndex++;
+          
+          // Report progress every 50 chunks for large documents
+          if (chunkIndex % 50 === 0) {
+            onProgress?.(chunkIndex, estimatedTotalChunks);
+          }
         }
       }
       charOffset += pageText.length + 1; // +1 for the form feed char
@@ -1441,7 +1593,30 @@ serve(async (req: Request) => {
       extractedText = sanitizeTextForDatabase(extractedText);
       docMetadata.source_type = 'audio_transcript';
     } else if (fileType === 'application/pdf') {
-      extractedText = await extractTextFromPdf(storagePath, supabaseClient, bucketName);
+      extractedText = await extractTextFromPdf(
+        storagePath, 
+        supabaseClient, 
+        bucketName,
+        (pagesProcessed, totalPages, textLength) => {
+          const percentage = Math.floor((pagesProcessed / totalPages) * 100);
+          console.log(`PDF extraction progress: ${pagesProcessed}/${totalPages} pages (${percentage}%)`);
+          
+          // Update document status with PDF extraction progress
+          if (supabaseClient && documentId) {
+            updateDocumentStatus(supabaseClient, documentId, 'processing', {
+              processing_stage: 'extracting_text',
+              processing_progress: {
+                stage: 'extracting_text',
+                substage: 'parsing_pdf',
+                percentage: Math.floor(10 + (percentage * 0.2)), // 10-30% range
+                pagesProcessed,
+                totalPages,
+                textLength
+              }
+            }).catch(err => console.error('Failed to update PDF extraction progress:', err));
+          }
+        }
+      );
       if (!extractedText || typeof extractedText !== 'string') {
         throw new Error('PDF text extraction returned null or invalid text');
       }
@@ -1546,7 +1721,29 @@ serve(async (req: Request) => {
     
     console.log(`File type: ${fileType}, Document type for chunking: ${documentType}`);
     
-    const processedChunks: Chunk[] = await chunkText(extractedText, documentType, { chunkSize: 1500, overlap: 200 });
+    const processedChunks: Chunk[] = await chunkText(
+      extractedText, 
+      documentType, 
+      { chunkSize: 1500, overlap: 200 },
+      (chunksCreated, estimatedTotal) => {
+        const percentage = Math.floor((chunksCreated / estimatedTotal) * 100);
+        console.log(`Chunking progress: ${chunksCreated}/${estimatedTotal} chunks created (${percentage}%)`);
+        
+        // Update document status with chunking progress
+        if (supabaseClient && documentId) {
+          updateDocumentStatus(supabaseClient, documentId, 'processing', {
+            processing_stage: 'chunking_text',
+            processing_progress: {
+              stage: 'chunking_text',
+              substage: 'creating_chunks',
+              percentage: Math.floor(30 + (percentage * 0.3)), // 30-60% range
+              chunksCreated,
+              estimatedTotal
+            }
+          }).catch(err => console.error('Failed to update chunking progress:', err));
+        }
+      }
+    );
     console.log(`Created ${processedChunks.length} chunks from the text.`);
 
     if (processedChunks.length === 0) {
@@ -1770,21 +1967,48 @@ serve(async (req: Request) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
+    let structuredError = null;
     
     console.error(`PROCESS-DOCUMENT: Main error for doc ID ${documentId}:`, errorMessage);
     if (errorStack) {
       console.error(`PROCESS-DOCUMENT: Error stack:`, errorStack);
     }
     
+    // Try to parse structured error details for better user feedback
+    try {
+      if (errorMessage.startsWith('{')) {
+        structuredError = JSON.parse(errorMessage);
+        console.log(`PROCESS-DOCUMENT: Parsed structured error:`, structuredError);
+      }
+    } catch {
+      // Not structured JSON, use raw error
+      console.log(`PROCESS-DOCUMENT: Using raw error message (not structured)`);
+    }
+    
     // Try to update document status to error, but don't let it cause another error
     if (documentId && supabaseClient) {
       try {
         console.log(`PROCESS-DOCUMENT: Attempting to mark document ${documentId} as error...`);
-        await updateDocumentStatus(supabaseClient, documentId, 'error', { 
-          processing_error: errorMessage,
+        
+        const errorMetadata = {
+          processing_error: structuredError || {
+            code: 'PROCESSING_ERROR',
+            message: errorMessage,
+            userFriendlyMessage: 'An error occurred while processing your document',
+            suggestedActions: [
+              'Try uploading the document again',
+              'Check that the document is not corrupted or password-protected',
+              'Contact support if the issue persists'
+            ],
+            retryable: true,
+            timestamp: new Date().toISOString()
+          },
           error_timestamp: new Date().toISOString(),
+          processing_stage: 'error',
           error_stack_trace: errorStack ? errorStack.substring(0, 2000) : undefined // Limit stack trace length
-        });
+        };
+        
+        await updateDocumentStatus(supabaseClient, documentId, 'error', errorMetadata);
       } catch (dbUpdateError) {
         const dbErrorMessage = dbUpdateError instanceof Error ? dbUpdateError.message : String(dbUpdateError);
         console.error(`PROCESS-DOCUMENT: Failed to update document status to error:`, dbErrorMessage);
@@ -1794,7 +2018,8 @@ serve(async (req: Request) => {
     
     return new Response(JSON.stringify({ 
       success: false, 
-      error: errorMessage,
+      error: structuredError?.userFriendlyMessage || errorMessage,
+      errorDetails: structuredError,
       documentId: documentId || 'unknown'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -97,7 +97,7 @@ export function FileUploadDropzone({
   organisationId,
   onUrlSubmit,
   maxFiles = 10,
-  maxSize = 50 * 1024 * 1024, // 50MB default
+  maxSize = 50 * 1024 * 1024, // 50MB default - supports large documents with optimized processing
   className,
 }: FileUploadDropzoneProps) {
   const [files, setFiles] = useState<UploadedFile[]>([])

@@ -204,6 +204,88 @@ All tables implement Row Level Security (RLS) policies following these patterns:
 
 ## Recent Updates
 
+### Enhanced Document Processing System (2025-01-21)
+**Added:** Enhanced document processing with comprehensive progress tracking, error handling, and large file support (up to 50MB PDFs with 1000+ pages).
+
+#### Documents Table - Enhanced Metadata Structure
+
+The `documents.metadata` JSONB field now supports detailed processing information:
+
+```json
+{
+  // Processing Progress
+  "processing_progress": {
+    "stage": "extracting_text|chunking_text|generating_embeddings|storing_chunks|summarizing|finalizing",
+    "substage": "downloading_file|parsing_pdf|validating_content|creating_chunks|batch_embedding_generation|database_insertion|cleanup",
+    "percentage": 75,
+    "currentStep": 3,
+    "totalSteps": 5,
+    "estimatedTimeRemaining": 120,
+    "pagesProcessed": 150,
+    "totalPages": 200,
+    "chunksCreated": 85,
+    "embeddings_generated": 60
+  },
+  
+  // Error Information
+  "processing_error": {
+    "code": "PDF_NO_TEXT|PDF_ENCRYPTED|PROCESSING_TIMEOUT|MEMORY_EXCEEDED",
+    "message": "Technical error message",
+    "userFriendlyMessage": "This PDF appears to be scanned or contains no readable text",
+    "suggestedActions": [
+      "Use an OCR tool to convert scanned images to text",
+      "Remove password protection if the PDF is encrypted"
+    ],
+    "retryable": true,
+    "timestamp": "2024-01-15T10:30:00Z"
+  },
+  
+  // Processing Results
+  "extracted_text_length": 125000,
+  "chunks_created": 95,
+  "processing_time_seconds": 45,
+  
+  // Retry Information
+  "retry_count": 0,
+  "last_retry_at": "2024-01-15T10:35:00Z",
+  
+  // Performance Metrics
+  "processing_start_time": "2024-01-15T10:30:00Z",
+  "processing_end_time": "2024-01-15T10:30:45Z",
+  "memory_usage_mb": 128,
+  "peak_memory_mb": 256,
+  
+  // File Information
+  "total_pages": 200,
+  "file_size": 5242880
+}
+```
+
+#### Enhanced Processing Features
+
+- **Large File Support**: Up to 50MB PDFs with 1000+ pages
+- **Memory Management**: Batch processing (50 pages at a time)
+- **Timeout Protection**: 8-minute processing limit with early termination
+- **Progress Reporting**: Real-time updates every 20 pages for extraction, every 50 chunks for processing
+- **Structured Error Handling**: User-friendly error messages with suggested actions
+- **Retry Functionality**: API endpoints for retrying failed processing
+- **Real-time Updates**: Supabase subscriptions + fallback polling
+
+#### Error Codes and User-Friendly Messages
+
+- **PDF_NO_TEXT**: Scanned PDF or no readable content
+- **PDF_ENCRYPTED**: Password-protected PDF
+- **PDF_NO_READABLE_PAGES**: No readable pages found
+- **PROCESSING_TIMEOUT**: Processing took too long (8+ minutes)
+- **MEMORY_EXCEEDED**: Document too large for available memory
+- **PDF_PROCESSING_ERROR**: General PDF processing failure
+- **USER_CANCELLED**: Processing cancelled by user
+
+#### API Endpoints Added
+
+- `/api/knowledge-base/retry-processing` - POST: Retry failed document processing
+- `/api/knowledge-base/cancel-processing` - POST: Cancel active document processing
+
 - **2025-01-21**: Added complete Study Space system (6 new tables) + Study Sessions table
 - **2025-01-10**: Added AI insights system for learning analytics
 - **Previous**: Core educational platform tables (profiles, classes, lessons, etc.) 
