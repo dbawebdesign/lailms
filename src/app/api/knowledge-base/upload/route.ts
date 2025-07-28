@@ -40,6 +40,7 @@ export async function POST(request: Request) {
 
   const formData = await request.formData();
   const file = formData.get('file') as File | null;
+  const baseClassId = formData.get('base_class_id') as string | null; // Get base_class_id from form data
 
   if (!file) {
     return NextResponse.json({ error: 'File is required' }, { status: 400 });
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
       file_size: file.size,
       uploaded_by: user.id,
       status: 'queued' as DocumentStatus, // Use the defined enum type
+      base_class_id: baseClassId || null, // Set base_class_id if provided
       // processing_error and metadata are initially null
     };
 
@@ -127,21 +129,51 @@ export async function POST(request: Request) {
     } else {
         // Create a temporary client for function invocation
         const invokeClient = createClient(supabaseUrl, supabaseAnonKey);
-        const { error: invokeError } = await invokeClient.functions.invoke(
+        
+        // 🚀 ASYNC PROCESSING: Fire-and-forget invocation to prevent HTTP timeout
+        // Don't await - let the edge function run in background while we return immediately
+        invokeClient.functions.invoke(
             'process-document', // Name of your deployed Edge Function
             {
                 body: { documentId: insertedDocumentId }
             }
-        );
-
-        if (invokeError) {
-            // Log the error, but don't fail the upload response
-            // The processing function handles its own status updates on failure
-            console.error('Failed to invoke process-document function:', invokeError);
-            // Optionally: Update document status here to an 'invocation_failed' state?
-        } else {
-            console.log('process-document function invoked successfully.');
-        }
+        ).then(({ error: invokeError }) => {
+            if (invokeError) {
+                console.error('Failed to invoke process-document function:', invokeError);
+                
+                // Update document status to error since invocation failed
+                const adminSupabase = createClient(
+                    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+                    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+                );
+                
+                adminSupabase.from('documents')
+                    .update({ 
+                        status: 'error',
+                        metadata: {
+                            processing_error: {
+                                code: 'INVOCATION_FAILED',
+                                message: `Failed to start processing: ${invokeError.message}`,
+                                userFriendlyMessage: 'Failed to start document processing',
+                                suggestedActions: [
+                                    'Try uploading the document again',
+                                    'Contact support if the issue persists'
+                                ],
+                                retryable: true,
+                                timestamp: new Date().toISOString()
+                            },
+                            error_timestamp: new Date().toISOString()
+                        }
+                    })
+                    .eq('id', insertedDocumentId);
+            } else {
+                console.log('✅ Process-document function invoked successfully - processing started in background.');
+            }
+        }).catch((error) => {
+            console.error('Unexpected error during process-document invocation:', error);
+        });
+        
+        console.log('🔥 ASYNC PROCESSING STARTED: Function invoked, returning immediately while processing continues in background...');
     }
 
     // Return the initially inserted document ID and status

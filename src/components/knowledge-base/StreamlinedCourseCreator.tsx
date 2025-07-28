@@ -23,6 +23,7 @@ import {
 import { formatBytes } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
 import LunaContextElement from '@/components/luna/LunaContextElement';
+import { supabase } from '@/utils/supabase/browser';
 
 interface StreamlinedCourseCreatorProps {
   userId: string;
@@ -82,6 +83,71 @@ export default function StreamlinedCourseCreator({
   const [analysisResult, setAnalysisResult] = useState<GeneratedCourseInfo | null>(null);
   const [baseClassId, setBaseClassId] = useState<string | null>(existingBaseClassId || null);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Function to wait for all documents associated with a base class to be processed
+  const waitForDocumentProcessing = async (baseClassId: string, organisationId: string): Promise<void> => {
+    const maxWaitTime = 10 * 60 * 1000; // 10 minutes max wait
+    const pollInterval = 3000; // Check every 3 seconds
+    const startTime = Date.now();
+    while (Date.now() - startTime < maxWaitTime) {
+      try {
+        // Fetch documents associated with this base class
+        const { data: documents, error } = await supabase
+          .from('documents')
+          .select('id, status, file_name, metadata')
+          .eq('organisation_id', organisationId)
+          .eq('base_class_id', baseClassId);
+
+        if (error) {
+          console.error('Error fetching documents:', error);
+          throw new Error('Failed to check document processing status');
+        }
+
+        if (!documents || documents.length === 0) {
+          throw new Error('No documents found for this course');
+        }
+
+        // Check if all documents are processed
+        const processingDocuments = documents.filter((doc: any) => 
+          doc.status === 'queued' || doc.status === 'processing'
+        );
+        const errorDocuments = documents.filter((doc: any) => doc.status === 'error');
+        const completedDocuments = documents.filter((doc: any) => doc.status === 'completed');
+
+        console.log(`Document processing status: ${completedDocuments.length} completed, ${processingDocuments.length} processing, ${errorDocuments.length} errors`);
+
+        // If there are error documents, provide specific error information
+        if (errorDocuments.length > 0) {
+          const errorMessages = errorDocuments.map((doc: any) => {
+            const metadata = doc.metadata as any;
+            const error = metadata?.processing_error;
+            return `${doc.file_name}: ${error?.userFriendlyMessage || 'Processing failed'}`;
+          }).join('; ');
+          
+          throw new Error(`Document processing failed: ${errorMessages}`);
+        }
+
+        // If all documents are completed, we're done
+        if (processingDocuments.length === 0) {
+          console.log('All documents processed successfully');
+          return;
+        }
+
+        // Update progress message with specific info
+        setProcessingMessage(`Processing documents... (${completedDocuments.length}/${documents.length} complete)`);
+
+        // Wait before next check
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+      } catch (error) {
+        console.error('Error waiting for document processing:', error);
+        throw error;
+      }
+    }
+
+    // Timeout reached
+    throw new Error('Document processing timed out. Please try again or contact support.');
+  };
 
   // Handle file selection
   const handleFileSelect = useCallback((files: FileList) => {
@@ -231,6 +297,10 @@ export default function StreamlinedCourseCreator({
             const formData = new FormData();
             formData.append('file', item.file);
             formData.append('organisation_id', organisationId);
+            // Pass the base class ID so document is linked immediately
+            if (newBaseClassId) {
+              formData.append('base_class_id', newBaseClassId);
+            }
 
             const response = await fetch('/api/knowledge-base/upload', {
               method: 'POST',
@@ -238,7 +308,9 @@ export default function StreamlinedCourseCreator({
             });
 
             if (!response.ok) {
-              throw new Error('Upload failed');
+              const errorData = await response.json().catch(() => ({}));
+              const errorMessage = errorData.error || errorData.message || `Upload failed with status ${response.status}`;
+              throw new Error(errorMessage);
             }
           } else if (item.type === 'url' && item.url) {
             const urlType = item.url.includes('youtube.com') || item.url.includes('youtu.be') ? 'youtube' : 'webpage';
@@ -246,11 +318,18 @@ export default function StreamlinedCourseCreator({
             const response = await fetch('/api/knowledge-base/url', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ url: item.url, type: urlType }),
+              body: JSON.stringify({ 
+                url: item.url, 
+                type: urlType,
+                // Pass the base class ID so document is linked immediately
+                base_class_id: newBaseClassId
+              }),
             });
 
             if (!response.ok) {
-              throw new Error('URL processing failed');
+              const errorData = await response.json().catch(() => ({}));
+              const errorMessage = errorData.error || errorData.message || `URL processing failed with status ${response.status}`;
+              throw new Error(errorMessage);
             }
           }
 
@@ -267,27 +346,19 @@ export default function StreamlinedCourseCreator({
 
       await Promise.all(uploadPromises);
 
-      // Step 3: Associate content with course
-      setProcessingMessage('Organizing content...');
-      setProgress(60);
+      // Step 3: Wait for document processing to complete (running in background)
+      setProcessingMessage('🔄 Processing documents in background... Large PDFs may take several minutes.');
+      setProgress(50);
 
-      const associateResponse = await fetch('/api/knowledge-base/associate-documents-with-base-class', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          baseClassId: newBaseClassId,
-          organisationId,
-          timeWindowMinutes: 15
-        }),
-      });
-
-      if (!associateResponse.ok) {
-        throw new Error('Failed to organize content');
+      // Wait for all documents to be processed
+      if (!newBaseClassId) {
+        throw new Error('Failed to create course - missing base class ID');
       }
+      await waitForDocumentProcessing(newBaseClassId, organisationId);
 
-      // Step 4: Analyze and generate course info
+      // Step 4: Analyze and generate course info (documents are already linked to base class)
       setProcessingMessage('Analyzing content...');
-      setProgress(80);
+      setProgress(70);
 
       const analysisResponse = await fetch('/api/knowledge-base/analyze-and-generate-course-info', {
         method: 'POST',

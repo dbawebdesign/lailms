@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { url, type } = await request.json();
+    const { url, type, base_class_id } = await request.json();
 
     if (!url || !type) {
       return NextResponse.json({ error: 'URL and type are required' }, { status: 400 });
@@ -104,6 +104,7 @@ export async function POST(request: Request) {
       file_size: url.length, // URL content size
       uploaded_by: user.id,
       status: 'queued' as DocumentStatus,
+      base_class_id: base_class_id || null, // Set base_class_id if provided
       metadata: metadata
     };
 

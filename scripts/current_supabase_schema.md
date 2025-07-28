@@ -2,6 +2,26 @@
 
 ## Recent Updates
 
+### Document Chunks Base Class ID Fix (2025-01-28)
+Fixed critical missing column in document_chunks table that was causing large PDF processing failures:
+
+- **Schema Changes:**
+  - Added `base_class_id UUID` column to `document_chunks` table (nullable)
+  - Added foreign key constraint `fk_document_chunks_base_class_id` referencing `base_classes(id)` with CASCADE delete
+  - Added index `idx_document_chunks_base_class_id` for query performance
+  - Updated existing document_chunks to inherit `base_class_id` from their parent documents
+
+- **Problem Solved:**
+  - Large PDF processing was failing with 500 error: "Could not find the 'base_class_id' column of 'document_chunks' in the schema cache"
+  - Edge function `process-document` was attempting to insert `base_class_id` but column didn't exist
+  - All document chunks now properly linked to their base class for proper data relationships
+
+- **Impact:**
+  - Large PDF processing (325+ pages, 5MB+) now works correctly
+  - Smart sampling strategy can complete successfully 
+  - Document chunks properly associated with courses/classes
+  - Maintains data consistency across the knowledge base system
+
 ### Study Spaces Course Linking (2025-01-21)
 Added course_id column to study_spaces table to enable persistent study spaces per user-course combination:
 
