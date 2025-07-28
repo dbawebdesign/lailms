@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { StepIndicator, type Step } from '@/components/ui/step-indicator';
 import { FileUploadDropzone } from './FileUploadDropzone';
 import { FileListTable } from './FileListTable';
 import CourseGenerationInterface from './CourseGenerationInterface';
@@ -104,32 +104,36 @@ export default function KnowledgeBaseCourseGenerator({ baseClassId }: KnowledgeB
     console.log('Deploying course:', courseOutlineId);
   };
 
-  const stepConfig = {
-    overview: {
+  const steps: Step[] = [
+    {
+      id: 'overview',
       title: 'Course Overview',
-      description: 'View course information and knowledge base',
+      description: 'Review knowledge base',
       icon: <BookOpen className="h-5 w-5" />,
-      completed: !!baseClassInfo
+      completed: !!baseClassInfo && currentStep !== 'overview'
     },
-    generate: {
+    {
+      id: 'generate',
       title: 'Generate Course',
-      description: 'Configure and generate comprehensive course content',
+      description: 'AI course creation',
       icon: <Brain className="h-5 w-5" />,
-      completed: !!generatedCourseId
+      completed: !!generatedCourseId && currentStep !== 'generate'
     },
-    review: {
-      title: 'Review & Refine',
-      description: 'Review and customize all course content',
+    {
+      id: 'review',
+      title: 'Review & Edit',
+      description: 'Customize course content',
       icon: <Settings className="h-5 w-5" />,
-      completed: currentStep === 'deploy'
+      completed: !!generatedCourseId && currentStep !== 'review'
     },
-    deploy: {
+    {
+      id: 'deploy',
       title: 'Deploy Course',
-      description: 'Publish course for student access',
+      description: 'Make course live',
       icon: <CheckCircle className="h-5 w-5" />,
       completed: currentStep === 'deploy'
     }
-  };
+  ];
 
   if (isLoading) {
     return (
@@ -197,28 +201,26 @@ export default function KnowledgeBaseCourseGenerator({ baseClassId }: KnowledgeB
                   </div>
                 </div>
               </div>
-              <Badge variant="secondary" className="ml-4">
-                <Sparkles className="h-3 w-3 mr-1" />
-                AI-Enhanced
+              
+              <Badge variant="secondary" className="flex items-center space-x-1">
+                <Layers className="h-3 w-3" />
+                <span>Knowledge Base Course</span>
               </Badge>
             </div>
           </CardHeader>
         </Card>
       )}
 
-      {/* Navigation Tabs */}
-      <Tabs value={currentStep} onValueChange={(value) => setCurrentStep(value as WorkflowStep)}>
-        <TabsList className="grid w-full grid-cols-4">
-          {Object.entries(stepConfig).map(([step, config]) => (
-            <TabsTrigger key={step} value={step} className="flex items-center space-x-2">
-              {config.completed ? <CheckCircle className="h-4 w-4" /> : config.icon}
-              <span>{config.title}</span>
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      {/* Step Indicator */}
+      <StepIndicator 
+        steps={steps}
+        currentStepId={currentStep}
+        className="mb-8"
+      />
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
+      {/* Current Step Content */}
+      {currentStep === 'overview' && (
+        <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Knowledge Base Summary */}
             <Card>
@@ -318,37 +320,36 @@ export default function KnowledgeBaseCourseGenerator({ baseClassId }: KnowledgeB
                           </div>
                           <div className="flex items-center space-x-2">
                             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                            <span><strong>KB Supplemented:</strong> Comprehensive expansion</span>
+                            <span><strong>KB Supplemented:</strong> Enhanced with external knowledge</span>
                           </div>
                         </div>
                       </div>
 
                       <Button 
-                        className="w-full" 
+                        className="w-full"
                         onClick={() => setCurrentStep('generate')}
-                        disabled={!documentSummary?.completed}
+                        disabled={!documentSummary || documentSummary.completed === 0}
                       >
                         <Sparkles className="h-4 w-4 mr-2" />
                         Start Course Generation
-                        <ArrowRight className="h-4 w-4 ml-2" />
                       </Button>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <div className="text-green-800 text-sm">
-                          ✅ Course content generated successfully<br />
-                          ✅ Ready for review and refinement
-                        </div>
-                      </div>
-                      
+                      <Alert>
+                        <CheckCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          Course generated successfully! Review and customize before deployment.
+                        </AlertDescription>
+                      </Alert>
+
                       <Button 
-                        className="w-full" 
+                        variant="outline" 
+                        className="w-full"
                         onClick={() => setCurrentStep('review')}
                       >
-                        <Settings className="h-4 w-4 mr-2" />
-                        Review & Refine Course
-                        <ArrowRight className="h-4 w-4 ml-2" />
+                        <ArrowRight className="h-4 w-4 mr-2" />
+                        Review Generated Course
                       </Button>
                     </div>
                   )}
@@ -357,41 +358,61 @@ export default function KnowledgeBaseCourseGenerator({ baseClassId }: KnowledgeB
             </Card>
           </div>
 
-          {/* Additional Details */}
+          {/* File Management */}
           {baseClassInfo && (
-            <FileListTable 
-              organisationId={baseClassInfo.organisation_id}
-              baseClassId={baseClassId}
-            />
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Upload className="h-5 w-5" />
+                  <span>Knowledge Base Management</span>
+                </CardTitle>
+                <CardDescription>
+                  Manage your source documents and files
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <FileListTable 
+                  organisationId={baseClassInfo.organisation_id}
+                  baseClassId={baseClassId}
+                />
+              </CardContent>
+            </Card>
           )}
-        </TabsContent>
+        </div>
+      )}
 
-        {/* Generate Course Tab */}
-        <TabsContent value="generate" className="space-y-6">
+      {currentStep === 'generate' && (
+        <div className="space-y-6">
           <CourseGenerationInterface
             baseClassId={baseClassId}
             baseClassInfo={baseClassInfo}
             onCourseGenerated={handleCourseGenerated}
           />
-        </TabsContent>
+        </div>
+      )}
 
-        {/* Review & Refine Tab */}
-        <TabsContent value="review" className="space-y-6">
+      {currentStep === 'review' && (
+        <div className="space-y-6">
           {generatedCourseId ? (
             <GeneratedCourseViewer
               courseOutlineId={generatedCourseId}
+              baseClassId={baseClassId}
               onDeployToCourse={handleDeployToCourse}
             />
           ) : (
             <Card>
               <CardContent className="pt-6">
-                <div className="text-center py-8">
-                  <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="font-medium mb-2">No Course Generated Yet</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Generate a course first to access the review and refinement tools
-                  </p>
-                  <Button onClick={() => setCurrentStep('generate')}>
+                <div className="text-center">
+                  <Alert className="max-w-md mx-auto">
+                    <AlertDescription>
+                      No generated course found. Please return to the generation step.
+                    </AlertDescription>
+                  </Alert>
+                  <Button 
+                    variant="outline" 
+                    className="mt-4"
+                    onClick={() => setCurrentStep('generate')}
+                  >
                     <ArrowRight className="h-4 w-4 mr-2" />
                     Go to Course Generation
                   </Button>
@@ -399,10 +420,11 @@ export default function KnowledgeBaseCourseGenerator({ baseClassId }: KnowledgeB
               </CardContent>
             </Card>
           )}
-        </TabsContent>
+        </div>
+      )}
 
-        {/* Deploy Tab */}
-        <TabsContent value="deploy" className="space-y-6">
+      {currentStep === 'deploy' && (
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -422,7 +444,7 @@ export default function KnowledgeBaseCourseGenerator({ baseClassId }: KnowledgeB
                   </div>
                   <div className="flex items-center space-x-2">
                     <CheckCircle className="h-4 w-4" />
-                    <span>Lessons with detailed content generated</span>
+                    <span>Learning paths and lessons generated</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <CheckCircle className="h-4 w-4" />
@@ -430,27 +452,23 @@ export default function KnowledgeBaseCourseGenerator({ baseClassId }: KnowledgeB
                   </div>
                   <div className="flex items-center space-x-2">
                     <CheckCircle className="h-4 w-4" />
-                    <span>Final exam and progress tracking enabled</span>
+                    <span>Course is live and accessible to students</span>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Button variant="default" size="lg">
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  View Course
-                </Button>
-                <Button variant="outline" size="lg">
-                  <Users className="h-4 w-4 mr-2" />
-                  Manage Students
+              <div className="flex gap-4">
+                <Button 
+                  className="flex-1"
+                  onClick={() => window.location.href = `/teach/courses/${baseClassId}`}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Manage Course
                 </Button>
                 <Button 
-                  variant="outline" 
-                  size="lg"
-                  onClick={() => {
-                    setCurrentStep('overview');
-                    setGeneratedCourseId(null);
-                  }}
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setCurrentStep('overview')}
                 >
                   <Sparkles className="h-4 w-4 mr-2" />
                   Create New Course
@@ -458,8 +476,8 @@ export default function KnowledgeBaseCourseGenerator({ baseClassId }: KnowledgeB
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
     </div>
   );
 } 
