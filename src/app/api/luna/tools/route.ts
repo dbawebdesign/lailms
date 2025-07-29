@@ -356,12 +356,38 @@ IMPORTANT: This will be converted to audio, so write in a conversational, engagi
         // Ensure script is within TTS character limit (4096 characters)
         if (cleanScript.length > 4096) {
           console.log(`Script too long (${cleanScript.length} chars), truncating to 4096 characters`);
-          const truncateAt = cleanScript.lastIndexOf('.', 4050);
-          if (truncateAt > 3500) {
+          
+          // First try to find a good truncation point (end of sentence near the limit)
+          let truncateAt = cleanScript.lastIndexOf('.', 4050);
+          
+          // If no good sentence break found, try other punctuation
+          if (truncateAt <= 3000) {
+            truncateAt = cleanScript.lastIndexOf('!', 4050);
+          }
+          if (truncateAt <= 3000) {
+            truncateAt = cleanScript.lastIndexOf('?', 4050);
+          }
+          if (truncateAt <= 3000) {
+            truncateAt = cleanScript.lastIndexOf(',', 4050);
+          }
+          
+          // If still no good break point, hard truncate
+          if (truncateAt > 3000) {
             cleanScript = cleanScript.substring(0, truncateAt + 1);
           } else {
+            // Fallback: hard truncate at 4090 chars and add period
             cleanScript = cleanScript.substring(0, 4090) + '.';
           }
+          
+          console.log(`Script truncated to ${cleanScript.length} characters`);
+        }
+
+        // Double-check the final length before sending to TTS
+        if (cleanScript.length > 4096) {
+          console.error(`Script still too long after truncation: ${cleanScript.length} characters`);
+          // Final emergency truncation
+          cleanScript = cleanScript.substring(0, 4090) + '.';
+          console.log(`Emergency truncation to ${cleanScript.length} characters`);
         }
 
         // Generate audio using OpenAI TTS
@@ -371,6 +397,12 @@ IMPORTANT: This will be converted to audio, so write in a conversational, engagi
           input: cleanScript,
           speed: 1.0,
         });
+
+        if (!audioResponse.ok) {
+          const errorText = await audioResponse.text();
+          console.error('TTS API error:', errorText);
+          throw new Error(`TTS API failed: ${errorText}`);
+        }
 
         // Convert audio to buffer
         const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());

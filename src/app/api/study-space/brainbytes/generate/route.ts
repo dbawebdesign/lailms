@@ -195,11 +195,55 @@ Format the response as a single cohesive script for Luna to speak. Do not includ
       throw new Error('Failed to generate podcast script');
     }
 
+    // Clean up script for TTS and ensure character limit
+    let cleanScript = script
+      .replace(/\[.*?\]/g, '') // Remove any stage directions
+      .replace(/LUNA:/g, '') // Remove speaker labels
+      .replace(/\n\n+/g, '\n\n') // Normalize line breaks
+      .trim();
+
+    // Ensure script is within TTS character limit (4096 characters)
+    if (cleanScript.length > 4096) {
+      console.log(`Script too long (${cleanScript.length} chars), truncating to 4096 characters`);
+      
+      // First try to find a good truncation point (end of sentence near the limit)
+      let truncateAt = cleanScript.lastIndexOf('.', 4050);
+      
+      // If no good sentence break found, try other punctuation
+      if (truncateAt <= 3000) {
+        truncateAt = cleanScript.lastIndexOf('!', 4050);
+      }
+      if (truncateAt <= 3000) {
+        truncateAt = cleanScript.lastIndexOf('?', 4050);
+      }
+      if (truncateAt <= 3000) {
+        truncateAt = cleanScript.lastIndexOf(',', 4050);
+      }
+      
+      // If still no good break point, hard truncate
+      if (truncateAt > 3000) {
+        cleanScript = cleanScript.substring(0, truncateAt + 1);
+      } else {
+        // Fallback: hard truncate at 4090 chars and add period
+        cleanScript = cleanScript.substring(0, 4090) + '.';
+      }
+      
+      console.log(`Script truncated to ${cleanScript.length} characters`);
+    }
+
+    // Double-check the final length before sending to TTS
+    if (cleanScript.length > 4096) {
+      console.error(`Script still too long after truncation: ${cleanScript.length} characters`);
+      // Final emergency truncation
+      cleanScript = cleanScript.substring(0, 4090) + '.';
+      console.log(`Emergency truncation to ${cleanScript.length} characters`);
+    }
+
     // Convert script to audio using TTS (explicitly using shimmer voice)
     const ttsResponse = await openai.audio.speech.create({
       model: 'tts-1',
       voice: 'shimmer',  // Explicitly set to shimmer
-      input: script,
+      input: cleanScript,
       response_format: 'mp3',
     });
 

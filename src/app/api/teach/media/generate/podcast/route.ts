@@ -273,8 +273,8 @@ ${comprehensiveContent}
 7. **Encouraging Language**: Use encouraging language throughout
 
 ## Format Requirements
-- **Length**: Aim for 3-4 minutes of spoken content
-- **Character Limit**: MAXIMUM 3500 characters total (critical for TTS compatibility)
+- **Length**: Aim for 2-3 minutes of spoken content (shorter is better)
+- **Character Limit**: MAXIMUM 2500 characters total (critical for TTS compatibility)
 - **Structure**: Follow the provided script format exactly
 
 ## Script Format
@@ -292,7 +292,7 @@ LUNA: That's a wrap on today's Brain Bytes! Remember, learning is an adventure, 
 
 # Output Requirements
 - Return only the script text, no additional formatting or comments
-- Keep the total length under 3500 characters
+- Keep the total length under 2500 characters
 - Ensure all key concepts from the lesson are covered
 - Maintain Luna's encouraging and educational tone throughout`;
 
@@ -310,14 +310,14 @@ You are Luna, an AI educational podcast host who creates engaging, grade-appropr
 - Focus on actually teaching concepts, not just mentioning them
 - Keep content appropriate for the specified grade level
 - Maintain an encouraging and educational tone throughout
-- CRITICAL: Stay within the 3500 character limit for TTS compatibility`
+- CRITICAL: Stay within the 2500 character limit for TTS compatibility`
         },
         {
           role: 'user',
           content: scriptPrompt
         }
       ],
-      max_tokens: 2000,
+      max_tokens: 1500,
       temperature: 0.8,
     });
 
@@ -336,14 +336,38 @@ You are Luna, an AI educational podcast host who creates engaging, grade-appropr
     // Ensure script is within TTS character limit (4096 characters)
     if (cleanScript.length > 4096) {
       console.log(`Script too long (${cleanScript.length} chars), truncating to 4096 characters`);
-      // Find a good truncation point (end of sentence near the limit)
-      const truncateAt = cleanScript.lastIndexOf('.', 4050);
-      if (truncateAt > 3500) {
+      
+      // First try to find a good truncation point (end of sentence near the limit)
+      let truncateAt = cleanScript.lastIndexOf('.', 4050);
+      
+      // If no good sentence break found, try other punctuation
+      if (truncateAt <= 3000) {
+        truncateAt = cleanScript.lastIndexOf('!', 4050);
+      }
+      if (truncateAt <= 3000) {
+        truncateAt = cleanScript.lastIndexOf('?', 4050);
+      }
+      if (truncateAt <= 3000) {
+        truncateAt = cleanScript.lastIndexOf(',', 4050);
+      }
+      
+      // If still no good break point, hard truncate
+      if (truncateAt > 3000) {
         cleanScript = cleanScript.substring(0, truncateAt + 1);
       } else {
         // Fallback: hard truncate at 4090 chars and add period
         cleanScript = cleanScript.substring(0, 4090) + '.';
       }
+      
+      console.log(`Script truncated to ${cleanScript.length} characters`);
+    }
+
+    // Double-check the final length before sending to TTS
+    if (cleanScript.length > 4096) {
+      console.error(`Script still too long after truncation: ${cleanScript.length} characters`);
+      // Final emergency truncation
+      cleanScript = cleanScript.substring(0, 4090) + '.';
+      console.log(`Emergency truncation to ${cleanScript.length} characters`);
     }
 
     // Generate audio using OpenAI TTS
@@ -355,7 +379,9 @@ You are Luna, an AI educational podcast host who creates engaging, grade-appropr
     });
 
     if (!audioResponse.ok) {
-      throw new Error('Failed to generate audio');
+      const errorText = await audioResponse.text();
+      console.error('TTS API error:', errorText);
+      throw new Error(`TTS API failed: ${errorText}`);
     }
 
     // Convert audio to buffer
