@@ -23,12 +23,14 @@ import {
   FileCheck,
   Calendar,
   Timer,
-  BarChart3
+  BarChart3,
+  Activity
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatEstimatedTime } from '@/lib/utils/courseGenerationEstimator';
 import Link from 'next/link';
 import JSConfetti from 'js-confetti';
+import { useProgressStream } from '@/hooks/use-progress-stream';
 
 // --- Types ---
 interface GenerationTask {
@@ -124,6 +126,11 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
   const [hasTriggeredConfetti, setHasTriggeredConfetti] = useState(false);
   const [previousStatus, setPreviousStatus] = useState(initialJob.status);
   const jsConfettiRef = useRef<JSConfetti | null>(null);
+  
+  // Add streaming for active jobs
+  const { progress: streamProgress, isConnected, connectionType } = useProgressStream(
+    job.status === 'processing' ? job.id : ''
+  );
 
   // Initialize confetti instance
   useEffect(() => {
@@ -216,7 +223,16 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
   const totalTasks = job.tasks?.length || 0;
 
   // Try to get task summary from stored result_data first
-  const storedSummary = (job as any).result?.taskSummary;
+  const storedSummary = (job as any).result_data?.taskSummary || (job as any).result?.taskSummary;
+  
+  // Debug logging to help track data structure issues
+  if (job.status === 'completed' && !storedSummary) {
+    console.log(`[Debug] No taskSummary found for completed job ${job.id}:`, {
+      result_data: (job as any).result_data,
+      result: (job as any).result,
+      job
+    });
+  }
   
   // Generate summary data with fallbacks for completed jobs without task details
   const generationSummary = storedSummary ? {
@@ -270,7 +286,32 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
                     <h4 className="font-medium text-sm truncate">{job.title}</h4>
                     <Badge variant={job.status === 'failed' ? 'destructive' : 'outline'}>{job.status}</Badge>
                   </div>
-                   <p className="text-xs text-muted-foreground truncate">{job.baseClassName}</p>
+                  {/* Show streaming message for active jobs, fallback to base class name */}
+                  {job.status === 'processing' ? (
+                    streamProgress?.liveMessage?.message ? (
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-3 w-3 text-blue-500 animate-pulse" />
+                        <p className="text-xs text-blue-600 font-medium truncate">{streamProgress.liveMessage.message}</p>
+                      </div>
+                    ) : streamProgress?.detailedMessage ? (
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-3 w-3 text-blue-500 animate-pulse" />
+                        <p className="text-xs text-blue-600 font-medium truncate">{streamProgress.detailedMessage}</p>
+                      </div>
+                    ) : isConnected ? (
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-3 w-3 text-blue-500 animate-pulse" />
+                        <p className="text-xs text-blue-600 font-medium truncate">Processing...</p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-3 w-3 text-amber-500 animate-pulse" />
+                        <p className="text-xs text-amber-600 font-medium truncate">Connecting...</p>
+                      </div>
+                    )
+                  ) : (
+                    <p className="text-xs text-muted-foreground truncate">{job.baseClassName}</p>
+                  )}
                 </div>
               </div>
               

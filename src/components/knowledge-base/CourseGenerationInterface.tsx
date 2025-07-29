@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { triggerCelebration } from '@/components/ui/confetti';
+import { RealTimeProgress } from '@/components/ui/real-time-progress';
 import { 
   estimateCourseGenerationTime, 
   formatEstimatedTime, 
@@ -316,70 +317,61 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
 
   if (generationJob && (generationJob.status === 'processing' || generationJob.status === 'queued')) {
     return (
-      <div className="flex flex-col items-center justify-center p-6">
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-center text-2xl font-bold">
-              <Sparkles className="h-6 w-6 mr-2 text-purple-500" />
-              <span>Generating Course</span>
-            </CardTitle>
-            <CardDescription>
-              Creating your course based on the knowledge base content...
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Progress value={generationJob.progress || 0} className="w-full" />
-            <div className="text-sm text-muted-foreground">
-              {generationJob.progress || 0}% complete
+      <div className="flex flex-col items-center justify-center p-6 space-y-6">
+        <div className="text-center">
+          <div className="flex items-center justify-center mb-4">
+            <Sparkles className="h-8 w-8 text-purple-500 mr-3" />
+            <h2 className="text-2xl font-bold">Generating Course</h2>
+          </div>
+          <p className="text-muted-foreground">
+            Creating your course based on the knowledge base content...
+          </p>
+        </div>
+
+        {/* Real-time Progress Display */}
+        <div className="w-full max-w-2xl">
+          <RealTimeProgress 
+            jobId={generationJob.id} 
+          />
+        </div>
+        
+        {/* Background Generation Notice */}
+        <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg max-w-2xl">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <Sparkles className="h-5 w-5 text-blue-600 mt-0.5" />
             </div>
-            <div className="text-sm">
-              {generationJob.status === 'queued' && 'Waiting to start...'}
-              {generationJob.status === 'processing' && generationJob.progress < 20 && 'Analyzing knowledge base...'}
-              {generationJob.status === 'processing' && generationJob.progress >= 20 && generationJob.progress < 50 && 'Generating course outline...'}
-              {generationJob.status === 'processing' && generationJob.progress >= 50 && generationJob.progress < 70 && 'Creating learning paths and lessons...'}
-              {generationJob.status === 'processing' && generationJob.progress >= 70 && generationJob.progress < 90 && 'Generating lesson content...'}
-              {generationJob.status === 'processing' && generationJob.progress >= 90 && 'Creating assessments and quizzes...'}
-            </div>
-            
-            {/* Background Generation Notice */}
-            <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0">
-                  <Sparkles className="h-5 w-5 text-blue-600 mt-0.5" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    Course Generation in Progress
-                  </h4>
-                  <div className="mt-2 text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                    <p>Your course is being generated in the background. This process may take several minutes depending on the complexity and size of your knowledge base.</p>
-                    <p className="font-medium">You can safely:</p>
-                    <ul className="list-disc list-inside ml-2 space-y-0.5">
-                      <li>Navigate back to your dashboard to work on other tasks</li>
-                      <li>Check on other courses or manage your content</li>
-                    </ul>
-                    <p className="mt-2 font-medium">You'll be notified in the dashboard when your course is ready!</p>
-                  </div>
-                </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                Course Generation in Progress
+              </h4>
+              <div className="mt-2 text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                <p>Your course is being generated in the background. This process may take several minutes depending on the complexity and size of your knowledge base.</p>
+                <p className="font-medium">You can safely:</p>
+                <ul className="list-disc list-inside ml-2 space-y-0.5">
+                  <li>Navigate back to your dashboard to work on other tasks</li>
+                  <li>Check on other courses or manage your content</li>
+                </ul>
+                <p className="mt-2 font-medium">You'll be notified in the dashboard when your course is ready!</p>
               </div>
             </div>
-            
-            {/* Dashboard Navigation Button */}
-            <div className="flex justify-center">
-              <Button
-                variant="outline"
-                onClick={() => window.location.href = '/teach'}
-                className="flex items-center space-x-2"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
-                </svg>
-                <span>Go to Dashboard</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+        
+        {/* Dashboard Navigation Button */}
+        <div className="flex justify-center">
+          <Button
+            variant="outline"
+            onClick={() => window.location.href = '/teach'}
+            className="flex items-center space-x-2"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
+            </svg>
+            <span>Go to Dashboard</span>
+          </Button>
+        </div>
       </div>
     );
   }

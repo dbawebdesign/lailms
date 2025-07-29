@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { knowledgeBaseAnalyzer, COURSE_GENERATION_MODES } from './knowledge-base-analyzer';
 import { AssessmentGenerationService } from './assessment-generation-service';
 import type { CourseGenerationRequest, CourseOutline, ModuleLesson } from './course-generator';
+import { courseProgressCalculator } from '@/lib/utils/courseGenerationProgressCalculator';
 
 export interface GenerationTask {
   id: string;
@@ -23,6 +24,7 @@ export interface GenerationTask {
 
 export interface OrchestrationState {
   jobId: string;
+  baseClassId: string;
   tasks: Map<string, GenerationTask>;
   completedTasks: Set<string>;
   runningTasks: Set<string>;
@@ -75,6 +77,47 @@ export class CourseGenerationOrchestrator {
   }
 
   /**
+   * Update live progress message in database for real-time display
+   */
+  private async updateLiveProgressMessage(jobId: string, message: string, level: 'info' | 'warn' | 'error' = 'info'): Promise<void> {
+    try {
+      const supabase = this.getSupabaseClient();
+      
+      // Get current result_data to preserve existing information
+      const { data: currentJob } = await supabase
+        .from('course_generation_jobs')
+        .select('result_data')
+        .eq('id', jobId)
+        .single();
+
+      const currentResultData = (currentJob?.result_data as Record<string, any>) || {};
+      
+      // Add/update live message
+      const updatedResultData = {
+        ...currentResultData,
+        live_message: {
+          message,
+          level,
+          timestamp: new Date().toISOString()
+        },
+        last_activity: new Date().toISOString()
+      };
+
+      await supabase
+        .from('course_generation_jobs')
+        .update({
+          result_data: updatedResultData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+
+      console.log(`📝 Live message updated: ${message}`);
+    } catch (error) {
+      console.error('Error updating live progress message:', error);
+    }
+  }
+
+  /**
    * Wrapper for OpenAI API calls with custom timeout and retry logic
    */
   private async callOpenAIWithTimeout<T>(
@@ -95,14 +138,6 @@ export class CourseGenerationOrchestrator {
       return result;
     } catch (error) {
       console.error(`❌ OpenAI operation failed: ${operation}`, error);
-      
-      // If it's a timeout or rate limit, throw a specific error
-      if (error instanceof Error) {
-        if (error.message.includes('timeout') || error.message.includes('rate limit')) {
-          throw new Error(`OpenAI ${operation} failed: ${error.message}`);
-        }
-      }
-      
       throw error;
     }
   }
@@ -154,8 +189,8 @@ export class CourseGenerationOrchestrator {
       const state = await this.initializeOrchestrationState(jobId, outline, request);
       this.orchestrationStates.set(jobId, state);
 
-      // Update job status to running
-      await this.updateJobStatusInDatabase(jobId, 'running');
+      // Update job status to processing
+      await this.updateJobStatusInDatabase(jobId, 'processing');
 
       // Pre-cache knowledge base content
       console.log('🔍 Caching KB content for orchestrated generation...');
@@ -191,14 +226,36 @@ export class CourseGenerationOrchestrator {
         // Update progress in database
         await this.updateProgressBasedOnCompletedTasks(state);
         
-        // Check for completion
-        const allTasksFinished = Array.from(state.tasks.values()).every(task => 
-          task.status === 'completed' || task.status === 'failed'
-        );
+        // Check for completion - more nuanced logic
+        const tasksArray = Array.from(state.tasks.values());
+        const completedTasks = tasksArray.filter(task => task.status === 'completed');
+        const failedTasks = tasksArray.filter(task => task.status === 'failed');
+        const runningTasks = tasksArray.filter(task => task.status === 'running');
+        const pendingTasks = tasksArray.filter(task => task.status === 'pending');
+
+        // Job is considered complete if:
+        // 1. All tasks are either completed or failed (no running/pending tasks)
+        // 2. At least some tasks completed successfully (not all failed)
+        const allTasksFinished = runningTasks.length === 0 && pendingTasks.length === 0;
+        const hasSuccessfulTasks = completedTasks.length > 0;
+        const allTasksFailed = failedTasks.length === tasksArray.length;
 
         if (allTasksFinished) {
-          console.log(`🎉 All tasks completed for job ${state.jobId}`);
-          await this.updateJobStatusInDatabase(state.jobId, 'completed');
+          if (allTasksFailed) {
+            // Only mark as failed if ALL tasks failed
+            console.log(`❌ All tasks failed for job ${state.jobId}`);
+            await this.updateJobStatusInDatabase(state.jobId, 'failed', 'All generation tasks failed');
+            await this.updateLiveProgressMessage(state.jobId, 'Generation failed - all tasks encountered errors', 'error');
+          } else {
+            // Mark as completed if at least some tasks succeeded
+            console.log(`🎉 Job completed for ${state.jobId} - ${completedTasks.length}/${tasksArray.length} tasks successful`);
+            await this.updateJobStatusInDatabase(state.jobId, 'completed');
+            
+            // Update final completion message
+            const completionMessage = `Course generation completed successfully (${completedTasks.length}/${tasksArray.length} tasks)`;
+            await this.updateLiveProgressMessage(state.jobId, completionMessage, 'info');
+          }
+          
           clearInterval(progressInterval);
           
           // Clean up state after completion
@@ -211,7 +268,7 @@ export class CourseGenerationOrchestrator {
       } catch (error) {
         console.error('Progress monitoring error:', error);
       }
-    }, 30000); // Update every 30 seconds
+    }, 10000); // Update every 10 seconds (reduced from 30)
 
     // Clean up after 2 hours regardless
     setTimeout(() => {
@@ -486,6 +543,7 @@ export class CourseGenerationOrchestrator {
 
     const state: OrchestrationState = {
       jobId,
+      baseClassId: request.baseClassId,
       tasks,
       completedTasks: new Set(),
       runningTasks: new Set(),
@@ -595,37 +653,57 @@ export class CourseGenerationOrchestrator {
    * Execute a specific generation task with timeout monitoring
    */
   private async executeTask(state: OrchestrationState, task: GenerationTask): Promise<void> {
+    const taskStartMessage = `Starting ${task.type.replace('_', ' ')}${task.sectionTitle ? `: ${task.sectionTitle}` : ''}`;
+    console.log(`🚀 ${taskStartMessage}`);
+    
+    // Update live progress message in database instead of SSE
+    await this.updateLiveProgressMessage(state.jobId, taskStartMessage, 'info');
+
     task.status = 'running';
     task.startTime = new Date();
     state.runningTasks.add(task.id);
-    await this.updateProgressBasedOnCompletedTasks(state);
-
-    // Set up task timeout monitoring (10 minutes max per task)
-    const taskTimeoutMs = 10 * 60 * 1000; // 10 minutes
-    const taskTimeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        reject(new Error(`Task timeout: ${task.type} - ${task.sectionTitle || task.id} exceeded ${taskTimeoutMs}ms`));
-      }, taskTimeoutMs);
-    });
 
     while (task.retryCount <= 1) {
       try {
-        console.log(`🚀 Starting task: ${task.type} - ${task.sectionTitle || task.id} (attempt ${task.retryCount + 1})`);
-        
-        // Race the actual task execution against the timeout
-        await Promise.race([
-          this.executeTaskLogic(task),
-          taskTimeoutPromise
-        ]);
-        
+        // Execute the task based on its type
+        switch (task.type) {
+          case 'lesson_section':
+            await this.generateLessonSection(task);
+            break;
+          case 'lesson_assessment':
+            await this.generateLessonAssessment(task);
+            break;
+          case 'lesson_mind_map':
+            await this.generateLessonMindMap(task);
+            break;
+          case 'lesson_brainbytes':
+            await this.generateLessonBrainbytes(task);
+            break;
+          case 'path_quiz':
+            await this.generatePathQuiz(task);
+            break;
+          case 'class_exam':
+            await this.generateClassExam(task);
+            break;
+          default:
+            throw new Error(`Unknown task type: ${task.type}`);
+        }
+
+        // Task completed successfully
         task.status = 'completed';
         task.completeTime = new Date();
-        state.completedTasks.add(task.id);
         state.runningTasks.delete(task.id);
+        state.completedTasks.add(task.id);
         
-        const duration = task.completeTime.getTime() - (task.startTime?.getTime() || 0);
-        console.log(`✅ Completed task: ${task.type} - ${task.sectionTitle || task.id} (${Math.round(duration/1000)}s)`);
+        const completionMessage = `Completed ${task.type.replace('_', ' ')}${task.sectionTitle ? `: ${task.sectionTitle}` : ''}`;
+        console.log(`✅ ${completionMessage}`);
         
+        // Update live progress message in database instead of SSE
+        await this.updateLiveProgressMessage(state.jobId, completionMessage, 'info');
+
+        // Send immediate progress update when task completes
+        await this.updateProgressBasedOnCompletedTasks(state);
+
         this.checkAndTriggerDependentTasks(state, task);
         return;
 
@@ -634,19 +712,31 @@ export class CourseGenerationOrchestrator {
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
         
         if (task.retryCount > 1) {
-          console.error(`❌ Failed task after retry: ${task.id} (${task.type}):`, errorMessage);
+          const failureMessage = `Failed ${task.type.replace('_', ' ')}${task.sectionTitle ? `: ${task.sectionTitle}` : ''} - ${errorMessage}`;
+          console.error(`❌ ${failureMessage}`);
           task.status = 'failed';
           task.completeTime = new Date();
           task.error = errorMessage;
           state.runningTasks.delete(task.id);
           
-          // Update job status in database with error
-          await this.updateJobStatusInDatabase(state.jobId, 'failed', errorMessage);
+          // Update live progress message in database instead of SSE
+          await this.updateLiveProgressMessage(state.jobId, failureMessage, 'error');
+          
+          // Send immediate progress update when task fails
+          await this.updateProgressBasedOnCompletedTasks(state);
+          
+          // Do NOT mark the entire job as failed for individual task failures
+          // The job should continue processing other tasks
+          // Only mark job as failed if there are critical system errors
           
           this.checkAndTriggerDependentTasks(state, task);
           return;
         } else {
-          console.warn(`⚠️ Task failed, retrying: ${task.id} (${task.type}). Attempt: ${task.retryCount}. Error: ${errorMessage}`);
+          const retryMessage = `Retrying ${task.type.replace('_', ' ')}${task.sectionTitle ? `: ${task.sectionTitle}` : ''} (attempt ${task.retryCount + 1})`;
+          console.warn(`⚠️ ${retryMessage} - ${errorMessage}`);
+          
+          // Update live progress message in database instead of SSE
+          await this.updateLiveProgressMessage(state.jobId, retryMessage, 'warn');
           // Wait 5 seconds before retry
           await new Promise(resolve => setTimeout(resolve, 5000));
         }
@@ -966,17 +1056,15 @@ What makes this particularly important for ${request.academicLevel || 'college'}
   private async triggerFinalMediaGeneration(state: OrchestrationState): Promise<void> {
     console.log('🎬 Starting final media generation for all lessons...');
     
-    // Get all lessons that have completed assessments
-    const lessonsWithCompletedAssessments = state.lessons.filter(lesson => 
-      lesson.assessmentTask && this.isTaskFinished(state, lesson.assessmentTask)
-    );
+    // Process ALL lessons, not just those with completed assessments
+    const allLessons = state.lessons;
     
-    console.log(`📊 Found ${lessonsWithCompletedAssessments.length} lessons ready for media generation`);
+    console.log(`📊 Triggering media generation for ${allLessons.length} lessons`);
     
     // Trigger all media generation tasks with staggered delays
     let delayOffset = 0;
     
-    for (const lessonWorkflow of lessonsWithCompletedAssessments) {
+    for (const lessonWorkflow of allLessons) {
       // Trigger mind map generation
       if (lessonWorkflow.mindMapTask) {
         const mindMapTask = state.tasks.get(lessonWorkflow.mindMapTask);
@@ -1013,7 +1101,16 @@ What makes this particularly important for ${request.academicLevel || 'college'}
       if (allMediaComplete) {
         console.log('🎉 All media generation completed! Course generation finished successfully!');
         const taskSummary = this.generateTaskSummary(state);
-        await this.updateJobStatus(state.jobId, 'completed', 100, taskSummary);
+        
+        // Include courseOutline information for redirect
+        const completionData = {
+          ...taskSummary,
+          courseOutline: {
+            id: state.baseClassId // Using baseClassId as the courseOutline identifier for redirect
+          }
+        };
+        
+        await this.updateJobStatus(state.jobId, 'completed', 100, completionData);
       } else {
         console.log('⏳ Media generation still in progress, will check again...');
         // Schedule another check in 30 seconds
@@ -1035,7 +1132,16 @@ What makes this particularly important for ${request.academicLevel || 'college'}
     if (allMediaComplete) {
       console.log('🎉 Course generation completed successfully with all media assets!');
       const taskSummary = this.generateTaskSummary(state);
-      await this.updateJobStatus(state.jobId, 'completed', 100, taskSummary);
+      
+      // Include courseOutline information for redirect
+      const completionData = {
+        ...taskSummary,
+        courseOutline: {
+          id: state.baseClassId // Using baseClassId as the courseOutline identifier for redirect
+        }
+      };
+      
+      await this.updateJobStatus(state.jobId, 'completed', 100, completionData);
     } else {
       console.log('⏳ Media generation still in progress, scheduling another check...');
       setTimeout(() => this.checkFinalCompletion(state), 30000);
@@ -1323,6 +1429,11 @@ What makes this particularly important for ${request.academicLevel || 'college'}
               });
             }
           }
+
+          // Only check media generation trigger after this lesson completes
+          // The actual check will ensure ALL lessons are complete before triggering
+          console.log(`📊 Lesson "${lessonWorkflow.title}" sections complete. Checking if all lessons are ready for media generation...`);
+          await this.checkAndTriggerMediaGeneration(state);
         }
       }
     }
@@ -1385,8 +1496,15 @@ What makes this particularly important for ${request.academicLevel || 'college'}
 
     // Check overall completion
     if (completedTask.type === 'class_exam') {
-      console.log('🎓 Class exam completed! Starting final media generation...');
-      await this.triggerFinalMediaGeneration(state);
+      console.log('🎓 Class exam completed! Media generation will be handled by section completion logic if not already started...');
+      // Media generation is now handled by checkAndTriggerMediaGeneration when all sections are complete
+      // This ensures it happens regardless of assessment settings and avoids duplicate triggers
+      await this.checkAndTriggerMediaGeneration(state);
+    }
+
+    // Additional safety check: if this is any type of assessment completion, check media generation
+    if (['lesson_assessment', 'path_quiz', 'class_exam'].includes(completedTask.type)) {
+      await this.checkAndTriggerMediaGeneration(state);
     }
   }
 
@@ -1444,8 +1562,9 @@ What makes this particularly important for ${request.academicLevel || 'college'}
         console.log(`🎓 Triggering class exam: ${examTask.id}`);
         await this.executeTask(state, examTask);
       } else if (!examTask) {
-        console.log(`✅ No final exam configured - starting final media generation...`);
-        await this.triggerFinalMediaGeneration(state);
+        console.log(`✅ No final exam configured - media generation will be handled by section completion logic`);
+        // Media generation is now handled by checkAndTriggerMediaGeneration when all sections are complete
+        // No need to trigger it here as it may have already been triggered
       } else {
         console.log(`⚠️ Class exam task not pending:`, {
           status: examTask?.status,
@@ -1456,6 +1575,49 @@ What makes this particularly important for ${request.academicLevel || 'college'}
       const waitingFor = existingQuizTasks.length > 0 ? 'quizzes' : 'assessments';
       console.log(`⏳ Waiting for more ${waitingFor} to complete.`);
     }
+  }
+
+  /**
+   * Check if all lesson sections across all lessons are complete
+   */
+  private areAllLessonSectionsComplete(state: OrchestrationState): boolean {
+    return state.lessons.every(lesson => lesson.allSectionsComplete);
+  }
+
+  /**
+   * Check if we should trigger final media generation
+   * This should happen when all lesson sections are complete, regardless of assessment settings
+   */
+  private async checkAndTriggerMediaGeneration(state: OrchestrationState): Promise<void> {
+    const totalLessons = state.lessons.length;
+    const completeLessons = state.lessons.filter(l => l.allSectionsComplete).length;
+    
+    console.log(`🔍 Media generation check: ${completeLessons}/${totalLessons} lessons have completed all sections`);
+    
+    // Only trigger if all lesson sections are complete
+    if (!this.areAllLessonSectionsComplete(state)) {
+      console.log(`⏳ Not all lesson sections complete yet. Waiting for ${totalLessons - completeLessons} more lessons.`);
+      return;
+    }
+
+    // Check if media generation has already been triggered
+    const mediaGenerationStarted = state.lessons.some(lesson => {
+      const mindMapStarted = lesson.mindMapTask && 
+        (this.isTaskFinished(state, lesson.mindMapTask) || 
+         state.tasks.get(lesson.mindMapTask)?.status === 'running');
+      const brainbytesStarted = lesson.brainbytesTask && 
+        (this.isTaskFinished(state, lesson.brainbytesTask) || 
+         state.tasks.get(lesson.brainbytesTask)?.status === 'running');
+      return mindMapStarted || brainbytesStarted;
+    });
+
+    if (mediaGenerationStarted) {
+      console.log('🎬 Media generation already started, skipping trigger');
+      return;
+    }
+
+    console.log('✅ ALL lesson sections complete! Triggering final media generation...');
+    await this.triggerFinalMediaGeneration(state);
   }
 
   /**
@@ -1470,25 +1632,49 @@ What makes this particularly important for ${request.academicLevel || 'college'}
   }
 
   /**
-   * Update progress based on completed tasks with more granular tracking
+   * Update progress based on completed tasks with unified progress calculation including media generation
    */
   private async updateProgressBasedOnCompletedTasks(state: OrchestrationState): Promise<void> {
+    // Use the unified progress calculator
+    const progressData = courseProgressCalculator.calculateProgressFromOrchestrationState(state);
+    
     const tasksArray = Array.from(state.tasks.values());
     const completedTasks = tasksArray.filter(t => t.status === 'completed').length;
     const failedTasks = tasksArray.filter(t => t.status === 'failed').length;
     const runningTasks = state.runningTasks.size;
     const totalCount = state.tasks.size;
     
-    // Progress based on completed tasks only (failed tasks don't count toward progress)
-    const progress = totalCount > 0 ? Math.round((completedTasks / totalCount) * 100) : 0;
-    state.progress = progress;
+    // Update state with unified progress
+    state.progress = progressData.overallProgress;
+
+    // Calculate estimated time remaining
+    const jobStartTime = await this.getJobStartTime(state.jobId);
+    const estimatedTimeRemaining = jobStartTime ? 
+      courseProgressCalculator.getEstimatedTimeRemaining(progressData.overallProgress, jobStartTime) : 
+      'Calculating...';
+
+    // Write progress update directly to database instead of SSE
+    const progressUpdate = {
+      jobId: state.jobId,
+      timestamp: new Date().toISOString(),
+      overallProgress: progressData.overallProgress,
+      currentPhase: progressData.currentPhase?.name || 'unknown',
+      phaseDescription: progressData.currentPhase?.description || 'Processing...',
+      detailedMessage: progressData.detailedMessage,
+      phaseBreakdown: progressData.phaseBreakdown,
+      estimatedTimeRemaining,
+      logs: [`Progress: ${progressData.overallProgress}% - ${progressData.detailedMessage}`]
+    };
+
+    // Update live progress message with current phase
+    await this.updateLiveProgressMessage(state.jobId, progressData.detailedMessage, 'info');
 
     try {
       const supabase = this.getSupabaseClient();
       const { error } = await supabase
         .from('course_generation_jobs')
         .update({
-          progress_percentage: progress,
+          progress_percentage: progressData.overallProgress,
           updated_at: new Date().toISOString(),
           result_data: {
             total_tasks: totalCount,
@@ -1496,6 +1682,19 @@ What makes this particularly important for ${request.academicLevel || 'college'}
             failed_tasks: failedTasks,
             running_tasks: runningTasks,
             last_update: new Date().toISOString(),
+            current_phase: progressData.currentPhase?.name || 'unknown',
+            phase_description: progressData.currentPhase?.description || 'Processing...',
+            detailed_message: progressData.detailedMessage,
+            phase_breakdown: progressData.phaseBreakdown,
+            estimated_time_remaining: estimatedTimeRemaining,
+            unified_progress: true, // Flag to indicate this uses the new progress system
+            // Include live message in result_data for polling access
+            live_message: {
+              message: progressData.detailedMessage,
+              level: 'info' as const,
+              timestamp: new Date().toISOString()
+            },
+            last_activity: new Date().toISOString(),
             tasks_summary: tasksArray.map(t => ({
               id: t.id,
               type: t.type,
@@ -1511,7 +1710,8 @@ What makes this particularly important for ${request.academicLevel || 'college'}
       if (error) {
         console.error('Error updating job progress:', error);
       } else {
-        console.log(`📊 Progress updated: ${completedTasks}/${totalCount} completed (${progress}%) | Running: ${runningTasks} | Failed: ${failedTasks}`);
+        console.log(`📊 Progress: ${progressData.overallProgress}% | ${progressData.detailedMessage}`);
+        console.log(`📊 Tasks: ${completedTasks}/${totalCount} completed | Running: ${runningTasks} | Failed: ${failedTasks}`);
       }
     } catch (error) {
       console.error('Error updating progress in database:', error);
@@ -1746,6 +1946,30 @@ What makes this particularly important for ${request.academicLevel || 'college'}
         retryCount: task.retryCount
       }))
     };
+  }
+
+  /**
+   * Get job start time from database
+   */
+  private async getJobStartTime(jobId: string): Promise<Date | null> {
+    try {
+      const supabase = this.getSupabaseClient();
+      const { data, error } = await supabase
+        .from('course_generation_jobs')
+        .select('created_at')
+        .eq('id', jobId)
+        .single();
+      
+      if (error || !data || !data.created_at) {
+        console.error('Error fetching job start time:', error);
+        return null;
+      }
+      
+      return new Date(data.created_at);
+    } catch (error) {
+      console.error('Error fetching job start time:', error);
+      return null;
+    }
   }
 }
 
