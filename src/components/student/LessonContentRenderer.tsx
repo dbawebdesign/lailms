@@ -37,6 +37,20 @@ import {
 } from 'lucide-react';
 import LunaContextElement from '@/components/luna/LunaContextElement';
 import { emitProgressUpdate } from '@/lib/utils/progressEvents';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { Table } from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import TableCell from '@tiptap/extension-table-cell';
+import TableHeader from '@tiptap/extension-table-header';
+import { Image } from '@tiptap/extension-image';
+import Link from '@tiptap/extension-link';
+import { TaskList, TaskItem } from '@tiptap/extension-list';
+import { Highlight } from '@tiptap/extension-highlight';
+import { Mathematics } from '@tiptap/extension-mathematics';
+import { Typography } from '@tiptap/extension-typography';
+import { VideoNode } from '@/components/tiptap-node/video-node/video-node-extension';
+import { Node } from '@tiptap/core';
 
 interface LessonContentRendererProps {
   content?: LessonContent;
@@ -53,6 +67,139 @@ interface MediaAsset {
   content?: string;
   svg_content?: string;
 }
+
+// Simple YouTube iframe extension for student view
+const YouTubeIframeExtension = Node.create({
+  name: 'youtubeIframe',
+  group: 'block',
+  atom: true,
+
+  addAttributes() {
+    return {
+      src: {
+        default: null,
+      },
+      title: {
+        default: null,
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'div[data-youtube-embed]',
+        getAttrs: (element) => {
+          const iframe = element.querySelector('iframe');
+          if (iframe) {
+            return {
+              src: iframe.getAttribute('src'),
+              title: iframe.getAttribute('title'),
+            };
+          }
+          return {};
+        },
+      },
+      {
+        tag: 'div.youtube-embed-wrapper',
+        getAttrs: (element) => {
+          const iframe = element.querySelector('iframe');
+          if (iframe && iframe.getAttribute('src')?.includes('youtube.com/embed/')) {
+            return {
+              src: iframe.getAttribute('src'),
+              title: iframe.getAttribute('title'),
+            };
+          }
+          return false;
+        },
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    const { src, title } = HTMLAttributes;
+    return [
+      'div',
+      {
+        'data-youtube-embed': 'true',
+        class: 'youtube-embed-wrapper',
+        style: 'margin: 1.5rem 0;',
+      },
+      [
+        'div',
+        {
+          style: 'position: relative; width: 100%; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);',
+        },
+        [
+          'iframe',
+          {
+            src,
+            title: title || 'YouTube video',
+            style: 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;',
+            frameborder: '0',
+            allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture',
+            allowfullscreen: 'true',
+          },
+        ],
+      ],
+      title ? [
+        'p',
+        {
+          style: 'font-size: 0.875rem; color: #6b7280; margin-top: 0.5rem; text-align: center; font-style: italic;',
+        },
+        title,
+      ] : '',
+    ];
+  },
+});
+
+// Rich Content Renderer Component for HTML content with media
+const RichContentRenderer = ({ content }: { content: string }) => {
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      Image.configure({
+        inline: false,
+        allowBase64: false,
+      }),
+      VideoNode.configure({
+        inline: false,
+        allowBase64: false,
+      }),
+      YouTubeIframeExtension, // Include YouTube extension for student view
+      Link.configure({ 
+        openOnClick: true, 
+        autolink: true 
+      }),
+      TaskList,
+      TaskItem,
+      Highlight,
+      Mathematics,
+      Typography,
+    ],
+    content: content || '',
+    editable: false,
+    immediatelyRender: false,
+  });
+
+  if (!editor) {
+    return (
+      <div className="prose prose-slate dark:prose-invert max-w-none">
+        <ReactMarkdown>{content}</ReactMarkdown>
+      </div>
+    );
+  }
+
+  return (
+    <div className="prose prose-slate dark:prose-invert max-w-none">
+      <EditorContent editor={editor} />
+    </div>
+  );
+};
 
 // Modern content section component with Apple-inspired design
 const ContentSection = ({ 
@@ -1063,7 +1210,7 @@ export default function LessonContentRenderer({ content, lessonId }: LessonConte
               
               {displayContent.expertTeachingContent?.detailedExplanation && (
                 <ContentSection title="Detailed Explanation" icon={Brain} gradient="from-purple-500/10 to-pink-500/10" delay={0.3}>
-                  <ReactMarkdown>{displayContent.expertTeachingContent.detailedExplanation}</ReactMarkdown>
+                  <RichContentRenderer content={displayContent.expertTeachingContent.detailedExplanation} />
                 </ContentSection>
               )}
 

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { useUIContext } from '@/context/UIContext';
 
 interface SelectedTextContext {
   text: string;
@@ -21,6 +22,7 @@ const AskLunaContext = createContext<AskLunaContextType | undefined>(undefined);
 export function AskLunaProvider({ children }: { children: React.ReactNode }) {
   const [isLunaOpen, setIsLunaOpen] = useState(false);
   const [selectedTextContext, setSelectedTextContext] = useState<SelectedTextContext | null>(null);
+  const { setPanelVisible } = useUIContext();
 
   const clearSelectedText = useCallback(() => {
     setSelectedTextContext(null);
@@ -49,6 +51,9 @@ export function AskLunaProvider({ children }: { children: React.ReactNode }) {
     // Open Luna chat if it's not already open
     setIsLunaOpen(true);
     
+    // Also open the main AI panel in the app shell
+    setPanelVisible(true);
+    
     // Also dispatch to document for broader reach
     document.dispatchEvent(event);
     
@@ -57,7 +62,7 @@ export function AskLunaProvider({ children }: { children: React.ReactNode }) {
       question,
       quickAction
     });
-  }, []);
+  }, [setPanelVisible]);
 
   return (
     <AskLunaContext.Provider value={{
