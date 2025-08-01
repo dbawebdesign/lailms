@@ -83,7 +83,7 @@ export async function GET(
       failedTasks: tasks?.filter(t => t.status === 'failed').length || 0,
       skippedTasks: tasks?.filter(t => t.status === 'skipped').length || 0,
       pendingTasks: tasks?.filter(t => ['pending', 'queued', 'running'].includes(t.status || '')).length || 0,
-      avgExecutionTime: tasks?.reduce((sum, t) => sum + (t.actual_duration_seconds ?? 0), 0) / (tasks?.length || 1) || 0,
+      avgExecutionTime: (tasks?.reduce((sum, t) => sum + (t.actual_duration_seconds || 0), 0) || 0) / (tasks?.length || 1),
       tasksByType: tasks?.reduce((acc, t) => {
         const type = t.task_type;
         acc[type] = (acc[type] || 0) + 1;
