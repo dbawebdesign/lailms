@@ -13,6 +13,7 @@ import { toast } from '@/components/ui/use-toast'
 import { Loader2, CheckCircle, GraduationCap, Home } from 'lucide-react'
 import { useInviteCodeClipboard } from '@/hooks/useClipboard'
 import Image from 'next/image'
+import { buildPaymentLink } from '@/lib/stripe/config'
 
 interface CoopFamilySignupFormProps {
   inviteCode: string
@@ -342,10 +343,14 @@ export default function CoopFamilySignupForm({
 
                 <div className="flex space-x-3">
                   <Button 
-                    onClick={() => router.push('/login')}
+                    onClick={() => {
+                      // Redirect to Stripe payment link
+                      const paymentUrl = buildPaymentLink(signupResult.primaryParent.id, signupResult.primaryParent.email)
+                      window.location.href = paymentUrl
+                    }}
                     className="flex-1"
                   >
-                    Sign In to Dashboard
+                    Continue to Payment
                   </Button>
                 </div>
               </div>

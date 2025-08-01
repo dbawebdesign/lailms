@@ -15,6 +15,7 @@ import { toast } from '@/components/ui/use-toast'
 import { Loader2, Users, Home, ArrowRight, CheckCircle, UserPlus, GraduationCap, Building, User } from 'lucide-react'
 import { useInviteCodeClipboard } from '@/hooks/useClipboard'
 import Image from 'next/image'
+import { buildPaymentLink } from '@/lib/stripe/config'
 
 type HomeschoolType = 'individual_family' | 'coop_network' | ''
 
@@ -496,10 +497,14 @@ export default function HomeschoolSignupForm() {
 
                 <div className="flex space-x-3">
                   <Button 
-                    onClick={() => router.push('/login')}
+                    onClick={() => {
+                      // Redirect to Stripe payment link
+                      const paymentUrl = buildPaymentLink(organizationResult.primaryContact.id, organizationResult.primaryContact.email)
+                      window.location.href = paymentUrl
+                    }}
                     className="flex-1"
                   >
-                    Sign In to Dashboard
+                    Continue to Payment
                   </Button>
                 </div>
               </div>

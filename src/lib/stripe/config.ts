@@ -2,7 +2,7 @@
 
 export const STRIPE_CONFIG = {
   // Replace with your actual Stripe Payment Link ID
-  PAYMENT_LINK_BASE_URL: process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL || 'https://buy.stripe.com/your_payment_link_id',
+  PAYMENT_LINK_BASE_URL: process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL || 'https://buy.stripe.com/eVqbJ2agRaejc1V0Kb00001',
   
   // Success URL that Stripe will redirect to after payment
   SUCCESS_URL: process.env.NEXT_PUBLIC_APP_URL 
