@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch affected tasks if any
-    let affectedTasks = [];
+    let affectedTasks: any[] = [];
     if (taskIds && taskIds.length > 0) {
       const { data: tasks } = await supabase
         .from('course_generation_tasks')

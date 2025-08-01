@@ -42,14 +42,14 @@ export async function GET(
     const { data: taskStats } = await supabase
       .from('course_generation_tasks')
       .select('status')
-      .eq('job_id', params.jobId);
+      .eq('job_id', resolvedParams.jobId);
 
     if (taskStats) {
       const total = taskStats.length;
       const completed = taskStats.filter(t => 
-        ['completed', 'skipped'].includes(t.status)
+        t.status && ['completed', 'skipped'].includes(t.status)
       ).length;
-      job.progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+      job.progress_percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
     }
 
     return NextResponse.json({ 

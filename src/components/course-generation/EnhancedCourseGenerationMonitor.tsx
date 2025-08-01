@@ -187,7 +187,7 @@ export default function EnhancedCourseGenerationMonitor({
   // Smart recovery function
   const handleSmartRecover = async () => {
     try {
-      const result = await recovery.smartRecover(tasks);
+      const result = await recovery.smartRecover(tasks as any);
       console.log('Smart recovery completed:', result);
     } catch (error) {
       console.error('Smart recovery failed:', error);
@@ -196,7 +196,7 @@ export default function EnhancedCourseGenerationMonitor({
 
   // Get recovery suggestions
   const recoverySuggestions = job && tasks.length > 0 
-    ? recovery.getRecoverySuggestions(job, tasks)
+    ? recovery.getRecoverySuggestions(job, tasks as any)
     : [];
 
   // Export report function

@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         job_type: 'generate_course_v2_kb',
         status: 'queued',
         progress_percentage: 0,
-        job_data: generationRequest,
+        job_data: generationRequest as any,
         generation_config: {
           version: 'v2',
           orchestrator: 'CourseGenerationOrchestratorV2',

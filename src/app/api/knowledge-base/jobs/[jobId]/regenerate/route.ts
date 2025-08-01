@@ -44,7 +44,7 @@ export async function POST(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    const isV2 = job.generation_config?.version === 'v2';
+    const isV2 = (job.generation_config as any)?.version === 'v2';
     let success = false;
 
     if (isV2) {

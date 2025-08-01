@@ -480,9 +480,6 @@ export class CourseGenerationTaskExecutor {
     const analytics: CourseGenerationAnalyticsInsert = {
       job_id: jobId,
       total_generation_time_seconds: totalExecutionTime,
-      total_tasks: tasks?.length || 0,
-      successful_tasks: completedTasks.length,
-      failed_tasks: failedTasks.length,
       api_calls_made: this.performanceMetrics.apiCalls,
       tokens_consumed: this.performanceMetrics.tokensConsumed,
       average_task_time_seconds: 

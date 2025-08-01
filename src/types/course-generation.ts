@@ -152,7 +152,7 @@ export interface CourseGenerationReport {
   job: CourseGenerationJob;
   tasks: CourseGenerationTask[];
   errors: CourseGenerationError[];
-  analytics: CourseGenerationAnalytics;
+  analytics: CourseGenerationAnalytics | null;
   userActions: CourseGenerationUserAction[];
   summary: {
     duration: number;

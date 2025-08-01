@@ -8,7 +8,7 @@ import type { CourseGenerationRequest, CourseOutline, ModuleLesson } from './cou
 import { courseProgressCalculator } from '@/lib/utils/courseGenerationProgressCalculator';
 import { CourseGenerationTaskExecutor } from './course-generation-task-executor';
 import { CourseGenerationErrorHandler } from './course-generation-error-handler';
-import { CourseGenerationAnalytics } from './course-generation-analytics';
+import { CourseGenerationAnalyticsService } from './course-generation-analytics';
 import { 
   CourseGenerationJob,
   CourseGenerationJobInsert,
@@ -94,7 +94,7 @@ export class CourseGenerationOrchestratorV2 {
   // V2 System Components
   private taskExecutor: CourseGenerationTaskExecutor;
   private errorHandler: CourseGenerationErrorHandler;
-  private analytics: CourseGenerationAnalytics;
+  private analytics: CourseGenerationAnalyticsService;
   
   // Current job tracking
   private currentJobId?: string;
@@ -173,7 +173,7 @@ export class CourseGenerationOrchestratorV2 {
     // Initialize V2 system components
     this.taskExecutor = new CourseGenerationTaskExecutor();
     this.errorHandler = new CourseGenerationErrorHandler();
-    this.analytics = new CourseGenerationAnalytics();
+    this.analytics = new CourseGenerationAnalyticsService();
     
     // Initialize circuit breakers
     this.circuitBreakers.set('openai', { state: 'closed', failureCount: 0 });

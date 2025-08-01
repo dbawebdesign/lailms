@@ -54,12 +54,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has access to this base class
-    if (baseClass.created_by !== user.id) {
+    if (baseClass.user_id !== user.id) {
       const { data: orgMember } = await supabase
-        .from('organisation_members')
-        .select('*')
+        .from('profiles')
+        .select('id, role')
         .eq('organisation_id', baseClass.organisation_id)
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .single();
 
       if (!orgMember) {
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
         job_type: 'generate_course_v2',
         status: 'queued',
         progress_percentage: 0,
-        job_data: generationRequest,
+        job_data: generationRequest as any,
         generation_config: {
           version: 'v2',
           orchestrator: 'CourseGenerationOrchestratorV2',

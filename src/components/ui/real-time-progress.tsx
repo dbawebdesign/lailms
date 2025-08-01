@@ -30,7 +30,7 @@ export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
     }
     
     // Show progress status if available
-    if (progress?.status === 'completed') {
+    if (progress?.overallProgress === 100) {
       return (
         <div className="flex items-center gap-2 text-green-600 text-sm">
           <CheckCircle2 className="w-4 h-4" />
@@ -39,7 +39,7 @@ export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
       );
     }
     
-    if (progress?.status === 'failed') {
+    if (progress?.liveMessage?.level === 'error') {
       return (
         <div className="flex items-center gap-2 text-red-600 text-sm">
           <AlertCircle className="w-4 h-4" />
@@ -76,21 +76,17 @@ export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
       return progress.detailedMessage;
     }
     
-    // Fallback based on progress status
-    if (progress?.status === 'processing') {
-      return 'Processing...';
-    }
-    
-    if (progress?.status === 'queued') {
-      return 'Queued for processing...';
-    }
-    
-    if (progress?.status === 'completed') {
+    // Fallback based on progress data
+    if (progress?.overallProgress === 100) {
       return 'Course generation completed!';
     }
     
-    if (progress?.status === 'failed') {
-      return progress?.error || 'Generation failed';
+    if (progress?.liveMessage?.level === 'error') {
+      return 'Generation failed';
+    }
+    
+    if (progress?.overallProgress && progress.overallProgress > 0) {
+      return 'Processing...';
     }
     
     return 'Initializing...';
@@ -190,7 +186,7 @@ export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
       )}
 
       {/* Completion State */}
-      {(progress?.overallProgress === 100 || progress?.status === 'completed') && (
+      {progress?.overallProgress === 100 && (
         <div className="flex items-center gap-2 text-green-600 bg-green-50 p-3 rounded-md border border-green-200">
           <CheckCircle2 className="w-4 h-4" />
           <span className="text-sm font-medium">Generation Complete!</span>
@@ -198,12 +194,12 @@ export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
       )}
 
       {/* Failed State */}
-      {progress?.status === 'failed' && (
+      {progress?.liveMessage?.level === 'error' && (
         <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
           <AlertCircle className="w-4 h-4" />
           <span className="text-sm font-medium">Generation Failed</span>
-          {progress?.error && (
-            <p className="text-sm text-red-600 mt-1">{progress.error}</p>
+          {progress?.liveMessage?.message && (
+            <p className="text-sm text-red-600 mt-1">{progress.liveMessage.message}</p>
           )}
         </div>
       )}

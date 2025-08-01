@@ -41,7 +41,7 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    const isV2 = job.generation_config?.version === 'v2';
+    const isV2 = (job.generation_config as any)?.version === 'v2';
     
     if (isV2) {
       // Get failed tasks from V2 system (course_generation_tasks table)

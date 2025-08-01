@@ -78,7 +78,6 @@ export function CourseGenerationModal({ isOpen, jobId, onComplete }: CourseGener
     startPhase(0);
 
     return () => {
-      clearTimeout(phaseTimer);
       clearInterval(progressTimer);
     };
   }, [isOpen, jobId, onComplete]);

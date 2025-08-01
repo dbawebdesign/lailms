@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { CourseGenerationAnalytics } from '@/lib/services/course-generation-analytics';
+import { CourseGenerationAnalyticsService } from '@/lib/services/course-generation-analytics';
 import { ExportReportOptions, CourseGenerationReport } from '@/types/course-generation';
 
 export async function POST(
@@ -85,7 +85,7 @@ async function generateComprehensiveReport(
   options: ExportReportOptions
 ): Promise<CourseGenerationReport> {
   const supabase = createSupabaseServerClient();
-  const analytics = new CourseGenerationAnalytics();
+  const analytics = new CourseGenerationAnalyticsService();
 
   // Fetch job data
   const { data: job } = await supabase
@@ -94,8 +94,12 @@ async function generateComprehensiveReport(
     .eq('id', jobId)
     .single();
 
+  if (!job) {
+    throw new Error(`Job with ID ${jobId} not found`);
+  }
+
   // Fetch tasks if requested
-  let tasks = [];
+  let tasks: any[] = [];
   if (options.includeTasks) {
     const { data: taskData } = await supabase
       .from('course_generation_tasks')
@@ -106,7 +110,7 @@ async function generateComprehensiveReport(
   }
 
   // Fetch errors if requested
-  let errors = [];
+  let errors: any[] = [];
   if (options.includeErrors) {
     const { data: errorData } = await supabase
       .from('course_generation_errors')

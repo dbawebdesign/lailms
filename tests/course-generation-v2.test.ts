@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { CourseGenerationOrchestratorV2 } from '@/lib/services/course-generation-orchestrator-v2';
 import { CourseGenerationTaskExecutor } from '@/lib/services/course-generation-task-executor';
 import { CourseGenerationErrorHandler } from '@/lib/services/course-generation-error-handler';
-import { CourseGenerationAnalytics } from '@/lib/services/course-generation-analytics';
+import { CourseGenerationAnalyticsService } from '@/lib/services/course-generation-analytics';
 import { useCourseGenerationRecovery } from '@/hooks/useCourseGenerationRecovery';
 
 // Mock Supabase
@@ -17,7 +17,7 @@ describe('Course Generation V2 System', () => {
   let orchestrator: CourseGenerationOrchestratorV2;
   let taskExecutor: CourseGenerationTaskExecutor;
   let errorHandler: CourseGenerationErrorHandler;
-  let analytics: CourseGenerationAnalytics;
+  let analytics: CourseGenerationAnalyticsService;
   
   const mockUserId = 'test-user-id';
   const mockBaseClassId = 'test-base-class-id';
@@ -41,7 +41,7 @@ describe('Course Generation V2 System', () => {
     orchestrator = new CourseGenerationOrchestratorV2();
     taskExecutor = new CourseGenerationTaskExecutor();
     errorHandler = new CourseGenerationErrorHandler();
-    analytics = new CourseGenerationAnalytics();
+    analytics = new CourseGenerationAnalyticsService();
     
     // Mock Supabase responses
     const mockSupabaseClient = {

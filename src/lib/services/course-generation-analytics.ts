@@ -39,7 +39,7 @@ export interface QualityMetrics {
 }
 
 // Analytics collection and reporting service
-export class CourseGenerationAnalytics {
+export class CourseGenerationAnalyticsService {
   private supabase = createSupabaseServerClient();
   private performanceBuffer: TaskPerformanceMetrics[] = [];
   private systemMetricsBuffer: SystemMetrics[] = [];
@@ -350,7 +350,7 @@ export class CourseGenerationAnalytics {
 
     if (!currentAnalytics) return 0;
 
-    const improvement = ((currentAnalytics.success_rate - previousJob.success_rate) / previousJob.success_rate) * 100;
+    const improvement = (((currentAnalytics.success_rate || 0) - (previousJob.success_rate || 0)) / (previousJob.success_rate || 1)) * 100;
     return improvement;
   }
 
@@ -368,7 +368,7 @@ export class CourseGenerationAnalytics {
     const summary = {
       totalTime: analytics.total_generation_time_seconds,
       successRate: analytics.success_rate,
-      tasksCompleted: analytics.total_sections_generated + analytics.total_assessments_generated,
+      tasksCompleted: (analytics.total_sections_generated || 0) + (analytics.total_assessments_generated || 0),
       costEstimate: analytics.estimated_cost_usd,
       qualityScore: analytics.content_quality_score
     };
@@ -400,23 +400,23 @@ export class CourseGenerationAnalytics {
   private generateRecommendations(analytics: CourseGenerationAnalyticsInsert): string[] {
     const recommendations: string[] = [];
 
-    if (analytics.success_rate < 95) {
+    if ((analytics.success_rate || 0) < 95) {
       recommendations.push('Consider reviewing error patterns to improve success rate');
     }
 
-    if (analytics.cache_hit_rate < 60) {
+    if ((analytics.cache_hit_rate || 0) < 60) {
       recommendations.push('Implement more aggressive caching to reduce API costs');
     }
 
-    if (analytics.avg_cpu_usage_percent > 80) {
+    if ((analytics.avg_cpu_usage_percent || 0) > 80) {
       recommendations.push('Consider scaling resources or optimizing CPU-intensive tasks');
     }
 
-    if (analytics.baseline_time_comparison_percent > 20) {
+    if ((analytics.baseline_time_comparison_percent || 0) > 20) {
       recommendations.push('Generation time is above baseline - review performance optimizations');
     }
 
-    if (analytics.content_quality_score < 80) {
+    if ((analytics.content_quality_score || 0) < 80) {
       recommendations.push('Content quality could be improved - consider enhancing prompts or knowledge base');
     }
 
