@@ -465,3 +465,28 @@
   background-color: var(--tt-selection-color, rgba(122, 82, 255, 0.5));
   color: inherit;
 }
+
+/* Ensure text selection is enabled for all source content areas */
+[data-source-content] * {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+}
+
+/* Specifically ensure prose content is selectable */
+.select-text,
+.select-text * {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+}
+
+/* Override any potential TipTap read-only restrictions */
+.ProseMirror[contenteditable="false"] {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+}

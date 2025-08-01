@@ -244,71 +244,75 @@ export class MindMapGenerationService {
       }) || []
     };
 
-    // Generate mind map with AI - enhanced prompt for deeper hierarchy
-    const prompt = `Create a comprehensive, multi-level mind map from this lesson content. Extract ACTUAL content and create a deep hierarchy.
+    // Generate mind map with AI - using original format that produces correct structure
+    const prompt = `Create a comprehensive educational mind map from this lesson content. Extract actual content and organize it in a clear hierarchical structure.
 
-LESSON STRUCTURE:
-${JSON.stringify(lessonContent, null, 2)}
+LESSON CONTENT:
+Title: ${lessonContent.title}
+Description: ${lessonContent.description}
+
+SECTIONS:
+${lessonContent.sections.map((section: any, index: number) => `
+Section ${index + 1}: ${section.title}
+Content: ${section.content}
+Key Points: ${section.keyPoints?.join(', ') || 'N/A'}
+`).join('\n')}
 
 REQUIREMENTS:
-1. Center: Lesson title "${lessonContent.title}"
-2. Level 1: Main sections (up to 6 branches)
-3. Level 2: Key concepts from each section (3-5 per branch)
-4. Level 3: Detailed points and examples (2-4 per concept)
-5. Level 4: Specific details and applications (1-3 per point)
-6. Use ACTUAL content from lesson sections
-7. **Progressively Detailed Descriptions:**
-    - Level 1 descriptions: A concise, one-sentence overview of the section.
-    - Level 2 descriptions: A 2-3 sentence explanation of the concept.
-    - Level 3 descriptions: A 3-4 sentence detailed explanation with examples.
-    - Level 4 descriptions: An in-depth, 4-5 sentence analysis of the specific detail.
-8. Logical hierarchy progression
+1. Create a 4-level hierarchical mind map
+2. Center: "${lessonContent.title}" with lesson description
+3. Level 1 (branches): Main lesson sections with unique IDs and colors
+4. Level 2 (concepts): Key concepts from each section (2-4 per branch)
+5. Level 3 (points): Important points for each concept (2-3 per concept)
+6. Level 4 (details): Specific details and examples (1-2 per point)
+7. Use actual content from the lesson sections
+8. Each level should have meaningful descriptions that teach the content
 
 OUTPUT FORMAT (valid JSON only):
 {
   "center": {
     "label": "${lessonContent.title}",
-    "description": "${lessonContent.description || 'Comprehensive lesson overview'}"
+    "description": "${lessonContent.description || 'This lesson introduces students to key concepts and practical applications.'}"
   },
   "branches": [
     {
       "id": "section1",
-      "label": "Section Name",
-      "description": "Section overview and learning objectives",
       "color": "#DC2626",
+      "label": "Section Title",
       "concepts": [
         {
           "id": "concept1",
-          "label": "Key Concept",
-          "description": "Detailed concept explanation",
+          "label": "Concept Name",
+          "description": "Clear explanation of what this concept covers and why it's important.",
           "points": [
             {
               "id": "point1",
-              "label": "Important Point",
-              "description": "Point explanation with context",
+              "label": "Key Point",
+              "description": "Detailed explanation of this point with context and examples.",
               "details": [
                 {
                   "id": "detail1",
                   "label": "Specific Detail",
-                  "description": "Detailed explanation or example"
+                  "description": "Specific example, application, or deeper explanation of this detail."
                 }
               ]
             }
           ]
         }
-      ]
+      ],
+      "description": "Overview of what students will learn in this section."
     }
   ]
 }
 
-Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
+Use these colors in order: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
 
     console.log('🤖 [MindMapService] Calling OpenAI for mind map generation...');
     
     const aiResponse = await this.openai.chat.completions.create({
       model: 'gpt-4.1-mini',
       messages: [
-        { role: 'system', content: 'You create educational mind maps with deep hierarchical structure. Return only valid JSON.' },
+        { role: 'system', content: 'You are an expert educational mind map creator. Create comprehensive 4-level hierarchical mind maps from lesson content. Always return valid JSON with the exact structure: center, branches (with concepts array), concepts (with points array), points (with details array). Use actual educational content, not meta-descriptions.' },
         { role: 'user', content: prompt }
       ],
       temperature: 0.1,
@@ -522,7 +526,7 @@ Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
     const aiResponse = await this.openai.chat.completions.create({
       model: 'gpt-4.1-mini',
       messages: [
-        { role: 'system', content: 'You create comprehensive educational mind maps with deep content extraction. Always return valid JSON with the complete 5-level structure including center, branches, concepts, points, and details.' },
+        { role: 'system', content: 'You are an expert educational mind map creator. Create comprehensive 4-level hierarchical mind maps from lesson content. Always return valid JSON with the exact structure: center, branches (with concepts array), concepts (with points array), points (with details array). Use actual educational content, not meta-descriptions.' },
         { role: 'user', content: prompt }
       ],
       temperature: 0.2,
@@ -731,45 +735,595 @@ Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
   }
 
   /**
-   * Generate interactive SVG mind map
-   * (Simplified version - you can expand this as needed)
+   * Generate interactive SVG mind map using the EXACT same approach as the working React components
+   * This recreates the precise visual layout and styling from MindMapViewer.tsx
    */
   private _generateInteractiveSVGMindMap(data: any, title: string): string {
-    // This is a simplified version. The full implementation would be quite large.
-    // For now, we'll return a basic SVG structure that can be expanded later.
+    // Use the exact same positioning algorithm as the React component
+    const allNodes: any[] = [];
+    const nodePositions: any[] = [];
+
+    // Center node - exact same as React component
+    const centerNode = {
+      id: 'center',
+      label: data.center?.label || title,
+      description: data.center?.description || '',
+      level: 0,
+      x: 0,
+      y: 0,
+      children: [],
+      isExpanded: true
+    };
+
+    allNodes.push(centerNode);
+    nodePositions.push({ id: 'center', x: 0, y: 0, radius: 50 });
+
+    // Process branches with EXACT same spacing as React component
+    const branches = data.branches || [];
+    branches.forEach((branch: any, branchIndex: number) => {
+      const totalBranches = branches.length;
+      const angle = (branchIndex * 2 * Math.PI) / totalBranches;
+      // Use the exact same base radius calculation as React component
+      const baseRadius = Math.max(450, totalBranches * 70);
+      
+      const baseX = centerNode.x + baseRadius * Math.cos(angle);
+      const baseY = centerNode.y + baseRadius * Math.sin(angle);
+      
+      // Find non-colliding position (same algorithm as React)
+      const { x, y } = this._findNonCollidingPosition(baseX, baseY, angle, 40, nodePositions);
+      
+      const branchNode = {
+        id: branch.id || `branch_${branchIndex}`,
+        label: branch.label || 'Untitled Branch',
+        description: branch.description || '',
+        color: branch.color || '#3B82F6',
+        level: 1,
+        x,
+        y,
+        children: [],
+        isExpanded: true,
+        parentId: 'center'
+      };
+
+      allNodes.push(branchNode);
+      nodePositions.push({ id: branchNode.id, x, y, radius: 40 });
+
+      // Process concepts with exact same algorithm
+      if (branch.concepts && Array.isArray(branch.concepts)) {
+        branch.concepts.forEach((concept: any, conceptIndex: number) => {
+          const conceptCount = branch.concepts.length;
+          const conceptAngleOffset = (conceptIndex - (conceptCount - 1) / 2) * (Math.PI / 6);
+          const conceptAngle = angle + conceptAngleOffset;
+          const conceptRadius = Math.max(280, conceptCount * 40);
+          
+          const baseConceptX = branchNode.x + conceptRadius * Math.cos(conceptAngle);
+          const baseConceptY = branchNode.y + conceptRadius * Math.sin(conceptAngle);
+          
+          const { x: conceptX, y: conceptY } = this._findNonCollidingPosition(
+            baseConceptX, 
+            baseConceptY, 
+            conceptAngle, 
+            32, 
+            nodePositions
+          );
+          
+          const conceptNode = {
+            id: concept.id || `concept_${branchIndex}_${conceptIndex}`,
+            label: concept.label || 'Untitled Concept',
+            description: concept.description || '',
+            color: branchNode.color,
+            level: 2,
+            x: conceptX,
+            y: conceptY,
+            children: [],
+            isExpanded: true,
+            parentId: branchNode.id
+          };
+
+          allNodes.push(conceptNode);
+          nodePositions.push({ id: conceptNode.id, x: conceptX, y: conceptY, radius: 32 });
+
+          // Process points with exact same ring algorithm
+          if (concept.points && Array.isArray(concept.points)) {
+            concept.points.forEach((point: any, pointIndex: number) => {
+              const pointCount = concept.points.length;
+              const maxPointsPerRing = 4;
+              const ringIndex = Math.floor(pointIndex / maxPointsPerRing);
+              const positionInRing = pointIndex % maxPointsPerRing;
+              const pointsInThisRing = Math.min(maxPointsPerRing, pointCount - (ringIndex * maxPointsPerRing));
+              
+              const ringRadius = Math.max(180, 80 + (ringIndex * 90));
+              const ringSpread = Math.min(Math.PI * 0.8, pointsInThisRing * 0.5);
+              const startAngle = conceptAngle - ringSpread / 2;
+              
+              let pointAngle;
+              if (pointsInThisRing === 1) {
+                pointAngle = conceptAngle;
+              } else {
+                pointAngle = startAngle + (positionInRing / (pointsInThisRing - 1)) * ringSpread;
+              }
+              
+              const basePointX = conceptNode.x + ringRadius * Math.cos(pointAngle);
+              const basePointY = conceptNode.y + ringRadius * Math.sin(pointAngle);
+              
+              const { x: pointX, y: pointY } = this._findNonCollidingPosition(
+                basePointX, 
+                basePointY, 
+                pointAngle, 
+                24, 
+                nodePositions
+              );
+              
+              const pointNode = {
+                id: point.id || `point_${branchIndex}_${conceptIndex}_${pointIndex}`,
+                label: point.label || 'Untitled Point',
+                description: point.description || '',
+                color: branchNode.color,
+                level: 3,
+                x: pointX,
+                y: pointY,
+                children: [],
+                isExpanded: true,
+                parentId: conceptNode.id
+              };
+
+              allNodes.push(pointNode);
+              nodePositions.push({ id: pointNode.id, x: pointX, y: pointY, radius: 24 });
+
+              // Process details
+              if (point.details && Array.isArray(point.details)) {
+                point.details.forEach((detail: any, detailIndex: number) => {
+                  const detailCount = point.details.length;
+                  const detailAngleOffset = (detailIndex - (detailCount - 1) / 2) * (Math.PI / 8);
+                  const detailAngle = pointAngle + detailAngleOffset;
+                  const detailRadius = 120;
+                  
+                  const baseDetailX = pointNode.x + detailRadius * Math.cos(detailAngle);
+                  const baseDetailY = pointNode.y + detailRadius * Math.sin(detailAngle);
+                  
+                  const { x: detailX, y: detailY } = this._findNonCollidingPosition(
+                    baseDetailX, 
+                    baseDetailY, 
+                    detailAngle, 
+                    18, 
+                    nodePositions
+                  );
+                  
+                  const detailNode = {
+                    id: detail.id || `detail_${branchIndex}_${conceptIndex}_${pointIndex}_${detailIndex}`,
+                    label: detail.label || 'Untitled Detail',
+                    description: detail.description || '',
+                    color: branchNode.color,
+                    level: 4,
+                    x: detailX,
+                    y: detailY,
+                    children: [],
+                    isExpanded: true,
+                    parentId: pointNode.id
+                  };
+
+                  allNodes.push(detailNode);
+                  nodePositions.push({ id: detailNode.id, x: detailX, y: detailY, radius: 18 });
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+
+    // Generate connections using exact same approach
+    const connections = allNodes
+      .filter(node => node.parentId)
+      .map(node => {
+        const parent = allNodes.find(p => p.id === node.parentId);
+        if (!parent) return '';
+        
+        return `<line x1="${parent.x}" y1="${parent.y}" x2="${node.x}" y2="${node.y}" 
+                  stroke="${node.color || '#3B82F6'}" stroke-width="2" opacity="0.6" />`;
+      })
+      .join('');
+
+    // Generate nodes using EXACT same styling as React component
+    const nodes = allNodes.map(node => {
+      // Use exact same sizing and text logic as React component
+      const nodeRadius = node.level === 0 ? 50 : node.level === 1 ? 40 : node.level === 2 ? 32 : node.level === 3 ? 24 : 18;
+      const textSize = node.level === 0 ? 11 : node.level === 1 ? 9 : node.level === 2 ? 8 : node.level === 3 ? 7 : 6;
+      const maxLength = node.level === 0 ? 15 : node.level === 1 ? 12 : node.level === 2 ? 10 : 8;
+      
+      const nodeLabel = node.label || 'Untitled';
+      const displayText = nodeLabel.length > maxLength ? nodeLabel.substring(0, maxLength) + '...' : nodeLabel;
+      
+      // Use exact same fill logic as React component
+      const fillColor = node.level === 0 
+        ? '#1F2937' 
+        : node.level === 1 
+          ? node.color || '#3B82F6' 
+          : (node.color || '#3B82F6') + '80'; // Add transparency for level 2+
+      
+      const strokeColor = node.level === 0 ? '#374151' : node.color || '#3B82F6';
+      const strokeWidth = node.level === 0 ? 3 : 2;
+      
+      return `
+        <g class="node-group" data-node-id="${node.id}">
+          <circle cx="${node.x}" cy="${node.y}" r="${nodeRadius}"
+            fill="${fillColor}"
+            stroke="${strokeColor}"
+            stroke-width="${strokeWidth}"
+            class="node-circle transition-all duration-200 cursor-pointer" />
+          <text x="${node.x}" y="${node.y}" text-anchor="middle" dominant-baseline="middle"
+            fill="white" font-size="${textSize}" font-weight="${node.level <= 1 ? 'bold' : 'normal'}"
+            class="node-text pointer-events-none select-none">${displayText}</text>
+          <title>${node.label}${node.description ? ': ' + node.description : ''}</title>
+        </g>`;
+    }).join('');
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title} - Mind Map</title>
+    <title>${title} - Interactive Mind Map</title>
     <style>
-        body { margin: 0; padding: 0; background: #1a1a2e; color: white; font-family: Arial, sans-serif; }
-        .mind-map-container { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .center-node { background: #6B5DE5; padding: 20px; border-radius: 15px; text-align: center; }
-        .branches { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; }
-        .branch { background: #DC2626; padding: 10px; border-radius: 8px; margin: 5px; }
+        body { 
+          margin: 0; 
+          padding: 0; 
+          background: #0f172a; 
+          color: white; 
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+          overflow: hidden;
+        }
+        .mind-map-container { 
+          width: 100vw; 
+          height: 100vh; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          position: relative;
+        }
+        .mind-map-svg {
+          width: 100%;
+          height: 100%;
+          cursor: grab;
+        }
+        .mind-map-svg:active {
+          cursor: grabbing;
+        }
+        .node-circle {
+          transition: all 0.2s ease;
+          cursor: pointer;
+        }
+        .node-circle:hover {
+          filter: brightness(1.2);
+          stroke-width: 3;
+        }
+        .node-text {
+          pointer-events: none;
+          user-select: none;
+        }
+        .connections line {
+          transition: opacity 0.2s ease;
+        }
+        .zoom-controls {
+          position: absolute;
+          bottom: 20px;
+          right: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          z-index: 10;
+        }
+        .zoom-btn {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          border: none;
+          background: rgba(59, 130, 246, 0.8);
+          color: white;
+          font-size: 18px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background 0.2s ease;
+        }
+        .zoom-btn:hover {
+          background: rgba(59, 130, 246, 1);
+        }
+        .title-overlay {
+          position: absolute;
+          top: 20px;
+          left: 20px;
+          background: rgba(0, 0, 0, 0.7);
+          padding: 15px 20px;
+          border-radius: 10px;
+          backdrop-filter: blur(10px);
+        }
+        .title-overlay h1 {
+          margin: 0;
+          font-size: 18px;
+          font-weight: 600;
+        }
+        
+        /* Node Details Panel */
+        .node-details-panel {
+          position: absolute;
+          top: 80px;
+          left: 20px;
+          width: 300px;
+          max-height: 400px;
+          background: rgba(255, 255, 255, 0.95);
+          color: #1f2937;
+          border: 1px solid rgba(148, 163, 184, 0.3);
+          border-radius: 10px;
+          backdrop-filter: blur(10px);
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+          z-index: 15;
+          display: none;
+          transition: all 0.2s ease;
+        }
+        .node-details-panel.show {
+          display: block;
+        }
+        .node-details-header {
+          display: flex;
+          align-items: center;
+          justify-content: between;
+          padding: 12px 16px;
+          border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+          background: rgba(248, 250, 252, 0.5);
+          border-radius: 10px 10px 0 0;
+        }
+        .node-details-title {
+          font-weight: 600;
+          font-size: 14px;
+          color: #1f2937;
+          flex: 1;
+          margin: 0;
+        }
+        .node-details-close {
+          background: none;
+          border: none;
+          color: #64748b;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 4px;
+          font-size: 16px;
+          line-height: 1;
+          transition: all 0.2s ease;
+        }
+        .node-details-close:hover {
+          background: rgba(148, 163, 184, 0.2);
+          color: #374151;
+        }
+        .node-details-content {
+          padding: 16px;
+          overflow-y: auto;
+          max-height: 320px;
+        }
+        .node-details-description {
+          font-size: 14px;
+          line-height: 1.5;
+          color: #4b5563;
+          margin: 0 0 12px 0;
+        }
+        .node-details-meta {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+        .node-details-badge {
+          background: rgba(59, 130, 246, 0.1);
+          color: #3b82f6;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 500;
+          border: 1px solid rgba(59, 130, 246, 0.2);
+        }
     </style>
 </head>
 <body>
     <div class="mind-map-container">
-        <div>
-            <div class="center-node">
-                <h2>${data.center?.label || title}</h2>
-                <p>${data.center?.description || ''}</p>
+        <div class="title-overlay">
+            <h1>${title}</h1>
+        </div>
+        
+        <!-- Node Details Panel -->
+        <div id="nodeDetailsPanel" class="node-details-panel">
+            <div class="node-details-header">
+                <h4 id="nodeDetailsTitle" class="node-details-title">Node Title</h4>
+                <button class="node-details-close" onclick="closeNodeDetails()">×</button>
             </div>
-            <div class="branches">
-                ${(data.branches || []).map((branch: any) => `
-                    <div class="branch" style="background-color: ${branch.color || '#DC2626'}">
-                        <strong>${branch.label}</strong>
-                        <p>${branch.description || ''}</p>
-                    </div>
-                `).join('')}
+            <div class="node-details-content">
+                <p id="nodeDetailsDescription" class="node-details-description"></p>
+                <div class="node-details-meta">
+                    <span id="nodeDetailsLevel" class="node-details-badge">Level 0</span>
+                    <span id="nodeDetailsChildren" class="node-details-badge">0 children</span>
+                </div>
             </div>
         </div>
+        
+        <svg class="mind-map-svg" viewBox="-1500 -1500 3000 3000" preserveAspectRatio="xMidYMid meet">
+            <defs>
+                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5" opacity="0.3"/>
+                </pattern>
+                <filter id="glow">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+            </defs>
+            
+            <!-- Background grid -->
+            <rect x="-1500" y="-1500" width="3000" height="3000" fill="url(#grid)" />
+            
+            <!-- Connections -->
+            <g class="connections">
+                ${connections}
+            </g>
+            
+            <!-- Nodes -->
+            <g class="nodes">
+                ${nodes}
+            </g>
+        </svg>
+        
+        <div class="zoom-controls">
+            <button class="zoom-btn" onclick="zoomIn()">+</button>
+            <button class="zoom-btn" onclick="zoomOut()">−</button>
+            <button class="zoom-btn" onclick="resetZoom()">⌂</button>
+        </div>
     </div>
+
+    <script>
+        let scale = 1;
+        let translateX = 0;
+        let translateY = 0;
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let selectedNodeId = null;
+        
+        const svg = document.querySelector('.mind-map-svg');
+        const nodeDetailsPanel = document.getElementById('nodeDetailsPanel');
+        
+        // Store node data for details panel
+        const nodeData = ${JSON.stringify(allNodes)};
+        
+        function updateTransform() {
+            svg.style.transform = \`translate(\${translateX}px, \${translateY}px) scale(\${scale})\`;
+        }
+        
+        function zoomIn() {
+            scale = Math.min(scale * 1.2, 10);
+            updateTransform();
+        }
+        
+        function zoomOut() {
+            scale = Math.max(scale / 1.2, 0.1);
+            updateTransform();
+        }
+        
+        function resetZoom() {
+            scale = 1;
+            translateX = 0;
+            translateY = 0;
+            updateTransform();
+        }
+        
+        function showNodeDetails(nodeId) {
+            const node = nodeData.find(n => n.id === nodeId);
+            if (!node) return;
+            
+            // Update panel content
+            document.getElementById('nodeDetailsTitle').textContent = node.label || 'Untitled';
+            document.getElementById('nodeDetailsDescription').textContent = node.description || 'No description available.';
+            document.getElementById('nodeDetailsLevel').textContent = \`Level \${node.level}\`;
+            
+            // Count children
+            const childrenCount = nodeData.filter(n => n.parentId === nodeId).length;
+            document.getElementById('nodeDetailsChildren').textContent = \`\${childrenCount} children\`;
+            
+            // Show panel
+            nodeDetailsPanel.classList.add('show');
+            selectedNodeId = nodeId;
+        }
+        
+        function closeNodeDetails() {
+            nodeDetailsPanel.classList.remove('show');
+            selectedNodeId = null;
+        }
+        
+        // Mouse wheel zoom
+        svg.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            scale = Math.max(0.1, Math.min(10, scale * delta));
+            updateTransform();
+        });
+        
+        // Pan functionality
+        svg.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.node-group')) return; // Don't pan when clicking nodes
+            isDragging = true;
+            dragStart.x = e.clientX - translateX;
+            dragStart.y = e.clientY - translateY;
+            svg.style.cursor = 'grabbing';
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                translateX = e.clientX - dragStart.x;
+                translateY = e.clientY - dragStart.y;
+                updateTransform();
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            svg.style.cursor = 'grab';
+        });
+        
+        // Node click interactions
+        document.querySelectorAll('.node-group').forEach(node => {
+            node.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const nodeId = node.getAttribute('data-node-id');
+                
+                if (selectedNodeId === nodeId) {
+                    // Close if clicking the same node
+                    closeNodeDetails();
+                } else {
+                    // Show details for the clicked node
+                    showNodeDetails(nodeId);
+                }
+            });
+        });
+        
+        // Close panel when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.node-details-panel') && !e.target.closest('.node-group')) {
+                closeNodeDetails();
+            }
+        });
+    </script>
 </body>
 </html>`;
+  }
+
+  /**
+   * Helper function to find non-colliding positions (extracted from React component)
+   */
+  private _findNonCollidingPosition(baseX: number, baseY: number, angle: number, radius: number, existingPositions: any[]) {
+    let x = baseX;
+    let y = baseY;
+    let attempts = 0;
+    const maxAttempts = 50;
+    
+    while (attempts < maxAttempts) {
+      let collision = false;
+      for (const pos of existingPositions) {
+        const distance = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2);
+        if (distance < (radius + pos.radius + 20)) {
+          collision = true;
+          break;
+        }
+      }
+      
+      if (!collision) break;
+      
+      // Try a new position
+      const offsetAngle = angle + (Math.random() - 0.5) * Math.PI * 0.5;
+      const offsetDistance = 50 + Math.random() * 100;
+      x = baseX + offsetDistance * Math.cos(offsetAngle);
+      y = baseY + offsetDistance * Math.sin(offsetAngle);
+      attempts++;
+    }
+    
+    return { x, y };
   }
 }
 

@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { PasswordInput } from '@/components/ui/password-input'
+import { EnhancedInput } from '@/components/ui/enhanced-input'
+import { EnhancedPasswordInput } from '@/components/ui/enhanced-password-input'
+import { UsernameInput } from '@/components/ui/username-input'
 import { InviteCodeCopyButton } from '@/components/ui/copy-button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
@@ -191,6 +193,18 @@ export default function HomeschoolSignupForm() {
     agreedToTerms: false
   })
 
+  // Validation states
+  const [validationStates, setValidationStates] = useState({
+    organizationName: { isValid: false, errors: [] as string[] },
+    abbreviation: { isValid: true, errors: [] as string[] }, // Optional field
+    familyName: { isValid: true, errors: [] as string[] }, // Optional for coop_network
+    firstName: { isValid: false, errors: [] as string[] },
+    lastName: { isValid: false, errors: [] as string[] },
+    username: { isValid: false, errors: [] as string[] },
+    password: { isValid: false, errors: [] as string[] },
+    confirmPassword: { isValid: false, errors: [] as string[] }
+  })
+
   const updateFormData = (updates: Partial<SignupFormData>) => {
     setFormData(prev => ({ ...prev, ...updates }))
   }
@@ -200,6 +214,53 @@ export default function HomeschoolSignupForm() {
       ...prev,
       primaryContactInfo: { ...prev.primaryContactInfo, ...updates }
     }))
+  }
+
+  // Validation handlers
+  const updateValidationState = useCallback((field: keyof typeof validationStates, isValid: boolean, errors: string[]) => {
+    setValidationStates(prev => ({
+      ...prev,
+      [field]: { isValid, errors }
+    }))
+  }, [])
+
+  // Memoized validation rules
+  const organizationNameValidationRules = useMemo(() => [
+    { test: (value: string) => value.trim().length >= 3, message: 'Organization name must be at least 3 characters' },
+    { test: (value: string) => /^[a-zA-Z0-9\s'-]+$/.test(value), message: 'Organization name can only contain letters, numbers, spaces, hyphens, and apostrophes' }
+  ], [])
+
+  const abbreviationValidationRules = useMemo(() => [
+    { test: (value: string) => !value || (value.length >= 2 && value.length <= 10), message: 'Abbreviation must be 2-10 characters if provided' },
+    { test: (value: string) => !value || /^[A-Z0-9]+$/.test(value), message: 'Abbreviation should only contain uppercase letters and numbers' }
+  ], [])
+
+  const familyNameValidationRules = useMemo(() => [
+    { test: (value: string) => !value || value.trim().length >= 3, message: 'Family name must be at least 3 characters if provided' },
+    { test: (value: string) => !value || /^[a-zA-Z\s'-]+$/.test(value), message: 'Family name can only contain letters, spaces, hyphens, and apostrophes' }
+  ], [])
+
+  const nameValidationRules = useMemo(() => [
+    { test: (value: string) => value.trim().length >= 2, message: 'Name must be at least 2 characters' },
+    { test: (value: string) => /^[a-zA-Z\s'-]+$/.test(value), message: 'Name can only contain letters, spaces, hyphens, and apostrophes' }
+  ], [])
+
+  // Check if current step is ready for next
+  const canProceed = () => {
+    switch (currentStep) {
+      case 1:
+        return formData.organizationType !== ''
+      case 2:
+        const orgNameValid = validationStates.organizationName.isValid
+        const familyNameValid = formData.organizationType === 'individual_family' ? 
+          (formData.familyName ? validationStates.familyName.isValid : true) : true
+        return orgNameValid && familyNameValid
+      case 3:
+        const requiredFields = ['firstName', 'lastName', 'username', 'password', 'confirmPassword']
+        return requiredFields.every(field => validationStates[field as keyof typeof validationStates]?.isValid) && formData.agreedToTerms
+      default:
+        return false
+    }
   }
 
   const handleNext = () => {
@@ -224,13 +285,31 @@ export default function HomeschoolSignupForm() {
     setIsLoading(true)
     
     try {
-      // Validate passwords match
-      if (formData.primaryContactInfo.password !== formData.primaryContactInfo.confirmPassword) {
-        toast({
-          title: "Error",
-          description: "Passwords do not match",
-          variant: "destructive"
-        })
+      // Enhanced validation with specific error messages
+      if (!canProceed()) {
+        const fieldErrors = Object.entries(validationStates)
+          .filter(([_, state]) => !state.isValid && state.errors.length > 0)
+          .map(([field, state]) => `${field}: ${state.errors[0]}`)
+        
+        if (fieldErrors.length > 0) {
+          toast({
+            title: "Validation Error",
+            description: `Please fix the following errors: ${fieldErrors.join(', ')}`,
+            variant: "destructive"
+          })
+        } else if (!formData.agreedToTerms) {
+          toast({
+            title: "Error",
+            description: "You must agree to the Terms of Service to create an account",
+            variant: "destructive"
+          })
+        } else {
+          toast({
+            title: "Error",
+            description: "Please complete all required fields",
+            variant: "destructive"
+          })
+        }
         setIsLoading(false)
         return
       }
@@ -344,47 +423,44 @@ export default function HomeschoolSignupForm() {
             </div>
 
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="orgName">
-                  {formData.organizationType === 'individual_family' ? 'Family Name' : 'Co-op Name'}
-                </Label>
-                <Input
-                  id="orgName"
-                  value={formData.organizationName}
-                  onChange={(e) => updateFormData({ organizationName: e.target.value })}
-                  placeholder={formData.organizationType === 'individual_family' 
-                    ? 'e.g., Smith Family Homeschool' 
-                    : 'e.g., Riverside Homeschool Co-op'
-                  }
-                  className="mt-1"
-                />
-              </div>
+              <EnhancedInput
+                id="orgName"
+                label={formData.organizationType === 'individual_family' ? 'Family Name' : 'Co-op Name'}
+                value={formData.organizationName}
+                onChange={(e) => updateFormData({ organizationName: e.target.value })}
+                placeholder={formData.organizationType === 'individual_family' 
+                  ? 'e.g., Smith Family Homeschool' 
+                  : 'e.g., Riverside Homeschool Co-op'
+                }
+                required
+                disabled={isLoading}
+                validationRules={organizationNameValidationRules}
+                onValidationChange={(isValid, errors) => updateValidationState('organizationName', isValid, errors)}
+              />
 
-              <div>
-                <Label htmlFor="abbreviation">Abbreviation (Optional)</Label>
-                <Input
-                  id="abbreviation"
-                  value={formData.abbreviation}
-                  onChange={(e) => updateFormData({ abbreviation: e.target.value })}
-                  placeholder="e.g., SFH or RHC"
-                  className="mt-1"
-                />
-                <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-                  Used for generating unique codes. Leave blank to auto-generate.
-                </p>
-              </div>
+              <EnhancedInput
+                id="abbreviation"
+                label="Abbreviation (Optional)"
+                value={formData.abbreviation}
+                onChange={(e) => updateFormData({ abbreviation: e.target.value })}
+                placeholder="e.g., SFH or RHC"
+                disabled={isLoading}
+                validationRules={abbreviationValidationRules}
+                onValidationChange={(isValid, errors) => updateValidationState('abbreviation', isValid, errors)}
+                helperText="Used for generating unique codes. Leave blank to auto-generate."
+              />
 
               {formData.organizationType === 'individual_family' && (
-                <div>
-                  <Label htmlFor="familyName">Family Name (Optional)</Label>
-                  <Input
-                    id="familyName"
-                    value={formData.familyName}
-                    onChange={(e) => updateFormData({ familyName: e.target.value })}
-                    placeholder="e.g., The Smith Family"
-                    className="mt-1"
-                  />
-                </div>
+                <EnhancedInput
+                  id="familyName"
+                  label="Family Name (Optional)"
+                  value={formData.familyName || ''}
+                  onChange={(e) => updateFormData({ familyName: e.target.value })}
+                  placeholder="e.g., The Smith Family"
+                  disabled={isLoading}
+                  validationRules={familyNameValidationRules}
+                  onValidationChange={(isValid, errors) => updateValidationState('familyName', isValid, errors)}
+                />
               )}
             </div>
           </div>
@@ -402,51 +478,63 @@ export default function HomeschoolSignupForm() {
 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input
-                    id="firstName"
-                    value={formData.primaryContactInfo.firstName}
-                    onChange={(e) => updateContactInfo({ firstName: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input
-                    id="lastName"
-                    value={formData.primaryContactInfo.lastName}
-                    onChange={(e) => updateContactInfo({ lastName: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  value={formData.primaryContactInfo.username}
-                  onChange={(e) => updateContactInfo({ username: e.target.value })}
-                  placeholder="Choose a unique username"
-                  className="mt-1"
+                <EnhancedInput
+                  id="firstName"
+                  label="First Name"
+                  value={formData.primaryContactInfo.firstName}
+                  onChange={(e) => updateContactInfo({ firstName: e.target.value })}
+                  placeholder="Enter your first name"
+                  required
+                  disabled={isLoading}
+                  validationRules={nameValidationRules}
+                  onValidationChange={(isValid, errors) => updateValidationState('firstName', isValid, errors)}
+                />
+                
+                <EnhancedInput
+                  id="lastName"
+                  label="Last Name"
+                  value={formData.primaryContactInfo.lastName}
+                  onChange={(e) => updateContactInfo({ lastName: e.target.value })}
+                  placeholder="Enter your last name"
+                  required
+                  disabled={isLoading}
+                  validationRules={nameValidationRules}
+                  onValidationChange={(isValid, errors) => updateValidationState('lastName', isValid, errors)}
                 />
               </div>
 
-              <PasswordInput
+              <UsernameInput
+                id="username"
+                value={formData.primaryContactInfo.username}
+                onChange={(e) => updateContactInfo({ username: e.target.value })}
+                required
+                disabled={isLoading}
+                onValidationChange={(isValid, errors) => updateValidationState('username', isValid, errors)}
+              />
+
+              <EnhancedPasswordInput
                 id="password"
                 label="Password"
                 value={formData.primaryContactInfo.password}
                 onChange={(e) => updateContactInfo({ password: e.target.value })}
-                placeholder="Enter your password"
+                required
+                disabled={isLoading}
+                showStrengthIndicator={true}
+                minLength={8}
+                onValidationChange={(isValid, errors) => updateValidationState('password', isValid, errors)}
               />
 
-              <PasswordInput
+              <EnhancedPasswordInput
                 id="confirmPassword"
                 label="Confirm Password"
                 value={formData.primaryContactInfo.confirmPassword}
                 onChange={(e) => updateContactInfo({ confirmPassword: e.target.value })}
                 placeholder="Confirm your password"
+                required
+                disabled={isLoading}
+                showStrengthIndicator={false}
+                confirmValue={formData.primaryContactInfo.password}
+                onValidationChange={(isValid, errors) => updateValidationState('confirmPassword', isValid, errors)}
               />
 
               <TermsCheckbox
@@ -514,25 +602,7 @@ export default function HomeschoolSignupForm() {
     }
   }
 
-  const canProceed = () => {
-    switch (currentStep) {
-      case 1:
-        return formData.organizationType !== ''
-      case 2:
-        return formData.organizationName.trim() !== ''
-      case 3:
-        return (
-          formData.primaryContactInfo.firstName.trim() !== '' &&
-          formData.primaryContactInfo.lastName.trim() !== '' &&
-          formData.primaryContactInfo.username.trim() !== '' &&
-          formData.primaryContactInfo.password.trim() !== '' &&
-          formData.primaryContactInfo.confirmPassword.trim() !== '' &&
-          formData.agreedToTerms
-        )
-      default:
-        return true
-    }
-  }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-neutral-900 dark:to-neutral-800 flex items-center justify-center p-4">

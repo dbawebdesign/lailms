@@ -85,7 +85,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
     immediatelyRender: false, // Prevent SSR hydration mismatches
     editorProps: {
       attributes: {
-        class: 'prose dark:prose-invert max-w-none focus:outline-none',
+        class: 'prose dark:prose-invert max-w-none select-text focus:outline-none',
       },
     },
   });

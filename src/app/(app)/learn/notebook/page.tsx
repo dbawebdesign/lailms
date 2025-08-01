@@ -2080,7 +2080,7 @@ export default function UnifiedStudySpace() {
                         
                         {/* Text Content - Simple fallback for now */}
                         {content.content && typeof content.content === 'string' && (
-                          <div className="prose prose-slate dark:prose-invert max-w-none">
+                          <div className="prose prose-slate dark:prose-invert max-w-none select-text">
                             <ReactMarkdown className="text-base leading-relaxed select-text">
                               {content.content}
                             </ReactMarkdown>
@@ -2089,7 +2089,9 @@ export default function UnifiedStudySpace() {
                         
                         {/* Structured Content - JSON object */}
                         {content.content && typeof content.content === 'object' && (
-                          <LessonContentRenderer content={content.content as LessonSectionContent} />
+                          <div className="select-text">
+                            <LessonContentRenderer content={content.content as LessonSectionContent} />
+                          </div>
                         )}
                         
                         {/* Empty state for sections without content */}
@@ -2228,7 +2230,7 @@ export default function UnifiedStudySpace() {
                                     
                                     {/* Text Content */}
                                     {section.content && typeof section.content === 'string' && section.content.trim() && (
-                                      <div className="prose prose-slate dark:prose-invert max-w-none">
+                                      <div className="prose prose-slate dark:prose-invert max-w-none select-text">
                                         <ReactMarkdown 
                                           className="text-base leading-relaxed select-text"
                                           components={{

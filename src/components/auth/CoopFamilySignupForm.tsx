@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { PasswordInput } from '@/components/ui/password-input'
+import { EnhancedInput } from '@/components/ui/enhanced-input'
+import { EnhancedPasswordInput } from '@/components/ui/enhanced-password-input'
+import { UsernameInput } from '@/components/ui/username-input'
 import { InviteCodeCopyButton } from '@/components/ui/copy-button'
 import TermsCheckbox from '../ui/terms-checkbox'
 import { toast } from '@/components/ui/use-toast'
@@ -77,6 +79,16 @@ export default function CoopFamilySignupForm({
     agreedToTerms: false
   })
 
+  // Validation states
+  const [validationStates, setValidationStates] = useState({
+    familyName: { isValid: false, errors: [] as string[] },
+    firstName: { isValid: false, errors: [] as string[] },
+    lastName: { isValid: false, errors: [] as string[] },
+    username: { isValid: false, errors: [] as string[] },
+    password: { isValid: false, errors: [] as string[] },
+    confirmPassword: { isValid: false, errors: [] as string[] }
+  })
+
   const updateFormData = (updates: Partial<SignupFormData>) => {
     setFormData(prev => ({ ...prev, ...updates }))
   }
@@ -88,28 +100,61 @@ export default function CoopFamilySignupForm({
     }))
   }
 
+  // Validation handlers
+  const updateValidationState = useCallback((field: keyof typeof validationStates, isValid: boolean, errors: string[]) => {
+    setValidationStates(prev => ({
+      ...prev,
+      [field]: { isValid, errors }
+    }))
+  }, [])
+
+  // Memoized validation rules
+  const familyNameValidationRules = useMemo(() => [
+    { test: (value: string) => value.trim().length >= 3, message: 'Family name must be at least 3 characters' },
+    { test: (value: string) => /^[a-zA-Z\s'-]+$/.test(value), message: 'Family name can only contain letters, spaces, hyphens, and apostrophes' }
+  ], [])
+
+  const nameValidationRules = useMemo(() => [
+    { test: (value: string) => value.trim().length >= 2, message: 'Name must be at least 2 characters' },
+    { test: (value: string) => /^[a-zA-Z\s'-]+$/.test(value), message: 'Name can only contain letters, spaces, hyphens, and apostrophes' }
+  ], [])
+
+  // Check if form is ready for submission
+  const isFormValid = () => {
+    const requiredFields = ['familyName', 'firstName', 'lastName', 'username', 'password', 'confirmPassword']
+    return requiredFields.every(field => validationStates[field as keyof typeof validationStates]?.isValid) && formData.agreedToTerms
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     
     try {
-      // Validate passwords match
-      if (formData.primaryParentInfo.password !== formData.primaryParentInfo.confirmPassword) {
-        toast({
-          title: "Error",
-          description: "Passwords do not match",
-          variant: "destructive"
-        })
-        return
-      }
-
-      // Validate terms agreement
-      if (!formData.agreedToTerms) {
-        toast({
-          title: "Error",
-          description: "You must agree to the Terms of Service to create an account",
-          variant: "destructive"
-        })
+      // Enhanced validation with specific error messages
+      if (!isFormValid()) {
+        const fieldErrors = Object.entries(validationStates)
+          .filter(([_, state]) => !state.isValid && state.errors.length > 0)
+          .map(([field, state]) => `${field}: ${state.errors[0]}`)
+        
+        if (fieldErrors.length > 0) {
+          toast({
+            title: "Validation Error",
+            description: `Please fix the following errors: ${fieldErrors.join(', ')}`,
+            variant: "destructive"
+          })
+        } else if (!formData.agreedToTerms) {
+          toast({
+            title: "Error",
+            description: "You must agree to the Terms of Service to create an account",
+            variant: "destructive"
+          })
+        } else {
+          toast({
+            title: "Error",
+            description: "Please complete all required fields",
+            variant: "destructive"
+          })
+        }
         return
       }
 
@@ -164,72 +209,79 @@ export default function CoopFamilySignupForm({
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="familyName">Family Name</Label>
-                <Input
-                  id="familyName"
-                  value={formData.familyName}
-                  onChange={(e) => updateFormData({ familyName: e.target.value })}
-                  placeholder="e.g., The Smith Family"
-                  className="mt-1"
-                  required
-                />
-              </div>
+              <EnhancedInput
+                id="familyName"
+                label="Family Name"
+                value={formData.familyName}
+                onChange={(e) => updateFormData({ familyName: e.target.value })}
+                placeholder="e.g., The Smith Family"
+                required
+                disabled={isLoading}
+                validationRules={familyNameValidationRules}
+                onValidationChange={(isValid, errors) => updateValidationState('familyName', isValid, errors)}
+              />
 
               <div className="space-y-4">
                 <h3 className="font-medium">Primary Parent/Guardian Information</h3>
                 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input
-                      id="firstName"
-                      value={formData.primaryParentInfo.firstName}
-                      onChange={(e) => updateParentInfo({ firstName: e.target.value })}
-                      className="mt-1"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input
-                      id="lastName"
-                      value={formData.primaryParentInfo.lastName}
-                      onChange={(e) => updateParentInfo({ lastName: e.target.value })}
-                      className="mt-1"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="username">Username</Label>
-                  <Input
-                    id="username"
-                    value={formData.primaryParentInfo.username}
-                    onChange={(e) => updateParentInfo({ username: e.target.value })}
-                    placeholder="Choose a unique username"
-                    className="mt-1"
+                  <EnhancedInput
+                    id="firstName"
+                    label="First Name"
+                    value={formData.primaryParentInfo.firstName}
+                    onChange={(e) => updateParentInfo({ firstName: e.target.value })}
+                    placeholder="Enter your first name"
                     required
+                    disabled={isLoading}
+                    validationRules={nameValidationRules}
+                    onValidationChange={(isValid, errors) => updateValidationState('firstName', isValid, errors)}
+                  />
+                  
+                  <EnhancedInput
+                    id="lastName"
+                    label="Last Name"
+                    value={formData.primaryParentInfo.lastName}
+                    onChange={(e) => updateParentInfo({ lastName: e.target.value })}
+                    placeholder="Enter your last name"
+                    required
+                    disabled={isLoading}
+                    validationRules={nameValidationRules}
+                    onValidationChange={(isValid, errors) => updateValidationState('lastName', isValid, errors)}
                   />
                 </div>
 
-                <PasswordInput
+                <UsernameInput
+                  id="username"
+                  value={formData.primaryParentInfo.username}
+                  onChange={(e) => updateParentInfo({ username: e.target.value })}
+                  required
+                  disabled={isLoading}
+                  onValidationChange={(isValid, errors) => updateValidationState('username', isValid, errors)}
+                />
+
+                <EnhancedPasswordInput
                   id="password"
                   label="Password"
                   value={formData.primaryParentInfo.password}
                   onChange={(e) => updateParentInfo({ password: e.target.value })}
-                  placeholder="Enter your password"
-                  required={true}
+                  required
+                  disabled={isLoading}
+                  showStrengthIndicator={true}
+                  minLength={8}
+                  onValidationChange={(isValid, errors) => updateValidationState('password', isValid, errors)}
                 />
 
-                <PasswordInput
+                <EnhancedPasswordInput
                   id="confirmPassword"
                   label="Confirm Password"
                   value={formData.primaryParentInfo.confirmPassword}
                   onChange={(e) => updateParentInfo({ confirmPassword: e.target.value })}
                   placeholder="Confirm your password"
-                  required={true}
+                  required
+                  disabled={isLoading}
+                  showStrengthIndicator={false}
+                  confirmValue={formData.primaryParentInfo.password}
+                  onValidationChange={(isValid, errors) => updateValidationState('confirmPassword', isValid, errors)}
                 />
 
                 <TermsCheckbox
@@ -250,7 +302,7 @@ export default function CoopFamilySignupForm({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isLoading || !formData.familyName.trim() || !formData.primaryParentInfo.firstName.trim() || !formData.primaryParentInfo.lastName.trim() || !formData.primaryParentInfo.username.trim() || !formData.primaryParentInfo.password.trim() || !formData.primaryParentInfo.confirmPassword.trim() || !formData.agreedToTerms}
+                  disabled={isLoading || !isFormValid()}
                   className="flex-1"
                 >
                   {isLoading ? (

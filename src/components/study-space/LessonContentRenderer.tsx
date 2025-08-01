@@ -173,19 +173,24 @@ const RichContentRenderer = ({ content }: { content: string }) => {
     content: content || '',
     editable: false,
     immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        class: 'prose prose-slate dark:prose-invert max-w-none select-text focus:outline-none',
+      },
+    },
   });
 
   if (!editor) {
     return (
-      <div className="prose prose-slate dark:prose-invert max-w-none">
-        <ReactMarkdown>{content}</ReactMarkdown>
+      <div className="prose prose-slate dark:prose-invert max-w-none select-text">
+        <ReactMarkdown className="select-text">{content}</ReactMarkdown>
       </div>
     );
   }
 
   return (
-    <div className="prose prose-slate dark:prose-invert max-w-none">
-      <EditorContent editor={editor} />
+    <div className="prose prose-slate dark:prose-invert max-w-none select-text">
+      <EditorContent editor={editor} className="select-text" />
     </div>
   );
 };
@@ -235,7 +240,7 @@ const EnhancedMarkdownRenderer = ({ content }: { content: string }) => {
   if (processedContent.includes('<div class="youtube-embed-wrapper') || processedContent.includes('<div class="video-wrapper')) {
     return (
       <div 
-        className="prose prose-slate dark:prose-invert max-w-none"
+        className="prose prose-slate dark:prose-invert max-w-none select-text"
         dangerouslySetInnerHTML={{ __html: processedContent }}
       />
     );
@@ -243,8 +248,8 @@ const EnhancedMarkdownRenderer = ({ content }: { content: string }) => {
 
   // Otherwise use ReactMarkdown
   return (
-    <div className="prose prose-slate dark:prose-invert max-w-none">
-      <ReactMarkdown>{processedContent}</ReactMarkdown>
+    <div className="prose prose-slate dark:prose-invert max-w-none select-text">
+      <ReactMarkdown className="select-text">{processedContent}</ReactMarkdown>
     </div>
   );
 };
