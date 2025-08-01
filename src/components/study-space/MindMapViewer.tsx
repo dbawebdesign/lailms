@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Download, Edit3, Check, RefreshCw, Plus, Minus, Expand, Eye, List, Grid, X, Trash2, ZoomIn, ZoomOut, Move, RotateCcw, Loader2, ArrowLeft, Save, Map } from 'lucide-react';
+import { Copy, Download, Edit3, Check, RefreshCw, Plus, Minus, Expand, Eye, List, Grid, X, Trash2, ZoomIn, ZoomOut, Move, RotateCcw, Loader2, ArrowLeft, Save, Map, HelpCircle, GripVertical } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -196,12 +196,21 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
   const [nodes, setNodes] = useState<MindMapNode[]>([]);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [mapDragStart, setMapDragStart] = useState({ x: 0, y: 0 });
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingNode, setEditingNode] = useState<{ id: string; label: string; description: string } | null>(null);
   const [expandingNodes, setExpandingNodes] = useState<Set<string>>(new Set());
+  const [showInstructions, setShowInstructions] = useState(false);
+  
+  // Node details panel state
+  const [panelPosition, setPanelPosition] = useState({ x: 16, y: 16 }); // top-left default
+  const [panelSize, setPanelSize] = useState({ width: 320, height: 200 });
+  const [isPanelDragging, setIsPanelDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [panelDragStart, setPanelDragStart] = useState({ x: 0, y: 0 });
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -468,7 +477,7 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
     const target = e.target as Element;
     if (target.tagName === 'svg' || target.tagName === 'rect') {
       setIsDragging(true);
-      setDragStart({ 
+      setMapDragStart({ 
         x: e.clientX - transform.x, 
         y: e.clientY - transform.y 
       });
@@ -480,11 +489,11 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
     if (isDragging) {
       setTransform(prev => ({
         ...prev,
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
+        x: e.clientX - mapDragStart.x,
+        y: e.clientY - mapDragStart.y
       }));
     }
-  }, [isDragging, dragStart]);
+  }, [isDragging, mapDragStart]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
@@ -502,12 +511,15 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   const handleWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.15 : 0.15;
-    setTransform(prev => ({
-      ...prev,
-      scale: Math.max(0.1, Math.min(5, prev.scale + delta))
-    }));
+    // Only zoom when Ctrl key is held down
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.15 : 0.15;
+      setTransform(prev => ({
+        ...prev,
+        scale: Math.max(0.1, Math.min(5, prev.scale + delta))
+      }));
+    }
   }, []);
 
   useEffect(() => {
@@ -517,6 +529,30 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
       return () => container.removeEventListener('wheel', handleWheel);
     }
   }, [handleWheel]);
+
+  // Click outside and keyboard handler for instructions dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showInstructions && containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setShowInstructions(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showInstructions) {
+        setShowInstructions(false);
+      }
+    };
+
+    if (showInstructions) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [showInstructions]);
 
   const handleZoom = (direction: 'in' | 'out') => {
     const delta = direction === 'in' ? 0.2 : -0.2;
@@ -545,6 +581,108 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
       }
     }
   };
+
+  // Panel drag handlers
+  const handlePanelMouseDown = (e: React.MouseEvent) => {
+    // Don't start dragging if clicking on the close button or resize handle
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.classList.contains('resize-handle')) {
+      return;
+    }
+    
+    setIsPanelDragging(true);
+    setPanelDragStart({
+      x: e.clientX - panelPosition.x,
+      y: e.clientY - panelPosition.y
+    });
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handlePanelMouseMove = useCallback((e: MouseEvent) => {
+    if (isPanelDragging) {
+      const container = containerRef.current;
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        const newX = Math.max(0, Math.min(containerRect.width - panelSize.width, e.clientX - panelDragStart.x));
+        const newY = Math.max(0, Math.min(containerRect.height - panelSize.height, e.clientY - panelDragStart.y));
+        
+        setPanelPosition({ x: newX, y: newY });
+      }
+    }
+    
+    if (isResizing) {
+      const container = containerRef.current;
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        
+        // Calculate the change in mouse position
+        const deltaX = e.clientX - resizeStart.x;
+        const deltaY = e.clientY - resizeStart.y;
+        
+        // Calculate new size based on initial size + delta
+        const newWidth = Math.max(200, Math.min(
+          containerRect.width - panelPosition.x,
+          resizeStart.width + deltaX
+        ));
+        const newHeight = Math.max(150, Math.min(
+          containerRect.height - panelPosition.y,
+          resizeStart.height + deltaY
+        ));
+        
+        setPanelSize({ width: newWidth, height: newHeight });
+      }
+    }
+  }, [isPanelDragging, isResizing, panelDragStart, panelPosition, panelSize]);
+
+  const handlePanelMouseUp = useCallback(() => {
+    setIsPanelDragging(false);
+    setIsResizing(false);
+  }, []);
+
+  // Panel resize handlers
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    setIsResizing(true);
+    setResizeStart({
+      x: e.clientX,
+      y: e.clientY,
+      width: panelSize.width,
+      height: panelSize.height
+    });
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  // Panel mouse event listeners
+  useEffect(() => {
+    if (isPanelDragging || isResizing) {
+      document.addEventListener('mousemove', handlePanelMouseMove);
+      document.addEventListener('mouseup', handlePanelMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handlePanelMouseMove);
+        document.removeEventListener('mouseup', handlePanelMouseUp);
+      };
+    }
+  }, [isPanelDragging, isResizing, handlePanelMouseMove, handlePanelMouseUp]);
+
+  // Ensure panel stays within bounds when container resizes
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container && selectedNodeId) {
+      const handleResize = () => {
+        const containerRect = container.getBoundingClientRect();
+        setPanelPosition(prev => ({
+          x: Math.max(0, Math.min(containerRect.width - panelSize.width, prev.x)),
+          y: Math.max(0, Math.min(containerRect.height - panelSize.height, prev.y))
+        }));
+      };
+
+      const resizeObserver = new ResizeObserver(handleResize);
+      resizeObserver.observe(container);
+      
+      return () => resizeObserver.disconnect();
+    }
+  }, [selectedNodeId, panelSize]);
 
   const toggleNodeExpansion = (nodeId: string) => {
     const updateNodeExpansion = (nodes: MindMapNode[]): MindMapNode[] => {
@@ -826,44 +964,86 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
       ref={containerRef}
       className="relative w-full h-full min-h-[400px] bg-white dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50 shadow-sm"
     >
-      <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
-        {/* Zoom Controls */}
-        <div className="flex bg-white/90 dark:bg-slate-800/90 rounded-lg p-1 shadow-sm border border-slate-200/50 dark:border-slate-700/50">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleZoom('in')}
-            className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-700"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleZoom('out')}
-            className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-700"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleResetView}
-            className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-700"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-        </div>
-        
-        {/* Instructions */}
-        <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-lg p-3 shadow-sm border border-slate-200 dark:border-slate-700 max-w-xs">
-          <h3 className="font-medium text-sm text-slate-700 dark:text-slate-300 mb-1">Study Mind Map</h3>
-          <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
-            <div>• <strong>Drag</strong> to pan around</div>
-            <div>• <strong>Hover</strong> nodes for actions</div>
-            <div>• <strong>Click ✨</strong> to AI-expand nodes</div>
-            <div>• <strong>Click ±</strong> to show/hide children</div>
+      <div className="absolute top-4 right-4 z-10">
+        <div className="relative">
+          {/* Integrated Controls with Help Button */}
+          <div className="flex bg-white/90 dark:bg-slate-800/90 rounded-lg p-1 shadow-sm border border-slate-200/50 dark:border-slate-700/50">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleZoom('in')}
+              className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-700"
+              title="Zoom In"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleZoom('out')}
+              className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-700"
+              title="Zoom Out"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResetView}
+              className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-700"
+              title="Reset View"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <div className="w-px bg-slate-300 dark:bg-slate-600 mx-1" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowInstructions(!showInstructions)}
+              className={`h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-700 ${
+                showInstructions ? 'bg-slate-100 dark:bg-slate-700' : ''
+              }`}
+              title="Toggle Instructions"
+              aria-label="Toggle instructions"
+              aria-expanded={showInstructions}
+              aria-controls="mind-map-instructions"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </Button>
           </div>
+          
+          {/* Collapsible Instructions Dropdown */}
+          {showInstructions && (
+            <div 
+              id="mind-map-instructions"
+              className="absolute top-full right-0 mt-2 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-lg p-3 shadow-lg border border-slate-200 dark:border-slate-700 max-w-xs min-w-[240px] animate-in fade-in-0 zoom-in-95 duration-200"
+              role="tooltip"
+              aria-hidden={!showInstructions}
+            >
+              <h3 className="font-medium text-sm text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                <HelpCircle className="h-3 w-3" />
+                Study Mind Map
+              </h3>
+              <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
+                <div className="flex items-start gap-2">
+                  <span className="text-slate-400 mt-0.5">•</span>
+                  <span><strong>Drag</strong> to pan around</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-slate-400 mt-0.5">•</span>
+                  <span><strong>Hover</strong> nodes for actions</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-slate-400 mt-0.5">•</span>
+                  <span><strong>Click ✨</strong> to AI-expand nodes</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-slate-400 mt-0.5">•</span>
+                  <span><strong>Click ±</strong> to show/hide children</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -887,9 +1067,25 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
         </g>
       </svg>
 
-      {/* Selected node info panel */}
+      {/* Draggable and Resizable Node Details Panel */}
       {selectedNodeId && (
-        <div className="absolute top-4 left-4 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-lg p-4 shadow-lg border border-slate-200 dark:border-slate-700 max-w-sm z-10">
+        <div 
+          className={`absolute backdrop-blur-sm rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-20 select-none transition-opacity duration-200 ${
+            isPanelDragging || isResizing 
+              ? 'bg-white/85 dark:bg-slate-800/85 opacity-90' 
+              : 'bg-white/95 dark:bg-slate-800/95'
+          }`}
+          style={{
+            left: panelPosition.x,
+            top: panelPosition.y,
+            width: panelSize.width,
+            height: panelSize.height,
+            minWidth: '200px',
+            minHeight: '150px',
+            cursor: isPanelDragging ? 'grabbing' : isResizing ? 'se-resize' : 'default'
+          }}
+
+        >
           {(() => {
             const findSelectedNode = (nodes: MindMapNode[]): MindMapNode | null => {
               for (const node of nodes) {
@@ -907,26 +1103,59 @@ function InteractiveMindMapCanvas({ mindMapData, onExpandNode, onEditNode, onDel
             
             return (
               <>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium text-slate-800 dark:text-slate-200">{node.label || 'Untitled'}</h4>
+                {/* Draggable Header */}
+                <div 
+                  className={`drag-handle flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/50 rounded-t-lg ${
+                    isPanelDragging ? 'cursor-grabbing' : 'cursor-grab'
+                  }`}
+                  onMouseDown={handlePanelMouseDown}
+                >
+                  <div className="flex items-center gap-2">
+                    <GripVertical className="h-4 w-4 text-slate-400" />
+                    <h4 className="font-medium text-slate-800 dark:text-slate-200 truncate">{node.label || 'Untitled'}</h4>
+                  </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setSelectedNodeId(null)}
-                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedNodeId(null);
+                    }}
+                    className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-600"
                   >
                     <X className="h-3 w-3" />
                   </Button>
                 </div>
-                {node.description && (
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{node.description}</p>
-                )}
-                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
-                  <Badge variant="outline" className="text-xs">Level {node.level}</Badge>
-                  {node.children && node.children.length > 0 && (
-                    <Badge variant="outline" className="text-xs">{node.children.length} children</Badge>
+                
+                {/* Scrollable Content */}
+                <div className="p-3 overflow-y-auto" style={{ height: panelSize.height - 60 }}>
+                  {node.description && (
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 leading-relaxed">{node.description}</p>
                   )}
+                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
+                    <Badge variant="outline" className="text-xs">Level {node.level}</Badge>
+                    {node.children && node.children.length > 0 && (
+                      <Badge variant="outline" className="text-xs">{node.children.length} children</Badge>
+                    )}
+                  </div>
                 </div>
+                
+                {/* Resize Handle */}
+                <div 
+                  className="resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500 transition-colors"
+                  style={{
+                    clipPath: 'polygon(100% 0%, 0% 100%, 100% 100%)'
+                  }}
+                  onMouseDown={handleResizeMouseDown}
+                />
+                {/* Additional resize handle for better visibility */}
+                <div 
+                  className="resize-handle absolute bottom-1 right-1 w-3 h-3 cursor-se-resize"
+                  style={{
+                    background: 'repeating-linear-gradient(-45deg, transparent, transparent 1px, rgba(148, 163, 184, 0.5) 1px, rgba(148, 163, 184, 0.5) 2px)'
+                  }}
+                  onMouseDown={handleResizeMouseDown}
+                />
               </>
             );
           })()}

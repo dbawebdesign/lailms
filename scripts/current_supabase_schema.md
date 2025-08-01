@@ -2,6 +2,62 @@
 
 ## Recent Updates
 
+### Stripe Payment Integration (2025-01-29)
+Added comprehensive payment tracking and Stripe integration for homeschool signup flow:
+
+- **Schema Changes:**
+  - Added `paid` (boolean, default false) to `profiles` table
+  - Added `paid_at` (timestamptz) to track payment completion time
+  - Added `stripe_customer_id` (text) to link users to Stripe customers
+  - Added `stripe_payment_intent_id` (text) to track specific payment transactions
+  - Added `stripe_receipt_url` (text) to store receipt links
+  - Added `payment_amount_cents` (integer) to track payment amounts
+  - Added `payment_currency` (text, default 'usd') to track payment currency
+  - Added indexes on `paid` and `stripe_customer_id` for query performance
+
+- **Features:**
+  - **Payment Flow Integration**: Seamless redirect from signup to Stripe payment link
+  - **Webhook Processing**: Automatic profile updates when payments complete
+  - **Payment Tracking**: Complete audit trail of user payments and receipts
+  - **Status Checking**: API endpoint to verify payment status for authenticated users
+
+- **API Endpoints:**
+  - `/api/stripe/webhook` - POST: Process Stripe webhook events
+  - `/api/payment/status` - GET: Check current user's payment status
+
+- **Integration Points:**
+  - Connected to signup flow with automatic payment redirect
+  - Webhook updates user profiles upon successful payment
+  - Payment success page provides user feedback and login redirect
+  - Support for both one-time and subscription payments
+
+### Enhanced Course Generation Tracking System (2025-01-29)
+Added comprehensive task-level tracking, error management, and recovery capabilities for course generation:
+
+- **New Tables:**
+  - `course_generation_tasks`: Granular task tracking with status, dependencies, timing, and error details
+  - `course_generation_errors`: Comprehensive error logging with classification and recovery suggestions
+  - `course_generation_analytics`: Performance metrics, quality scores, and resource usage tracking
+  - `course_generation_user_actions`: Tracking of user interventions and recovery actions
+
+- **Enhanced Features:**
+  - **Task-Level Persistence**: All generation tasks now persisted with full state tracking
+  - **Intelligent Retry System**: Configurable retry logic with backoff strategies
+  - **Granular Error Handling**: Detailed error classification with recovery suggestions
+  - **Performance Analytics**: Comprehensive metrics for optimization and evaluation
+  - **User Recovery Actions**: Database tracking of user interventions and success rates
+  - **Dependency Management**: Sophisticated task dependency resolution and validation
+
+- **Database Functions:**
+  - `calculate_job_completion_percentage()`: Real-time progress calculation
+  - `check_task_dependencies_ready()`: Dependency validation for task execution
+
+- **Impact:**
+  - Enables granular progress tracking and intelligent recovery from failures
+  - Provides detailed analytics for system optimization and failure analysis
+  - Supports user-driven recovery workflows with skip/retry capabilities
+  - Creates foundation for 98%+ success rate through comprehensive error handling
+
 ### Document Chunks Base Class ID Fix (2025-01-28)
 Fixed critical missing column in document_chunks table that was causing large PDF processing failures:
 

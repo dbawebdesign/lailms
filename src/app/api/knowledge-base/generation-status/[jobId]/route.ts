@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { courseGenerationOrchestrator } from '@/lib/services/course-generation-orchestrator';
+import { CourseGenerationOrchestratorV2 } from '@/lib/services/course-generation-orchestrator-v2';
 import { Tables } from 'packages/types/db';
 
 interface GenerationTask {
@@ -73,7 +74,60 @@ export async function GET(
       );
     }
 
-    // Try to get live, detailed state from the orchestrator
+    // Check if this is a v2 job by looking at generation_config
+    const generationConfig = job.generation_config as any;
+    const isV2Job = generationConfig?.version === 'v2' || generationConfig?.orchestrator === 'CourseGenerationOrchestratorV2';
+
+    if (isV2Job) {
+      // For v2 jobs, get task details from the database
+      const { data: v2Tasks, error: tasksError } = await supabase
+        .from('course_generation_tasks')
+        .select('*')
+        .eq('job_id', jobId)
+        .order('created_at', { ascending: true });
+
+      if (!tasksError && v2Tasks) {
+        // Transform v2 tasks to match the expected format
+        const tasks = v2Tasks.map((task: any) => ({
+          id: task.id,
+          type: task.task_type,
+          status: task.status,
+          identifier: task.task_identifier,
+          error: task.error_message,
+          progress: task.status === 'completed' ? 100 : 
+                   task.status === 'running' ? 50 : 
+                   task.status === 'failed' ? 0 : 0,
+          metadata: task.result_metadata
+        }));
+
+        const determinedStatus = determineJobStatus(tasks as GenerationTask[], job.status || 'processing');
+        
+        return NextResponse.json({
+          success: true,
+          isLive: true,
+          isV2: true,
+          job: {
+            id: job.id,
+            status: determinedStatus,
+            progress: job.progress_percentage || 0,
+            error: job.error_message,
+            tasks: tasks,
+            confettiShown: (job as any).confetti_shown || false,
+            result: job.result_data,
+            result_data: job.result_data,
+            version: 'v2',
+            features: generationConfig?.features || []
+          },
+          result_data: job.result_data,
+          progress_percentage: job.progress_percentage || 0,
+          courseOutline: (job.result_data as any)?.courseOutline,
+          createdAt: job.created_at,
+          updatedAt: job.updated_at
+        });
+      }
+    }
+
+    // Try to get live, detailed state from the v1 orchestrator (legacy jobs)
     const liveState = courseGenerationOrchestrator.getJobState(jobId);
 
     if (liveState) {
@@ -84,6 +138,7 @@ export async function GET(
       return NextResponse.json({
         success: true,
         isLive: true,
+        isV2: false,
         job: {
           id: liveState.jobId,
           status: determinedStatus,
@@ -91,12 +146,13 @@ export async function GET(
           error: job.error_message,
           tasks: tasks,
           confettiShown: (job as any).confetti_shown || false,
-          result: job.result_data, // Include result for consistency with jobs list API
-          result_data: job.result_data, // Include result_data for new code
+          result: job.result_data,
+          result_data: job.result_data,
+          version: 'v1'
         },
-        result_data: job.result_data, // Include result_data for live jobs too
+        result_data: job.result_data,
         progress_percentage: liveState.progress,
-        courseOutline: (job.result_data as any)?.courseOutline, // Include courseOutline for redirect
+        courseOutline: (job.result_data as any)?.courseOutline,
         createdAt: job.created_at,
         updatedAt: job.updated_at
       });

@@ -17,6 +17,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { triggerCelebration } from '@/components/ui/confetti';
 import { RealTimeProgress } from '@/components/ui/real-time-progress';
+import { CourseGenerationModal } from '@/components/ui/course-generation-modal';
 import { 
   estimateCourseGenerationTime, 
   formatEstimatedTime, 
@@ -137,6 +138,13 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
   const [error, setError] = useState<string | null>(null);
   const [generationJob, setGenerationJob] = useState<any>(null);
   const [showTimeEstimate, setShowTimeEstimate] = useState(false);
+  const [showGenerationModal, setShowGenerationModal] = useState(false);
+
+  const handleModalComplete = useCallback(() => {
+    setShowGenerationModal(false);
+    // Redirect to dashboard
+    router.push('/teach');
+  }, [router]);
 
   const loadKnowledgeBaseAnalysis = useCallback(async () => {
     try {
@@ -233,7 +241,7 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
     let interval: NodeJS.Timeout | null = null;
     
     if (generationJob && (generationJob.status === 'processing' || generationJob.status === 'queued')) {
-      interval = setInterval(checkJobStatus, 2000);
+      interval = setInterval(checkJobStatus, 5000);
     }
     
     return () => {
@@ -295,6 +303,8 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
           progress: 0,
           estimatedMinutes: timeEstimate?.estimatedMinutes
         });
+        // Show the generation modal instead of progress UI
+        setShowGenerationModal(true);
       } else {
         setError(data.error || 'Failed to start course generation');
       }
@@ -315,76 +325,9 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
     );
   }
 
-  if (generationJob && (generationJob.status === 'processing' || generationJob.status === 'queued')) {
-    return (
-      <div className="flex flex-col items-center justify-center p-6 space-y-6">
-        <div className="text-center">
-          <div className="flex items-center justify-center mb-4">
-            <Sparkles className="h-8 w-8 text-purple-500 mr-3" />
-            <h2 className="text-2xl font-bold">Generating Course</h2>
-          </div>
-          <p className="text-muted-foreground">
-            Creating your course based on the knowledge base content...
-          </p>
-        </div>
+  // Progress is now handled by the modal - no need for separate progress UI
 
-        {/* Real-time Progress Display */}
-        <div className="w-full max-w-2xl">
-          <RealTimeProgress 
-            jobId={generationJob.id} 
-          />
-        </div>
-        
-        {/* Background Generation Notice */}
-        <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg max-w-2xl">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              <Sparkles className="h-5 w-5 text-blue-600 mt-0.5" />
-            </div>
-            <div className="flex-1">
-              <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                Course Generation in Progress
-              </h4>
-              <div className="mt-2 text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                <p>Your course is being generated in the background. This process may take several minutes depending on the complexity and size of your knowledge base.</p>
-                <p className="font-medium">You can safely:</p>
-                <ul className="list-disc list-inside ml-2 space-y-0.5">
-                  <li>Navigate back to your dashboard to work on other tasks</li>
-                  <li>Check on other courses or manage your content</li>
-                </ul>
-                <p className="mt-2 font-medium">You'll be notified in the dashboard when your course is ready!</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Dashboard Navigation Button */}
-        <div className="flex justify-center">
-          <Button
-            variant="outline"
-            onClick={() => window.location.href = '/teach'}
-            className="flex items-center space-x-2"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
-            </svg>
-            <span>Go to Dashboard</span>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (generationJob?.status === 'completed') {
-    return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <CheckCircle className="h-12 w-12 text-green-500" />
-        <p className="mt-4 text-xl font-semibold">Course Generated Successfully!</p>
-        <p className="text-gray-600">Redirecting to your new course...</p>
-      </div>
-    );
-  }
+  // Completion is now handled by the modal with redirect
 
   return (
     <div className="w-full space-y-6">
@@ -1026,6 +969,13 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
           Generate Course
         </Button>
       </div>
+
+      {/* Course Generation Modal */}
+      <CourseGenerationModal
+        isOpen={showGenerationModal}
+        jobId={generationJob?.id}
+        onComplete={handleModalComplete}
+      />
     </div>
   );
 } 

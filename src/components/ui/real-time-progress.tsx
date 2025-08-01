@@ -11,55 +11,12 @@ interface RealTimeProgressProps {
   jobId: string;
 }
 
-interface JobStatus {
-  id: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed';
-  progress: number;
-  error?: string;
-}
+// JobStatus interface removed - now using progress data from useProgressStream
 
 export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
   const { progress, isConnected, error, reconnect } = useProgressStream(jobId);
-  const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
-  const [isPollingJob, setIsPollingJob] = useState(false);
-
-  // Job status polling (similar to dashboard widget)
-  const pollJobStatus = useCallback(async () => {
-    if (isPollingJob || !jobId) return;
-    setIsPollingJob(true);
-    try {
-      const response = await fetch(`/api/knowledge-base/generation-status/${jobId}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          const newJobStatus = {
-            id: data.job.id,
-            status: data.job.status,
-            progress: data.job.progress || 0,
-            error: data.job.error
-          };
-          setJobStatus(newJobStatus);
-          console.log(`🔄 Course creator job status updated:`, newJobStatus);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to poll job status:', error);
-    } finally {
-      setIsPollingJob(false);
-    }
-  }, [jobId, isPollingJob]);
-
-  // Set up job status polling
-  useEffect(() => {
-    if (!jobId) return;
-    
-    // Initial poll
-    pollJobStatus();
-    
-    // Set up polling interval for job status
-    const interval = setInterval(pollJobStatus, 5000); // Poll every 5 seconds
-    return () => clearInterval(interval);
-  }, [jobId, pollJobStatus]);
+  
+  // Remove duplicate polling - useProgressStream already handles job status polling
 
   // Connection status indicator
   const connectionStatus = () => {
@@ -72,8 +29,8 @@ export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
       );
     }
     
-    // Show job status if available
-    if (jobStatus?.status === 'completed') {
+    // Show progress status if available
+    if (progress?.status === 'completed') {
       return (
         <div className="flex items-center gap-2 text-green-600 text-sm">
           <CheckCircle2 className="w-4 h-4" />
@@ -82,7 +39,7 @@ export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
       );
     }
     
-    if (jobStatus?.status === 'failed') {
+    if (progress?.status === 'failed') {
       return (
         <div className="flex items-center gap-2 text-red-600 text-sm">
           <AlertCircle className="w-4 h-4" />
@@ -91,7 +48,7 @@ export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
       );
     }
     
-    if (!isConnected && !jobStatus) {
+    if (!isConnected && !progress) {
       return (
         <div className="flex items-center gap-2 text-yellow-600 text-sm">
           <RefreshCw className="w-4 h-4 animate-spin" />
@@ -108,9 +65,9 @@ export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
     );
   };
 
-  // Display current activity message (prioritize streaming data)
+  // Display current activity message (use streaming data from useProgressStream)
   const getCurrentActivity = () => {
-    // Use streaming progress if available (from useProgressStream)
+    // Use streaming progress data
     if (progress?.liveMessage?.message) {
       return progress.liveMessage.message;
     }
@@ -119,21 +76,21 @@ export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
       return progress.detailedMessage;
     }
     
-    // Fallback to job status if streaming not available
-    if (jobStatus?.status === 'processing') {
+    // Fallback based on progress status
+    if (progress?.status === 'processing') {
       return 'Processing...';
     }
     
-    if (jobStatus?.status === 'queued') {
+    if (progress?.status === 'queued') {
       return 'Queued for processing...';
     }
     
-    if (jobStatus?.status === 'completed') {
+    if (progress?.status === 'completed') {
       return 'Course generation completed!';
     }
     
-    if (jobStatus?.status === 'failed') {
-      return jobStatus.error || 'Generation failed';
+    if (progress?.status === 'failed') {
+      return progress?.error || 'Generation failed';
     }
     
     return 'Initializing...';
@@ -171,11 +128,11 @@ export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
             Overall Progress
           </span>
           <span className="text-sm font-medium text-gray-900">
-            {progress ? `${Math.round(progress.overallProgress)}%` : jobStatus ? `${Math.round(jobStatus.progress)}%` : '0%'}
+            {progress ? `${Math.round(progress.overallProgress)}%` : '0%'}
           </span>
         </div>
         <Progress 
-          value={progress?.overallProgress || jobStatus?.progress || 0} 
+          value={progress?.overallProgress || 0} 
           className="h-3"
         />
       </div>
@@ -233,7 +190,7 @@ export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
       )}
 
       {/* Completion State */}
-      {(progress?.overallProgress === 100 || jobStatus?.status === 'completed') && (
+      {(progress?.overallProgress === 100 || progress?.status === 'completed') && (
         <div className="flex items-center gap-2 text-green-600 bg-green-50 p-3 rounded-md border border-green-200">
           <CheckCircle2 className="w-4 h-4" />
           <span className="text-sm font-medium">Generation Complete!</span>
@@ -241,12 +198,12 @@ export function RealTimeProgress({ jobId }: RealTimeProgressProps) {
       )}
 
       {/* Failed State */}
-      {jobStatus?.status === 'failed' && (
+      {progress?.status === 'failed' && (
         <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
           <AlertCircle className="w-4 h-4" />
           <span className="text-sm font-medium">Generation Failed</span>
-          {jobStatus.error && (
-            <p className="text-sm text-red-600 mt-1">{jobStatus.error}</p>
+          {progress?.error && (
+            <p className="text-sm text-red-600 mt-1">{progress.error}</p>
           )}
         </div>
       )}

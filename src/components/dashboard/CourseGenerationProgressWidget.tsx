@@ -54,6 +54,10 @@ interface GenerationJob {
   updatedAt: string;
   isCleared?: boolean;
   confettiShown?: boolean;
+  // System fields
+  version?: 'v1' | 'v2';
+  features?: string[];
+  source?: string;
 }
 
 interface CourseGenerationProgressWidgetProps {
@@ -286,36 +290,77 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
                     <h4 className="font-medium text-sm truncate">{job.title}</h4>
                     <Badge variant={job.status === 'failed' ? 'destructive' : 'outline'}>{job.status}</Badge>
                   </div>
-                  {/* Show streaming message for active jobs, fallback to base class name */}
+                  {/* Show real-time progress for active jobs, fallback to base class name */}
                   {job.status === 'processing' ? (
-                    streamProgress?.liveMessage?.message ? (
-                      <div className="flex items-center gap-2">
-                        <Activity className="h-3 w-3 text-blue-500 animate-pulse" />
-                        <p className="text-xs text-blue-600 font-medium truncate">{streamProgress.liveMessage.message}</p>
-                      </div>
-                    ) : streamProgress?.detailedMessage ? (
-                      <div className="flex items-center gap-2">
-                        <Activity className="h-3 w-3 text-blue-500 animate-pulse" />
-                        <p className="text-xs text-blue-600 font-medium truncate">{streamProgress.detailedMessage}</p>
-                      </div>
-                    ) : isConnected ? (
-                      <div className="flex items-center gap-2">
-                        <Activity className="h-3 w-3 text-blue-500 animate-pulse" />
-                        <p className="text-xs text-blue-600 font-medium truncate">Processing...</p>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Activity className="h-3 w-3 text-amber-500 animate-pulse" />
-                        <p className="text-xs text-amber-600 font-medium truncate">Connecting...</p>
-                      </div>
-                    )
+                    (() => {
+                      // Calculate task completion statistics
+                      const completedCount = job.tasks?.filter(t => t.status === 'completed').length || 0;
+                      const failedCount = job.tasks?.filter(t => t.status === 'failed').length || 0;
+                      const runningCount = job.tasks?.filter(t => t.status === 'running').length || 0;
+                      const totalCount = job.tasks?.length || 0;
+                      const finishedCount = completedCount + failedCount;
+                      const progressPercentage = totalCount > 0 ? Math.round((finishedCount / totalCount) * 100) : 0;
+                      
+                      // Show live message if available, otherwise show task progress
+                      if (streamProgress?.liveMessage?.message) {
+                        return (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Activity className="h-3 w-3 text-blue-500 animate-pulse" />
+                              <p className="text-xs text-blue-600 font-medium truncate">{streamProgress.liveMessage.message}</p>
+                            </div>
+                            {totalCount > 0 && (
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>{finishedCount}/{totalCount} tasks completed</span>
+                                <span>•</span>
+                                <span>{progressPercentage}% done</span>
+                                {runningCount > 0 && <span>• {runningCount} running</span>}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      } else if (totalCount > 0) {
+                        return (
+                          <div className="flex items-center gap-2">
+                            <Activity className="h-3 w-3 text-blue-500 animate-pulse" />
+                            <p className="text-xs text-blue-600 font-medium">
+                              {finishedCount}/{totalCount} tasks completed ({progressPercentage}%)
+                              {runningCount > 0 && ` • ${runningCount} running`}
+                            </p>
+                          </div>
+                        );
+                      } else if (isConnected) {
+                        return (
+                          <div className="flex items-center gap-2">
+                            <Activity className="h-3 w-3 text-blue-500 animate-pulse" />
+                            <p className="text-xs text-blue-600 font-medium truncate">Processing...</p>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="flex items-center gap-2">
+                            <Activity className="h-3 w-3 text-amber-500 animate-pulse" />
+                            <p className="text-xs text-amber-600 font-medium truncate">Connecting...</p>
+                          </div>
+                        );
+                      }
+                    })()
                   ) : (
                     <p className="text-xs text-muted-foreground truncate">{job.baseClassName}</p>
                   )}
                 </div>
               </div>
               
-              {job.status !== 'completed' && job.status !== 'failed' && <Progress value={job.progress} className="h-2" />}
+              {job.status !== 'completed' && job.status !== 'failed' && (() => {
+                // Calculate the same progress percentage used in the display
+                const completedCount = job.tasks?.filter(t => t.status === 'completed').length || 0;
+                const failedCount = job.tasks?.filter(t => t.status === 'failed').length || 0;
+                const totalCount = job.tasks?.length || 0;
+                const finishedCount = completedCount + failedCount;
+                const progressPercentage = totalCount > 0 ? Math.round((finishedCount / totalCount) * 100) : job.progress || 0;
+                
+                return <Progress value={progressPercentage} className="h-2" />;
+              })()}
               
               {failedTasks.length > 0 && (
                 <div className='text-xs text-red-500 flex items-center gap-1'>
@@ -406,6 +451,23 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
                 </div>
               )}
 
+              {/* View Course Button - Show for completed jobs regardless of failed items */}
+              {job.status === 'completed' && job.baseClassId && (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <Link href={`/class-instances/${job.baseClassId}`}>
+                    <Button className="w-full" size="sm">
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      View Course
+                    </Button>
+                  </Link>
+                  {failedTasks.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      Course is ready to use. {failedTasks.length} item(s) failed but can be regenerated individually.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Task Details */}
               {job.tasks && job.tasks.length > 0 ? (
                 <div className="space-y-2">
@@ -443,6 +505,32 @@ function JobProgressCard({ initialJob, onDismiss }: { initialJob: GenerationJob,
                 </div>
               ) : (
                 <p className='text-xs text-muted-foreground'>No detailed task information available.</p>
+              )}
+
+              {/* Enhanced Features */}
+              {job.features && job.features.length > 0 && (
+                <div className="space-y-2 mt-4 pt-4 border-t border-border">
+                  <h5 className="font-medium text-sm flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-purple-500" />
+                    Enhanced Features
+                  </h5>
+                  <div className="flex flex-wrap gap-1">
+                    {job.features.map(feature => (
+                      <Badge 
+                        key={feature} 
+                        variant="outline" 
+                        className="text-xs bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300"
+                      >
+                        {feature.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </Badge>
+                    ))}
+                  </div>
+                  {job.source && (
+                    <p className="text-xs text-muted-foreground">
+                      Generated via: <span className="font-medium">{job.source.replace(/_/g, ' ')}</span>
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </AccordionContent>

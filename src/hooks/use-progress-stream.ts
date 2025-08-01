@@ -47,14 +47,45 @@ export function useProgressStream(jobId: string): UseProgressStreamReturn {
 
       // Extract progress information from the API response
       const resultData = data.result_data || {};
+      const jobData = data.job || {};
+      const tasks = jobData.tasks || [];
+      
+      // Calculate task-based progress information
+      const completedCount = tasks.filter((t: any) => t.status === 'completed').length;
+      const failedCount = tasks.filter((t: any) => t.status === 'failed').length;  
+      const runningCount = tasks.filter((t: any) => t.status === 'running').length;
+      const totalCount = tasks.length;
+      const finishedCount = completedCount + failedCount;
+      const progressPercentage = totalCount > 0 ? Math.round((finishedCount / totalCount) * 100) : 0;
+      
+      // Generate intelligent detailed message based on task progress
+      let detailedMessage = resultData.detailed_message;
+      if (!detailedMessage || detailedMessage === 'Initializing...') {
+        if (totalCount > 0) {
+          if (runningCount > 0) {
+            const runningTask = tasks.find((t: any) => t.status === 'running');
+            if (runningTask) {
+              detailedMessage = `Generating ${runningTask.type?.replace(/_/g, ' ')} (${finishedCount}/${totalCount} completed)`;
+            } else {
+              detailedMessage = `Processing tasks (${finishedCount}/${totalCount} completed)`;
+            }
+          } else if (finishedCount === 0) {
+            detailedMessage = `Starting course generation (${totalCount} tasks queued)`;
+          } else {
+            detailedMessage = `Processing course content (${finishedCount}/${totalCount} completed)`;
+          }
+        } else {
+          detailedMessage = 'Setting up course generation...';
+        }
+      }
       
       const progressUpdate: ProgressUpdate = {
         jobId,
         timestamp: new Date().toISOString(),
-        overallProgress: data.progress_percentage || 0,
-        currentPhase: resultData.current_phase || 'unknown',
-        phaseDescription: resultData.phase_description || 'Processing...',
-        detailedMessage: resultData.detailed_message || 'Initializing...',
+        overallProgress: data.progress_percentage || progressPercentage,
+        currentPhase: resultData.current_phase || 'processing',
+        phaseDescription: resultData.phase_description || 'Generating course content',
+        detailedMessage,
         estimatedTimeRemaining: resultData.estimated_time_remaining || 'Calculating...',
         liveMessage: resultData.live_message
       };
@@ -97,8 +128,8 @@ export function useProgressStream(jobId: string): UseProgressStreamReturn {
     // Initial fetch
     fetchProgress();
 
-    // Set up polling interval (every 1 second for responsive updates)
-    intervalRef.current = setInterval(fetchProgress, 1000);
+    // Set up polling interval (every 5 seconds for reasonable updates)
+    intervalRef.current = setInterval(fetchProgress, 5000);
   }, [fetchProgress, jobId]);
 
   const reconnect = useCallback(() => {

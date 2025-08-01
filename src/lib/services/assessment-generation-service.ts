@@ -222,7 +222,15 @@ export class AssessmentGenerationService {
     difficulty: string,
     onProgress?: (message: string) => void
   ): Promise<GeneratedQuestion[]> {
-    const prompt = this.buildQuestionGenerationPrompt(content, count, questionTypes, difficulty);
+    // Truncate content if too long to prevent token overflow
+    const maxContentLength = 50000; // ~12,500 tokens (4:1 ratio)
+    let processedContent = content;
+    if (content.length > maxContentLength) {
+      console.warn(`⚠️ Content too long (${content.length} chars), truncating to ${maxContentLength} chars`);
+      processedContent = content.substring(0, maxContentLength) + '\n\n[Content truncated for assessment generation]';
+    }
+    
+    const prompt = this.buildQuestionGenerationPrompt(processedContent, count, questionTypes, difficulty);
     
     onProgress?.('Generating questions with GPT-4.1-mini...');
     
@@ -241,17 +249,33 @@ export class AssessmentGenerationService {
             }
           ],
           temperature: 0.8, // Slightly higher for more creative variation in question generation
-          max_tokens: 4000,
+          max_tokens: 20000, // Increased for class exams
         })
       );
 
       const messageContent = response.choices[0].message?.content;
+      const finishReason = response.choices[0].finish_reason;
+      
       if (!messageContent) {
         throw new Error('Empty response from GPT-4.1-mini');
+      }
+      
+      // Check if response was truncated
+      if (finishReason === 'length') {
+        console.warn('⚠️ AI response was truncated due to token limit, questions may be incomplete');
       }
 
       const questions = this.parseQuestionsResponse(messageContent);
       onProgress?.(`Parsed ${questions.length} questions from AI response`);
+      
+      // Enhanced debugging for class exam failures
+      if (questions.length === 0) {
+        console.error('❌ No questions parsed from AI response');
+        console.error('Raw AI response length:', messageContent.length);
+        console.error('Raw AI response preview:', messageContent.substring(0, 500));
+        console.error('Content length provided to AI:', content.length);
+        console.error('Content preview:', content.substring(0, 200));
+      }
       
       return questions;
 
@@ -444,12 +468,103 @@ Begin by analyzing the content for key testable concepts, then generate question
       // Remove markdown code blocks if present
       let cleanedResponse = response.replace(/^```json\s*|```$/gm, '').trim();
       
-      // Handle potentially truncated JSON by finding the last complete object
+      // Enhanced JSON repair for truncated responses
       if (!cleanedResponse.endsWith(']')) {
-        console.warn('Response appears truncated, attempting to repair...');
-        const lastCompleteObjectIndex = cleanedResponse.lastIndexOf('}');
-        if (lastCompleteObjectIndex > 0) {
-          cleanedResponse = cleanedResponse.substring(0, lastCompleteObjectIndex + 1) + ']';
+        console.warn('Response appears truncated, attempting comprehensive repair...');
+        
+        // Find the last complete question object
+        let repairAttempts = [
+          // Attempt 1: Find last complete object and close array
+          () => {
+            const lastCompleteObjectIndex = cleanedResponse.lastIndexOf('}');
+            if (lastCompleteObjectIndex > 0) {
+              return cleanedResponse.substring(0, lastCompleteObjectIndex + 1) + ']';
+            }
+            return null;
+          },
+          
+          // Attempt 2: Find last complete question by looking for question_text
+          () => {
+            const questionMatches = [...cleanedResponse.matchAll(/"question_text":\s*"[^"]*"/g)];
+            if (questionMatches.length > 0) {
+              const lastQuestionStart = cleanedResponse.lastIndexOf('{', questionMatches[questionMatches.length - 1].index);
+              if (lastQuestionStart > 0) {
+                const beforeLastQuestion = cleanedResponse.substring(0, lastQuestionStart);
+                const lastComma = beforeLastQuestion.lastIndexOf(',');
+                if (lastComma > 0) {
+                  return beforeLastQuestion.substring(0, lastComma) + ']';
+                }
+              }
+            }
+            return null;
+          },
+          
+          // Attempt 3: Extract only complete questions by parsing incrementally
+          () => {
+            const questions = [];
+            let currentPos = 0;
+            const jsonStart = cleanedResponse.indexOf('[');
+            if (jsonStart === -1) return null;
+            
+            currentPos = jsonStart + 1;
+            let braceCount = 0;
+            let inString = false;
+            let currentQuestion = '';
+            
+            for (let i = currentPos; i < cleanedResponse.length; i++) {
+              const char = cleanedResponse[i];
+              
+              if (char === '"' && cleanedResponse[i-1] !== '\\') {
+                inString = !inString;
+              }
+              
+              if (!inString) {
+                if (char === '{') braceCount++;
+                if (char === '}') braceCount--;
+              }
+              
+              currentQuestion += char;
+              
+              if (!inString && braceCount === 0 && char === '}') {
+                // Complete question found
+                try {
+                  const testJson = '[' + currentQuestion + ']';
+                  const testParsed = JSON.parse(testJson);
+                  if (testParsed.length > 0) {
+                    questions.push(currentQuestion);
+                  }
+                } catch (e) {
+                  // Skip malformed question
+                }
+                currentQuestion = '';
+                
+                // Skip comma if present
+                if (cleanedResponse[i + 1] === ',') {
+                  i++;
+                }
+              }
+            }
+            
+            return questions.length > 0 ? '[' + questions.join(',') + ']' : null;
+          }
+        ];
+        
+        // Try repair attempts in order
+        for (const attempt of repairAttempts) {
+          try {
+            const repairedJson = attempt();
+            if (repairedJson) {
+              const testParsed = JSON.parse(repairedJson);
+              if (Array.isArray(testParsed) && testParsed.length > 0) {
+                cleanedResponse = repairedJson;
+                console.log(`✅ Successfully repaired JSON, recovered ${testParsed.length} questions`);
+                break;
+              }
+            }
+          } catch (e) {
+            // Try next repair attempt
+            continue;
+          }
         }
       }
       

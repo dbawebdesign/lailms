@@ -11,12 +11,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get recent generation jobs for the user with base class info
+    // Get recent generation jobs for the user with base class info and tasks
     const { data: jobs, error: jobsError } = await supabase
       .from('course_generation_jobs')
       .select(`
         *,
-        base_classes(id, name)
+        base_classes(id, name),
+        course_generation_tasks(
+          id,
+          task_identifier,
+          task_type,
+          status,
+          error_message,
+          created_at,
+          updated_at
+        )
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
@@ -33,6 +42,17 @@ export async function GET(request: NextRequest) {
     // Transform the data for the frontend
     const transformedJobs = (jobs || []).map((job: any) => {
       const jobData = job.job_data || {};
+      const generationConfig = job.generation_config || {};
+      const isV2Job = generationConfig.version === 'v2' || generationConfig.orchestrator === 'CourseGenerationOrchestratorV2';
+      
+      // Transform tasks data for V2 jobs
+      const tasks = (job.course_generation_tasks || []).map((task: any) => ({
+        id: task.id,
+        type: task.task_type,
+        status: task.status,
+        sectionTitle: task.task_identifier,
+        error: task.error_message
+      }));
       
       return {
         id: job.id,
@@ -48,6 +68,13 @@ export async function GET(request: NextRequest) {
         estimatedMinutes: jobData.estimatedMinutes,
         isCleared: job.is_cleared,
         confettiShown: job.confetti_shown || false,
+        // Include tasks data for V2 jobs
+        tasks: isV2Job ? tasks : undefined,
+        // V2 system indicators
+        version: isV2Job ? 'v2' : 'v1',
+        isV2: isV2Job,
+        features: isV2Job ? generationConfig.features || [] : [],
+        source: generationConfig.source || 'legacy'
       };
     });
 

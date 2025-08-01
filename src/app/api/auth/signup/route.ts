@@ -123,14 +123,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Return success with user data
+    // Return success with user data including email for payment redirect
     return NextResponse.json({
       message: 'User created successfully',
       user: {
         id: authUser.user.id,
         username: username,
+        email: pseudoEmail,
         role: inviteData.role,
         organisation_id: inviteData.organisation_id,
+        requiresPayment: true, // Flag to indicate payment is needed
       },
     }, { status: 201 })
   } catch (error) {

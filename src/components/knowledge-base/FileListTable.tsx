@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { format } from 'date-fns'
 import { 
   FileIcon, 
@@ -52,6 +52,7 @@ interface FileListTableProps {
 export function FileListTable({ organisationId, baseClassId, userOnly = false }: FileListTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showDetailedStatus, setShowDetailedStatus] = useState<string | null>(null)
+  const hasProcessingDataRef = useRef(false)
 
   // Use our enhanced document processing status hook with real-time updates
   const { 
@@ -64,8 +65,13 @@ export function FileListTable({ organisationId, baseClassId, userOnly = false }:
   } = useDocumentProcessingStatus({
     organisationId: userOnly ? undefined : organisationId,
     autoRefresh: true,
-    refreshInterval: 2000 // Refresh every 2 seconds for active processing
+    refreshInterval: 5000 // Refresh every 5 seconds for active processing
   })
+
+  // Update ref when processing data changes
+  useEffect(() => {
+    hasProcessingDataRef.current = documentProcessingData.length > 0
+  }, [documentProcessingData.length])
 
   // Fallback: fetch documents using the original API if the hook doesn't provide them
   const [fallbackDocuments, setFallbackDocuments] = useState<Document[]>([])
@@ -73,7 +79,7 @@ export function FileListTable({ organisationId, baseClassId, userOnly = false }:
 
   useEffect(() => {
     async function fetchDocuments() {
-      if (!organisationId || documentProcessingData.length > 0) return;
+      if (!organisationId || hasProcessingDataRef.current) return;
       
       setFallbackLoading(true);
       try {
@@ -103,7 +109,7 @@ export function FileListTable({ organisationId, baseClassId, userOnly = false }:
     }
 
     fetchDocuments();
-  }, [organisationId, baseClassId, userOnly, documentProcessingData.length]);
+  }, [organisationId, baseClassId, userOnly]);
 
   // Use processing data if available, otherwise fallback to original API
   const documents = documentProcessingData.length > 0 ? 

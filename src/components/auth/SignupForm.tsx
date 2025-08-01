@@ -9,6 +9,7 @@ import { PasswordInput } from '@/components/ui/password-input'
 import TermsCheckbox from '../ui/terms-checkbox'
 import { toast } from 'sonner'
 import CoopFamilySignupForm from './CoopFamilySignupForm'
+import { buildPaymentLink } from '@/lib/stripe/config'
 
 interface InviteCodeData {
   valid: boolean
@@ -137,8 +138,19 @@ export default function SignupForm() {
         return
       }
 
-      // Redirect to login page on success
-      router.push('/login?registered=true')
+      const responseData = await response.json()
+      console.log('[SignupForm] Signup successful:', responseData); // Debug log
+
+      // Check if payment is required
+      if (responseData.user?.requiresPayment) {
+        // Redirect to Stripe payment link
+        const paymentUrl = buildPaymentLink(responseData.user.id, responseData.user.email)
+        console.log('[SignupForm] Redirecting to payment:', paymentUrl)
+        window.location.href = paymentUrl // Use window.location for external redirect
+      } else {
+        // Redirect to login page on success (for users who don't need payment)
+        router.push('/login?registered=true')
+      }
     } catch (error) {
       console.error('[SignupForm] Network or other error during signup:', error); // Debug log
       setError('An unexpected error occurred. Please try again.')

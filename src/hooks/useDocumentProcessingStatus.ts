@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/utils/supabase/browser'
 import { 
   DocumentStatus, 
@@ -33,6 +33,12 @@ export function useDocumentProcessingStatus({
   const [documents, setDocuments] = useState<DocumentWithProcessingInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const documentsRef = useRef<DocumentWithProcessingInfo[]>([])
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    documentsRef.current = documents
+  }, [documents])
 
   // Fetch documents
   const fetchDocuments = useCallback(async () => {
@@ -143,14 +149,15 @@ export function useDocumentProcessingStatus({
       }
     }
 
-    setupRealtimeSubscription()
+    // Temporarily disable real-time subscription to test
+    // setupRealtimeSubscription()
 
     // Fallback polling for cases where real-time doesn't work
     let pollInterval: NodeJS.Timeout | null = null
     if (refreshInterval > 0) {
       pollInterval = setInterval(() => {
-        // Only poll if we have processing documents
-        const hasProcessingDocs = documents.some(doc => doc.status === 'processing' || doc.status === 'queued')
+        // Only poll if we have processing documents using ref to avoid re-renders
+        const hasProcessingDocs = documentsRef.current.some(doc => doc.status === 'processing' || doc.status === 'queued')
         if (hasProcessingDocs) {
           fetchDocuments()
         }
@@ -165,7 +172,7 @@ export function useDocumentProcessingStatus({
         clearInterval(pollInterval)
       }
     }
-  }, [autoRefresh, refreshInterval, organisationId, documents, fetchDocuments])
+  }, [autoRefresh, refreshInterval, organisationId, fetchDocuments])
 
   // Retry processing for a failed document
   const retryProcessing = useCallback(async (docId: string) => {

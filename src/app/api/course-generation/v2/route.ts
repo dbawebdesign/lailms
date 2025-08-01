@@ -3,7 +3,6 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { CourseGenerationOrchestratorV2 } from '@/lib/services/course-generation-orchestrator-v2';
 import { knowledgeBaseAnalyzer } from '@/lib/services/knowledge-base-analyzer';
 import type { CourseGenerationRequest } from '@/lib/services/course-generator';
-import { Tables } from 'packages/types/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,11 +15,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { 
-      baseClassId, 
-      title, 
-      description, 
-      generationMode, 
+    const {
+      baseClassId,
+      title,
+      description,
+      generationMode,
       estimatedDurationWeeks,
       academicLevel,
       lessonDetailLevel,
@@ -29,30 +28,46 @@ export async function POST(request: NextRequest) {
       lessonsPerWeek,
       learningObjectives,
       assessmentSettings,
-      userGuidance 
+      userGuidance
     } = body;
 
     // Validate required fields
     if (!baseClassId || !title) {
       return NextResponse.json(
-        { error: 'Base class ID and title are required' }, 
+        { error: 'baseClassId and title are required' }, 
         { status: 400 }
       );
     }
 
-    // Verify user has access to this base class
+    // Verify base class exists and user has access
     const { data: baseClass, error: baseClassError } = await supabase
       .from('base_classes')
-      .select('organisation_id')
+      .select('*')
       .eq('id', baseClassId)
-      .eq('user_id', user.id)
-      .single<Tables<'base_classes'>>();
+      .single();
 
     if (baseClassError || !baseClass) {
       return NextResponse.json(
-        { error: 'Base class not found or access denied' }, 
+        { error: 'Base class not found' }, 
         { status: 404 }
       );
+    }
+
+    // Check if user has access to this base class
+    if (baseClass.created_by !== user.id) {
+      const { data: orgMember } = await supabase
+        .from('organisation_members')
+        .select('*')
+        .eq('organisation_id', baseClass.organisation_id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!orgMember) {
+        return NextResponse.json(
+          { error: 'Access denied to this base class' }, 
+          { status: 403 }
+        );
+      }
     }
 
     // Create course generation request
@@ -74,21 +89,20 @@ export async function POST(request: NextRequest) {
       userGuidance
     };
 
-    // Create generation job in database using v2 system
+    // Create generation job in database
     const { data: jobData, error: jobError } = await supabase
       .from('course_generation_jobs')
       .insert({
         base_class_id: baseClassId,
         organisation_id: baseClass.organisation_id,
         user_id: user.id,
-        job_type: 'generate_course_v2_kb',
+        job_type: 'generate_course_v2',
         status: 'queued',
         progress_percentage: 0,
         job_data: generationRequest,
         generation_config: {
           version: 'v2',
           orchestrator: 'CourseGenerationOrchestratorV2',
-          source: 'knowledge_base_api',
           features: [
             'enhanced_tracking',
             'task_level_monitoring', 
@@ -111,9 +125,9 @@ export async function POST(request: NextRequest) {
 
     const jobId = jobData.id;
 
-    // Start async processing with complete v2 orchestrator
-    processCompleteV2GenerationJob(jobId, generationRequest, supabase).catch(error => {
-      console.error('Complete V2 Course generation failed:', error);
+    // Start async processing with v2 orchestrator
+    processV2GenerationJob(jobId, generationRequest, supabase).catch(error => {
+      console.error('V2 Course generation failed:', error);
       updateJobStatus(jobId, 'failed', 0, supabase, error.message);
     });
 
@@ -122,18 +136,17 @@ export async function POST(request: NextRequest) {
       jobId,
       status: 'queued',
       version: 'v2',
-      message: 'Knowledge-base course generation started with enhanced v2 system. Check job status for progress.',
+      message: 'Enhanced course generation started with v2 system. Check job status for progress.',
       features: [
         'Real-time task tracking',
         'Performance analytics', 
         'Error recovery',
         'Enhanced monitoring'
-      ],
-      source: 'knowledge_base_api'
+      ]
     });
 
   } catch (error) {
-    console.error('Course generation error:', error);
+    console.error('V2 Course generation API error:', error);
     return NextResponse.json(
       { error: 'Failed to start course generation' }, 
       { status: 500 }
@@ -152,81 +165,47 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const baseClassId = searchParams.get('baseClassId');
+    const status = searchParams.get('status');
+    const limit = parseInt(searchParams.get('limit') || '10');
 
-    if (!baseClassId) {
-      return NextResponse.json(
-        { error: 'Base class ID is required' }, 
-        { status: 400 }
-      );
-    }
-
-    // Verify user has access to this base class
-    const { data: baseClass, error: baseClassError } = await supabase
-      .from('base_classes')
-      .select('*')
-      .eq('id', baseClassId)
-      .eq('user_id', user.id)
-      .single<Tables<'base_classes'>>();
-
-    if (baseClassError || !baseClass) {
-      return NextResponse.json(
-        { error: 'Base class not found or access denied' }, 
-        { status: 404 }
-      );
-    }
-
-    // Get knowledge base analysis for this base class
-    const kbAnalysis = await knowledgeBaseAnalyzer.analyzeKnowledgeBase(baseClassId);
-
-    // Get existing course outlines for this base class
-    const { data: courseOutlines, error: outlinesError } = await supabase
-      .from('course_outlines')
-      .select('*')
-      .eq('base_class_id', baseClassId)
+    // Build query
+    let query = supabase
+      .from('course_generation_jobs')
+      .select(`
+        *,
+        base_classes!inner(
+          id,
+          name,
+          description
+        )
+      `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .returns<Tables<'course_outlines'>[]>();
+      .limit(limit);
 
-    if (outlinesError) {
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data: jobs, error: jobsError } = await query;
+
+    if (jobsError) {
       return NextResponse.json(
-        { error: 'Failed to fetch course outlines' }, 
+        { error: 'Failed to fetch jobs' }, 
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      baseClass,
-      knowledgeBaseAnalysis: kbAnalysis,
-      courseOutlines: courseOutlines || [],
-      generationModes: {
-        kb_only: {
-          title: 'Knowledge Base Only',
-          description: 'Generate content exclusively from uploaded sources',
-          suitable: kbAnalysis.contentDepth === 'comprehensive' && 
-                   kbAnalysis.totalChunks >= 40 &&
-                   kbAnalysis.analysisDetails.contentQuality === 'high'
-        },
-        kb_priority: {
-          title: 'Knowledge Base Priority', 
-          description: 'Prioritize knowledge base content, fill minor gaps with general knowledge',
-          suitable: kbAnalysis.contentDepth !== 'minimal' && 
-                   kbAnalysis.totalChunks >= 40
-        },
-        kb_supplemented: {
-          title: 'Knowledge Base Supplemented',
-          description: 'Use knowledge base as foundation, freely supplement with general knowledge', 
-          suitable: true // Always available
-        }
-      },
-      recommendedMode: kbAnalysis.recommendedGenerationMode
+    return NextResponse.json({ 
+      success: true, 
+      jobs: jobs || [],
+      total: jobs?.length || 0 
     });
 
   } catch (error) {
-    console.error('Knowledge base analysis error:', error);
+    console.error('Failed to fetch generation jobs:', error);
     return NextResponse.json(
-      { error: 'Failed to analyze knowledge base' }, 
+      { error: 'Failed to fetch generation jobs' }, 
       { status: 500 }
     );
   }
@@ -251,6 +230,7 @@ async function processV2GenerationJob(
     await updateJobStatus(jobId, 'processing', 25, supabase);
 
     // Step 3: Generate course outline (45% progress)
+    // Note: We'll need to import the generateCourseOutline method or create a v2 version
     const { CourseGenerator } = await import('@/lib/services/course-generator');
     const tempGenerator = new CourseGenerator();
     const outline = await (tempGenerator as any).generateCourseOutline(request, kbAnalysis, generationMode);
@@ -268,12 +248,11 @@ async function processV2GenerationJob(
     await updateJobStatus(jobId, 'processing', 85, supabase, null, { 
       message: 'Starting enhanced v2 orchestrated content generation...',
       courseOutlineId,
-      orchestrator: 'v2',
-      source: 'knowledge_base_api'
+      orchestrator: 'v2'
     });
 
-    // Use v2 orchestrator for enhanced generation (it will use service role client internally)
-    const orchestrator = new CourseGenerationOrchestratorV2();
+    // Use v2 orchestrator for enhanced generation
+    const orchestrator = new CourseGenerationOrchestratorV2(supabase);
     await orchestrator.startOrchestration(jobId, outline, request);
     
     // The v2 orchestrator will handle completion status updates
@@ -320,29 +299,6 @@ async function updateJobStatus(
     }
   } catch (error) {
     console.error('Error updating job status:', error);
-    throw error;
-  }
-}
-
-// Complete V2 generation process from start to finish
-async function processCompleteV2GenerationJob(
-  jobId: string, 
-  request: CourseGenerationRequest, 
-  supabase: any
-): Promise<void> {
-  try {
-    console.log(`🚀 Starting complete V2 generation for job ${jobId}`);
-
-    // Use the complete v2 orchestrator (no outline needed - it will generate everything)
-    // It will use service role client internally for background operations
-    const orchestrator = new CourseGenerationOrchestratorV2();
-    await orchestrator.startCompleteOrchestration(jobId, request);
-    
-    // Success log is now handled inside the orchestrator
-
-  } catch (error) {
-    console.error('Complete V2 generation process failed:', error);
-    await updateJobStatus(jobId, 'failed', 0, supabase, error instanceof Error ? error.message : 'Unknown error');
     throw error;
   }
 } 
