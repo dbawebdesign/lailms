@@ -242,7 +242,7 @@ export async function POST(request: NextRequest) {
       return `${normalizedUsername}${randomSuffix}@${normalizedAbbreviation}.internal`
     }
 
-    const pseudoEmail = await generateUniquePseudoEmail(primaryContact.username, body.abbreviation)
+    const pseudoEmail = await generateUniquePseudoEmail(primaryContact.username, abbreviation)
     console.log('Generated unique email:', pseudoEmail)
 
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
