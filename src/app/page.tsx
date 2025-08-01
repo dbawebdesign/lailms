@@ -377,7 +377,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="https://buy.stripe.com/eVa9Ce5AmaJm4py288" target="_blank" rel="noopener noreferrer">
                 <Button className="bg-gradient-to-r from-[#E45DE5] via-[#FF835D] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity">
-                  Start Free Trial
+                  Get started today
                 </Button>
               </Link>
             </div>
@@ -696,60 +696,21 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-              {/* Early Adopter Family */}
-              <div className="relative bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 border border-blue-500/50">
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <div className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                    LIMITED TIME OFFER
-                  </div>
-                </div>
+            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              {/* Single Family */}
+              <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700 flex flex-col">
                 <div className="text-center">
-                  <h3 className="text-2xl font-bold mb-2">Early Adopter Family</h3>
-                  <p className="text-gray-400 mb-6">For our first 1,000 families</p>
-                  <div className="mb-6">
-                    <span className="text-4xl font-bold">$20</span>
-                    <span className="text-gray-400">/month</span>
-                  </div>
-                  <div className="bg-gradient-to-r from-green-500 to-blue-500 text-white px-4 py-2 rounded-lg mb-6 text-sm font-semibold">
-                    First 2 months FREE!
-                  </div>
-                </div>
-                <ul className="space-y-3 mb-8">
-                  <li className="flex items-center space-x-3">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm">Up to 5 users included</span>
-                  </li>
-                  <li className="flex items-center space-x-3">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm">$5/month for each additional user</span>
-                  </li>
-                  <li className="flex items-center space-x-3">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm">Full access to all features</span>
-                  </li>
-                </ul>
-                <Link href="https://buy.stripe.com/eVa9Ce5AmaJm4py288" target="_blank" rel="noopener noreferrer">
-                  <Button className="w-full bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white py-3 rounded-lg hover:opacity-90 transition-opacity">
-                    Reserve Your Spot
-                  </Button>
-                </Link>
-              </div>
-
-              {/* Standard Family */}
-              <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700">
-                <div className="text-center">
-                  <h3 className="text-2xl font-bold mb-2">Standard Family</h3>
+                  <h3 className="text-2xl font-bold mb-2">Single Family</h3>
                   <p className="text-gray-400 mb-6">For families joining after initial launch offer</p>
                   <div className="mb-6">
                     <span className="text-4xl font-bold">$40</span>
                     <span className="text-gray-400">/month</span>
                   </div>
                 </div>
-                <ul className="space-y-3 mb-8">
+                <ul className="space-y-3 mb-8 flex-grow">
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm">5 users included</span>
+                    <span className="text-sm">Up to 6 users included</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="w-5 h-5 text-green-500" />
@@ -760,13 +721,15 @@ export default function LandingPage() {
                     <span className="text-sm">Full access to all features</span>
                   </li>
                 </ul>
-                <Button className="w-full bg-gray-700 text-white py-3 rounded-lg hover:bg-gray-600 transition-colors">
-                  Coming Soon
-                </Button>
+                <Link href="/homeschool-signup">
+                  <Button className="w-full bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white py-3 rounded-lg hover:opacity-90 transition-opacity">
+                    Get started today
+                  </Button>
+                </Link>
               </div>
 
               {/* Micro-Academies & Networks */}
-              <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700">
+              <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700 flex flex-col">
                 <div className="text-center">
                   <h3 className="text-2xl font-bold mb-2">Micro-Academies & Networks</h3>
                   <p className="text-gray-400 mb-6">Ideal for co-ops and small learning groups</p>
@@ -775,10 +738,10 @@ export default function LandingPage() {
                     <span className="text-gray-400">/mo/user</span>
                   </div>
                   <div className="bg-gradient-to-r from-green-500 to-blue-500 text-white px-4 py-2 rounded-lg mb-6 text-sm font-semibold">
-                    First 2 months FREE for the network!
+                    30 days FREE for the network!
                   </div>
                 </div>
-                <ul className="space-y-3 mb-8">
+                <ul className="space-y-3 mb-8 flex-grow">
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="w-5 h-5 text-green-500" />
                     <span className="text-sm">Billed per active user</span>
@@ -792,9 +755,9 @@ export default function LandingPage() {
                     <span className="text-sm">Full access to all features</span>
                   </li>
                 </ul>
-                <Link href="mailto:zjones@learnologyai.com?subject=Setup%20Inquiry&body=Hi%20there,%0D%0A%0D%0AI'm%20interested%20in%20setting%20up%20Learnology%20AI%20for%20my%20organization.%20Please%20contact%20me%20to%20discuss%20next%20steps.%0D%0A%0D%0AThank%20you!">
+                <Link href="/homeschool-signup">
                   <Button className="w-full bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white py-3 rounded-lg hover:opacity-90 transition-opacity">
-                    Contact Us for Setup
+                    Get started today
                   </Button>
                 </Link>
               </div>
@@ -892,7 +855,7 @@ export default function LandingPage() {
                 </div>
                 <div>
                   <h4 className="text-lg font-semibold mb-2">Is there a free trial?</h4>
-                  <p className="text-gray-400 text-sm">Yes! Early adopter families get 2 months free, and all other plans include a 14-day free trial with no credit card required.</p>
+                  <p className="text-gray-400 text-sm">Yes! 30 days free for homeschool co-op and networks.</p>
                 </div>
               </div>
               <div className="space-y-6">

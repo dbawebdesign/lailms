@@ -170,15 +170,15 @@ export function SurveyModal({ isOpen, onClose, onComplete }: SurveyModalProps) {
                 
                 <div className="space-y-4 text-body text-slate-600 max-w-2xl mx-auto">
                   <p>
-                    Before you dive into your <strong>free 2-month pilot program</strong>, we'd love to learn more about your homeschooling needs and challenges.
+                    We're passionate about creating educational tools that truly serve your family's unique needs. To ensure we're building the right solutions for you, we'd love to learn more about your homeschooling journey and challenges.
                   </p>
                   
                   <p>
-                    This brief 5-minute survey is completely <strong>anonymous</strong> and helps us ensure we're providing the best solutions for your unique educational goals.
+                    This brief 5-minute survey is completely <strong>anonymous</strong> and helps us understand how we can better support your educational goals. Your feedback is invaluable in shaping our platform.
                   </p>
                   
                   <p>
-                    Your insights drive our product development and help us create tools that truly make a difference in your homeschooling experience.
+                    Once you complete the survey, you'll be ready to begin your personalized learning journey with Learnology AI. Thank you for helping us serve you better!
                   </p>
                 </div>
 

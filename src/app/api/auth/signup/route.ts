@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Return success with user data including email for payment redirect
+    // Return success with user data - no payment required for regular signup flow
     return NextResponse.json({
       message: 'User created successfully',
       user: {
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
         email: pseudoEmail,
         role: inviteData.role,
         organisation_id: inviteData.organisation_id,
-        requiresPayment: true, // Flag to indicate payment is needed
+        requiresPayment: false, // Regular signup flow never requires payment
       },
     }, { status: 201 })
   } catch (error) {
