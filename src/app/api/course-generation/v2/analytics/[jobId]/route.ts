@@ -115,7 +115,7 @@ export async function GET(
         }
         return acc;
       }, {} as Record<string, number>) || {},
-      recoveryRate: errors?.filter(e => e.resolved_at).length / (errors?.length || 1) || 0,
+      recoveryRate: (errors?.filter(e => e.resolved_at)?.length || 0) / (errors?.length || 1),
       criticalErrors: errors?.filter(e => e.error_severity === 'critical') || []
     };
 
