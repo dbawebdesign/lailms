@@ -69,18 +69,23 @@ export async function GET(
       .from('course_generation_errors')
       .select(`
         id,
+        job_id,
         task_id,
+        error_type,
         error_severity,
         error_category,
-        resolved_at,
-        created_at,
-        error_context,
         error_message,
         error_stack,
-        job_id,
-        recovery_attempt_count,
-        recovery_successful,
-        updated_at
+        error_context,
+        system_metrics,
+        request_metadata,
+        is_retryable,
+        retry_strategy,
+        suggested_actions,
+        resolved_at,
+        resolution_method,
+        resolution_notes,
+        created_at
       `)
       .eq('job_id', resolvedParams.jobId);
 
