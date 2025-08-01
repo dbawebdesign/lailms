@@ -2,6 +2,28 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  
+  // Disable static optimization for pages that use dynamic APIs
+  experimental: {
+    // This helps with bundle optimization
+    optimizePackageImports: ['@supabase/supabase-js'],
+  },
+  
+  // Force dynamic rendering for pages that use cookies API
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+        ],
+      },
+    ];
+  },
+  
   webpack: (config, { isServer }) => {
     // Fix for Supabase realtime critical dependency warnings
     config.resolve.fallback = {
@@ -28,12 +50,6 @@ const nextConfig: NextConfig = {
     }
 
     return config;
-  },
-  
-  // Optional: Disable realtime entirely if not needed
-  experimental: {
-    // This helps with bundle optimization
-    optimizePackageImports: ['@supabase/supabase-js'],
   },
 };
 
