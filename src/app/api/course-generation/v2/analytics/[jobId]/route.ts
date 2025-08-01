@@ -72,7 +72,15 @@ export async function GET(
         task_id,
         error_severity,
         error_category,
-        resolved_at
+        resolved_at,
+        created_at,
+        error_context,
+        error_message,
+        error_stack,
+        job_id,
+        recovery_attempt_count,
+        recovery_successful,
+        updated_at
       `)
       .eq('job_id', resolvedParams.jobId);
 
