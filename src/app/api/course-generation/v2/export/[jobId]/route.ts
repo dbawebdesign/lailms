@@ -5,10 +5,11 @@ import { ExportReportOptions, CourseGenerationReport } from '@/types/course-gene
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
     const supabase = createSupabaseServerClient();
+    const resolvedParams = await params;
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -24,7 +25,7 @@ export async function POST(
     const { data: job } = await supabase
       .from('course_generation_jobs')
       .select('*')
-      .eq('id', params.jobId)
+      .eq('id', resolvedParams.jobId)
       .eq('user_id', user.id)
       .single();
 
@@ -36,14 +37,14 @@ export async function POST(
     }
 
     // Generate comprehensive report
-    const report = await generateComprehensiveReport(params.jobId, options);
+    const report = await generateComprehensiveReport(resolvedParams.jobId, options);
 
     // Format based on requested format
     switch (format) {
       case 'json':
         return NextResponse.json(report, {
           headers: {
-            'Content-Disposition': `attachment; filename="course-generation-report-${params.jobId}.json"`,
+            'Content-Disposition': `attachment; filename="course-generation-report-${resolvedParams.jobId}.json"`,
             'Content-Type': 'application/json'
           }
         });
@@ -52,7 +53,7 @@ export async function POST(
         const csvContent = await generateCSVReport(report);
         return new NextResponse(csvContent, {
           headers: {
-            'Content-Disposition': `attachment; filename="course-generation-report-${params.jobId}.csv"`,
+            'Content-Disposition': `attachment; filename="course-generation-report-${resolvedParams.jobId}.csv"`,
             'Content-Type': 'text/csv'
           }
         });
@@ -61,7 +62,7 @@ export async function POST(
         const pdfBuffer = await generatePDFReport(report);
         return new NextResponse(pdfBuffer, {
           headers: {
-            'Content-Disposition': `attachment; filename="course-generation-report-${params.jobId}.pdf"`,
+            'Content-Disposition': `attachment; filename="course-generation-report-${resolvedParams.jobId}.pdf"`,
             'Content-Type': 'application/pdf'
           }
         });

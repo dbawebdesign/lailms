@@ -3,10 +3,11 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
     const supabase = createSupabaseServerClient();
+    const resolvedParams = await params;
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -18,7 +19,7 @@ export async function GET(
     const { data: job } = await supabase
       .from('course_generation_jobs')
       .select('id')
-      .eq('id', params.jobId)
+      .eq('id', resolvedParams.jobId)
       .eq('user_id', user.id)
       .single();
 
@@ -54,7 +55,7 @@ export async function GET(
         estimated_duration_seconds,
         result_metadata
       `)
-      .eq('job_id', params.jobId)
+      .eq('job_id', resolvedParams.jobId)
       .order('execution_priority', { ascending: true });
 
     if (tasksError) {

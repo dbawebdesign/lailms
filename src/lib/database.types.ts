@@ -226,6 +226,431 @@ export type Database = {
         }
         Relationships: []
       }
+      course_generation_analytics: {
+        Row: {
+          api_calls_failed: number | null
+          api_calls_made: number | null
+          average_task_time_seconds: number | null
+          avg_cpu_usage_percent: number | null
+          baseline_time_comparison_percent: number | null
+          cache_hit_rate: number | null
+          content_quality_score: number | null
+          created_at: string | null
+          database_queries_count: number | null
+          estimated_cost_usd: number | null
+          id: string
+          job_id: string
+          knowledge_base_size_mb: number | null
+          peak_memory_usage_mb: number | null
+          previous_job_improvement_percent: number | null
+          success_rate: number | null
+          tokens_consumed: number | null
+          total_assessments_generated: number | null
+          total_generation_time_seconds: number | null
+          total_lessons_generated: number | null
+          total_sections_generated: number | null
+          updated_at: string | null
+          user_satisfaction_score: number | null
+        }
+        Insert: {
+          api_calls_failed?: number | null
+          api_calls_made?: number | null
+          average_task_time_seconds?: number | null
+          avg_cpu_usage_percent?: number | null
+          baseline_time_comparison_percent?: number | null
+          cache_hit_rate?: number | null
+          content_quality_score?: number | null
+          created_at?: string | null
+          database_queries_count?: number | null
+          estimated_cost_usd?: number | null
+          id?: string
+          job_id: string
+          knowledge_base_size_mb?: number | null
+          peak_memory_usage_mb?: number | null
+          previous_job_improvement_percent?: number | null
+          success_rate?: number | null
+          tokens_consumed?: number | null
+          total_assessments_generated?: number | null
+          total_generation_time_seconds?: number | null
+          total_lessons_generated?: number | null
+          total_sections_generated?: number | null
+          updated_at?: string | null
+          user_satisfaction_score?: number | null
+        }
+        Update: {
+          api_calls_failed?: number | null
+          api_calls_made?: number | null
+          average_task_time_seconds?: number | null
+          avg_cpu_usage_percent?: number | null
+          baseline_time_comparison_percent?: number | null
+          cache_hit_rate?: number | null
+          content_quality_score?: number | null
+          created_at?: string | null
+          database_queries_count?: number | null
+          estimated_cost_usd?: number | null
+          id?: string
+          job_id?: string
+          knowledge_base_size_mb?: number | null
+          peak_memory_usage_mb?: number | null
+          previous_job_improvement_percent?: number | null
+          success_rate?: number | null
+          tokens_consumed?: number | null
+          total_assessments_generated?: number | null
+          total_generation_time_seconds?: number | null
+          total_lessons_generated?: number | null
+          total_sections_generated?: number | null
+          updated_at?: string | null
+          user_satisfaction_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_generation_analytics_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "course_generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_generation_errors: {
+        Row: {
+          created_at: string | null
+          error_category: string
+          error_context: Json | null
+          error_message: string
+          error_severity: Database["public"]["Enums"]["course_generation_error_severity"]
+          error_stack: string | null
+          error_type: string
+          id: string
+          is_retryable: boolean | null
+          job_id: string
+          request_metadata: Json | null
+          resolution_method: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          retry_strategy: string | null
+          suggested_actions: string[] | null
+          system_metrics: Json | null
+          task_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_category: string
+          error_context?: Json | null
+          error_message: string
+          error_severity: Database["public"]["Enums"]["course_generation_error_severity"]
+          error_stack?: string | null
+          error_type: string
+          id?: string
+          is_retryable?: boolean | null
+          job_id: string
+          request_metadata?: Json | null
+          resolution_method?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          retry_strategy?: string | null
+          suggested_actions?: string[] | null
+          system_metrics?: Json | null
+          task_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_category?: string
+          error_context?: Json | null
+          error_message?: string
+          error_severity?: Database["public"]["Enums"]["course_generation_error_severity"]
+          error_stack?: string | null
+          error_type?: string
+          id?: string
+          is_retryable?: boolean | null
+          job_id?: string
+          request_metadata?: Json | null
+          resolution_method?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          retry_strategy?: string | null
+          suggested_actions?: string[] | null
+          system_metrics?: Json | null
+          task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_generation_errors_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "course_generation_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_generation_errors_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "course_generation_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_generation_jobs: {
+        Row: {
+          actual_completion_time: string | null
+          base_class_id: string | null
+          completed_at: string | null
+          completed_tasks: number | null
+          confetti_shown: boolean | null
+          created_at: string | null
+          error_message: string | null
+          estimated_completion_time: string | null
+          failed_tasks: number | null
+          generation_config: Json | null
+          id: string
+          is_cleared: boolean
+          job_data: Json | null
+          job_type: string
+          organisation_id: string
+          performance_metrics: Json | null
+          progress_percentage: number | null
+          result_data: Json | null
+          retry_configuration: Json | null
+          skipped_tasks: number | null
+          started_at: string | null
+          status: string | null
+          total_tasks: number | null
+          updated_at: string | null
+          user_actions: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          actual_completion_time?: string | null
+          base_class_id?: string | null
+          completed_at?: string | null
+          completed_tasks?: number | null
+          confetti_shown?: boolean | null
+          created_at?: string | null
+          error_message?: string | null
+          estimated_completion_time?: string | null
+          failed_tasks?: number | null
+          generation_config?: Json | null
+          id?: string
+          is_cleared?: boolean
+          job_data?: Json | null
+          job_type: string
+          organisation_id: string
+          performance_metrics?: Json | null
+          progress_percentage?: number | null
+          result_data?: Json | null
+          retry_configuration?: Json | null
+          skipped_tasks?: number | null
+          started_at?: string | null
+          status?: string | null
+          total_tasks?: number | null
+          updated_at?: string | null
+          user_actions?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          actual_completion_time?: string | null
+          base_class_id?: string | null
+          completed_at?: string | null
+          completed_tasks?: number | null
+          confetti_shown?: boolean | null
+          created_at?: string | null
+          error_message?: string | null
+          estimated_completion_time?: string | null
+          failed_tasks?: number | null
+          generation_config?: Json | null
+          id?: string
+          is_cleared?: boolean
+          job_data?: Json | null
+          job_type?: string
+          organisation_id?: string
+          performance_metrics?: Json | null
+          progress_percentage?: number | null
+          result_data?: Json | null
+          retry_configuration?: Json | null
+          skipped_tasks?: number | null
+          started_at?: string | null
+          status?: string | null
+          total_tasks?: number | null
+          updated_at?: string | null
+          user_actions?: Json | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_generation_jobs_base_class_id_fkey"
+            columns: ["base_class_id"]
+            isOneToOne: false
+            referencedRelation: "base_classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_generation_tasks: {
+        Row: {
+          actual_duration_seconds: number | null
+          base_class_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          current_retry_count: number | null
+          dependencies: string[] | null
+          error_category: string | null
+          error_details: Json | null
+          error_message: string | null
+          error_severity:
+            | Database["public"]["Enums"]["course_generation_error_severity"]
+            | null
+          estimated_duration_seconds: number | null
+          execution_priority: number | null
+          id: string
+          input_data: Json | null
+          is_recoverable: boolean | null
+          job_id: string
+          last_retry_at: string | null
+          lesson_id: string | null
+          max_retry_count: number | null
+          output_data: Json | null
+          path_id: string | null
+          queued_at: string | null
+          recovery_suggestions: string[] | null
+          result_metadata: Json | null
+          section_index: number | null
+          section_title: string | null
+          started_at: string | null
+          status:
+            | Database["public"]["Enums"]["course_generation_task_status"]
+            | null
+          task_identifier: string
+          task_type: Database["public"]["Enums"]["course_generation_task_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          actual_duration_seconds?: number | null
+          base_class_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_retry_count?: number | null
+          dependencies?: string[] | null
+          error_category?: string | null
+          error_details?: Json | null
+          error_message?: string | null
+          error_severity?:
+            | Database["public"]["Enums"]["course_generation_error_severity"]
+            | null
+          estimated_duration_seconds?: number | null
+          execution_priority?: number | null
+          id?: string
+          input_data?: Json | null
+          is_recoverable?: boolean | null
+          job_id: string
+          last_retry_at?: string | null
+          lesson_id?: string | null
+          max_retry_count?: number | null
+          output_data?: Json | null
+          path_id?: string | null
+          queued_at?: string | null
+          recovery_suggestions?: string[] | null
+          result_metadata?: Json | null
+          section_index?: number | null
+          section_title?: string | null
+          started_at?: string | null
+          status?:
+            | Database["public"]["Enums"]["course_generation_task_status"]
+            | null
+          task_identifier: string
+          task_type: Database["public"]["Enums"]["course_generation_task_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          actual_duration_seconds?: number | null
+          base_class_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_retry_count?: number | null
+          dependencies?: string[] | null
+          error_category?: string | null
+          error_details?: Json | null
+          error_message?: string | null
+          error_severity?:
+            | Database["public"]["Enums"]["course_generation_error_severity"]
+            | null
+          estimated_duration_seconds?: number | null
+          execution_priority?: number | null
+          id?: string
+          input_data?: Json | null
+          is_recoverable?: boolean | null
+          job_id?: string
+          last_retry_at?: string | null
+          lesson_id?: string | null
+          max_retry_count?: number | null
+          output_data?: Json | null
+          path_id?: string | null
+          queued_at?: string | null
+          recovery_suggestions?: string[] | null
+          result_metadata?: Json | null
+          section_index?: number | null
+          section_title?: string | null
+          started_at?: string | null
+          status?:
+            | Database["public"]["Enums"]["course_generation_task_status"]
+            | null
+          task_identifier?: string
+          task_type?: Database["public"]["Enums"]["course_generation_task_type"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_generation_tasks_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "course_generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_generation_user_actions: {
+        Row: {
+          action_context: Json | null
+          action_result: Json | null
+          action_successful: boolean | null
+          action_type: string
+          affected_tasks: string[] | null
+          created_at: string | null
+          id: string
+          job_id: string
+          user_id: string
+        }
+        Insert: {
+          action_context?: Json | null
+          action_result?: Json | null
+          action_successful?: boolean | null
+          action_type: string
+          affected_tasks?: string[] | null
+          created_at?: string | null
+          id?: string
+          job_id: string
+          user_id: string
+        }
+        Update: {
+          action_context?: Json | null
+          action_result?: Json | null
+          action_successful?: boolean | null
+          action_type?: string
+          affected_tasks?: string[] | null
+          created_at?: string | null
+          id?: string
+          job_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_generation_user_actions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "course_generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       study_content_index: {
         Row: {
           assessment_ids: string[] | null
@@ -407,7 +832,26 @@ export type Database = {
       [key: string]: any
     }
     Enums: {
-      [key: string]: string
+      course_generation_error_severity: "low" | "medium" | "high" | "critical"
+      course_generation_task_status:
+        | "pending"
+        | "queued"
+        | "running"
+        | "completed"
+        | "failed"
+        | "skipped"
+        | "retrying"
+        | "cancelled"
+      course_generation_task_type:
+        | "lesson_section"
+        | "lesson_assessment"
+        | "lesson_mind_map"
+        | "lesson_brainbytes"
+        | "path_quiz"
+        | "class_exam"
+        | "knowledge_analysis"
+        | "outline_generation"
+        | "content_validation"
     }
     CompositeTypes: {
       [_ in never]: never

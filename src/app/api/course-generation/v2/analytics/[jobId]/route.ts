@@ -4,10 +4,11 @@ import { TaskAnalytics, ErrorAnalytics } from '@/types/course-generation';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
     const supabase = createSupabaseServerClient();
+    const resolvedParams = await params;
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -19,7 +20,7 @@ export async function GET(
     const { data: job } = await supabase
       .from('course_generation_jobs')
       .select('id')
-      .eq('id', params.jobId)
+      .eq('id', resolvedParams.jobId)
       .eq('user_id', user.id)
       .single();
 
@@ -33,8 +34,18 @@ export async function GET(
     // Fetch analytics data
     const { data: analytics, error: analyticsError } = await supabase
       .from('course_generation_analytics')
-      .select('*')
-      .eq('job_id', params.jobId)
+      .select(`
+        id,
+        job_id,
+        api_calls_made,
+        api_calls_failed,
+        tokens_consumed,
+        total_generation_time_seconds,
+        success_rate,
+        created_at,
+        updated_at
+      `)
+      .eq('job_id', resolvedParams.jobId)
       .single();
 
     if (analyticsError && analyticsError.code !== 'PGRST116') {
@@ -44,14 +55,26 @@ export async function GET(
     // Fetch task statistics
     const { data: tasks } = await supabase
       .from('course_generation_tasks')
-      .select('*')
-      .eq('job_id', params.jobId);
+      .select(`
+        id,
+        task_identifier,
+        task_type,
+        status,
+        actual_duration_seconds
+      `)
+      .eq('job_id', resolvedParams.jobId);
 
     // Fetch error statistics
     const { data: errors } = await supabase
       .from('course_generation_errors')
-      .select('*')
-      .eq('job_id', params.jobId);
+      .select(`
+        id,
+        task_id,
+        error_severity,
+        error_category,
+        resolved_at
+      `)
+      .eq('job_id', resolvedParams.jobId);
 
     // Calculate task analytics
     const taskAnalytics: TaskAnalytics = {

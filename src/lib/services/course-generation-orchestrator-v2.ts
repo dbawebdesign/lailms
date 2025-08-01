@@ -491,7 +491,7 @@ export class CourseGenerationOrchestratorV2 {
       
       // Generate task definitions from outline using actual database UUIDs
       for (let moduleIndex = 0; moduleIndex < outline.modules.length; moduleIndex++) {
-        const module = outline.modules[moduleIndex];
+        const courseModule = outline.modules[moduleIndex];
         const actualPath = pathsByIndex.get(moduleIndex);
         
         if (!actualPath) {
@@ -505,8 +505,8 @@ export class CourseGenerationOrchestratorV2 {
           continue;
         }
 
-        for (let lessonIndex = 0; lessonIndex < module.lessons.length; lessonIndex++) {
-          const lesson = module.lessons[lessonIndex];
+        for (let lessonIndex = 0; lessonIndex < courseModule.lessons.length; lessonIndex++) {
+          const lesson = courseModule.lessons[lessonIndex];
           const actualLesson = pathLessons.get(lessonIndex);
           
           if (!actualLesson) {
@@ -2114,7 +2114,7 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
     const lmsCreationTasks: TaskDefinition[] = [];
     
     for (let moduleIndex = 0; moduleIndex < outline.modules.length; moduleIndex++) {
-      const module = outline.modules[moduleIndex];
+      const courseModule = outline.modules[moduleIndex];
       
       // Path creation task
       const pathTaskId = `create-path-${moduleIndex}`;
@@ -2129,13 +2129,13 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
         current_retry_count: 0,
         estimated_duration_seconds: 30,
         base_class_id: request.baseClassId,
-        input_data: { module, moduleIndex, request },
+        input_data: { module: courseModule, moduleIndex, request },
         is_recoverable: true,
         recovery_suggestions: ['Retry path creation', 'Use simplified path structure']
       });
 
       // Lesson creation tasks (depend on path)
-      for (let lessonIndex = 0; lessonIndex < module.lessons.length; lessonIndex++) {
+      for (let lessonIndex = 0; lessonIndex < courseModule.lessons.length; lessonIndex++) {
         const lessonTaskId = `create-lesson-${moduleIndex}-${lessonIndex}`;
         lmsCreationTasks.push({
           id: crypto.randomUUID(),
@@ -2148,7 +2148,7 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
           current_retry_count: 0,
           estimated_duration_seconds: 20,
           base_class_id: request.baseClassId,
-          input_data: { lesson: module.lessons[lessonIndex], moduleIndex, lessonIndex, request },
+          input_data: { lesson: courseModule.lessons[lessonIndex], moduleIndex, lessonIndex, request },
           is_recoverable: true,
           recovery_suggestions: ['Retry lesson creation', 'Use simplified lesson structure']
         });
@@ -2181,15 +2181,15 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
         if (task.task_identifier.startsWith('create-path-')) {
           // Create path
           const moduleIndex = task.input_data.moduleIndex;
-          const module = task.input_data.module;
+          const courseModule = task.input_data.module;
 
           const { data: path, error: pathError } = await this.supabase
             .from('paths')
             .insert({
               organisation_id: request.organisationId,
               base_class_id: request.baseClassId,
-              title: module.title,
-              description: module.description,
+              title: courseModule.title,
+              description: courseModule.description,
               level: request.academicLevel,
               order_index: moduleIndex,
               published: false,
@@ -2204,7 +2204,7 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
           }
 
           pathIdMap.set(moduleIndex, path.id);
-          console.log(`📁 Created path: ${module.title}`);
+          console.log(`📁 Created path: ${courseModule.title}`);
           
         } else if (task.task_identifier.startsWith('create-lesson-')) {
           // Create lesson
