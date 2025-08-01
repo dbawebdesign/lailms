@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
+import { mindMapGenerationService } from '@/lib/services/mind-map-generation-service';
 import { Tables } from 'packages/types/db';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 // Extract rich text content from JSONB
 function extractTextContent(content: any): string {
@@ -85,17 +81,37 @@ export async function POST(request: NextRequest) {
     let mindMapData, svgHtml, assetData;
 
     if (isLessonMindMap) {
-      // Generate lesson mind map
-      const result = await generateLessonMindMap(supabase, lessonId, user, regenerate);
+      // Generate lesson mind map using the service
+      const result = await mindMapGenerationService.generateLessonMindMap(
+        supabase, 
+        lessonId, 
+        user, 
+        { regenerate, internal: !!internal }
+      );
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to generate lesson mind map');
+      }
+      
       mindMapData = result.mindMapData;
       svgHtml = result.svgHtml;
-      assetData = result.assetData;
+      assetData = result.asset;
     } else {
-      // Generate base class mind map
-      const result = await generateBaseClassMindMap(supabase, baseClassId, user, regenerate);
+      // Generate base class mind map using the service
+      const result = await mindMapGenerationService.generateBaseClassMindMap(
+        supabase, 
+        baseClassId, 
+        user, 
+        { regenerate, internal: !!internal }
+      );
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to generate base class mind map');
+      }
+      
       mindMapData = result.mindMapData;
       svgHtml = result.svgHtml;
-      assetData = result.assetData;
+      assetData = result.asset;
     }
 
     return NextResponse.json({

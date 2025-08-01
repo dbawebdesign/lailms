@@ -2,8 +2,11 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import { knowledgeBaseAnalyzer, COURSE_GENERATION_MODES } from './knowledge-base-analyzer';
 import { AssessmentGenerationService } from './assessment-generation-service';
+import { mindMapGenerationService } from './mind-map-generation-service';
+import { brainbytesGenerationService } from './brainbytes-generation-service';
 import type { CourseGenerationRequest, CourseOutline, ModuleLesson } from './course-generator';
 import { courseProgressCalculator } from '@/lib/utils/courseGenerationProgressCalculator';
+import { createClient } from '@supabase/supabase-js';
 
 export interface GenerationTask {
   id: string;
@@ -1150,153 +1153,117 @@ What makes this particularly important for ${request.academicLevel || 'college'}
 
   /**
    * Generate mind map for lesson after assessment is complete
+   * Uses direct service call instead of HTTP request to avoid authentication issues
    */
   private async generateLessonMindMap(task: GenerationTask): Promise<void> {
     if (!task.lessonId) return;
 
     const { moduleLesson, request } = task.data;
-    console.log(`🧠 Generating mind map for lesson: ${moduleLesson.title}`);
+    console.log(`🧠 [Orchestrator] Generating mind map for lesson: ${moduleLesson.title}`);
 
     // Add delay to ensure lesson data is committed to database
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    let retryCount = 0;
-    const maxRetries = 3;
-
-    while (retryCount < maxRetries) {
-      try {
-        console.log(`🧠 Attempt ${retryCount + 1}/${maxRetries} - Generating mind map for lesson: ${task.lessonId}`);
-        
-              // Construct the API URL for internal requests
-      const baseUrl = process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-      
-      // Call the existing mind map API directly with internal flag and user ID
-      const response = await fetch(`${baseUrl}/api/teach/media/generate/mind-map`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Internal-Request': 'true', // Flag for internal requests
-          },
-          body: JSON.stringify({
-            lessonId: task.lessonId,
-            userId: request.userId, // Pass user ID for internal requests
-            internal: true
-          })
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`🧠 Mind map API error (${response.status}):`, errorText);
-          
-          // If it's a lesson not found error, retry after delay
-          if (response.status === 500 && errorText.includes('Lesson not found')) {
-            retryCount++;
-            if (retryCount < maxRetries) {
-              console.log(`🧠 Lesson not found, retrying in 5 seconds... (${retryCount}/${maxRetries})`);
-              await new Promise(resolve => setTimeout(resolve, 5000));
-              continue;
-            }
+    try {
+      // Create service role Supabase client for internal operations
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
           }
-          
-          throw new Error(`Mind map API returned ${response.status}: ${errorText}`);
         }
+      );
 
-        console.log(`✅ Created mind map for lesson: ${moduleLesson.title}`);
-        break; // Success, exit retry loop
-        
-      } catch (error) {
-        retryCount++;
-        console.error(`🧠 Failed attempt ${retryCount}/${maxRetries} for mind map generation:`, error);
-        
-        if (retryCount >= maxRetries) {
-          console.error(`❌ Failed to generate mind map for lesson ${moduleLesson.title} after ${maxRetries} attempts:`, error);
-          // Don't throw error to prevent course generation from failing
-          break;
+      // Create user object for the service
+      const user = { id: request.userId };
+
+      // Use direct service call instead of HTTP request
+      const result = await mindMapGenerationService.generateLessonMindMap(
+        supabase,
+        task.lessonId,
+        user,
+        {
+          regenerate: false,
+          internal: true,
+          maxRetries: 3,
+          retryDelay: 5000
         }
-        
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 5000));
+      );
+
+      if (result.success) {
+        console.log(`✅ [Orchestrator] Successfully created mind map for lesson: ${moduleLesson.title}`);
+      } else {
+        console.error(`❌ [Orchestrator] Failed to generate mind map for lesson ${moduleLesson.title}:`, result.error);
+        // Don't throw error to prevent course generation from failing completely
+        // The service already handles retries internally
       }
+
+    } catch (error) {
+      console.error(`❌ [Orchestrator] Unexpected error generating mind map for lesson ${moduleLesson.title}:`, error);
+      // Don't throw error to prevent course generation from failing completely
     }
   }
 
   /**
    * Generate brainbytes podcast for lesson after assessment is complete
+   * Uses BrainbytesGenerationService instead of HTTP requests to avoid authentication issues
    */
   private async generateLessonBrainbytes(task: GenerationTask): Promise<void> {
     if (!task.lessonId) return;
 
     const { moduleLesson, request } = task.data;
-    console.log(`🎧 Generating brainbytes for lesson: ${moduleLesson.title}`);
+    console.log(`🎧 [Orchestrator] Generating brainbytes for lesson: ${moduleLesson.title}`);
 
     // Add delay to ensure lesson data is committed to database
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    let retryCount = 0;
-    const maxRetries = 3;
-
-    while (retryCount < maxRetries) {
-      try {
-        console.log(`🎧 Attempt ${retryCount + 1}/${maxRetries} - Generating brainbytes for lesson: ${task.lessonId}`);
-        
-        // Use academic level from request, default to 'college'
-        const gradeLevel = request.academicLevel || 'college';
-        
-              // Construct the API URL for internal requests
-      const baseUrl = process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-      
-      // Call the existing brainbytes API directly with internal flag and user ID
-      const response = await fetch(`${baseUrl}/api/teach/media/generate/podcast`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Internal-Request': 'true', // Flag for internal requests
-          },
-          body: JSON.stringify({
-            lessonId: task.lessonId,
-            gradeLevel: gradeLevel,
-            userId: request.userId, // Pass user ID for internal requests
-            internal: true
-          })
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`🎧 Brainbytes API error (${response.status}):`, errorText);
-          
-          // If it's a lesson not found error, retry after delay
-          if (response.status === 500 && (errorText.includes('Failed to fetch lesson') || errorText.includes('Lesson not found'))) {
-            retryCount++;
-            if (retryCount < maxRetries) {
-              console.log(`🎧 Lesson not found, retrying in 5 seconds... (${retryCount}/${maxRetries})`);
-              await new Promise(resolve => setTimeout(resolve, 5000));
-              continue;
-            }
+    try {
+      // Create service role Supabase client for internal operations
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
           }
-          
-          throw new Error(`Brainbytes API returned ${response.status}: ${errorText}`);
         }
+      );
 
-        console.log(`✅ Created brainbytes for lesson: ${moduleLesson.title}`);
-        break; // Success, exit retry loop
-        
-      } catch (error) {
-        retryCount++;
-        console.error(`🎧 Failed attempt ${retryCount}/${maxRetries} for brainbytes generation:`, error);
-        
-        if (retryCount >= maxRetries) {
-          console.error(`❌ Failed to generate brainbytes for lesson ${moduleLesson.title} after ${maxRetries} attempts:`, error);
-          // Don't throw error to prevent course generation from failing
-          break;
+      // Create user object for the service
+      const user = { id: request.userId };
+
+      // Use academic level from request, default to 'college'
+      const gradeLevel = request.academicLevel || 'college';
+
+      // Use direct service call instead of HTTP request
+      const result = await brainbytesGenerationService.generateLessonBrainbytes(
+        supabase,
+        task.lessonId,
+        user,
+        {
+          regenerate: false,
+          internal: true,
+          gradeLevel,
+          maxRetries: 3,
+          retryDelay: 5000
         }
-        
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 5000));
+      );
+
+      if (result.success) {
+        console.log(`✅ [Orchestrator] Successfully created brainbytes for lesson: ${moduleLesson.title}`);
+      } else {
+        console.error(`❌ [Orchestrator] Failed to generate brainbytes for lesson ${moduleLesson.title}:`, result.error);
+        // Don't throw error to prevent course generation from failing completely
+        // The service already handles retries internally
       }
+
+    } catch (error) {
+      console.error(`❌ [Orchestrator] Unexpected error generating brainbytes for lesson ${moduleLesson.title}:`, error);
+      // Don't throw error to prevent course generation from failing completely
     }
   }
 

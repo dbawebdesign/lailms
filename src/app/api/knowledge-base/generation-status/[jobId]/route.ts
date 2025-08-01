@@ -102,6 +102,13 @@ export async function GET(
 
         const determinedStatus = determineJobStatus(tasks as GenerationTask[], job.status || 'processing');
         
+        // Calculate task counts
+        const totalTasks = tasks.length;
+        const completedTasks = tasks.filter(task => task.status === 'completed').length;
+        const failedTasks = tasks.filter(task => task.status === 'failed').length;
+        const runningTasks = tasks.filter(task => task.status === 'running').length;
+        const pendingTasks = tasks.filter(task => task.status === 'pending').length;
+        
         return NextResponse.json({
           success: true,
           isLive: true,
@@ -112,6 +119,11 @@ export async function GET(
             progress: job.progress_percentage || 0,
             error: job.error_message,
             tasks: tasks,
+            total_tasks: totalTasks,
+            completed_tasks: completedTasks,
+            failed_tasks: failedTasks,
+            running_tasks: runningTasks,
+            pending_tasks: pendingTasks,
             confettiShown: (job as any).confetti_shown || false,
             result: job.result_data,
             result_data: job.result_data,
@@ -135,6 +147,13 @@ export async function GET(
       const tasks = Array.from(liveState.tasks.values());
       const determinedStatus = determineJobStatus(tasks as GenerationTask[], job.status || 'processing');
       
+      // Calculate task counts for V1
+      const totalTasks = tasks.length;
+      const completedTasks = tasks.filter(task => task.status === 'completed').length;
+      const failedTasks = tasks.filter(task => task.status === 'failed').length;
+      const runningTasks = tasks.filter(task => task.status === 'running').length;
+      const pendingTasks = tasks.filter(task => task.status === 'pending').length;
+      
       return NextResponse.json({
         success: true,
         isLive: true,
@@ -145,6 +164,11 @@ export async function GET(
           progress: liveState.progress,
           error: job.error_message,
           tasks: tasks,
+          total_tasks: totalTasks,
+          completed_tasks: completedTasks,
+          failed_tasks: failedTasks,
+          running_tasks: runningTasks,
+          pending_tasks: pendingTasks,
           confettiShown: (job as any).confetti_shown || false,
           result: job.result_data,
           result_data: job.result_data,
@@ -160,10 +184,17 @@ export async function GET(
       // Fallback to database record if not live in memory
       // If result_data contains task summary, extract tasks for compatibility
       const resultData = job.result_data as any;
-      const tasks = resultData?.tasks || undefined;
+      const tasks = resultData?.tasks || [];
       
       // Use stored status or determine from tasks if available
-      const determinedStatus = tasks ? determineJobStatus(tasks, job.status || 'processing') : job.status;
+      const determinedStatus = tasks.length > 0 ? determineJobStatus(tasks, job.status || 'processing') : job.status;
+      
+      // Calculate task counts for fallback
+      const totalTasks = tasks.length;
+      const completedTasks = tasks.filter((task: any) => task.status === 'completed').length;
+      const failedTasks = tasks.filter((task: any) => task.status === 'failed').length;
+      const runningTasks = tasks.filter((task: any) => task.status === 'running').length;
+      const pendingTasks = tasks.filter((task: any) => task.status === 'pending').length;
       
       return NextResponse.json({
         success: true,
@@ -176,6 +207,11 @@ export async function GET(
           result: job.result_data, // Include result for consistency with jobs list API
           result_data: job.result_data, // Include result_data for new code
           tasks: tasks, // Include tasks from stored result_data if available
+          total_tasks: totalTasks,
+          completed_tasks: completedTasks,
+          failed_tasks: failedTasks,
+          running_tasks: runningTasks,
+          pending_tasks: pendingTasks,
           confettiShown: (job as any).confetti_shown || false,
         },
         result_data: job.result_data, // Include result_data at root level for consistency

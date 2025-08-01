@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, BookOpen, Layers, CheckCircle, ArrowRight } from 'lucide-react';
+import Image from 'next/image';
 
 interface CourseGenerationModalProps {
   isOpen: boolean;
@@ -23,7 +24,7 @@ const generationPhases: GenerationPhase[] = [
     id: 'initializing',
     title: 'Initializing Course Builder',
     description: 'Analyzing your knowledge base and setting up the course generation process. You will be redirected to the dashboard where you can track detailed progress. Courses typically take 10-20 minutes to complete depending on complexity.',
-    icon: <Brain className="w-6 h-6" />,
+    icon: <Image src="/favicon.svg" alt="Learnology AI" width={24} height={24} className="w-6 h-6" />,
     duration: 40 // Increased from 25 to 40 seconds (added 15 seconds)
   }
 ];
@@ -32,23 +33,66 @@ export function CourseGenerationModal({ isOpen, jobId, onComplete }: CourseGener
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
   const [phaseProgress, setPhaseProgress] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [taskCount, setTaskCount] = useState(0);
+  const [isWaitingForTasks, setIsWaitingForTasks] = useState(false);
+
+  // Check job status to see if we have enough tasks created
+  const checkJobStatus = async () => {
+    if (!jobId) return false;
+
+    try {
+      const response = await fetch(`/api/knowledge-base/generation-status/${jobId}`);
+      const data = await response.json();
+
+      if (data.success && data.job) {
+        const job = data.job;
+        setTaskCount(job.total_tasks || 0);
+        
+        // Check if we have enough tasks to show meaningful progress
+        const hasEnoughTasks = (job.total_tasks || 0) >= 10;
+        const hasStartedProcessing = job.status === 'processing';
+        const hasAnyProgress = (job.completed_tasks || 0) > 0 || (job.running_tasks || 0) > 0;
+        
+        // Redirect when we have at least 10 tasks AND the job is processing with some activity
+        return hasEnoughTasks && hasStartedProcessing && hasAnyProgress;
+      }
+    } catch (error) {
+      console.error('Failed to check job status:', error);
+    }
+    
+    return false;
+  };
 
   useEffect(() => {
     if (!isOpen || !jobId) return;
 
     let phaseTimer: NodeJS.Timeout;
     let progressTimer: NodeJS.Timeout;
-
-    // Removed checkJobStatus function since we're now redirecting immediately after animation
+    let statusCheckTimer: NodeJS.Timeout;
 
     const startPhase = (phaseIndex: number) => {
       if (phaseIndex >= generationPhases.length) {
-        // All phases complete - immediately redirect to dashboard
-        console.log('🎯 Initialization animation completed, redirecting to dashboard');
-        setIsCompleted(true);
-        setTimeout(() => {
-          onComplete?.();
-        }, 2000); // Show completion state for 2 seconds then redirect
+        // Animation complete - now wait for tasks to be created
+        console.log('🎯 Initialization animation completed, waiting for tasks to be created...');
+        setIsWaitingForTasks(true);
+        
+        // Start checking for task creation
+        const checkTasks = async () => {
+          const hasEnoughTasks = await checkJobStatus();
+          
+          if (hasEnoughTasks) {
+            console.log(`✅ Found ${taskCount} tasks created, redirecting to dashboard`);
+            setIsCompleted(true);
+            setTimeout(() => {
+              onComplete?.();
+            }, 2000); // Show completion state for 2 seconds then redirect
+          } else {
+            // Keep checking every 2 seconds
+            statusCheckTimer = setTimeout(checkTasks, 2000);
+          }
+        };
+        
+        checkTasks();
         return;
       }
 
@@ -79,8 +123,9 @@ export function CourseGenerationModal({ isOpen, jobId, onComplete }: CourseGener
 
     return () => {
       clearInterval(progressTimer);
+      clearTimeout(statusCheckTimer);
     };
-  }, [isOpen, jobId, onComplete]);
+  }, [isOpen, jobId, onComplete, taskCount]);
 
   if (!isOpen) return null;
 
@@ -115,7 +160,11 @@ export function CourseGenerationModal({ isOpen, jobId, onComplete }: CourseGener
                   }}
                   className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-lg"
                 >
-                  {currentPhase?.icon}
+                  {isWaitingForTasks ? (
+                    <Image src="/favicon.svg" alt="Learnology AI" width={24} height={24} className="w-6 h-6" />
+                  ) : (
+                    currentPhase?.icon
+                  )}
                 </motion.div>
                 
                 {/* Pulse rings */}
@@ -133,36 +182,39 @@ export function CourseGenerationModal({ isOpen, jobId, onComplete }: CourseGener
 
               {/* Phase Title */}
               <motion.h2
-                key={currentPhase?.id}
+                key={isWaitingForTasks ? 'waiting-for-tasks' : currentPhase?.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-2xl font-bold text-gray-900 mb-3"
               >
-                {currentPhase?.title}
+                {isWaitingForTasks ? 'Creating Course Structure' : currentPhase?.title}
               </motion.h2>
 
               {/* Phase Description */}
               <motion.p
-                key={`${currentPhase?.id}-desc`}
+                key={isWaitingForTasks ? 'waiting-for-tasks-desc' : `${currentPhase?.id}-desc`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
                 className="text-gray-600 mb-8 leading-relaxed"
               >
-                {currentPhase?.description}
+                {isWaitingForTasks 
+                  ? `Setting up your course structure and preparing tasks for generation. We're creating lessons, assessments, and media components. Found ${taskCount} tasks so far...`
+                  : currentPhase?.description
+                }
               </motion.p>
 
               {/* Progress Bar */}
               <div className="w-full bg-gray-200 rounded-full h-2 mb-6">
                 <motion.div
                   className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full"
-                  style={{ width: `${phaseProgress}%` }}
+                  style={{ width: isWaitingForTasks ? '85%' : `${phaseProgress}%` }}
                   transition={{ ease: "easeOut" }}
                 />
               </div>
 
-              {/* Phase Indicators - Only show if multiple phases */}
-              {generationPhases.length > 1 && (
+              {/* Phase Indicators - Only show if multiple phases and not waiting */}
+              {generationPhases.length > 1 && !isWaitingForTasks && (
                 <div className="flex justify-center space-x-3">
                   {generationPhases.map((phase, index) => (
                     <div
@@ -177,6 +229,17 @@ export function CourseGenerationModal({ isOpen, jobId, onComplete }: CourseGener
                     />
                   ))}
                 </div>
+              )}
+
+              {/* Task Count Display when waiting */}
+              {isWaitingForTasks && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-sm text-gray-500 mt-4"
+                >
+                  Tasks created: {taskCount} (waiting for at least 10 to start)
+                </motion.div>
               )}
             </>
           ) : (

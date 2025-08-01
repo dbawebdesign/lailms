@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
 import { knowledgeBaseAnalyzer, COURSE_GENERATION_MODES } from './knowledge-base-analyzer';
 import { AssessmentGenerationService } from './assessment-generation-service';
+import { mindMapGenerationService } from './mind-map-generation-service';
+import { brainbytesGenerationService } from './brainbytes-generation-service';
 import type { CourseGenerationRequest, CourseOutline, ModuleLesson } from './course-generator';
 import { courseProgressCalculator } from '@/lib/utils/courseGenerationProgressCalculator';
 import { CourseGenerationTaskExecutor } from './course-generation-task-executor';
@@ -2727,10 +2729,11 @@ Generate a comprehensive course outline in JSON format:
   }
 
   /**
-   * Execute lesson mind map task - V1 EXACT MATCH calling existing API
+   * Execute lesson mind map task - Updated to use direct service call
+   * Uses MindMapGenerationService instead of HTTP requests to avoid authentication issues
    */
   private async executeLessonMindMapTask(task: TaskDefinition, outline: CourseOutline, request: CourseGenerationRequest): Promise<any> {
-    console.log(`🧠 Executing lesson mind map task: ${task.task_identifier}`);
+    console.log(`🧠 [OrchestratorV2] Executing lesson mind map task: ${task.task_identifier}`);
     
     try {
       const lessonId = task.lesson_id;
@@ -2738,95 +2741,58 @@ Generate a comprehensive course outline in JSON format:
         throw new Error('No lesson_id provided for mind map task');
       }
 
-      // V1 EXACT MATCH: Call the existing mind map API like V1 does
-      console.log(`🧠 Calling V1 mind map API for lesson: ${lessonId}`);
+      console.log(`🧠 [OrchestratorV2] Generating mind map for lesson: ${lessonId}`);
       
-      // Add delay to ensure lesson data is committed to database (V1 pattern)
+      // Add delay to ensure lesson data is committed to database
       await new Promise(resolve => setTimeout(resolve, 3000));
 
-      let retryCount = 0;
-      const maxRetries = 3;
-
-      while (retryCount < maxRetries) {
-        try {
-          console.log(`🧠 Attempt ${retryCount + 1}/${maxRetries} - Generating mind map for lesson: ${lessonId}`);
-          
-          // Construct the API URL for internal requests (V1 pattern)
-          const baseUrl = process.env.VERCEL_URL 
-            ? `https://${process.env.VERCEL_URL}` 
-            : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-          
-          // Call the existing mind map API directly with internal flag and user ID (V1 pattern)
-          // Add timeout to prevent hanging
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
-          
-          const response = await fetch(`${baseUrl}/api/teach/media/generate/mind-map`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Internal-Request': 'true', // Flag for internal requests
-            },
-            body: JSON.stringify({
-              lessonId: lessonId,
-              userId: request.userId, // Pass user ID for internal requests
-              internal: true
-            }),
-            signal: controller.signal
-          });
-          
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`🧠 Mind map API error (${response.status}):`, errorText);
-            
-            // Handle specific error cases without retrying
-            if (errorText.includes('A mind map already exists for this lesson')) {
-              console.log(`✅ Mind map already exists for lesson, marking as completed`);
-              return { message: 'Mind map already exists - marked as completed' };
-            }
-            
-            // If it's a lesson not found error, retry after delay (V1 pattern)
-            if (response.status === 500 && errorText.includes('Lesson not found')) {
-              retryCount++;
-              if (retryCount < maxRetries) {
-                console.log(`🧠 Lesson not found, retrying in 2 seconds... (${retryCount}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                continue;
-              }
-            }
-            
-            throw new Error(`Mind map API returned ${response.status}: ${errorText}`);
+      // Create service role Supabase client for internal operations
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
           }
-
-          const result = await response.json();
-          console.log(`✅ Created mind map for lesson using V1 API`);
-          console.log(`✅ Lesson mind map task completed: ${task.task_identifier}`);
-          return result;
-          
-        } catch (error) {
-          retryCount++;
-          
-          // Handle timeout errors specifically
-          if (error.name === 'AbortError') {
-            console.error(`🧠 Mind map generation timed out (2 minutes) - attempt ${retryCount}/${maxRetries}`);
-          } else {
-            console.error(`🧠 Failed attempt ${retryCount}/${maxRetries} for mind map generation:`, error);
-          }
-          
-          if (retryCount >= maxRetries) {
-            console.error(`❌ Failed to generate mind map for lesson after ${maxRetries} attempts:`, error);
-            // V1 compatible: Don't throw error to prevent course generation from failing
-            break;
-          }
-          
-          // Wait before retry
-          await new Promise(resolve => setTimeout(resolve, 5000));
         }
+      );
+
+      // Create user object for the service
+      const user = { id: request.userId };
+
+      // Use direct service call instead of HTTP request
+      const result = await mindMapGenerationService.generateLessonMindMap(
+        supabase,
+        lessonId,
+        user,
+        {
+          regenerate: false,
+          internal: true,
+          maxRetries: 3,
+          retryDelay: 2000
+        }
+      );
+
+      if (result.success) {
+        console.log(`✅ [OrchestratorV2] Successfully created mind map for lesson: ${lessonId}`);
+        console.log(`✅ [OrchestratorV2] Lesson mind map task completed: ${task.task_identifier}`);
+        return { message: 'Mind map generated successfully', asset: result.asset };
+      } else {
+        // Handle specific error cases
+        if (result.error?.includes('A mind map already exists for this lesson')) {
+          console.log(`✅ [OrchestratorV2] Mind map already exists for lesson, marking as completed`);
+          return { message: 'Mind map already exists - marked as completed' };
+        }
+        
+        console.error(`❌ [OrchestratorV2] Failed to generate mind map for lesson ${lessonId}:`, result.error);
+        // Don't throw error to prevent course generation from failing completely
+        // The task will be marked as failed by the orchestrator but generation continues
+        return null;
       }
+
     } catch (error) {
-      console.error(`❌ Lesson mind map task failed: ${task.task_identifier}`, error);
+      console.error(`❌ [OrchestratorV2] Lesson mind map task failed: ${task.task_identifier}`, error);
       // V1 compatible: Don't throw error to prevent course generation from failing
       // The task will be marked as failed by the orchestrator but generation continues
       return null;
@@ -2834,10 +2800,11 @@ Generate a comprehensive course outline in JSON format:
   }
 
   /**
-   * Execute lesson brainbytes task - V1 EXACT MATCH calling existing API
+   * Execute lesson brainbytes task - Updated to use direct service call
+   * Uses BrainbytesGenerationService instead of HTTP requests to avoid authentication issues
    */
   private async executeLessonBrainbytesTask(task: TaskDefinition, outline: CourseOutline, request: CourseGenerationRequest): Promise<any> {
-    console.log(`🧩 Executing lesson brainbytes task: ${task.task_identifier}`);
+    console.log(`🎧 [OrchestratorV2] Executing lesson brainbytes task: ${task.task_identifier}`);
     
     try {
       const lessonId = task.lesson_id;
@@ -2845,111 +2812,62 @@ Generate a comprehensive course outline in JSON format:
         throw new Error('No lesson_id provided for brainbytes task');
       }
 
-      // V1 EXACT MATCH: Call the existing brainbytes API like V1 does
-      console.log(`🎧 Calling V1 brainbytes API for lesson: ${lessonId}`);
+      console.log(`🎧 [OrchestratorV2] Generating brainbytes for lesson: ${lessonId}`);
       
-      // Add delay to ensure lesson data is committed to database (V1 pattern)
+      // Add delay to ensure lesson data is committed to database
       await new Promise(resolve => setTimeout(resolve, 3000));
 
-      let retryCount = 0;
-      const maxRetries = 3;
-
-      while (retryCount < maxRetries) {
-        try {
-          console.log(`🎧 Attempt ${retryCount + 1}/${maxRetries} - Generating brainbytes for lesson: ${lessonId}`);
-          
-          // Use academic level from request, default to 'college' (V1 pattern)
-          const gradeLevel = request.academicLevel || 'college';
-          
-          // Construct the API URL for internal requests (V1 pattern)
-          const baseUrl = process.env.VERCEL_URL 
-            ? `https://${process.env.VERCEL_URL}` 
-            : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-          
-          // Call the existing brainbytes API directly with internal flag and user ID (V1 pattern)
-          // Add timeout to prevent hanging
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
-          
-          const response = await fetch(`${baseUrl}/api/teach/media/generate/podcast`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Internal-Request': 'true', // Flag for internal requests
-            },
-            body: JSON.stringify({
-              lessonId: lessonId,
-              userId: request.userId, // Pass user ID for internal requests
-              gradeLevel: gradeLevel,
-              internal: true
-            }),
-            signal: controller.signal
-          });
-          
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`🎧 Brainbytes API error (${response.status}):`, errorText);
-            
-            // Handle specific error cases without retrying
-            if (errorText.includes('already exists for this lesson') || 
-                errorText.includes('Brain Bytes podcast already exists')) {
-              console.log(`✅ Brainbytes already exists for lesson, marking as completed`);
-              return { message: 'Brainbytes already exists - marked as completed' };
-            }
-            
-            // Handle network/connectivity errors with exponential backoff
-            if (response.status >= 500 && errorText.includes('fetch failed')) {
-              retryCount++;
-              if (retryCount < maxRetries) {
-                const backoffDelay = Math.min(2000 * Math.pow(2, retryCount - 1), 10000); // Max 10s delay
-                console.log(`🎧 Network error, retrying in ${backoffDelay/1000}s... (${retryCount}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, backoffDelay));
-                continue;
-              }
-            }
-            
-            // If it's a lesson not found error, retry after delay (V1 pattern)
-            if (response.status === 500 && errorText.includes('Lesson not found')) {
-              retryCount++;
-              if (retryCount < maxRetries) {
-                console.log(`🎧 Lesson not found, retrying in 2 seconds... (${retryCount}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                continue;
-              }
-            }
-            
-            throw new Error(`Brainbytes API returned ${response.status}: ${errorText}`);
+      // Create service role Supabase client for internal operations
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
           }
-
-          const result = await response.json();
-          console.log(`✅ Created brainbytes for lesson using V1 API`);
-          console.log(`✅ Lesson brainbytes task completed: ${task.task_identifier}`);
-          return result;
-          
-        } catch (error) {
-          retryCount++;
-          
-          // Handle timeout errors specifically
-          if (error.name === 'AbortError') {
-            console.error(`🎧 Brainbytes generation timed out (2 minutes) - attempt ${retryCount}/${maxRetries}`);
-          } else {
-            console.error(`🎧 Failed attempt ${retryCount}/${maxRetries} for brainbytes generation:`, error);
-          }
-          
-          if (retryCount >= maxRetries) {
-            console.error(`❌ Failed to generate brainbytes for lesson after ${maxRetries} attempts:`, error);
-            // V1 compatible: Don't throw error to prevent course generation from failing
-            break;
-          }
-          
-          // Wait before retry
-          await new Promise(resolve => setTimeout(resolve, 5000));
         }
+      );
+
+      // Create user object for the service
+      const user = { id: request.userId };
+
+      // Use academic level from request, default to 'college'
+      const gradeLevel = request.academicLevel || 'college';
+
+      // Use direct service call instead of HTTP request
+      const result = await brainbytesGenerationService.generateLessonBrainbytes(
+        supabase,
+        lessonId,
+        user,
+        {
+          regenerate: false,
+          internal: true,
+          gradeLevel,
+          maxRetries: 3,
+          retryDelay: 2000
+        }
+      );
+
+      if (result.success) {
+        console.log(`✅ [OrchestratorV2] Successfully created brainbytes for lesson: ${lessonId}`);
+        console.log(`✅ [OrchestratorV2] Lesson brainbytes task completed: ${task.task_identifier}`);
+        return { message: 'Brainbytes generated successfully', asset: result.asset };
+      } else {
+        // Handle specific error cases
+        if (result.error?.includes('A Brain Bytes podcast already exists for this lesson')) {
+          console.log(`✅ [OrchestratorV2] Brainbytes already exists for lesson, marking as completed`);
+          return { message: 'Brainbytes already exists - marked as completed' };
+        }
+        
+        console.error(`❌ [OrchestratorV2] Failed to generate brainbytes for lesson ${lessonId}:`, result.error);
+        // Don't throw error to prevent course generation from failing completely
+        // The task will be marked as failed by the orchestrator but generation continues
+        return null;
       }
+
     } catch (error) {
-      console.error(`❌ Lesson brainbytes task failed: ${task.task_identifier}`, error);
+      console.error(`❌ [OrchestratorV2] Lesson brainbytes task failed: ${task.task_identifier}`, error);
       // V1 compatible: Don't throw error to prevent course generation from failing
       // The task will be marked as failed by the orchestrator but generation continues
       return null;
