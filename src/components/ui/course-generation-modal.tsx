@@ -24,7 +24,7 @@ const generationPhases: GenerationPhase[] = [
     id: 'initializing',
     title: 'Initializing Course Builder',
     description: 'Analyzing your knowledge base and setting up the course generation process. You will be redirected to the dashboard where you can track detailed progress. Courses typically take 10-20 minutes to complete depending on complexity.',
-    icon: <Image src="/favicon.svg" alt="Learnology AI" width={24} height={24} className="w-6 h-6" />,
+    icon: <Image src="/favicon.svg" alt="Learnology AI" width={48} height={48} className="w-12 h-12" />,
     duration: 40 // Increased from 25 to 40 seconds (added 15 seconds)
   }
 ];
@@ -161,7 +161,7 @@ export function CourseGenerationModal({ isOpen, jobId, onComplete }: CourseGener
                   className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-lg"
                 >
                   {isWaitingForTasks ? (
-                    <Image src="/favicon.svg" alt="Learnology AI" width={24} height={24} className="w-6 h-6" />
+                    <Image src="/favicon.svg" alt="Learnology AI" width={48} height={48} className="w-12 h-12" />
                   ) : (
                     currentPhase?.icon
                   )}
