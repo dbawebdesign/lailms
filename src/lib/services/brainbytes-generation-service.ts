@@ -84,6 +84,13 @@ class BrainbytesGenerationService {
 
         const { comprehensiveContent } = contentResult;
 
+        if (!comprehensiveContent) {
+          return {
+            success: false,
+            error: 'No content available for brainbytes generation'
+          };
+        }
+
         // Generate podcast script using OpenAI
         const script = await this.generatePodcastScript(comprehensiveContent, gradeLevel);
 
@@ -172,7 +179,7 @@ class BrainbytesGenerationService {
       .from('lessons')
       .select('title, description')
       .eq('id', lessonId)
-      .single<Tables<"lessons">>();
+      .single();
 
     console.log('📊 [BrainbytesService] Lesson query result:', { lesson: !!lesson, error: lessonError });
 
@@ -214,7 +221,7 @@ class BrainbytesGenerationService {
     if (sections && sections.length > 0) {
       comprehensiveContent += 'Lesson Content:\n\n';
       
-      sections.forEach((section, index) => {
+      sections.forEach((section: any, index: number) => {
         comprehensiveContent += `Section ${index + 1}: ${(section as any).title}\n`;
         
         // Extract text content from JSONB
@@ -447,7 +454,7 @@ You are Luna, an AI educational podcast host who creates engaging, grade-appropr
         created_by: userId
       })
       .select()
-      .single<Tables<"lesson_media_assets">>();
+      .single();
 
     if (assetError) {
       console.error('[BrainbytesService] Database error:', assetError);

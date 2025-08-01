@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, CheckCircle, Zap, Users, BookOpen, Brain, TrendingUp, Shield, Star, Play, ChevronRight, GraduationCap, Home, School, Sparkles, Target, Award, Lightbulb, MessageCircle } from 'lucide-react'
+import { ArrowRight, CheckCircle, Zap, Users, BookOpen, Brain, TrendingUp, Shield, Star, Play, ChevronRight, GraduationCap, Home, School, Sparkles, Target, Award, Lightbulb, MessageCircle, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ShinyButton } from '@/components/ui/shiny-button'
 import AnimatedGridBackground from '@/components/layout/AnimatedGridBackground'
@@ -13,6 +13,7 @@ import { VideoModal } from '@/components/ui/VideoModal'
 export default function LandingPage() {
   const [isContactModalOpen, setIsContactModalOpen] = useState(false)
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     // Word by word animation
@@ -124,6 +125,7 @@ export default function LandingPage() {
             <Link href="#homeschool" className="text-gray-300 hover:text-white transition-colors">Homeschool</Link>
             <Link href="#features" className="text-gray-300 hover:text-white transition-colors">Features</Link>
             <Link href="#pricing" className="text-gray-300 hover:text-white transition-colors">Pricing</Link>
+            <Link href="/homeschool-signup" className="text-gray-300 hover:text-white transition-colors">Expo</Link>
             <button 
               onClick={() => setIsContactModalOpen(true)}
               className="text-gray-300 hover:text-white transition-colors"
@@ -133,14 +135,82 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="flex items-center space-x-4 relative z-10">
-          <Link href="/login" className="text-sm text-gray-300 hover:text-white transition-colors">Sign In</Link>
+          <Link href="/login" className="hidden md:block text-sm text-gray-300 hover:text-white transition-colors">Sign In</Link>
           <Link href="/signup">
             <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white text-sm px-6 py-2 rounded-lg hover:opacity-90 transition-opacity">
               Get Started
             </Button>
           </Link>
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2 text-gray-300 hover:text-white transition-colors"
+            aria-label="Toggle mobile menu"
+          >
+            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
         </div>
       </nav>
+
+      {/* Mobile Navigation Menu */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden fixed top-[73px] left-0 right-0 bg-black border-b border-gray-800 z-40">
+          <div className="flex flex-col py-4 px-6 space-y-4">
+            <Link 
+              href="#k12-college" 
+              className="text-gray-300 hover:text-white transition-colors py-2"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              K-12 & College
+            </Link>
+            <Link 
+              href="#homeschool" 
+              className="text-gray-300 hover:text-white transition-colors py-2"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Homeschool
+            </Link>
+            <Link 
+              href="#features" 
+              className="text-gray-300 hover:text-white transition-colors py-2"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Features
+            </Link>
+            <Link 
+              href="#pricing" 
+              className="text-gray-300 hover:text-white transition-colors py-2"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Pricing
+            </Link>
+            <Link 
+              href="/homeschool-signup" 
+              className="text-gray-300 hover:text-white transition-colors py-2 font-medium"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Expo
+            </Link>
+            <button 
+              onClick={() => {
+                setIsContactModalOpen(true);
+                setIsMobileMenuOpen(false);
+              }}
+              className="text-gray-300 hover:text-white transition-colors py-2 text-left"
+            >
+              Contact
+            </button>
+            <hr className="border-gray-700 my-2" />
+            <Link 
+              href="/login" 
+              className="text-gray-300 hover:text-white transition-colors py-2"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Sign In
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex flex-col justify-center items-center px-8 py-12 md:px-16 md:py-20 overflow-hidden">
