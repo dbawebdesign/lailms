@@ -24,7 +24,6 @@ type HomeschoolType = 'individual_family' | 'coop_network' | ''
 interface SignupFormData {
   organizationType: HomeschoolType
   organizationName: string
-  abbreviation: string
   familyName?: string
   primaryContactInfo: {
     username: string
@@ -181,7 +180,6 @@ export default function HomeschoolSignupForm() {
   const [formData, setFormData] = useState<SignupFormData>({
     organizationType: '',
     organizationName: '',
-    abbreviation: '',
     familyName: '',
     primaryContactInfo: {
       username: '',
@@ -196,7 +194,6 @@ export default function HomeschoolSignupForm() {
   // Validation states
   const [validationStates, setValidationStates] = useState({
     organizationName: { isValid: false, errors: [] as string[] },
-    abbreviation: { isValid: true, errors: [] as string[] }, // Optional field
     familyName: { isValid: true, errors: [] as string[] }, // Optional for coop_network
     firstName: { isValid: false, errors: [] as string[] },
     lastName: { isValid: false, errors: [] as string[] },
@@ -228,11 +225,6 @@ export default function HomeschoolSignupForm() {
   const organizationNameValidationRules = useMemo(() => [
     { test: (value: string) => value.trim().length >= 3, message: 'Organization name must be at least 3 characters' },
     { test: (value: string) => /^[a-zA-Z0-9\s'-]+$/.test(value), message: 'Organization name can only contain letters, numbers, spaces, hyphens, and apostrophes' }
-  ], [])
-
-  const abbreviationValidationRules = useMemo(() => [
-    { test: (value: string) => !value || (value.length >= 2 && value.length <= 10), message: 'Abbreviation must be 2-10 characters if provided' },
-    { test: (value: string) => !value || /^[A-Z0-9]+$/.test(value), message: 'Abbreviation should only contain uppercase letters and numbers' }
   ], [])
 
   const familyNameValidationRules = useMemo(() => [
@@ -314,14 +306,9 @@ export default function HomeschoolSignupForm() {
         return
       }
 
-      // Generate abbreviation from organization name if not provided
-      const abbreviation = formData.abbreviation || 
-        formData.organizationName.split(' ').map(word => word.charAt(0).toUpperCase()).join('')
-
       const requestBody = {
         organizationType: formData.organizationType,
         organizationName: formData.organizationName,
-        abbreviation,
         familyName: formData.familyName,
         primaryContactInfo: {
           username: formData.primaryContactInfo.username,
@@ -444,17 +431,7 @@ export default function HomeschoolSignupForm() {
                 onValidationChange={(isValid, errors) => updateValidationState('organizationName', isValid, errors)}
               />
 
-              <EnhancedInput
-                id="abbreviation"
-                label="Abbreviation (Optional)"
-                value={formData.abbreviation}
-                onChange={(e) => updateFormData({ abbreviation: e.target.value })}
-                placeholder="e.g., SFH or RHC"
-                disabled={isLoading}
-                validationRules={abbreviationValidationRules}
-                onValidationChange={(isValid, errors) => updateValidationState('abbreviation', isValid, errors)}
-                helperText="Used for generating unique codes. Leave blank to auto-generate."
-              />
+
 
               {formData.organizationType === 'individual_family' && (
                 <EnhancedInput

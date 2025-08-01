@@ -7,7 +7,6 @@ type HomeschoolType = 'individual_family' | 'coop_network'
 interface CreateHomeschoolOrgRequest {
   organizationType: HomeschoolType
   organizationName: string
-  abbreviation: string
   
   // For individual families
   familyName?: string
@@ -38,15 +37,13 @@ export async function POST(request: NextRequest) {
     console.log('Request body:', JSON.stringify(body, null, 2))
     console.log('organizationType:', body.organizationType)
     console.log('organizationName:', body.organizationName)
-    console.log('abbreviation:', body.abbreviation)
     console.log('primaryContactInfo:', body.primaryContactInfo)
     
     // Validate required fields
-    if (!body.organizationType || !body.organizationName || !body.abbreviation || !body.primaryContactInfo) {
+    if (!body.organizationType || !body.organizationName || !body.primaryContactInfo) {
       console.log('ERROR: Missing required fields')
       console.log('organizationType present:', !!body.organizationType)
       console.log('organizationName present:', !!body.organizationName)
-      console.log('abbreviation present:', !!body.abbreviation)
       console.log('primaryContactInfo present:', !!body.primaryContactInfo)
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
@@ -68,30 +65,60 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // Check if abbreviation is already taken
-    console.log('Checking abbreviation availability for:', body.abbreviation)
-    const { data: existingOrg, error: checkError } = await supabase
-      .from('organisations')
-      .select('id')
-      .eq('abbr', body.abbreviation)
-      .single()
-
-    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" which is expected
-      console.log('ERROR: Failed to check abbreviation availability:', checkError)
-      return NextResponse.json({ 
-        error: 'Failed to validate abbreviation availability',
-        details: checkError.message
-      }, { status: 500 })
+    // Generate a unique abbreviation
+    const generateUniqueAbbreviation = async (orgName: string): Promise<string> => {
+      // Start with initials from organization name
+      const baseAbbr = orgName
+        .split(' ')
+        .filter(word => word.length > 0)
+        .map(word => word.charAt(0).toUpperCase())
+        .join('')
+        .substring(0, 4) // Limit to 4 characters max for base
+      
+      // Try different variations until we find a unique one
+      for (let attempt = 0; attempt < 100; attempt++) {
+        let candidateAbbr: string
+        
+        if (attempt === 0) {
+          // First try: just the base abbreviation
+          candidateAbbr = baseAbbr
+        } else {
+          // Add random suffix for uniqueness
+          const randomSuffix = Math.random().toString(36).substring(2, 4).toUpperCase()
+          candidateAbbr = `${baseAbbr}${randomSuffix}`
+        }
+        
+        // Check if this abbreviation already exists
+        const { data: existingOrg, error: checkError } = await supabase
+          .from('organisations')
+          .select('id')
+          .eq('abbr', candidateAbbr)
+          .single()
+        
+        if (checkError && checkError.code === 'PGRST116') {
+          // PGRST116 means "not found" - this abbreviation is available
+          console.log('Generated unique abbreviation:', candidateAbbr)
+          return candidateAbbr
+        }
+        
+        if (checkError && checkError.code !== 'PGRST116') {
+          // Some other error occurred
+          console.log('ERROR: Failed to check abbreviation availability:', checkError)
+          throw new Error(`Failed to validate abbreviation: ${checkError.message}`)
+        }
+        
+        // If we get here, the abbreviation exists, so try the next variation
+        console.log('Abbreviation already exists, trying next variation:', candidateAbbr)
+      }
+      
+      // If we couldn't find a unique abbreviation after 100 attempts, use timestamp
+      const timestamp = Date.now().toString().slice(-4)
+      const fallbackAbbr = `${baseAbbr}${timestamp}`
+      console.log('Using fallback abbreviation with timestamp:', fallbackAbbr)
+      return fallbackAbbr
     }
 
-    if (existingOrg) {
-      console.log('ERROR: Abbreviation already exists:', body.abbreviation)
-      return NextResponse.json({ 
-        error: 'Organization abbreviation already exists. Please choose a different abbreviation.' 
-      }, { status: 400 })
-    }
-    
-    console.log('Abbreviation is available:', body.abbreviation)
+    const abbreviation = await generateUniqueAbbreviation(body.organizationName)
 
     // Start transaction-like operations
     let organizationId: string
@@ -101,7 +128,7 @@ export async function POST(request: NextRequest) {
     // 1. Create the organization
     console.log('Creating organization with data:', {
       name: body.organizationName,
-      abbr: body.abbreviation,
+      abbr: abbreviation,
       organisation_type: body.organizationType,
       settings: {
         homeschool_type: body.organizationType,
@@ -113,7 +140,7 @@ export async function POST(request: NextRequest) {
       .from('organisations')
       .insert({
         name: body.organizationName,
-        abbr: body.abbreviation,
+        abbr: abbreviation,
         organisation_type: body.organizationType, // Use the specific type: 'individual_family' or 'coop_network'
         settings: {
           homeschool_type: body.organizationType,
@@ -341,7 +368,7 @@ export async function POST(request: NextRequest) {
         id: organizationId,
         name: body.organizationName,
         type: body.organizationType,
-        abbreviation: body.abbreviation
+        abbreviation: abbreviation
       },
       primaryContact: {
         id: primaryContactId,
