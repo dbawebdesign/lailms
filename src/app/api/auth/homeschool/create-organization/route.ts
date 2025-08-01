@@ -33,9 +33,33 @@ export async function POST(request: NextRequest) {
   try {
     const body: CreateHomeschoolOrgRequest = await request.json()
     
+    // Enhanced logging for debugging
+    console.log('=== HOMESCHOOL SIGNUP DEBUG ===')
+    console.log('Request body:', JSON.stringify(body, null, 2))
+    console.log('organizationType:', body.organizationType)
+    console.log('organizationName:', body.organizationName)
+    console.log('abbreviation:', body.abbreviation)
+    console.log('primaryContactInfo:', body.primaryContactInfo)
+    
     // Validate required fields
     if (!body.organizationType || !body.organizationName || !body.abbreviation || !body.primaryContactInfo) {
+      console.log('ERROR: Missing required fields')
+      console.log('organizationType present:', !!body.organizationType)
+      console.log('organizationName present:', !!body.organizationName)
+      console.log('abbreviation present:', !!body.abbreviation)
+      console.log('primaryContactInfo present:', !!body.primaryContactInfo)
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+    
+    // Validate primaryContactInfo fields
+    if (!body.primaryContactInfo.username || !body.primaryContactInfo.firstName || 
+        !body.primaryContactInfo.lastName || !body.primaryContactInfo.password) {
+      console.log('ERROR: Missing primaryContactInfo fields')
+      console.log('username present:', !!body.primaryContactInfo.username)
+      console.log('firstName present:', !!body.primaryContactInfo.firstName)
+      console.log('lastName present:', !!body.primaryContactInfo.lastName)
+      console.log('password present:', !!body.primaryContactInfo.password)
+      return NextResponse.json({ error: 'Missing required contact information' }, { status: 400 })
     }
 
     // Initialize Supabase admin client
@@ -45,17 +69,29 @@ export async function POST(request: NextRequest) {
     )
 
     // Check if abbreviation is already taken
-    const { data: existingOrg } = await supabase
+    console.log('Checking abbreviation availability for:', body.abbreviation)
+    const { data: existingOrg, error: checkError } = await supabase
       .from('organisations')
       .select('id')
       .eq('abbr', body.abbreviation)
       .single()
 
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" which is expected
+      console.log('ERROR: Failed to check abbreviation availability:', checkError)
+      return NextResponse.json({ 
+        error: 'Failed to validate abbreviation availability',
+        details: checkError.message
+      }, { status: 500 })
+    }
+
     if (existingOrg) {
+      console.log('ERROR: Abbreviation already exists:', body.abbreviation)
       return NextResponse.json({ 
         error: 'Organization abbreviation already exists. Please choose a different abbreviation.' 
       }, { status: 400 })
     }
+    
+    console.log('Abbreviation is available:', body.abbreviation)
 
     // Start transaction-like operations
     let organizationId: string
@@ -63,6 +99,16 @@ export async function POST(request: NextRequest) {
     let primaryContactId: string
 
     // 1. Create the organization
+    console.log('Creating organization with data:', {
+      name: body.organizationName,
+      abbr: body.abbreviation,
+      organisation_type: body.organizationType,
+      settings: {
+        homeschool_type: body.organizationType,
+        created_via: 'homeschool_signup'
+      }
+    })
+    
     const { data: newOrg, error: orgError } = await supabase
       .from('organisations')
       .insert({
@@ -78,8 +124,14 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (orgError || !newOrg) {
-      return NextResponse.json({ error: 'Failed to create organization' }, { status: 500 })
+      console.log('ERROR: Failed to create organization:', orgError)
+      return NextResponse.json({ 
+        error: 'Failed to create organization',
+        details: orgError?.message || 'Unknown error'
+      }, { status: 500 })
     }
+    
+    console.log('Organization created successfully:', newOrg.id)
 
     organizationId = newOrg.id
 

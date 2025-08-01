@@ -318,21 +318,27 @@ export default function HomeschoolSignupForm() {
       const abbreviation = formData.abbreviation || 
         formData.organizationName.split(' ').map(word => word.charAt(0).toUpperCase()).join('')
 
+      const requestBody = {
+        organizationType: formData.organizationType,
+        organizationName: formData.organizationName,
+        abbreviation,
+        familyName: formData.familyName,
+        primaryContactInfo: {
+          username: formData.primaryContactInfo.username,
+          firstName: formData.primaryContactInfo.firstName,
+          lastName: formData.primaryContactInfo.lastName,
+          password: formData.primaryContactInfo.password
+        }
+      }
+
+      console.log('=== CLIENT SIDE DEBUG ===')
+      console.log('Sending request body:', JSON.stringify(requestBody, null, 2))
+      console.log('formData.primaryContactInfo:', formData.primaryContactInfo)
+
       const response = await fetch('/api/auth/homeschool/create-organization', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organizationType: formData.organizationType,
-          organizationName: formData.organizationName,
-          abbreviation,
-          familyName: formData.familyName,
-          primaryContactInfo: {
-            username: formData.primaryContactInfo.username,
-            firstName: formData.primaryContactInfo.firstName,
-            lastName: formData.primaryContactInfo.lastName,
-            password: formData.primaryContactInfo.password
-          }
-        })
+        body: JSON.stringify(requestBody)
       })
 
       if (!response.ok) {
