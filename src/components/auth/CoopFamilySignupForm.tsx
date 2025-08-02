@@ -397,7 +397,7 @@ export default function CoopFamilySignupForm({
                   <Button 
                     onClick={() => {
                       // Redirect to Stripe payment link
-                      const paymentUrl = buildPaymentLink(signupResult.primaryParent.id, signupResult.primaryParent.email)
+                      const paymentUrl = buildPaymentLink(signupResult.primaryParent.id)
                       window.location.href = paymentUrl
                     }}
                     className="flex-1"

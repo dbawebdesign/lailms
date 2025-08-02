@@ -201,7 +201,7 @@ export default function SignupForm() {
       // Check if payment is required
       if (responseData.user?.requiresPayment) {
         // Redirect to Stripe payment link
-        const paymentUrl = buildPaymentLink(responseData.user.id, responseData.user.email)
+        const paymentUrl = buildPaymentLink(responseData.user.id)
         console.log('[SignupForm] Redirecting to payment:', paymentUrl)
         window.location.href = paymentUrl // Use window.location for external redirect
       } else {

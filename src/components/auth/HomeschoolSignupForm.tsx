@@ -570,7 +570,7 @@ export default function HomeschoolSignupForm() {
                   <Button 
                     onClick={() => {
                       // Redirect to Stripe payment link
-                      const paymentUrl = buildPaymentLink(organizationResult.primaryContact.id, organizationResult.primaryContact.email)
+                      const paymentUrl = buildPaymentLink(organizationResult.primaryContact.id)
                       window.location.href = paymentUrl
                     }}
                     className="flex-1"

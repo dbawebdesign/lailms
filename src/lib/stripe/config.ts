@@ -24,10 +24,10 @@ export function buildPaymentLink(userId: string, userEmail?: string): string {
   // Add user ID as client reference for webhook processing
   paymentLink.searchParams.set('client_reference_id', userId);
   
-  // Pre-fill email if available
-  if (userEmail) {
-    paymentLink.searchParams.set('prefilled_email', userEmail);
-  }
+  // Optional: Pre-fill email if you want to (commented out to let users enter their own)
+  // if (userEmail) {
+  //   paymentLink.searchParams.set('prefilled_email', userEmail);
+  // }
   
   return paymentLink.toString();
 }
