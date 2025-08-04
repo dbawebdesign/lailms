@@ -92,18 +92,21 @@ export function useRealtimeJobHealth({
 
     // Create a basic healthy status for jobs that are processing
     const basicHealth: JobHealthStatus = {
+      jobId,
       status: 'healthy',
+      lastActivity: new Date(),
+      timeSinceActivity: 0,
+      totalTasks: 0,
+      completedTasks: 0,
+      failedTasks: 0,
+      runningTasks: 0,
+      pendingTasks: 0,
       progressPercentage: 0,
       userMessage: 'Generation in progress...',
       canAutoRecover: false,
       recommendedAction: 'wait',
-
-      details: {
-        tasksCompleted: 0,
-        tasksTotal: 0,
-        currentTask: null,
-        estimatedTimeRemaining: null
-      }
+      recoveryAttempts: 0,
+      maxRecoveryAttempts: 3
     };
 
     setState(prev => ({ 
@@ -136,7 +139,7 @@ export function useRealtimeJobHealth({
           if (updatedJob.status === 'completed') {
             healthStatus = 'healthy';
             userMessage = 'Generation completed successfully!';
-            recommendedAction = 'none';
+            recommendedAction = 'wait';
           } else if (updatedJob.status === 'failed') {
             healthStatus = 'failed';
             userMessage = 'Generation failed. You can try restarting.';
@@ -149,18 +152,21 @@ export function useRealtimeJobHealth({
           }
 
           const updatedHealth: JobHealthStatus = {
+            jobId,
             status: healthStatus,
+            lastActivity: new Date(updatedJob.updated_at || Date.now()),
+            timeSinceActivity: 0,
+            totalTasks: updatedJob.tasks_total || 0,
+            completedTasks: updatedJob.tasks_completed || 0,
+            failedTasks: 0,
+            runningTasks: 0,
+            pendingTasks: (updatedJob.tasks_total || 0) - (updatedJob.tasks_completed || 0),
             progressPercentage: Math.round((updatedJob.progress || 0) * 100),
             userMessage,
             canAutoRecover,
             recommendedAction,
-      
-            details: {
-              tasksCompleted: updatedJob.tasks_completed || 0,
-              tasksTotal: updatedJob.tasks_total || 0,
-              currentTask: updatedJob.current_task || null,
-              estimatedTimeRemaining: null
-            }
+            recoveryAttempts: 0,
+            maxRecoveryAttempts: 3
           };
 
           setState(prev => ({ 

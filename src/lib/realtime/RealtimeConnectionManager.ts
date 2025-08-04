@@ -103,7 +103,7 @@ export class RealtimeConnectionManager {
   /**
    * Create a subscription with production-ready error handling and recovery
    */
-  async subscribe<T = any>(
+  async subscribe<T extends { [key: string]: any } = any>(
     subscriptionId: string,
     config: SubscriptionConfig,
     callback: (payload: RealtimePostgresChangesPayload<T>) => void
@@ -160,13 +160,7 @@ export class RealtimeConnectionManager {
     const channelName = `${config.table}-${subscriptionId}-${Date.now()}`;
     
     const channel = this.supabase
-      .channel(channelName, {
-        config: {
-          broadcast: { self: false },
-          presence: { key: subscriptionId },
-          private: false
-        }
-      })
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -175,7 +169,7 @@ export class RealtimeConnectionManager {
           table: config.table,
           filter: config.filter
         },
-        (payload) => {
+        (payload: any) => {
           this.updateActivity(subscriptionId);
           callback(payload);
         }

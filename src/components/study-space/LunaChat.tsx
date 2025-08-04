@@ -86,6 +86,8 @@ interface LunaChatProps {
   setChatMessage?: (message: string) => void;
   isGenerating?: boolean;
   className?: string;
+  userId?: string;
+  studySpaceId?: string;
 }
 
 export interface LunaChatRef {
@@ -110,7 +112,9 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
   chatMessage = '',
   setChatMessage,
   isGenerating = false,
-  className 
+  className,
+  userId,
+  studySpaceId
 }, ref) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -125,6 +129,17 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
   const conversationIdRef = useRef<string | null>(null);
   const isInitialLoad = useRef<boolean>(true);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Generate scoped localStorage key for user and study space
+  const getStorageKey = () => {
+    if (userId && studySpaceId) {
+      return `study-tools-luna-history-${userId}-${studySpaceId}`;
+    } else if (userId) {
+      return `study-tools-luna-history-${userId}`;
+    } else {
+      return 'study-tools-luna-history'; // fallback to global
+    }
+  };
 
   // Use local state if no external state provided
   const currentMessage = chatMessage || localChatMessage;
@@ -150,7 +165,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
 
   // Load chat history from localStorage on component mount
   useEffect(() => {
-    const savedHistory = localStorage.getItem('study-tools-luna-history');
+    const savedHistory = localStorage.getItem(getStorageKey());
     if (savedHistory) {
       try {
         const parsedHistory = JSON.parse(savedHistory);
@@ -172,7 +187,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
     setTimeout(() => {
       isInitialLoad.current = false;
     }, 100);
-  }, []);
+  }, [userId, studySpaceId]);
 
   // Save current chat to history whenever messages change
   useEffect(() => {
@@ -204,7 +219,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
         .sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime())
         .slice(0, 10);
       
-      localStorage.setItem('study-tools-luna-history', JSON.stringify(sortedHistory));
+      localStorage.setItem(getStorageKey(), JSON.stringify(sortedHistory));
       return sortedHistory;
     });
   }, [messages, currentChatId]);
@@ -355,7 +370,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
   const deleteChat = (chatId: string) => {
     const updatedHistory = chatHistory.filter(chat => chat.id !== chatId);
     setChatHistory(updatedHistory);
-    localStorage.setItem('study-tools-luna-history', JSON.stringify(updatedHistory));
+            localStorage.setItem(getStorageKey(), JSON.stringify(updatedHistory));
     
     // If we're deleting the current chat, go back to list view
     if (chatId === currentChatId) {

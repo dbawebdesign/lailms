@@ -2547,6 +2547,8 @@ export default function UnifiedStudySpace() {
             onHighlightedTextUsed={() => setHighlightedTextForLuna(null)}
             onAddToNotes={handleAddToNotes}
             className="h-full"
+            userId={currentUser?.id}
+            studySpaceId={selectedSpace?.id}
           />
         );
 
@@ -3231,6 +3233,8 @@ export default function UnifiedStudySpace() {
                           setChatMessage={setChatMessage}
                           isGenerating={isGenerating}
                           className="h-full w-full"
+                          userId={currentUser?.id}
+                          studySpaceId={selectedSpace?.id}
                         />
                       </div>
                     ) : (
