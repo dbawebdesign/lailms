@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,6 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import JSConfetti from 'js-confetti';
-import { useRealtimeJobHealth } from '@/hooks/useRealtimeJobHealth';
 
 interface CourseGenerationJob {
   id: string;
@@ -57,24 +56,12 @@ function EnhancedJobCard({ job, onClear }: EnhancedJobCardProps) {
   const [showHealthDetails, setShowHealthDetails] = useState(false);
   const [confettiRef, setConfettiRef] = useState<JSConfetti | null>(null);
 
-  // Use health monitoring for resilience
-  const {
-    health,
-    isLoading: isHealthLoading,
-    needsAttention,
-    attemptRecovery,
-    isRecovering,
-    error: healthError
-  } = useRealtimeJobHealth({
-    jobId: job.id,
-    enabled: job.status === 'processing' || job.status === 'failed',
-    onHealthChange: (newHealth) => {
-      // Show health details if there are issues
-      if (['stalled', 'stuck', 'failed', 'abandoned'].includes(newHealth.status)) {
-        setShowHealthDetails(true);
-      }
-    }
-  });
+  // Derive health status directly from job data to avoid API calls
+  const needsAttention = job.status === 'failed' || 
+    (job.status === 'processing' && 
+     new Date().getTime() - new Date(job.updated_at).getTime() > 5 * 60 * 1000); // 5 minutes without update
+  
+  const isRecovering = false; // We'll track this at component level if needed
 
   // Handle confetti for completion
   useEffect(() => {
@@ -91,7 +78,20 @@ function EnhancedJobCard({ job, onClear }: EnhancedJobCardProps) {
 
   const handleRecovery = async (action: 'resume' | 'restart' | 'delete') => {
     try {
-      await attemptRecovery(action);
+      let response;
+      if (action === 'resume') {
+        response = await fetch(`/api/knowledge-base/jobs/${job.id}/resume`, { method: 'POST' });
+      } else if (action === 'restart') {
+        response = await fetch(`/api/knowledge-base/jobs/${job.id}/restart`, { method: 'POST' });
+      } else if (action === 'delete') {
+        response = await fetch(`/api/knowledge-base/jobs/${job.id}`, { method: 'DELETE' });
+      }
+
+      if (!response?.ok) {
+        const errorData = await response?.json();
+        throw new Error(errorData?.error || `Failed to ${action} job`);
+      }
+
       toast.success('Recovery initiated', {
         description: `${action} operation started successfully`
       });
@@ -143,30 +143,27 @@ function EnhancedJobCard({ job, onClear }: EnhancedJobCardProps) {
     }
   };
 
-  // Get health status badge
+  // Get health status badge based on job status and timing
   const getHealthBadge = () => {
-    if (!health || job.status !== 'processing') return null;
+    if (job.status !== 'processing') return null;
     
-    switch (health.status) {
-      case 'healthy':
-        return <Badge variant="default" className="bg-green-100 text-green-800 text-xs">Healthy</Badge>;
-      case 'stalled':
-        return <Badge variant="secondary" className="text-xs">Stalled</Badge>;
-      case 'stuck':
-      case 'failed':
-        return <Badge variant="destructive" className="text-xs">Needs Attention</Badge>;
-      default:
-        return null;
+    if (needsAttention) {
+      return <Badge variant="destructive" className="text-xs">Needs Attention</Badge>;
+    } else {
+      return <Badge variant="default" className="bg-green-100 text-green-800 text-xs">Healthy</Badge>;
     }
   };
 
-  // Get recommended recovery action
+  // Get recommended recovery action based on job status
   const getRecommendedAction = () => {
-    if (!health || !needsAttention) return null;
+    if (!needsAttention) return null;
     
-    if (health.status === 'stalled') return 'resume';
-    if (health.status === 'stuck') return 'restart';
-    if (health.status === 'failed') return 'delete_and_retry';
+    if (job.status === 'failed') return 'restart';
+    if (job.status === 'processing') {
+      // If processing for more than 5 minutes, suggest resume first
+      const timeSinceUpdate = new Date().getTime() - new Date(job.updated_at).getTime();
+      return timeSinceUpdate > 10 * 60 * 1000 ? 'restart' : 'resume'; // 10 minutes
+    }
     return 'restart';
   };
 
@@ -293,23 +290,17 @@ function EnhancedJobCard({ job, onClear }: EnhancedJobCardProps) {
           <div className="mb-3">
             <div className="flex justify-between text-sm mb-1">
               <span>Progress</span>
-              <span>{health?.progressPercentage || job.progress_percentage || 0}%</span>
+              <span>{job.progress_percentage || 0}%</span>
             </div>
-            <Progress value={health?.progressPercentage || job.progress_percentage || 0} className="w-full" />
+            <Progress value={job.progress_percentage || 0} className="w-full" />
           </div>
         )}
 
         {/* Current task */}
-        {job.current_task && job.status === 'processing' && (
+        {/* Current task for processing jobs */}
+        {job.status === 'processing' && job.current_task && (
           <p className="text-sm text-muted-foreground mb-2">
-            Current: {job.current_task}
-          </p>
-        )}
-
-        {/* Health message for processing jobs */}
-        {job.status === 'processing' && health?.message && (
-          <p className="text-sm text-muted-foreground mb-2">
-            {health.message}
+            Currently working on: {job.current_task}
           </p>
         )}
 
@@ -325,30 +316,20 @@ function EnhancedJobCard({ job, onClear }: EnhancedJobCardProps) {
         {getRecoveryActions()}
 
         {/* Health Details */}
-        {showHealthDetails && health && (
+        {showHealthDetails && needsAttention && (
           <Alert className="mt-3">
             <h4 className="font-semibold text-sm mb-2">Health Details</h4>
             <div className="space-y-1 text-xs">
-              <div><span className="font-medium">Status:</span> {health.status}</div>
-              <div><span className="font-medium">Progress:</span> {health.progressPercentage}%</div>
-              {health.details && (
+              <div><span className="font-medium">Status:</span> {job.status}</div>
+              <div><span className="font-medium">Progress:</span> {job.progress_percentage || 0}%</div>
+              {job.error_message && (
                 <div>
                   <span className="font-medium text-xs">Error Details:</span>
-                  <p className="text-xs text-gray-600 mt-1">{health.details}</p>
+                  <p className="text-xs text-gray-600 mt-1">{job.error_message}</p>
                 </div>
               )}
-              {health.lastUpdated && (
-                <div><span className="font-medium">Last Updated:</span> {new Date(health.lastUpdated).toLocaleString()}</div>
-              )}
+              <div><span className="font-medium">Last Updated:</span> {new Date(job.updated_at).toLocaleString()}</div>
             </div>
-          </Alert>
-        )}
-
-        {/* Error Display */}
-        {healthError && (
-          <Alert className="mt-2">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>Health Check Error: {healthError}</AlertDescription>
           </Alert>
         )}
 
@@ -394,11 +375,54 @@ export default function RealtimeCourseGenerationWidget({
   const [jobs, setJobs] = useState<CourseGenerationJob[]>(initialJobs);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+  const fallbackPollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fallback polling function when realtime fails
+  const startFallbackPolling = useCallback(() => {
+    console.log('RealtimeCourseGenerationWidget: Starting fallback polling for userId:', userId);
+    
+    // Clear any existing polling
+    if (fallbackPollingRef.current) {
+      clearInterval(fallbackPollingRef.current);
+    }
+
+    // Poll every 3 seconds for active jobs
+    fallbackPollingRef.current = setInterval(async () => {
+      try {
+        const { data: updatedJobs, error } = await supabase
+          .from('course_generation_jobs')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('is_cleared', false)
+          .order('created_at', { ascending: false });
+
+        if (!error && updatedJobs) {
+          setJobs(updatedJobs);
+          
+          // Stop polling if no active jobs
+          const hasActiveJobs = updatedJobs.some(job => 
+            job.status === 'processing' || job.status === 'pending'
+          );
+          
+          if (!hasActiveJobs && fallbackPollingRef.current) {
+            console.log('RealtimeCourseGenerationWidget: No active jobs, stopping fallback polling');
+            clearInterval(fallbackPollingRef.current);
+            fallbackPollingRef.current = null;
+          }
+        }
+      } catch (error) {
+        console.error('RealtimeCourseGenerationWidget: Fallback polling error:', error);
+      }
+    }, 3000); // Poll every 3 seconds
+  }, [userId, supabase]);
 
   // Set up realtime subscription with retry logic following Supabase tutorial pattern
   useEffect(() => {
+    if (!userId) return;
+    
     console.log('RealtimeCourseGenerationWidget: Setting up realtime subscription for userId:', userId);
 
     let retryCount = 0;
@@ -464,9 +488,17 @@ export default function RealtimeCourseGenerationWidget({
           if (status === 'SUBSCRIBED') {
             console.log('RealtimeCourseGenerationWidget: Successfully subscribed for userId:', userId);
             retryCount = 0; // Reset retry count on success
+            setIsRealtimeConnected(true);
             setError(null);
+            
+            // Stop fallback polling since realtime is working
+            if (fallbackPollingRef.current) {
+              clearInterval(fallbackPollingRef.current);
+              fallbackPollingRef.current = null;
+            }
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             console.error(`RealtimeCourseGenerationWidget: ${status} for userId:`, userId);
+            setIsRealtimeConnected(false);
             
             if (retryCount < maxRetries) {
               retryCount++;
@@ -479,7 +511,10 @@ export default function RealtimeCourseGenerationWidget({
               }, Math.min(1000 * Math.pow(2, retryCount - 1), 10000)); // Exponential backoff, max 10s
             } else {
               console.error(`RealtimeCourseGenerationWidget: Max retries reached for userId:`, userId);
-              setError('Connection failed after multiple attempts. Please refresh the page.');
+              setError('Realtime connection failed. Using fallback updates...');
+              
+              // Start fallback polling when realtime fails completely
+              startFallbackPolling();
             }
           }
         });
@@ -501,6 +536,12 @@ export default function RealtimeCourseGenerationWidget({
       if (currentChannel) {
         supabase.removeChannel(currentChannel);
         currentChannel = null;
+      }
+      
+      // Clean up fallback polling
+      if (fallbackPollingRef.current) {
+        clearInterval(fallbackPollingRef.current);
+        fallbackPollingRef.current = null;
       }
     };
   }, [userId, supabase]);
@@ -610,6 +651,16 @@ export default function RealtimeCourseGenerationWidget({
             {jobs.length > 0 && (
               <Badge variant="secondary" className="ml-2">
                 {jobs.length}
+              </Badge>
+            )}
+            {/* Connection status indicator */}
+            {isRealtimeConnected ? (
+              <Badge variant="default" className="bg-green-100 text-green-800 text-xs ml-2">
+                Live
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="text-xs ml-2">
+                Polling
               </Badge>
             )}
           </CardTitle>
