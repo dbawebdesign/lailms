@@ -188,7 +188,7 @@ function EnhancedJobCard({ job, onClear }: EnhancedJobCardProps) {
           </Button>
         )}
         
-        {(recommendedAction === 'restart' || recommendedAction === 'delete_and_retry') && (
+        {recommendedAction === 'restart' && (
           <Button
             size="sm"
             variant="outline"
@@ -201,18 +201,7 @@ function EnhancedJobCard({ job, onClear }: EnhancedJobCardProps) {
           </Button>
         )}
 
-        {recommendedAction === 'delete_and_retry' && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleRecovery('delete')}
-            disabled={isRecovering}
-            className="text-xs h-7"
-          >
-            <Trash2 className="w-3 h-3 mr-1" />
-            Delete & Retry
-          </Button>
-        )}
+
 
         <Button
           size="sm"
