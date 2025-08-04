@@ -138,7 +138,7 @@ export function useProductionRealtimeUserJobs({
       }
 
       // Verify user ID matches
-      if (user.id !== userId) {
+      if (!user || user.id !== userId) {
         throw new Error('Access denied: User ID mismatch');
       }
 

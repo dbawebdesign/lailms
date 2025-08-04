@@ -97,7 +97,7 @@ export function useRealtimeJobHealth({
       userMessage: 'Generation in progress...',
       canAutoRecover: false,
       recommendedAction: 'wait',
-      lastChecked: new Date().toISOString(),
+
       details: {
         tasksCompleted: 0,
         tasksTotal: 0,
@@ -154,7 +154,7 @@ export function useRealtimeJobHealth({
             userMessage,
             canAutoRecover,
             recommendedAction,
-            lastChecked: new Date().toISOString(),
+      
             details: {
               tasksCompleted: updatedJob.tasks_completed || 0,
               tasksTotal: updatedJob.tasks_total || 0,

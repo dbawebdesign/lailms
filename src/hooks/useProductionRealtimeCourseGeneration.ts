@@ -90,7 +90,7 @@ export function useProductionRealtimeCourseGeneration({
   /**
    * Fetch initial data with comprehensive error handling
    */
-  const fetchInitialData = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     if (!jobId || !fetchInitialData) return;
 
     try {
@@ -336,7 +336,7 @@ export function useProductionRealtimeCourseGeneration({
 
     const initializeConnection = async () => {
       // Fetch initial data first
-      await fetchInitialData();
+      await fetchData();
       
       // Then setup realtime subscriptions
       await setupSubscriptions();
@@ -387,7 +387,7 @@ export function useProductionRealtimeCourseGeneration({
     
     // Actions
     retryConnection,
-    refetchData: fetchInitialData,
+    refetchData: fetchData,
     
     // Utilities
     isConnected: state.connectionState === ConnectionState.CONNECTED,
