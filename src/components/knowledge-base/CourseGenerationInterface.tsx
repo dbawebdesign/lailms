@@ -142,8 +142,8 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
 
   const handleModalComplete = useCallback(() => {
     setShowGenerationModal(false);
-    // Redirect to dashboard
-    router.push('/teach');
+    // Redirect to dashboard with course creation flag for auto-refresh
+    router.push('/teach?from=course-creation');
   }, [router]);
 
   const loadKnowledgeBaseAnalysis = useCallback(async () => {
@@ -196,7 +196,7 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
   const timeEstimate = getTimeEstimate();
 
   const returnToDashboard = () => {
-    router.push('/teach');
+    router.push('/teach?from=course-creation');
   };
 
   const onCourseGeneratedSafe = onCourseGenerated;

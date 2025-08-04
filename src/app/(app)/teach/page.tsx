@@ -4,6 +4,7 @@ import WelcomeCard from "@/components/dashboard/WelcomeCard";
 import { ActiveClassItem } from "@/components/dashboard/teacher/ActiveClassItem";
 import ServerCourseGenerationWidget from '@/components/dashboard/ServerCourseGenerationWidget';
 import HomeschoolDashboard from "@/components/dashboard/HomeschoolDashboard";
+import AutoRefreshHandler from "@/components/dashboard/AutoRefreshHandler";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BookOpenCheck, ClipboardCheck, AlertTriangle, Info, Users, Sparkles, Activity, TrendingUp, BookOpen, CheckCircle, Target, Eye, Lightbulb, Search } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -628,6 +629,9 @@ export default async function TeacherDashboardPage() {
   if (isHomeschoolOrg && organization) {
     return (
       <div className="min-h-screen bg-background">
+        {/* Auto-refresh handler for course creation redirects */}
+        <AutoRefreshHandler />
+        
         {/* Header Section */}
         <div className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container mx-auto px-6 py-8">
@@ -660,6 +664,9 @@ export default async function TeacherDashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Auto-refresh handler for course creation redirects */}
+      <AutoRefreshHandler />
+      
       {/* Header Section */}
       <div className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-6 py-8">

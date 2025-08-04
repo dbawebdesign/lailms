@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation';
 import type { UserRole } from "@/lib/utils/roleUtils";
 import { Tables } from 'packages/types/db';
 import { PROFILE_ROLE_FIELDS } from "@/lib/utils/roleUtils";
+import AdminMessageModal from "@/components/messaging/AdminMessageModal";
 
 export default async function AppPagesLayout({
   children,
@@ -79,6 +80,7 @@ export default async function AppPagesLayout({
           <AppShell userRole={userRole}>
             {children}
             <SurveyIntegration userRole={userRole} profile={profile} />
+            <AdminMessageModal />
           </AppShell>
         </AskLunaProvider>
       </LunaContextRegistration>

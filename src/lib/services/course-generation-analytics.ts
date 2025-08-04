@@ -241,27 +241,27 @@ export class CourseGenerationAnalyticsService {
     const completedTasks = tasks.filter(t => t.status === 'completed');
     const taskTypes = new Set(completedTasks.map(t => t.task_type));
     
-    // Content coherence based on task variety and completion
-    const contentCoherence = Math.min(100, (taskTypes.size / 9) * 100); // 9 total task types
+    // Content coherence based on task variety and completion (scale 0-9.99 for database precision)
+    const contentCoherence = Math.min(9.99, (taskTypes.size / 9) * 9.99); // 9 total task types
     
-    // Knowledge base utilization (would be calculated from actual usage)
-    const knowledgeBaseUtilization = 75; // Placeholder
+    // Knowledge base utilization (would be calculated from actual usage) - scale 0-9.99
+    const knowledgeBaseUtilization = 7.5; // Placeholder (75% -> 7.5)
     
-    // Assessment quality based on assessment task success
+    // Assessment quality based on assessment task success - scale 0-9.99
     const assessmentTasks = completedTasks.filter(t => t.task_type.includes('assessment'));
-    const assessmentQuality = assessmentTasks.length > 0 ? 85 : 0;
+    const assessmentQuality = assessmentTasks.length > 0 ? 8.5 : 0; // 85% -> 8.5
     
-    // Structural complexity based on lesson hierarchy
-    const structuralComplexity = Math.min(100, (completedTasks.length / tasks.length) * 100);
+    // Structural complexity based on lesson hierarchy - scale 0-9.99
+    const structuralComplexity = Math.min(9.99, (completedTasks.length / tasks.length) * 9.99);
     
-    // User satisfaction prediction based on completion rate and error frequency
+    // User satisfaction prediction based on completion rate and error frequency - scale 0-9.99
     const { data: errors } = await this.supabase
       .from('course_generation_errors')
       .select('error_severity')
       .eq('job_id', jobId);
     
     const criticalErrors = errors?.filter(e => e.error_severity === 'critical').length || 0;
-    const userSatisfactionPrediction = Math.max(0, 100 - (criticalErrors * 20));
+    const userSatisfactionPrediction = Math.max(0, 9.99 - (criticalErrors * 2)); // Scale to 0-9.99
     
     const overallQuality = (contentCoherence + knowledgeBaseUtilization + assessmentQuality + structuralComplexity + userSatisfactionPrediction) / 5;
 

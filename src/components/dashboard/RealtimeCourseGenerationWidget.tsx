@@ -375,14 +375,12 @@ export default function RealtimeCourseGenerationWidget({
   const [jobs, setJobs] = useState<CourseGenerationJob[]>(initialJobs);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   
   const supabase = useMemo(() => createClient(), []);
   const fallbackPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fallback polling function when realtime fails
   const startFallbackPolling = useCallback(() => {
-    console.log('RealtimeCourseGenerationWidget: Starting fallback polling for userId:', userId);
     
     // Clear any existing polling
     if (fallbackPollingRef.current) {
@@ -408,7 +406,6 @@ export default function RealtimeCourseGenerationWidget({
           );
           
           if (!hasActiveJobs && fallbackPollingRef.current) {
-            console.log('RealtimeCourseGenerationWidget: No active jobs, stopping fallback polling');
             clearInterval(fallbackPollingRef.current);
             fallbackPollingRef.current = null;
           }
@@ -422,8 +419,6 @@ export default function RealtimeCourseGenerationWidget({
   // Set up realtime subscription with retry logic following Supabase tutorial pattern
   useEffect(() => {
     if (!userId) return;
-    
-    console.log('RealtimeCourseGenerationWidget: Setting up realtime subscription for userId:', userId);
 
     let retryCount = 0;
     const maxRetries = 3;
@@ -455,7 +450,7 @@ export default function RealtimeCourseGenerationWidget({
             filter: `user_id=eq.${userId}`
           },
           (payload) => {
-            console.log('RealtimeCourseGenerationWidget: Job update received:', payload);
+  
             
             const updatedJob = payload.new as CourseGenerationJob;
             
@@ -483,12 +478,9 @@ export default function RealtimeCourseGenerationWidget({
           }
         )
         .subscribe((status) => {
-          console.log('RealtimeCourseGenerationWidget: Subscription status:', status, 'for userId:', userId);
           
           if (status === 'SUBSCRIBED') {
-            console.log('RealtimeCourseGenerationWidget: Successfully subscribed for userId:', userId);
             retryCount = 0; // Reset retry count on success
-            setIsRealtimeConnected(true);
             setError(null);
             
             // Stop fallback polling since realtime is working
@@ -497,22 +489,14 @@ export default function RealtimeCourseGenerationWidget({
               fallbackPollingRef.current = null;
             }
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.error(`RealtimeCourseGenerationWidget: ${status} for userId:`, userId);
-            setIsRealtimeConnected(false);
-            
             if (retryCount < maxRetries) {
               retryCount++;
-              console.log(`RealtimeCourseGenerationWidget: Retrying subscription (${retryCount}/${maxRetries}) for userId:`, userId);
-              setError(`Connection ${status.toLowerCase()}, retrying... (${retryCount}/${maxRetries})`);
               
               // Retry after exponential backoff delay
               retryTimeout = setTimeout(() => {
                 setupSubscription();
               }, Math.min(1000 * Math.pow(2, retryCount - 1), 10000)); // Exponential backoff, max 10s
             } else {
-              console.error(`RealtimeCourseGenerationWidget: Max retries reached for userId:`, userId);
-              setError('Realtime connection failed. Using fallback updates...');
-              
               // Start fallback polling when realtime fails completely
               startFallbackPolling();
             }
@@ -527,7 +511,6 @@ export default function RealtimeCourseGenerationWidget({
 
     // Cleanup subscription on unmount
     return () => {
-      console.log('RealtimeCourseGenerationWidget: Cleaning up subscription for userId:', userId);
       
       if (retryTimeout) {
         clearTimeout(retryTimeout);
@@ -653,16 +636,7 @@ export default function RealtimeCourseGenerationWidget({
                 {jobs.length}
               </Badge>
             )}
-            {/* Connection status indicator */}
-            {isRealtimeConnected ? (
-              <Badge variant="default" className="bg-green-100 text-green-800 text-xs ml-2">
-                Live
-              </Badge>
-            ) : (
-              <Badge variant="secondary" className="text-xs ml-2">
-                Polling
-              </Badge>
-            )}
+
           </CardTitle>
           <Button 
             variant="ghost" 
@@ -679,12 +653,7 @@ export default function RealtimeCourseGenerationWidget({
         </p>
       </CardHeader>
       <CardContent>
-        {error && (
-          <Alert className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+
         
         <div className="space-y-4">
           {jobs.map((job) => (
