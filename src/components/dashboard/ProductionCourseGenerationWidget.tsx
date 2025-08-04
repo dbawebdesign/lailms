@@ -108,12 +108,10 @@ function JobCard({ job, onClearJob, onRecoveryAction }: JobCardProps) {
 
   return (
     <div className="border rounded-lg p-4 space-y-3">
-      {/* Job title */}
-      {job.job_data?.title && (
-        <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">
-          {job.job_data.title}
-        </h4>
-      )}
+      {/* Job title - always show if available */}
+      <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">
+        {job.job_data?.title || 'Course Generation Job'}
+      </h4>
       
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -154,9 +152,11 @@ function JobCard({ job, onClearJob, onRecoveryAction }: JobCardProps) {
       {job.status === 'processing' && (
         <div className="text-sm text-gray-600">
           <span className="font-medium">Status:</span> {
-            job.total_tasks && job.completed_tasks 
-              ? `Processing (${job.completed_tasks}/${job.total_tasks} tasks completed)`
-              : 'Processing course generation...'
+            job.total_tasks && job.completed_tasks !== undefined && job.total_tasks > 0
+              ? `Processing (${Math.min(job.completed_tasks, job.total_tasks)}/${job.total_tasks} tasks completed)`
+              : job.progress_percentage 
+                ? `Processing (${job.progress_percentage}% complete)`
+                : 'Processing course generation...'
           }
         </div>
       )}
