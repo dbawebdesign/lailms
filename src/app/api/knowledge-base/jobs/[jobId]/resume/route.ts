@@ -16,11 +16,17 @@ export async function POST(
       );
     }
 
-    // Check authentication
+    // Check authentication - allow service role bypass
+    const isServiceRole = request.headers.get('x-service-role') === 'true';
     const supabase = createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    
+    let user = null;
+    if (!isServiceRole) {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      if (authError || !authUser) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      user = authUser;
     }
 
     // Get job details
@@ -37,8 +43,8 @@ export async function POST(
       );
     }
 
-    // Verify user has access to this job
-    if (job.user_id !== user.id) {
+    // Verify user has access to this job (skip for service role)
+    if (!isServiceRole && job.user_id !== user?.id) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
