@@ -28,9 +28,16 @@ export default async function ServerCourseGenerationWidget({
     console.error('ServerCourseGenerationWidget: Failed to fetch initial jobs:', error);
   }
 
-  // Transform database null values to undefined to match CourseGenerationJob interface
+  // Transform database null values to match CourseGenerationJob interface
   const transformedJobs = initialJobs?.map(job => ({
     ...job,
+    user_id: job.user_id ?? '',
+    organisation_id: job.organisation_id ?? '',
+    job_type: job.job_type ?? '',
+    status: (job.status ?? 'pending') as 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled',
+    progress_percentage: job.progress_percentage ?? 0,
+    created_at: job.created_at ?? '',
+    updated_at: job.updated_at ?? '',
     base_class_id: job.base_class_id ?? undefined,
     job_data: job.job_data ?? undefined,
     result_data: job.result_data ?? undefined,
@@ -42,11 +49,12 @@ export default async function ServerCourseGenerationWidget({
     performance_metrics: job.performance_metrics ?? undefined,
     retry_configuration: job.retry_configuration ?? undefined,
     user_actions: job.user_actions ?? undefined,
+    total_tasks: job.total_tasks ?? undefined,
+    completed_tasks: job.completed_tasks ?? undefined,
+    failed_tasks: job.failed_tasks ?? undefined,
+    skipped_tasks: job.skipped_tasks ?? undefined,
     actual_completion_time: job.actual_completion_time ?? undefined,
     estimated_completion_time: job.estimated_completion_time ?? undefined,
-    priority: job.priority ?? undefined,
-    tags: job.tags ?? undefined,
-    metadata: job.metadata ?? undefined,
   })) || [];
 
   return (

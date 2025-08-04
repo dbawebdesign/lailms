@@ -56,9 +56,12 @@ export default function AdminMessageModal() {
         .from('admin_messages')
         .select(`
           id,
+          from_admin_id,
+          to_user_id,
           subject,
           message,
           created_at,
+          updated_at,
           admin_message_responses (id)
         `)
         .eq('to_user_id', user.id)

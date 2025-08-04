@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         from_admin_id,
+        to_user_id,
         subject,
         message,
         created_at,
