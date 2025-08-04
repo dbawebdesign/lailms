@@ -17,9 +17,11 @@ export async function GET(request: NextRequest) {
       .from('admin_messages')
       .select(`
         id,
+        from_admin_id,
         subject,
         message,
         created_at,
+        updated_at,
         admin_message_responses (id)
       `)
       .eq('to_user_id', user.id)

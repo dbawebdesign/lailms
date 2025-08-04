@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const { data: existingResponse } = await supabase
       .from('admin_message_responses')
       .select('id')
-      .eq('admin_message_id', messageId)
+      .eq('message_id', messageId)
       .single()
 
     if (existingResponse) {
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const { error: responseError } = await supabase
       .from('admin_message_responses')
       .insert({
-        admin_message_id: messageId,
+        message_id: messageId,
         response: response.trim()
       })
 

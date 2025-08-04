@@ -63,9 +63,11 @@ export default function MessagingPage() {
         .from('admin_messages')
         .select(`
           id,
+          from_admin_id,
           subject,
           message,
           created_at,
+          updated_at,
           to_user_id,
           profiles!admin_messages_to_user_id_fkey (
             user_id,
