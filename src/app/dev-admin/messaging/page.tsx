@@ -15,7 +15,7 @@ import Link from 'next/link'
 import type { Profile, AdminMessageWithResponse } from '@/types/messaging'
 
 interface AdminMessageWithProfile extends AdminMessageWithResponse {
-  profiles: Profile
+  profiles: Profile[]
 }
 
 export default function MessagingPage() {
@@ -258,7 +258,7 @@ export default function MessagingPage() {
                       <div>
                         <h4 className="font-medium">{message.subject}</h4>
                         <p className="text-sm text-muted-foreground">
-                          To: {getUserDisplayName(message.profiles)}
+                          To: {message.profiles.length > 0 ? getUserDisplayName(message.profiles[0]) : 'Unknown User'}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {formatDate(message.created_at)}
