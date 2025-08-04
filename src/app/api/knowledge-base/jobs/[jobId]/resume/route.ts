@@ -53,7 +53,7 @@ export async function POST(
     console.log(`🔄 Resuming stuck job: ${jobId}`);
     
     // Get the request data from the job
-    const request_data = job.job_data;
+    const request_data = job.job_data as any;
     if (!request_data) {
       return NextResponse.json(
         { error: 'Job data not found' },
