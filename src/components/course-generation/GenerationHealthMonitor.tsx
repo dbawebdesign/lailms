@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useCourseGenerationHealth } from '@/hooks/useCourseGenerationHealth';
+import { useRealtimeJobHealth } from '@/hooks/useRealtimeJobHealth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -40,10 +40,9 @@ export function GenerationHealthMonitor({
     recommendedAction,
     attemptRecovery,
     checkHealth
-  } = useCourseGenerationHealth({
+  } = useRealtimeJobHealth({
     jobId,
     enabled: true,
-    pollInterval: 30000, // Poll every 30 seconds
     onHealthChange: (newHealth) => {
       // Show toast notifications for status changes
       if (newHealth.status === 'stalled') {

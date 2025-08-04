@@ -34,8 +34,8 @@ import { cn } from '@/lib/utils';
 import { formatEstimatedTime } from '@/lib/utils/courseGenerationEstimator';
 import Link from 'next/link';
 import JSConfetti from 'js-confetti';
-import { useProgressStream } from '@/hooks/use-progress-stream';
-import { useCourseGenerationHealth } from '@/hooks/useCourseGenerationHealth';
+import { useOptimizedRealtimeCourseGeneration, useOptimizedRealtimeUserJobs } from '@/hooks/useOptimizedRealtimeCourseGeneration';
+import { useRealtimeJobHealth } from '@/hooks/useRealtimeJobHealth';
 import { toast } from 'sonner';
 
 // --- Types ---
@@ -77,8 +77,8 @@ function EnhancedJobProgressCard({
   const [showHealthDetails, setShowHealthDetails] = useState(false);
   const confettiRef = useRef<JSConfetti | null>(null);
   
-  // Use progress stream for real-time updates
-  const streamProgress = useProgressStream(job.id);
+  // Use realtime course generation monitoring
+  const realtimeState = useOptimizedRealtimeCourseGeneration(job.id);
   
   // Use health monitoring for resilience
   const {
@@ -91,10 +91,9 @@ function EnhancedJobProgressCard({
     attemptRecovery,
     isRecovering,
     error: healthError
-  } = useCourseGenerationHealth({
+  } = useRealtimeJobHealth({
     jobId: job.id,
     enabled: job.status === 'processing',
-    pollInterval: 30000, // Check every 30 seconds
     onHealthChange: (newHealth) => {
       // Show health details if there are issues
       if (['stalled', 'stuck', 'failed', 'abandoned'].includes(newHealth.status)) {
@@ -105,10 +104,10 @@ function EnhancedJobProgressCard({
 
   // Update job from stream progress
   useEffect(() => {
-    if (streamProgress?.job) {
-      setJob(streamProgress.job);
+    if (realtimeState.job) {
+      setJob(realtimeState.job);
     }
-  }, [streamProgress]);
+  }, [realtimeState.job]);
 
   // Handle confetti for completion
   useEffect(() => {
@@ -343,10 +342,22 @@ function EnhancedJobProgressCard({
   };
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="border rounded-lg overflow-hidden relative">
+      {/* X button positioned outside the accordion trigger */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDismiss(job.id);
+        }}
+        className="absolute top-2 right-2 z-10 h-6 w-6 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+        aria-label="Clear job"
+      >
+        <X className="h-3 w-3" />
+      </button>
+      
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="job" className="border-none">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline">
+          <AccordionTrigger className="px-4 py-3 pr-10 hover:no-underline">
             <div className="flex items-center justify-between w-full mr-4">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 {getStatusIcon()}
@@ -367,12 +378,12 @@ function EnhancedJobProgressCard({
                             <p className="text-xs text-yellow-600 font-medium truncate">{userMessage}</p>
                           </div>
                         );
-                      } else if (streamProgress?.liveMessage?.message) {
+                      } else if (realtimeState.currentTask) {
                         return (
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <Activity className="h-3 w-3 text-blue-500 animate-pulse" />
-                              <p className="text-xs text-blue-600 font-medium truncate">{streamProgress.liveMessage.message}</p>
+                              <p className="text-xs text-blue-600 font-medium truncate">{realtimeState.currentTask}</p>
                             </div>
                             {totalCount > 0 && (
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -412,18 +423,6 @@ function EnhancedJobProgressCard({
                   )}
                 </div>
               </div>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDismiss(job.id);
-                }}
-                className="h-6 w-6 p-0 ml-2"
-              >
-                <X className="h-3 w-3" />
-              </Button>
             </div>
           </AccordionTrigger>
           
@@ -521,47 +520,41 @@ export default function EnhancedCourseGenerationProgressWidget({
   userId, 
   className 
 }: CourseGenerationProgressWidgetProps) {
-  const [jobs, setJobs] = useState<GenerationJob[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use realtime user jobs hook instead of polling
+  const { jobs: realtimeJobs, isLoading, error, refreshJobs } = useOptimizedRealtimeUserJobs(userId);
+  
+  // Convert realtime jobs to the expected format
+  const jobs = realtimeJobs.map(job => ({
+    id: job.id,
+    status: job.status,
+    progress: job.progress || 0,
+    current_task: job.current_task,
+    error_message: job.error_message,
+    updated_at: job.updated_at,
+    baseClassId: (job as any).base_class_id, // Type assertion for additional fields
+    isCleared: false // Default value
+  }));
 
-  const fetchJobs = useCallback(async () => {
-    setIsLoading(true);
+  const clearJob = useCallback(async (jobId: string) => {
     try {
-      const response = await fetch('/api/knowledge-base/generation-jobs');
-      if (!response.ok) throw new Error('Failed to fetch generation jobs');
-      
-      const data = await response.json();
-      if (data.success) {
-        setJobs(data.jobs || []);
-        setError(null);
-      } else {
-        setError(data.error || 'Failed to load generation jobs');
+      const response = await fetch(`/api/knowledge-base/jobs/${jobId}/clear`, { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to clear job');
       }
+
+      toast.success('Job cleared from dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load generation jobs');
-    } finally {
-      setIsLoading(false);
+      console.error('Failed to clear job:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to clear job');
     }
   }, []);
-
-  const dismissJob = useCallback(async (jobId: string) => {
-    // This is optimistic UI. The job is removed from state immediately.
-    setJobs(prev => prev.filter(job => job.id !== jobId));
-    try {
-      await fetch(`/api/knowledge-base/generation-jobs/${jobId}/dismiss`, { method: 'POST' });
-    } catch (err) {
-      console.error('Failed to dismiss job:', err);
-      // If the API call fails, we might want to add the job back or show an error.
-      // For now, we'll just log it.
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchJobs();
-    const interval = setInterval(fetchJobs, 30000); // Refresh the list of jobs every 30 seconds
-    return () => clearInterval(interval);
-  }, [fetchJobs]);
   
   const visibleJobs = jobs.filter(job => !job.isCleared);
 
@@ -581,7 +574,7 @@ export default function EnhancedCourseGenerationProgressWidget({
               Your courses are being generated. Track progress and resolve issues here.
             </p>
           </div>
-          <Button variant="ghost" size="sm" onClick={fetchJobs} disabled={isLoading} className="h-8 w-8 p-0">
+          <Button variant="ghost" size="sm" onClick={refreshJobs} disabled={isLoading} className="h-8 w-8 p-0">
             <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
           </Button>
         </div>
@@ -596,7 +589,7 @@ export default function EnhancedCourseGenerationProgressWidget({
         )}
 
         {visibleJobs.map((job) => (
-          <EnhancedJobProgressCard key={job.id} initialJob={job} onDismiss={dismissJob} />
+          <EnhancedJobProgressCard key={job.id} initialJob={job} onDismiss={clearJob} />
         ))}
       </CardContent>
     </Card>

@@ -27,4 +27,20 @@ export const createSupabaseServerClient = () => {
       },
     }
   );
+};
+
+// Service client for server-side operations that need service role access
+export const createSupabaseServiceClient = () => {
+  return createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      cookies: {
+        // Service client doesn't need cookie handling
+        async get() { return undefined; },
+        async set() {},
+        async remove() {},
+      },
+    }
+  );
 }; 

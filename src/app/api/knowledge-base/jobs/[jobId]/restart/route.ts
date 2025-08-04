@@ -78,13 +78,6 @@ export async function POST(
       );
     }
 
-    // Clear any existing alerts
-    await supabase
-      .from('course_generation_alerts')
-      .update({ resolved: true, resolved_at: new Date().toISOString(), resolved_by: user.id })
-      .eq('job_id', jobId)
-      .eq('resolved', false);
-
     await generationLogger.logInfo(
       jobId,
       'Job marked for restart - ready for new generation',

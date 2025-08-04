@@ -177,20 +177,13 @@ class CourseGenerationLogger {
         timestamp: new Date()
       };
 
-      await this.supabase
-        .from('course_generation_alerts')
-        .insert({
-          job_id: alertEntry.jobId,
-          alert_type: alertEntry.alertType,
-          severity: alertEntry.severity,
-          message: alertEntry.message,
-          details: alertEntry.details,
-          timestamp: alertEntry.timestamp.toISOString(),
-          user_id: alertEntry.userId,
-          resolved: alertEntry.resolved,
-          resolved_at: alertEntry.resolvedAt?.toISOString(),
-          resolved_by: alertEntry.resolvedBy
-        });
+      // For now, just log to our generation_logs table and console
+      await this.logCritical(
+        alertEntry.jobId,
+        `ALERT: ${alertEntry.message}`,
+        'alert_system',
+        alertEntry.details
+      );
 
       // For critical alerts, also log to console
       if (alertEntry.severity === 'critical') {
@@ -207,17 +200,13 @@ class CourseGenerationLogger {
    */
   async resolveAlert(jobId: string, alertType: string, resolvedBy?: string): Promise<void> {
     try {
-      await this.supabase
-        .from('course_generation_alerts')
-        .update({
-          resolved: true,
-          resolved_at: new Date().toISOString(),
-          resolved_by: resolvedBy
-        })
-        .eq('job_id', jobId)
-        .eq('alert_type', alertType)
-        .eq('resolved', false);
-
+      // For now, just log the resolution
+      await this.logInfo(
+        jobId,
+        `Alert resolved: ${alertType}`,
+        'alert_system',
+        { resolvedBy }
+      );
     } catch (error) {
       console.error('Failed to resolve alert:', error);
     }
@@ -424,30 +413,8 @@ export const initializeLoggingTables = async () => {
     CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON course_generation_logs(timestamp);
   `;
 
-  const createAlertsTable = `
-    CREATE TABLE IF NOT EXISTS course_generation_alerts (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      job_id UUID NOT NULL,
-      alert_type TEXT NOT NULL CHECK (alert_type IN ('stall', 'failure', 'timeout', 'critical_error', 'recovery_failed')),
-      severity TEXT NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
-      message TEXT NOT NULL,
-      details JSONB DEFAULT '{}',
-      timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      user_id UUID,
-      resolved BOOLEAN DEFAULT FALSE,
-      resolved_at TIMESTAMPTZ,
-      resolved_by TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_alerts_job_id ON course_generation_alerts(job_id);
-    CREATE INDEX IF NOT EXISTS idx_alerts_resolved ON course_generation_alerts(resolved);
-    CREATE INDEX IF NOT EXISTS idx_alerts_severity ON course_generation_alerts(severity);
-  `;
-
   try {
     await supabase.rpc('exec_sql', { sql: createLogsTable });
-    await supabase.rpc('exec_sql', { sql: createAlertsTable });
   } catch (error) {
     console.error('Failed to initialize logging tables:', error);
   }

@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import WelcomeCard from "@/components/dashboard/WelcomeCard";
 import { ActiveClassItem } from "@/components/dashboard/teacher/ActiveClassItem";
-import EnhancedCourseGenerationProgressWidget from "@/components/dashboard/EnhancedCourseGenerationProgressWidget";
+import ServerCourseGenerationWidget from '@/components/dashboard/ServerCourseGenerationWidget';
 import HomeschoolDashboard from "@/components/dashboard/HomeschoolDashboard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BookOpenCheck, ClipboardCheck, AlertTriangle, Info, Users, Sparkles, Activity, TrendingUp, BookOpen, CheckCircle, Target, Eye, Lightbulb, Search } from 'lucide-react';
@@ -638,7 +638,7 @@ export default async function TeacherDashboardPage() {
         {/* Homeschool Dashboard */}
         <div className="container mx-auto px-6 py-8 space-y-8">
           {/* Course Generation Progress Widget */}
-          <EnhancedCourseGenerationProgressWidget userId={user.id} />
+          <ServerCourseGenerationWidget userId={user.id} />
           
           <HomeschoolDashboard 
             organizationId={organization.id}
@@ -670,7 +670,7 @@ export default async function TeacherDashboardPage() {
       {/* Main Content */}
       <div className="container mx-auto px-6 py-8 space-y-8">
         {/* Course Generation Progress Widget */}
-        <EnhancedCourseGenerationProgressWidget userId={user.id} />
+        <ServerCourseGenerationWidget userId={user.id} />
 
         {/* Teaching Progress & Insights - Moved to top for better hierarchy */}
         <div className="bg-card/50 backdrop-blur-sm border border-border/40 rounded-2xl p-6">

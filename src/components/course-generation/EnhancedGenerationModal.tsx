@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, BookOpen, Layers, CheckCircle, ArrowRight, AlertTriangle } from 'lucide-react';
 import Image from 'next/image';
 import { GenerationHealthMonitor } from './GenerationHealthMonitor';
-import { useCourseGenerationHealth } from '@/hooks/useCourseGenerationHealth';
+import { useRealtimeJobHealth } from '@/hooks/useRealtimeJobHealth';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
@@ -57,10 +57,9 @@ export function EnhancedGenerationModal({
     isHealthy,
     progressPercentage,
     userMessage
-  } = useCourseGenerationHealth({
+  } = useRealtimeJobHealth({
     jobId: jobId || '',
     enabled: isOpen && !!jobId,
-    pollInterval: 15000, // Check every 15 seconds during generation
     onHealthChange: (newHealth) => {
       // Show health monitor if there are issues
       if (['stalled', 'stuck', 'failed', 'abandoned'].includes(newHealth.status)) {
