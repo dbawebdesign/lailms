@@ -77,6 +77,8 @@ export default function MessagingPage() {
             role
           ),
           admin_message_responses (
+            id,
+            message_id,
             response,
             responded_at
           )
@@ -84,7 +86,7 @@ export default function MessagingPage() {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setMessages(data || [])
+      setMessages((data || []) as AdminMessageWithProfile[])
     } catch (error) {
       console.error('Error loading messages:', error)
       toast({
