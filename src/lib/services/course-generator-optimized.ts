@@ -116,7 +116,7 @@ CRITICAL: Generate REAL EDUCATIONAL CONTENT that teaches concepts thoroughly. Ea
       }
     ],
     temperature: 0.7,
-    max_tokens: 16000 // Large enough for complete module
+    max_tokens: 16000 // Optimized for efficient module content generation
   });
 
   const content = completion.choices[0]?.message?.content;

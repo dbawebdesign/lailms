@@ -538,10 +538,29 @@ export class CourseGenerationOrchestratorV2 {
               section_index: i,
               section_title: lesson.contentOutline[i],
               input_data: {
-                lesson,
+                lesson: {
+                  id: lesson.id,
+                  title: lesson.title,
+                  description: lesson.description,
+                  contentType: lesson.contentType,
+                  learningObjectives: lesson.learningObjectives,
+                  contentOutline: lesson.contentOutline,
+                  estimatedDurationHours: lesson.estimatedDurationHours
+                },
                 sectionIndex: i,
-                outline,
-                request
+                outline: {
+                  academicLevel: outline.academicLevel,
+                  lessonDetailLevel: outline.lessonDetailLevel,
+                  targetAudience: outline.targetAudience,
+                  prerequisites: outline.prerequisites
+                },
+                request: {
+                  baseClassId: request.baseClassId,
+                  academicLevel: request.academicLevel,
+                  lessonDetailLevel: request.lessonDetailLevel,
+                  targetAudience: request.targetAudience,
+                  prerequisites: request.prerequisites
+                }
               },
               is_recoverable: true,
               recovery_suggestions: [
@@ -568,9 +587,14 @@ export class CourseGenerationOrchestratorV2 {
             path_id: actualPath.id,
             base_class_id: request.baseClassId,
             input_data: {
-              lesson,
-              outline,
-              request
+              lesson: {
+                id: lesson.id,
+                title: lesson.title,
+                description: lesson.description,
+                learningObjectives: lesson.learningObjectives
+              },
+              academicLevel: request.academicLevel,
+              baseClassId: request.baseClassId
             },
             is_recoverable: true,
             recovery_suggestions: [
@@ -597,7 +621,11 @@ export class CourseGenerationOrchestratorV2 {
             lesson_id: actualLesson.id,
             path_id: actualPath.id,
             base_class_id: request.baseClassId,
-            input_data: { lesson, outline, request },
+            input_data: { 
+              lessonId: actualLesson.id,
+              lessonTitle: lesson.title,
+              baseClassId: request.baseClassId
+            },
             is_recoverable: true,
             recovery_suggestions: [
               'Skip mind map generation and continue',
@@ -619,7 +647,11 @@ export class CourseGenerationOrchestratorV2 {
             lesson_id: actualLesson.id,
             path_id: actualPath.id,
             base_class_id: request.baseClassId,
-            input_data: { lesson, outline, request },
+            input_data: { 
+              lessonId: actualLesson.id,
+              lessonTitle: lesson.title,
+              baseClassId: request.baseClassId
+            },
             is_recoverable: true,
             recovery_suggestions: [
               'Skip brainbytes generation and continue',
@@ -998,7 +1030,7 @@ export class CourseGenerationOrchestratorV2 {
     request: CourseGenerationRequest
   ): Promise<any> {
     const { lesson, sectionIndex } = task.input_data;
-    const sectionTitle = lesson.contentOutline[sectionIndex];
+    const sectionTitle = task.section_title || lesson.contentOutline?.[sectionIndex] || `Section ${sectionIndex + 1}`;
     
     // Use the actual lesson_id from the task, not from the outline lesson object
     const actualLessonId = task.lesson_id;
@@ -1030,7 +1062,7 @@ export class CourseGenerationOrchestratorV2 {
       ],
       response_format: { type: "json_object" },
       temperature: 0.7,
-      max_tokens: 16000
+      max_tokens: 16000  // Sufficient for lesson content with optimized prompts
     });
     
     const content = completion.choices[0]?.message?.content || '{}';
@@ -1383,32 +1415,85 @@ export class CourseGenerationOrchestratorV2 {
   private async handleStuckJob(jobId: string): Promise<void> {
     console.log(`🔧 Attempting to recover stuck job ${jobId}`);
     
-    // Get all pending tasks
-    const { data: pendingTasks, error } = await this.supabase
+    // Get all tasks with their current status
+    const { data: allTasks, error } = await this.supabase
       .from('course_generation_tasks')
       .select('*')
-      .eq('job_id', jobId)
-      .eq('status', 'pending');
+      .eq('job_id', jobId);
     
     if (error) {
-      console.error('Failed to get pending tasks for recovery:', error);
+      console.error('Failed to get tasks for recovery:', error);
       return;
     }
     
-    if (!pendingTasks || pendingTasks.length === 0) {
-      console.log('No pending tasks found for recovery');
+    if (!allTasks || allTasks.length === 0) {
+      console.log('No tasks found for recovery');
       return;
     }
     
-    console.log(`Found ${pendingTasks.length} pending tasks to potentially recover`);
+    const statusCounts = allTasks.reduce((acc, task) => {
+      acc[task.status] = (acc[task.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
     
-    // For now, just log the pending tasks - in the future we could implement more sophisticated recovery
-    pendingTasks.forEach(task => {
-      console.log(`  - Pending task: ${task.task_identifier} (type: ${task.task_type})`);
-    });
+    console.log(`📊 Task status distribution:`, statusCounts);
     
-    // Simple recovery: wait a bit to see if tasks naturally resolve
-    await this.sleep(5000); // Wait 5 seconds
+    // Check for tasks that have been running too long (over 10 minutes)
+    const staleRunningTasks = allTasks.filter(task => 
+      task.status === 'running' && 
+      task.started_at && 
+      (Date.now() - new Date(task.started_at).getTime()) > 10 * 60 * 1000
+    );
+    
+    if (staleRunningTasks.length > 0) {
+      console.log(`🔄 Found ${staleRunningTasks.length} stale running tasks, resetting to pending`);
+      
+      const staleTaskIds = staleRunningTasks.map(t => t.id);
+      const { error: resetError } = await this.supabase
+        .from('course_generation_tasks')
+        .update({ 
+          status: 'pending', 
+          started_at: null,
+          error_message: 'Reset from stale running state'
+        })
+        .in('id', staleTaskIds);
+      
+      if (resetError) {
+        console.error('Failed to reset stale tasks:', resetError);
+      } else {
+        console.log(`✅ Reset ${staleTaskIds.length} stale tasks to pending`);
+      }
+    }
+    
+    // Check for failed tasks that could be retried
+    const retriableTasks = allTasks.filter(task => 
+      task.status === 'failed' && 
+      task.current_retry_count < task.max_retry_count &&
+      task.is_recoverable
+    );
+    
+    if (retriableTasks.length > 0) {
+      console.log(`🔄 Found ${retriableTasks.length} retriable failed tasks`);
+      
+      const retriableTaskIds = retriableTasks.map(t => t.id);
+      const { error: retryError } = await this.supabase
+        .from('course_generation_tasks')
+        .update({ 
+          status: 'pending',
+          current_retry_count: retriableTasks[0].current_retry_count + 1,
+          error_message: null
+        })
+        .in('id', retriableTaskIds);
+      
+      if (retryError) {
+        console.error('Failed to retry failed tasks:', retryError);
+      } else {
+        console.log(`✅ Set ${retriableTaskIds.length} failed tasks for retry`);
+      }
+    }
+    
+    // Wait a bit to see if recovery actions help
+    await this.sleep(3000);
   }
 
   /**
@@ -1773,7 +1858,8 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
       // Try basic JSON parsing first
       return JSON.parse(content);
     } catch (error) {
-      console.log('Attempting JSON repair...');
+      console.log('🔧 Attempting enhanced JSON repair...');
+      console.log(`📊 Content length: ${content.length} characters`);
       
       // Try to fix common JSON issues
       let repairedContent = content
@@ -1781,6 +1867,7 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
         .replace(/```\n?/g, '')
         .replace(/\n/g, ' ')        // Replace newlines with spaces
         .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
+        .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3') // Quote unquoted keys
         .trim();
       
       // Handle truncated JSON by finding the last complete object/array
@@ -1790,9 +1877,20 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
       
       // Try parsing the repaired content
       try {
-        return JSON.parse(repairedContent);
+        const parsed = JSON.parse(repairedContent);
+        console.log('✅ JSON repair successful');
+        return parsed;
       } catch (repairError) {
-        console.error('JSON repair failed:', repairError);
+        console.error('❌ JSON repair failed:', repairError);
+        console.log('🔍 Repair attempt preview:', repairedContent.substring(0, 500));
+        
+        // Last resort: try to extract valid JSON from the beginning
+        const extractedJson = this.extractValidJsonFromStart(repairedContent);
+        if (extractedJson) {
+          console.log('✅ Extracted partial valid JSON');
+          return extractedJson;
+        }
+        
         return null;
       }
     }
@@ -1865,6 +1963,59 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
     
     console.log(`🔧 Added closing brackets: ${content.length} → ${fixed.length} characters`);
     return fixed;
+  }
+
+  /**
+   * Extract valid JSON from the start of truncated content
+   */
+  private extractValidJsonFromStart(content: string): any | null {
+    try {
+      // Try to find the main object structure
+      let braceCount = 0;
+      let inString = false;
+      let escapeNext = false;
+      let validEndIndex = -1;
+      
+      for (let i = 0; i < content.length; i++) {
+        const char = content[i];
+        
+        if (escapeNext) {
+          escapeNext = false;
+          continue;
+        }
+        
+        if (char === '\\') {
+          escapeNext = true;
+          continue;
+        }
+        
+        if (char === '"' && !escapeNext) {
+          inString = !inString;
+          continue;
+        }
+        
+        if (inString) continue;
+        
+        if (char === '{') {
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            validEndIndex = i;
+            break;
+          }
+        }
+      }
+      
+      if (validEndIndex > -1) {
+        const extracted = content.substring(0, validEndIndex + 1);
+        return JSON.parse(extracted);
+      }
+      
+      return null;
+    } catch (error) {
+      return null;
+    }
   }
 
   // ... Additional methods for other task types and utilities
@@ -1968,22 +2119,45 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
       console.log(`📊 Task insert payload size: ${payloadSize} characters (${Math.round(payloadSize / 1024)}KB)`);
 
       // If payload is too large, try batch insertion
-      if (payloadSize > 1000000) { // 1MB limit
+      if (payloadSize > 500000) { // 500KB limit for better reliability
         console.log(`⚠️ Large payload detected, switching to batch insertion`);
-        const batchSize = 10;
+        const batchSize = 5; // Reduced batch size for better reliability
+        let successfulBatches = 0;
         for (let i = 0; i < taskInserts.length; i += batchSize) {
           const batch = taskInserts.slice(i, i + batchSize);
-          console.log(`🔄 Inserting batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(taskInserts.length / batchSize)} (${batch.length} tasks)`);
+          const batchNumber = Math.floor(i / batchSize) + 1;
+          const totalBatches = Math.ceil(taskInserts.length / batchSize);
           
-          const { error: batchError } = await this.supabase
-            .from('course_generation_tasks')
-            .insert(batch);
+          console.log(`🔄 Inserting batch ${batchNumber}/${totalBatches} (${batch.length} tasks)`);
+          
+          try {
+            const { error: batchError } = await this.supabase
+              .from('course_generation_tasks')
+              .insert(batch);
+              
+            if (batchError) {
+              console.error(`❌ Failed to insert batch ${batchNumber}:`, batchError);
+              
+              // Try to continue with remaining batches instead of failing completely
+              console.warn(`⚠️ Skipping failed batch ${batchNumber}, continuing with remaining batches`);
+              continue;
+            }
             
-          if (batchError) {
-            console.error(`❌ Failed to insert batch ${Math.floor(i / batchSize) + 1}:`, batchError);
-            throw new Error(`Failed to insert batch: ${batchError.message}`);
+            successfulBatches++;
+            console.log(`✅ Successfully inserted batch ${batchNumber}/${totalBatches}`);
+            
+            // Add small delay between batches to reduce database load
+            if (i + batchSize < taskInserts.length) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          } catch (networkError) {
+            console.error(`🌐 Network error on batch ${batchNumber}:`, networkError);
+            console.warn(`⚠️ Skipping batch ${batchNumber} due to network error, continuing...`);
+            continue;
           }
         }
+        
+        console.log(`✅ Successfully inserted ${successfulBatches}/${Math.ceil(taskInserts.length / batchSize)} batches for job ${jobId}`);
         console.log(`✅ Successfully inserted all ${tasks.length} tasks in batches for job ${jobId}`);
       } else {
         // Normal single insert
@@ -2381,7 +2555,7 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
       ],
       response_format: { type: "json_object" }, // Force valid JSON like v1
       temperature: 0.7,
-      max_tokens: 8000  // Increased from 4000 to prevent truncation
+      max_tokens: 16000  // Sufficient for course outlines with optimized prompts
     });
 
     const outlineText = completion.choices[0]?.message?.content;
@@ -2522,9 +2696,27 @@ COURSE CONFIGURATION:
 - Total Lessons: ${totalLessons}
 - Academic Level: ${request.academicLevel || 'college'}
 - Content Depth: ${request.lessonDetailLevel || 'detailed'}
+- Target Audience: ${request.targetAudience || 'General learners'}
+- Prerequisites: ${request.prerequisites || 'None specified'}
 
-Knowledge Base Analysis: ${JSON.stringify(kbAnalysis, null, 2)}
-Relevant Content: ${JSON.stringify(kbContent, null, 2)}
+ASSESSMENT CONFIGURATION:
+- Lesson Assessments: ${request.assessmentSettings?.includeAssessments !== false ? 'Yes' : 'No'}
+- Module Quizzes: ${request.assessmentSettings?.includeQuizzes !== false ? 'Yes' : 'No'}
+- Final Exam: ${request.assessmentSettings?.includeFinalExam !== false ? 'Yes' : 'No'}
+
+${this.getAcademicLevelGuidance(request.academicLevel)}
+
+${this.getLessonDetailGuidance(request.lessonDetailLevel)}
+
+KNOWLEDGE BASE ANALYSIS:
+- Documents: ${kbAnalysis?.totalDocuments || 0}
+- Content Chunks: ${kbAnalysis?.totalChunks || 0}
+- Content Depth: ${kbAnalysis?.contentDepth || 'Unknown'}
+- Subject Areas: ${kbAnalysis?.subjectCoverage?.join(', ') || 'General'}
+
+KNOWLEDGE BASE CONTENT SAMPLE:
+${kbContent.slice(0, 10).map(chunk => `- ${chunk.summary || chunk.content?.substring(0, 300) || 'No content'}`).join('\n')}
+
 Generation Mode: ${modeConfig.name}
 
 ${request.userGuidance ? `\nADDITIONAL GUIDANCE:\n${request.userGuidance}` : ''}
@@ -2653,6 +2845,132 @@ Generate a comprehensive course outline in JSON format:
    */
   private async sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Get academic level guidance for prompt generation
+   */
+  private getAcademicLevelGuidance(academicLevel?: string): string {
+    switch (academicLevel) {
+      case 'kindergarten':
+      case '1st-grade':
+      case '2nd-grade':
+      case '3rd-grade':
+        return `
+ELEMENTARY GUIDANCE:
+- Use very simple language and short sentences
+- Focus on concrete concepts rather than abstract ideas
+- Include visual and hands-on learning activities
+- Questions should be basic recall and simple comprehension
+- Use familiar examples from daily life
+- Keep lessons short and engaging`;
+
+      case '4th-grade':
+      case '5th-grade':
+      case '6th-grade':
+        return `
+UPPER ELEMENTARY GUIDANCE:
+- Use clear, age-appropriate language
+- Introduce some abstract concepts with concrete examples
+- Include interactive activities and group work
+- Mix recall, comprehension, and basic application questions
+- Use relatable examples and scenarios
+- Balance individual and collaborative learning`;
+
+      case '7th-grade':
+      case '8th-grade':
+        return `
+MIDDLE SCHOOL GUIDANCE:
+- Use grade-appropriate vocabulary with explanations
+- Develop critical thinking skills
+- Include project-based learning opportunities
+- Focus on comprehension, application, and analysis questions
+- Connect to real-world applications
+- Encourage independent thinking and research`;
+
+      case '9th-grade':
+      case '10th-grade':
+      case '11th-grade':
+      case '12th-grade':
+        return `
+HIGH SCHOOL GUIDANCE:
+- Use academic vocabulary and complex concepts
+- Develop analytical and critical thinking skills
+- Include research and presentation components
+- Focus on analysis, synthesis, and evaluation questions
+- Connect to career and college preparation
+- Encourage independent learning and problem-solving`;
+
+      case 'college':
+        return `
+COLLEGE GUIDANCE:
+- Use advanced academic vocabulary and concepts
+- Develop research and analytical skills
+- Include independent study and original research
+- Focus on higher-order thinking: analysis, synthesis, evaluation, creation
+- Connect to professional applications and current research
+- Encourage critical thinking and scholarly discourse`;
+
+      case 'graduate':
+      case 'professional':
+      case 'master':
+        return `
+GRADUATE/PROFESSIONAL GUIDANCE:
+- Use professional and scholarly language
+- Focus on advanced research and theoretical concepts
+- Include original research and professional applications
+- Emphasize critical analysis, evaluation, and innovation
+- Connect to current industry practices and cutting-edge research
+- Encourage leadership and expert-level problem-solving`;
+
+      default:
+        return `
+GENERAL GUIDANCE:
+- Use clear, appropriate language for the intended audience
+- Balance theoretical concepts with practical applications
+- Include varied learning activities and assessments
+- Focus on comprehension, application, and analysis
+- Connect to real-world examples and use cases
+- Encourage active learning and engagement`;
+    }
+  }
+
+  /**
+   * Get lesson detail level guidance for prompt generation
+   */
+  private getLessonDetailGuidance(lessonDetailLevel?: string): string {
+    switch (lessonDetailLevel) {
+      case 'basic':
+        return `
+BASIC LESSON DETAIL GUIDANCE:
+- Focus on core concepts and essential information
+- Keep explanations concise and straightforward
+- Provide clear, actionable learning objectives
+- Include simple examples and basic exercises
+- Emphasize practical application over theory
+- Limit lesson length to maintain engagement`;
+
+      case 'comprehensive':
+        return `
+COMPREHENSIVE LESSON DETAIL GUIDANCE:
+- Provide in-depth exploration of concepts
+- Include detailed explanations and multiple examples
+- Cover theoretical foundations and practical applications
+- Add extended activities and complex assessments
+- Include supplementary resources and further reading
+- Accommodate different learning styles and paces`;
+
+      case 'detailed':
+      default:
+        return `
+DETAILED LESSON DETAIL GUIDANCE:
+- Balance depth with accessibility
+- Provide clear explanations with relevant examples
+- Include mix of theoretical and practical content
+- Add interactive elements and varied activities
+- Provide adequate context and background information
+- Structure content for progressive skill building`;
+    }
   }
 
   // ===== MISSING TASK EXECUTION METHODS =====

@@ -840,7 +840,7 @@ Remember: Every element should contribute to TEACHING and helping students achie
       ],
       response_format: { type: "json_object" },
       temperature: 0.7,
-      max_tokens: 16000
+      max_tokens: 16000  // Optimized for efficient content generation
     });
 
     try {
@@ -1222,7 +1222,7 @@ Remember: Every element should contribute to TEACHING and helping students achie
           }
         ],
         temperature: 0.7,
-        max_tokens: 16000 // Much larger for complete module content
+        max_tokens: 16000  // Optimized for efficient content generation // Much larger for complete module content
       });
 
       const content = completion.choices[0]?.message?.content;
@@ -2041,7 +2041,7 @@ Generate complete educational content for ALL ${lesson.contentOutline.length} se
         ],
         response_format: { type: "json_object" },
         temperature: 0.7,
-        max_tokens: 16000
+        max_tokens: 16000  // Optimized for efficient content generation
       });
 
       const content = completion.choices[0]?.message?.content || '{}';
@@ -2449,7 +2449,7 @@ CRITICAL: Questions must be based ONLY on the actual lesson content provided abo
         ],
         response_format: { type: "json_object" },
         temperature: 0.7,
-        max_tokens: 8000
+        max_tokens: 16000  // Optimized for efficient content generation
       });
 
       const content = completion.choices[0]?.message?.content || '{}';

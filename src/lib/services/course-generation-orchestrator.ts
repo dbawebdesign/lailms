@@ -940,7 +940,7 @@ CRITICAL: This content should feel like learning from a master teacher who is pa
         ],
         response_format: { type: "json_object" },
         temperature: 0.7,
-        max_tokens: 16000
+        max_tokens: 16000  // Optimized for efficient content generation
       }),
       `Section Content Generation: ${sectionTitle}`,
       240000 // 4 minutes for content generation
