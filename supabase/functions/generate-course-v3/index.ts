@@ -29,24 +29,31 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: 'Missing required parameters: jobId, outline, or request' }),
         { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
 
-    console.log(`🚀 Starting V3 course generation for job: ${jobId}`);
+    console.log(`🚀 Edge function starting V3 course generation for job ${jobId}`);
 
-    // Initialize Supabase client with service role
+    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase environment variables');
+    }
+    
     supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Update job status to processing
+    console.log(`📊 Updating job ${jobId} status to processing...`);
     const { error: updateError } = await supabase
       .from('course_generation_jobs')
-      .update({ 
+      .update({
         status: 'processing',
+        progress_percentage: 90,
         updated_at: new Date().toISOString()
       })
       .eq('id', jobId);
@@ -55,11 +62,27 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to update job status: ${updateError.message}`);
     }
 
-    // Import the V3 orchestrator logic from the main app
-    // For now, we'll call back to the main app's internal endpoint
-    const baseUrl = Deno.env.get('NEXT_PUBLIC_SITE_URL') || 'https://www.learnologyai.com';
+    // Get the correct base URL for the internal API call
+    // Check multiple environment variables to find the right URL
+    let baseUrl = Deno.env.get('NEXT_PUBLIC_SITE_URL') || 
+                  Deno.env.get('VERCEL_URL') || 
+                  Deno.env.get('SITE_URL');
+    
+    // If we have a Vercel URL but no protocol, add https
+    if (baseUrl && !baseUrl.startsWith('http')) {
+      baseUrl = `https://${baseUrl}`;
+    }
+    
+    // For local development, we need to use a different approach
+    // The edge function runs in Supabase's cloud, so it can't reach localhost
+    // We'll use the production URL or a tunnel URL for development
+    if (!baseUrl) {
+      // Default to production URL - this should work for most cases
+      baseUrl = 'https://www.learnologyai.com';
+      console.log(`⚠️ No base URL found in environment, using production: ${baseUrl}`);
+    }
+    
     const internalEndpoint = `${baseUrl}/api/internal/course-generation-v3`;
-
     console.log(`📡 Calling internal V3 orchestrator at: ${internalEndpoint}`);
 
     const orchestratorResponse = await fetch(internalEndpoint, {
@@ -79,36 +102,37 @@ Deno.serve(async (req: Request) => {
 
     if (!orchestratorResponse.ok) {
       const errorText = await orchestratorResponse.text();
-      console.error('Orchestrator failed:', errorText);
-      throw new Error(`Orchestrator failed: ${errorText}`);
+      console.error(`❌ Internal orchestrator failed: ${orchestratorResponse.status} - ${errorText}`);
+      throw new Error(`Internal orchestrator failed: ${orchestratorResponse.status} - ${errorText}`);
     }
 
     const result = await orchestratorResponse.json();
-    console.log(`✅ V3 generation completed for job: ${jobId}`);
+    console.log(`✅ V3 orchestration completed for job ${jobId}`);
 
     return new Response(
       JSON.stringify({ 
-        success: true,
-        message: 'Course generation completed successfully',
+        success: true, 
         jobId,
-        result
+        message: 'Course generation completed successfully',
+        result 
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
 
   } catch (error) {
-    console.error('Edge function error:', error);
+    console.error('❌ Edge function error:', error);
     
-    // Update job status to failed if we have jobId and supabase
+    // Update job status to failed if we have the jobId
     if (jobId && supabase) {
       try {
         await supabase
           .from('course_generation_jobs')
-          .update({ 
+          .update({
             status: 'failed',
-            error_message: error instanceof Error ? error.message : 'Unknown error',
+            error_message: error.message,
             failed_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
@@ -120,12 +144,13 @@ Deno.serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: 'Course generation failed', 
+        details: error.message,
         jobId 
       }),
       { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
