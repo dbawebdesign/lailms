@@ -49,15 +49,20 @@ Add these environment variables to your `.env.local` file:
 STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key_here
 STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
 NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL=https://buy.stripe.com/your_payment_link_id
+NEXT_PUBLIC_STRIPE_PRICE_ID=price_your_stripe_price_id_here
 
 # App Configuration (update with your domain)
 NEXT_PUBLIC_APP_URL=https://yourdomain.com
 ```
 
-### Getting Your Stripe Secret Key
+### Getting Your Stripe Keys
 
-1. In Stripe Dashboard, go to **Developers** → **API keys**
-2. Copy the **Secret key** (starts with `sk_test_` for test mode or `sk_live_` for live mode)
+1. **Secret Key**: In Stripe Dashboard, go to **Developers** → **API keys**
+   - Copy the **Secret key** (starts with `sk_test_` for test mode or `sk_live_` for live mode)
+
+2. **Price ID**: In Stripe Dashboard, go to **Products**
+   - Find your product and copy the **Price ID** (starts with `price_`)
+   - This is used for the new checkout session API
 
 ## Step 4: Testing with Stripe CLI (Development)
 
@@ -104,6 +109,13 @@ When ready for production:
 - **Method**: POST
 - **Purpose**: Processes Stripe webhook events and updates user profiles
 
+### Create Checkout Session (NEW)
+- **URL**: `/api/payment/create-checkout`
+- **Method**: POST
+- **Purpose**: Creates a Stripe checkout session with proper metadata
+- **Authentication**: Required
+- **Body**: `{ "priceId": "price_xxx" }` (optional, uses env var if not provided)
+
 ### Payment Status Check
 - **URL**: `/api/payment/status`
 - **Method**: GET
@@ -134,8 +146,9 @@ When ready for production:
 
 2. **Payment not updating profile**:
    - Check webhook logs in Stripe dashboard
-   - Verify `client_reference_id` is being set correctly
+   - Verify `client_reference_id` is being set correctly (should be automatic with new checkout session API)
    - Check Supabase service role key permissions
+   - If using the old Payment Link method, consider switching to the new checkout session API
 
 3. **Redirect not working**:
    - Verify success URL in Stripe Payment Link settings

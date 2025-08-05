@@ -763,7 +763,7 @@ export class CourseGenerationOrchestratorV2 {
   /**
    * Main execution engine - runs tasks with intelligent scheduling and recovery
    */
-  private async runExecutionEngine(
+  protected async runExecutionEngine(
     jobId: string,
     outline: CourseOutline,
     request: CourseGenerationRequest
@@ -861,7 +861,7 @@ export class CourseGenerationOrchestratorV2 {
   /**
    * Execute a single task with comprehensive error handling and resilience
    */
-  private async executeTaskWithResilience(
+  protected async executeTaskWithResilience(
     jobId: string,
     task: TaskDefinition,
     outline: CourseOutline,
@@ -901,7 +901,7 @@ export class CourseGenerationOrchestratorV2 {
   /**
    * Execute task by type - separated for cleaner timeout handling
    */
-  private async executeTaskByType(
+  protected async executeTaskByType(
     task: TaskDefinition,
     outline: CourseOutline,
     request: CourseGenerationRequest
@@ -1024,7 +1024,7 @@ export class CourseGenerationOrchestratorV2 {
   /**
    * Execute lesson section generation task
    */
-  private async executeLessonSectionTask(
+  protected async executeLessonSectionTask(
     task: TaskDefinition,
     outline: CourseOutline,
     request: CourseGenerationRequest
@@ -1090,7 +1090,7 @@ export class CourseGenerationOrchestratorV2 {
   /**
    * Circuit breaker implementation for OpenAI API calls
    */
-  private async callOpenAIWithCircuitBreaker(params: any): Promise<any> {
+  protected async callOpenAIWithCircuitBreaker(params: any): Promise<any> {
     const circuitBreaker = this.circuitBreakers.get('openai');
     
     if (circuitBreaker.state === 'open') {
@@ -1499,7 +1499,7 @@ export class CourseGenerationOrchestratorV2 {
   /**
    * Finalize generation and calculate comprehensive analytics
    */
-  private async finalizeGeneration(jobId: string): Promise<void> {
+  protected async finalizeGeneration(jobId: string): Promise<void> {
     console.log(`🏁 Finalizing generation for job ${jobId}`);
     
     try {
@@ -1631,7 +1631,7 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
     }
   }
 
-  private async storeLessonSectionContent(lessonId: string, sectionIndex: number, content: any): Promise<void> {
+  protected async storeLessonSectionContent(lessonId: string, sectionIndex: number, content: any): Promise<void> {
     try {
       console.log(`💾 Storing lesson section content for lesson ${lessonId}, section ${sectionIndex}`);
       
@@ -2023,17 +2023,27 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
   /**
    * Update job status in the database
    */
-  private async updateJobStatus(
+  protected async updateJobStatus(
     jobId: string, 
     status: 'queued' | 'processing' | 'completed' | 'failed'
   ): Promise<void> {
     try {
-      const { error } = await this.supabase
-        .from('course_generation_jobs')
-        .update({
+      const updateData: any = {
           status,
           updated_at: new Date().toISOString()
-        })
+      };
+
+      // Set progress to 100 when completed
+      if (status === 'completed') {
+        updateData.progress_percentage = 100;
+        updateData.completed_at = new Date().toISOString();
+      } else if (status === 'failed') {
+        updateData.failed_at = new Date().toISOString();
+      }
+
+      const { error } = await this.supabase
+        .from('course_generation_jobs')
+        .update(updateData)
         .eq('id', jobId);
 
       if (error) {
@@ -2652,7 +2662,7 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
   /**
    * Get relevant knowledge base content (simplified version of v1)
    */
-  private async getRelevantKnowledgeBaseContent(
+  protected async getRelevantKnowledgeBaseContent(
     baseClassId: string,
     title: string,
     description: string,
@@ -2978,7 +2988,7 @@ DETAILED LESSON DETAIL GUIDANCE:
   /**
    * Execute lesson assessment task - V1 EXACT MATCH using AssessmentGenerationService
    */
-  private async executeLessonAssessmentTask(task: TaskDefinition, outline: CourseOutline, request: CourseGenerationRequest): Promise<any> {
+  protected async executeLessonAssessmentTask(task: TaskDefinition, outline: CourseOutline, request: CourseGenerationRequest): Promise<any> {
     console.log(`📝 Executing lesson assessment task: ${task.task_identifier}`);
     
     try {
@@ -3050,7 +3060,7 @@ DETAILED LESSON DETAIL GUIDANCE:
    * Execute lesson mind map task - Updated to use direct service call
    * Uses MindMapGenerationService instead of HTTP requests to avoid authentication issues
    */
-  private async executeLessonMindMapTask(task: TaskDefinition, outline: CourseOutline, request: CourseGenerationRequest): Promise<any> {
+  protected async executeLessonMindMapTask(task: TaskDefinition, outline: CourseOutline, request: CourseGenerationRequest): Promise<any> {
     console.log(`🧠 [OrchestratorV2] Executing lesson mind map task: ${task.task_identifier}`);
     
     try {
@@ -3121,7 +3131,7 @@ DETAILED LESSON DETAIL GUIDANCE:
    * Execute lesson brainbytes task - Updated to use direct service call
    * Uses BrainbytesGenerationService instead of HTTP requests to avoid authentication issues
    */
-  private async executeLessonBrainbytesTask(task: TaskDefinition, outline: CourseOutline, request: CourseGenerationRequest): Promise<any> {
+  protected async executeLessonBrainbytesTask(task: TaskDefinition, outline: CourseOutline, request: CourseGenerationRequest): Promise<any> {
     console.log(`🎧 [OrchestratorV2] Executing lesson brainbytes task: ${task.task_identifier}`);
     
     try {
@@ -3195,7 +3205,7 @@ DETAILED LESSON DETAIL GUIDANCE:
   /**
    * Execute path quiz task - create comprehensive quizzes (V1 compatible)
    */
-  private async executePathQuizTask(task: TaskDefinition, outline: CourseOutline, request: CourseGenerationRequest): Promise<any> {
+  protected async executePathQuizTask(task: TaskDefinition, outline: CourseOutline, request: CourseGenerationRequest): Promise<any> {
     console.log(`❓ Executing path quiz task: ${task.task_identifier}`);
     
     try {
@@ -3241,7 +3251,7 @@ DETAILED LESSON DETAIL GUIDANCE:
   /**
    * Execute class exam task - create comprehensive exams (V1 compatible)
    */
-  private async executeClassExamTask(task: TaskDefinition, outline: CourseOutline, request: CourseGenerationRequest): Promise<any> {
+  protected async executeClassExamTask(task: TaskDefinition, outline: CourseOutline, request: CourseGenerationRequest): Promise<any> {
     console.log(`📋 Executing class exam task: ${task.task_identifier}`);
     
     try {

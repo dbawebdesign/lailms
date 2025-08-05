@@ -26,8 +26,10 @@ export interface GenerationAlert {
   resolvedBy?: string;
 }
 
-class CourseGenerationLogger {
+export class CourseGenerationLogger {
   private supabase = createSupabaseServiceClient();
+
+  private isCreatingAlert = false; // Prevent infinite loops
 
   /**
    * Log a generation event
@@ -54,35 +56,42 @@ class CourseGenerationLogger {
           console.log(logMessage, logEntry.details);
       }
 
-      // Store in database - TODO: Create course_generation_logs table migration
-      // await this.supabase
-      //   .from('course_generation_logs')
-      //   .insert({
-      //     job_id: logEntry.jobId,
-      //     level: logEntry.level,
-      //     message: logEntry.message,
-      //     details: logEntry.details || {},
-      //     timestamp: logEntry.timestamp.toISOString(),
-      //     source: logEntry.source,
-      //     user_id: logEntry.userId,
-      //     task_id: logEntry.taskId,
-      //     error_code: logEntry.errorCode,
-      //     stack_trace: logEntry.stackTrace
-      //   });
+      // Store in database
+      await this.supabase
+        .from('course_generation_logs')
+        .insert({
+          job_id: logEntry.jobId,
+          level: logEntry.level,
+          message: logEntry.message,
+          details: logEntry.details || {},
+          timestamp: logEntry.timestamp.toISOString(),
+          source: logEntry.source,
+          user_id: logEntry.userId,
+          task_id: logEntry.taskId,
+          error_code: logEntry.errorCode,
+          stack_trace: logEntry.stackTrace
+        });
 
-      // Create alert for high-severity issues - TODO: Uncomment when course_generation_alerts table is created
-      // if (logEntry.level === 'error' || logEntry.level === 'critical') {
-      //   await this.createAlert({
-      //     jobId: logEntry.jobId,
-      //     alertType: logEntry.errorCode === 'TIMEOUT' ? 'timeout' : 'critical_error',
-      //     severity: logEntry.level === 'critical' ? 'critical' : 'high',
-      //     message: logEntry.message,
-      //     details: logEntry.details || {},
-      //     timestamp: logEntry.timestamp,
-      //     userId: logEntry.userId,
-      //     resolved: false
-      //   });
-      // }
+      // Create alert for high-severity issues (with loop prevention)
+      if ((logEntry.level === 'error' || logEntry.level === 'critical') && 
+          !this.isCreatingAlert && 
+          logEntry.source !== 'alert_system') {
+        this.isCreatingAlert = true;
+        try {
+          await this.createAlert({
+            jobId: logEntry.jobId,
+            alertType: logEntry.errorCode === 'TIMEOUT' ? 'timeout' : 'critical_error',
+            severity: logEntry.level === 'critical' ? 'critical' : 'high',
+            message: logEntry.message,
+            details: logEntry.details || {},
+            timestamp: logEntry.timestamp,
+            userId: logEntry.userId,
+            resolved: false
+          });
+        } finally {
+          this.isCreatingAlert = false;
+        }
+      }
 
     } catch (error) {
       // Fallback logging - don't let logging failures break the main process

@@ -1,49 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { courseGenerationOrchestrator } from '@/lib/services/course-generation-orchestrator';
-import { CourseGenerationOrchestratorV2 } from '@/lib/services/course-generation-orchestrator-v2';
-import { Tables } from 'packages/types/db';
-
-interface GenerationTask {
-  id: string;
-  type: 'lesson_section' | 'lesson_assessment' | 'path_quiz' | 'class_exam';
-  status: 'pending' | 'running' | 'completed' | 'failed';
-}
-
-function determineJobStatus(tasks: GenerationTask[], dbStatus: string): string {
-  if (!tasks || tasks.length === 0) {
-    // If no tasks available, rely on database status
-    return dbStatus;
-  }
-
-  const completedTasks = tasks.filter(task => task.status === 'completed');
-  const failedTasks = tasks.filter(task => task.status === 'failed');
-  const runningTasks = tasks.filter(task => task.status === 'running');
-  const pendingTasks = tasks.filter(task => task.status === 'pending');
-
-  // If all tasks are completed, job is completed
-  if (completedTasks.length === tasks.length) {
-    return 'completed';
-  }
-
-  // If there are running or pending tasks, job is still processing
-  if (runningTasks.length > 0 || pendingTasks.length > 0) {
-    return 'processing';
-  }
-
-  // If some tasks completed and some failed, but no running/pending tasks
-  if (completedTasks.length > 0 && failedTasks.length > 0) {
-    return 'completed'; // Partial success is still considered completed
-  }
-
-  // If all tasks failed (very rare case)
-  if (failedTasks.length === tasks.length) {
-    return 'failed';
-  }
-
-  // Fallback to database status
-  return dbStatus;
-}
 
 export async function GET(
   request: NextRequest,
@@ -51,182 +7,67 @@ export async function GET(
 ) {
   try {
     const { jobId } = await params;
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Verify user owns this job
+    // Get the job details
     const { data: job, error: jobError } = await supabase
       .from('course_generation_jobs')
-      .select('*')
+      .select(`
+        *,
+        base_classes!inner(
+          id,
+          name,
+          description
+        )
+      `)
       .eq('id', jobId)
-      .eq('user_id', user.id)
-      .single<Tables<'course_generation_jobs'>>();
+      .single();
 
     if (jobError || !job) {
       return NextResponse.json(
-        { error: 'Job not found or access denied' }, 
+        { error: 'Job not found' },
         { status: 404 }
       );
     }
 
-    // Check if this is a v2 job by looking at generation_config
-    const generationConfig = job.generation_config as any;
-    const isV2Job = generationConfig?.version === 'v2' || generationConfig?.orchestrator === 'CourseGenerationOrchestratorV2';
-
-    if (isV2Job) {
-      // For v2 jobs, get task details from the database
-      const { data: v2Tasks, error: tasksError } = await supabase
-        .from('course_generation_tasks')
+    // If job is completed, get the course outline
+    let courseOutline = null;
+    if (job.status === 'completed' && job.result_data && typeof job.result_data === 'object' && 'courseOutlineId' in job.result_data) {
+      const { data: outline } = await supabase
+        .from('course_outlines')
         .select('*')
-        .eq('job_id', jobId)
-        .order('created_at', { ascending: true });
-
-      if (!tasksError && v2Tasks) {
-        // Transform v2 tasks to match the expected format
-        const tasks = v2Tasks.map((task: any) => ({
-          id: task.id,
-          type: task.task_type,
-          status: task.status,
-          identifier: task.task_identifier,
-          error: task.error_message,
-          progress: task.status === 'completed' ? 100 : 
-                   task.status === 'running' ? 50 : 
-                   task.status === 'failed' ? 0 : 0,
-          metadata: task.result_metadata
-        }));
-
-        const determinedStatus = determineJobStatus(tasks as GenerationTask[], job.status || 'processing');
-        
-        // Calculate task counts
-        const totalTasks = tasks.length;
-        const completedTasks = tasks.filter(task => task.status === 'completed').length;
-        const failedTasks = tasks.filter(task => task.status === 'failed').length;
-        const runningTasks = tasks.filter(task => task.status === 'running').length;
-        const pendingTasks = tasks.filter(task => task.status === 'pending').length;
-        
-        return NextResponse.json({
-          success: true,
-          isLive: true,
-          isV2: true,
-          job: {
-            id: job.id,
-            status: determinedStatus,
-            progress: job.progress_percentage || 0,
-            error: job.error_message,
-            tasks: tasks,
-            total_tasks: totalTasks,
-            completed_tasks: completedTasks,
-            failed_tasks: failedTasks,
-            running_tasks: runningTasks,
-            pending_tasks: pendingTasks,
-            confettiShown: (job as any).confetti_shown || false,
-            result: job.result_data,
-            result_data: job.result_data,
-            version: 'v2',
-            features: generationConfig?.features || []
-          },
-          result_data: job.result_data,
-          progress_percentage: job.progress_percentage || 0,
-          courseOutline: (job.result_data as any)?.courseOutline,
-          createdAt: job.created_at,
-          updatedAt: job.updated_at
-        });
-      }
+        .eq('id', (job.result_data as any).courseOutlineId)
+        .single();
+      
+      courseOutline = outline;
     }
 
-    // Try to get live, detailed state from the v1 orchestrator (legacy jobs)
-    const liveState = courseGenerationOrchestrator.getJobState(jobId);
+    // Get task statistics
+    const { data: taskStats } = await supabase
+      .from('course_generation_tasks')
+      .select('status')
+      .eq('job_id', jobId);
 
-    if (liveState) {
-      // Serialize Map to Array for JSON response
-      const tasks = Array.from(liveState.tasks.values());
-      const determinedStatus = determineJobStatus(tasks as GenerationTask[], job.status || 'processing');
-      
-      // Calculate task counts for V1
-      const totalTasks = tasks.length;
-      const completedTasks = tasks.filter(task => task.status === 'completed').length;
-      const failedTasks = tasks.filter(task => task.status === 'failed').length;
-      const runningTasks = tasks.filter(task => task.status === 'running').length;
-      const pendingTasks = tasks.filter(task => task.status === 'pending').length;
-      
-      return NextResponse.json({
-        success: true,
-        isLive: true,
-        isV2: false,
-        job: {
-          id: liveState.jobId,
-          status: determinedStatus,
-          progress: liveState.progress,
-          error: job.error_message,
-          tasks: tasks,
-          total_tasks: totalTasks,
-          completed_tasks: completedTasks,
-          failed_tasks: failedTasks,
-          running_tasks: runningTasks,
-          pending_tasks: pendingTasks,
-          confettiShown: (job as any).confetti_shown || false,
-          result: job.result_data,
-          result_data: job.result_data,
-          version: 'v1'
-        },
-        result_data: job.result_data,
-        progress_percentage: liveState.progress,
-        courseOutline: (job.result_data as any)?.courseOutline,
-        createdAt: job.created_at,
-        updatedAt: job.updated_at
-      });
-    } else {
-      // Fallback to database record if not live in memory
-      // If result_data contains task summary, extract tasks for compatibility
-      const resultData = job.result_data as any;
-      const tasks = resultData?.tasks || [];
-      
-      // Use stored status or determine from tasks if available
-      const determinedStatus = tasks.length > 0 ? determineJobStatus(tasks, job.status || 'processing') : job.status;
-      
-      // Calculate task counts for fallback
-      const totalTasks = tasks.length;
-      const completedTasks = tasks.filter((task: any) => task.status === 'completed').length;
-      const failedTasks = tasks.filter((task: any) => task.status === 'failed').length;
-      const runningTasks = tasks.filter((task: any) => task.status === 'running').length;
-      const pendingTasks = tasks.filter((task: any) => task.status === 'pending').length;
-      
-      return NextResponse.json({
-        success: true,
-        isLive: false,
-        job: {
-          id: job.id,
-          status: determinedStatus,
-          progress: job.progress_percentage,
-          error: job.error_message,
-          result: job.result_data, // Include result for consistency with jobs list API
-          result_data: job.result_data, // Include result_data for new code
-          tasks: tasks, // Include tasks from stored result_data if available
-          total_tasks: totalTasks,
-          completed_tasks: completedTasks,
-          failed_tasks: failedTasks,
-          running_tasks: runningTasks,
-          pending_tasks: pendingTasks,
-          confettiShown: (job as any).confetti_shown || false,
-        },
-        result_data: job.result_data, // Include result_data at root level for consistency
-        progress_percentage: job.progress_percentage,
-        courseOutline: (job.result_data as any)?.courseOutline, // Include courseOutline for redirect
-        createdAt: job.created_at,
-        updatedAt: job.updated_at
-      });
-    }
+    const totalTasks = taskStats?.length || 0;
+    const completedTasks = taskStats?.filter(t => t.status === 'completed').length || 0;
+    const failedTasks = taskStats?.filter(t => t.status === 'failed').length || 0;
+
+    return NextResponse.json({
+      success: true,
+      job: {
+        ...job,
+        total_tasks: totalTasks,
+        completed_tasks: completedTasks,
+        failed_tasks: failedTasks
+      },
+      courseOutline
+    });
 
   } catch (error) {
-    console.error('Job status check error:', error);
+    console.error('Failed to get job status:', error);
     return NextResponse.json(
-      { error: 'Failed to check job status' }, 
+      { error: 'Failed to get job status' },
       { status: 500 }
     );
   }
-} 
+}

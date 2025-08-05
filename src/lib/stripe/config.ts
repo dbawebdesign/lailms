@@ -17,6 +17,7 @@ export const STRIPE_CONFIG = {
 
 /**
  * Builds a Stripe Payment Link URL with user information
+ * @deprecated Use createCheckoutSession API instead for better metadata support
  */
 export function buildPaymentLink(userId: string, userEmail?: string): string {
   const paymentLink = new URL(STRIPE_CONFIG.PAYMENT_LINK_BASE_URL);
@@ -30,6 +31,27 @@ export function buildPaymentLink(userId: string, userEmail?: string): string {
   // }
   
   return paymentLink.toString();
+}
+
+/**
+ * Creates a Stripe Checkout Session via API (recommended approach)
+ */
+export async function createCheckoutSession(userId?: string): Promise<{ url: string; sessionId: string }> {
+  const response = await fetch('/api/payment/create-checkout', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID, // You'll need to add this env var
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to create checkout session');
+  }
+
+  return response.json();
 }
 
 /**

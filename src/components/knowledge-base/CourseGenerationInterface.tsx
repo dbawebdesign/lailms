@@ -149,7 +149,7 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
   const loadKnowledgeBaseAnalysis = useCallback(async () => {
     try {
       setAnalyzing(true);
-      const response = await fetch(`/api/knowledge-base/generate-course?baseClassId=${baseClassId}`);
+      const response = await fetch(`/api/course-generation/v2?baseClassId=${baseClassId}`);
       const data = await response.json();
 
       if (data.success) {
@@ -286,7 +286,7 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
         estimatedMinutes: timeEstimate?.estimatedMinutes
       };
 
-      const response = await fetch('/api/knowledge-base/generate-course', {
+      const response = await fetch('/api/course-generation/v2', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

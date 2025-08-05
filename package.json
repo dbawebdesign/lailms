@@ -18,7 +18,9 @@
     "test:e2e": "jest --testPathPattern=tests/e2e",
     "pre-PR": "npm run lint && npm run build",
     "deploy:functions": "npx supabase functions deploy",
-    "deploy:process-document": "npx supabase functions deploy process-document"
+    "deploy:process-document": "npx supabase functions deploy process-document",
+    "verify:v3": "tsx scripts/verify-v3-setup.ts",
+    "test:v3-api": "tsx scripts/test-v3-api-endpoint.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^0.0.17",
@@ -163,6 +165,7 @@
     "turbo": "^2.5.2",
     "tw-animate-css": "^1.2.8",
     "typescript": "^5",
+    "tsx": "^4.20.3",
     "typescript-eslint": "^8.31.1"
   }
 }

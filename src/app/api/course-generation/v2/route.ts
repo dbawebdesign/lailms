@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { CourseGenerationOrchestratorV2 } from '@/lib/services/course-generation-orchestrator-v2';
+import { CourseGenerationOrchestratorV3 } from '@/lib/services/course-generation-orchestrator-v3';
 import { knowledgeBaseAnalyzer } from '@/lib/services/knowledge-base-analyzer';
 import type { CourseGenerationRequest } from '@/lib/services/course-generator';
 
@@ -101,14 +101,20 @@ export async function POST(request: NextRequest) {
         progress_percentage: 0,
         job_data: generationRequest as any,
         generation_config: {
-          version: 'v2',
-          orchestrator: 'CourseGenerationOrchestratorV2',
+          version: 'v3',
+          orchestrator: 'CourseGenerationOrchestratorV3',
           features: [
             'enhanced_tracking',
             'task_level_monitoring', 
             'performance_analytics',
             'error_recovery',
-            'user_action_logging'
+            'user_action_logging',
+            'structured_outputs',
+            'rate_limiting',
+            'content_caching',
+            'database_logging',
+            'quality_validation',
+            'model_optimization'
           ]
         }
       })
@@ -165,6 +171,73 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
+    const baseClassId = searchParams.get('baseClassId');
+    
+    // If baseClassId is provided, return knowledge base analysis
+    if (baseClassId) {
+      // Verify user has access to this base class
+      const { data: baseClass, error: baseClassError } = await supabase
+        .from('base_classes')
+        .select('*')
+        .eq('id', baseClassId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (baseClassError || !baseClass) {
+        return NextResponse.json(
+          { error: 'Base class not found or access denied' }, 
+          { status: 404 }
+        );
+      }
+
+      // Get knowledge base analysis for this base class
+      const kbAnalysis = await knowledgeBaseAnalyzer.analyzeKnowledgeBase(baseClassId);
+
+      // Get existing course outlines for this base class
+      const { data: courseOutlines, error: outlinesError } = await supabase
+        .from('course_outlines')
+        .select('*')
+        .eq('base_class_id', baseClassId)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (outlinesError) {
+        return NextResponse.json(
+          { error: 'Failed to fetch course outlines' }, 
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        baseClass,
+        knowledgeBaseAnalysis: kbAnalysis,
+        generationModes: {
+          kb_only: {
+            title: 'Knowledge Base Only',
+            description: 'Generate content exclusively from uploaded sources',
+            suitable: kbAnalysis.contentDepth === 'comprehensive' && 
+                     kbAnalysis.totalChunks >= 40 &&
+                     kbAnalysis.analysisDetails.contentQuality === 'high'
+          },
+          kb_priority: {
+            title: 'Knowledge Base Priority', 
+            description: 'Prioritize knowledge base content, fill minor gaps with general knowledge',
+            suitable: kbAnalysis.contentDepth !== 'minimal' && 
+                     kbAnalysis.totalChunks >= 40
+          },
+          kb_supplemented: {
+            title: 'Knowledge Base Supplemented',
+            description: 'Use knowledge base as foundation, freely supplement with general knowledge', 
+            suitable: true // Always available
+          }
+        },
+        recommendedMode: kbAnalysis.recommendedGenerationMode,
+        existingCourseOutlines: courseOutlines || []
+      });
+    }
+
+    // Otherwise, return jobs list
     const status = searchParams.get('status');
     const limit = parseInt(searchParams.get('limit') || '10');
 
@@ -251,8 +324,8 @@ async function processV2GenerationJob(
       orchestrator: 'v2'
     });
 
-    // Use v2 orchestrator for enhanced generation
-    const orchestrator = new CourseGenerationOrchestratorV2(supabase);
+    // Use v3 orchestrator with optimizations
+    const orchestrator = new CourseGenerationOrchestratorV3(supabase);
     await orchestrator.startOrchestration(jobId, outline, request);
     
     // The v2 orchestrator will handle completion status updates

@@ -17,7 +17,7 @@ import { toast } from '@/components/ui/use-toast'
 import { Loader2, Users, Home, ArrowRight, CheckCircle, UserPlus, GraduationCap, Building, User } from 'lucide-react'
 import { useInviteCodeClipboard } from '@/hooks/useClipboard'
 import Image from 'next/image'
-import { buildPaymentLink } from '@/lib/stripe/config'
+import { buildPaymentLink, createCheckoutSession } from '@/lib/stripe/config'
 
 type HomeschoolType = 'individual_family' | 'coop_network' | ''
 
@@ -568,10 +568,17 @@ export default function HomeschoolSignupForm() {
 
                 <div className="flex space-x-3">
                   <Button 
-                    onClick={() => {
-                      // Redirect to Stripe payment link
-                      const paymentUrl = buildPaymentLink(organizationResult.primaryContact.id)
-                      window.location.href = paymentUrl
+                    onClick={async () => {
+                      try {
+                        // Create checkout session with proper metadata
+                        const { url } = await createCheckoutSession()
+                        window.location.href = url
+                      } catch (error) {
+                        console.error('Failed to create checkout session:', error)
+                        // Fallback to payment link
+                        const paymentUrl = buildPaymentLink(organizationResult.primaryContact.id)
+                        window.location.href = paymentUrl
+                      }
                     }}
                     className="flex-1"
                   >

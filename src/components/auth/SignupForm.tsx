@@ -11,7 +11,7 @@ import { UsernameInput } from '@/components/ui/username-input'
 import TermsCheckbox from '../ui/terms-checkbox'
 import { toast } from 'sonner'
 import CoopFamilySignupForm from './CoopFamilySignupForm'
-import { buildPaymentLink } from '@/lib/stripe/config'
+import { buildPaymentLink, createCheckoutSession } from '@/lib/stripe/config'
 
 interface InviteCodeData {
   valid: boolean
@@ -200,10 +200,17 @@ export default function SignupForm() {
 
       // Check if payment is required
       if (responseData.user?.requiresPayment) {
-        // Redirect to Stripe payment link
-        const paymentUrl = buildPaymentLink(responseData.user.id)
-        console.log('[SignupForm] Redirecting to payment:', paymentUrl)
-        window.location.href = paymentUrl // Use window.location for external redirect
+        try {
+          // Create checkout session with proper metadata
+          const { url } = await createCheckoutSession()
+          console.log('[SignupForm] Redirecting to payment:', url)
+          window.location.href = url // Use window.location for external redirect
+        } catch (error) {
+          console.error('[SignupForm] Failed to create checkout session:', error)
+          // Fallback to payment link
+          const paymentUrl = buildPaymentLink(responseData.user.id)
+          window.location.href = paymentUrl
+        }
       } else {
         // Redirect to login page on success (for users who don't need payment)
         router.push('/login?registered=true')
