@@ -192,8 +192,8 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
         message: `V3: Failed to generate lesson section: ${sectionTitle}`,
         source: 'CourseGenerationOrchestratorV3',
         errorCode: 'GENERATION_ERROR',
-        stackTrace: error.stack,
-        details: { error: error.message }
+        stackTrace: error instanceof Error ? error.stack : undefined,
+        details: { error: error instanceof Error ? error.message : String(error) }
       });
 
       throw error; // Re-throw to let parent class handle it
