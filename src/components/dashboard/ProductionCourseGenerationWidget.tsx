@@ -311,6 +311,11 @@ export default function ProductionCourseGenerationWidget({
     );
   }
 
+  // Don't render if no jobs (matches original behavior)
+  if (jobs.length === 0) {
+    return null;
+  }
+
   return (
     <Card className={className}>
       <CardHeader>

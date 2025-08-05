@@ -71,7 +71,7 @@ export function useProductionRealtimeUserJobs({
   
   const [state, setState] = useState<UseProductionRealtimeUserJobsState>({
     jobs: initialJobs,
-    isLoading: initialJobs.length === 0, // Don't show loading if we have initial data
+    isLoading: false, // Never show loading initially - we either have data or will fetch quickly
     error: null,
     connectionState: ConnectionState.DISCONNECTED,
     retryCount: 0
@@ -94,11 +94,21 @@ export function useProductionRealtimeUserJobs({
       return;
     }
 
-    // If we have initial jobs and this isn't a forced refresh, skip the fetch
+    // If we have initial jobs and this isn't a forced refresh, skip the fetch but ensure auth is ready
     if (!forceRefresh && initialJobs.length > 0) {
-      console.log('useProductionRealtimeUserJobs: Skipping initial fetch - using server-provided data');
-      setState(prev => ({ ...prev, isLoading: false }));
-      return;
+      console.log('useProductionRealtimeUserJobs: Using server-provided data, verifying auth');
+      
+      try {
+        // Quick auth check to ensure realtime will work
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && user.id === userId) {
+          setState(prev => ({ ...prev, isLoading: false, error: null }));
+          return;
+        }
+      } catch (error) {
+        console.log('useProductionRealtimeUserJobs: Auth check failed, falling back to full fetch');
+        // Fall through to full fetch if auth check fails
+      }
     }
 
     try {

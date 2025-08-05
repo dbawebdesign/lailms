@@ -54,35 +54,35 @@ class CourseGenerationLogger {
           console.log(logMessage, logEntry.details);
       }
 
-      // Store in database
-      await this.supabase
-        .from('course_generation_logs')
-        .insert({
-          job_id: logEntry.jobId,
-          level: logEntry.level,
-          message: logEntry.message,
-          details: logEntry.details || {},
-          timestamp: logEntry.timestamp.toISOString(),
-          source: logEntry.source,
-          user_id: logEntry.userId,
-          task_id: logEntry.taskId,
-          error_code: logEntry.errorCode,
-          stack_trace: logEntry.stackTrace
-        });
+      // Store in database - TODO: Create course_generation_logs table migration
+      // await this.supabase
+      //   .from('course_generation_logs')
+      //   .insert({
+      //     job_id: logEntry.jobId,
+      //     level: logEntry.level,
+      //     message: logEntry.message,
+      //     details: logEntry.details || {},
+      //     timestamp: logEntry.timestamp.toISOString(),
+      //     source: logEntry.source,
+      //     user_id: logEntry.userId,
+      //     task_id: logEntry.taskId,
+      //     error_code: logEntry.errorCode,
+      //     stack_trace: logEntry.stackTrace
+      //   });
 
-      // Create alert for high-severity issues
-      if (logEntry.level === 'error' || logEntry.level === 'critical') {
-        await this.createAlert({
-          jobId: logEntry.jobId,
-          alertType: logEntry.errorCode === 'TIMEOUT' ? 'timeout' : 'critical_error',
-          severity: logEntry.level === 'critical' ? 'critical' : 'high',
-          message: logEntry.message,
-          details: logEntry.details || {},
-          timestamp: logEntry.timestamp,
-          userId: logEntry.userId,
-          resolved: false
-        });
-      }
+      // Create alert for high-severity issues - TODO: Uncomment when course_generation_alerts table is created
+      // if (logEntry.level === 'error' || logEntry.level === 'critical') {
+      //   await this.createAlert({
+      //     jobId: logEntry.jobId,
+      //     alertType: logEntry.errorCode === 'TIMEOUT' ? 'timeout' : 'critical_error',
+      //     severity: logEntry.level === 'critical' ? 'critical' : 'high',
+      //     message: logEntry.message,
+      //     details: logEntry.details || {},
+      //     timestamp: logEntry.timestamp,
+      //     userId: logEntry.userId,
+      //     resolved: false
+      //   });
+      // }
 
     } catch (error) {
       // Fallback logging - don't let logging failures break the main process
@@ -217,27 +217,31 @@ class CourseGenerationLogger {
    */
   async getJobLogs(jobId: string, limit: number = 100): Promise<GenerationLogEntry[]> {
     try {
-      const { data, error } = await this.supabase
-        .from('course_generation_logs')
-        .select('*')
-        .eq('job_id', jobId)
-        .order('timestamp', { ascending: false })
-        .limit(limit);
+      // TODO: Uncomment when course_generation_logs table is created
+      // const { data, error } = await this.supabase
+      //   .from('course_generation_logs')
+      //   .select('*')
+      //   .eq('job_id', jobId)
+      //   .order('timestamp', { ascending: false })
+      //   .limit(limit);
 
-      if (error) throw error;
+      // if (error) throw error;
 
-      return (data || []).map(log => ({
-        jobId: log.job_id,
-        level: log.level,
-        message: log.message,
-        details: log.details,
-        timestamp: new Date(log.timestamp),
-        source: log.source,
-        userId: log.user_id,
-        taskId: log.task_id,
-        errorCode: log.error_code,
-        stackTrace: log.stack_trace
-      }));
+      // return (data || []).map(log => ({
+      //   jobId: log.job_id,
+      //   level: log.level,
+      //   message: log.message,
+      //   details: log.details,
+      //   timestamp: new Date(log.timestamp),
+      //   source: log.source,
+      //   userId: log.user_id,
+      //   taskId: log.task_id,
+      //   errorCode: log.error_code,
+      //   stackTrace: log.stack_trace
+      // }));
+
+      // Temporary return empty array until table is created
+      return [];
 
     } catch (error) {
       console.error('Failed to get job logs:', error);
@@ -250,27 +254,31 @@ class CourseGenerationLogger {
    */
   async getJobAlerts(jobId: string): Promise<GenerationAlert[]> {
     try {
-      const { data, error } = await this.supabase
-        .from('course_generation_alerts')
-        .select('*')
-        .eq('job_id', jobId)
-        .eq('resolved', false)
-        .order('timestamp', { ascending: false });
+      // TODO: Uncomment when course_generation_alerts table is created
+      // const { data, error } = await this.supabase
+      //   .from('course_generation_alerts')
+      //   .select('*')
+      //   .eq('job_id', jobId)
+      //   .eq('resolved', false)
+      //   .order('timestamp', { ascending: false });
 
-      if (error) throw error;
+      // if (error) throw error;
 
-      return (data || []).map(alert => ({
-        jobId: alert.job_id,
-        alertType: alert.alert_type,
-        severity: alert.severity,
-        message: alert.message,
-        details: alert.details,
-        timestamp: new Date(alert.timestamp),
-        userId: alert.user_id,
-        resolved: alert.resolved,
-        resolvedAt: alert.resolved_at ? new Date(alert.resolved_at) : undefined,
-        resolvedBy: alert.resolved_by
-      }));
+      // return (data || []).map(alert => ({
+      //   jobId: alert.job_id,
+      //   alertType: alert.alert_type,
+      //   severity: alert.severity,
+      //   message: alert.message,
+      //   details: alert.details,
+      //   timestamp: new Date(alert.timestamp),
+      //   userId: alert.user_id,
+      //   resolved: alert.resolved,
+      //   resolvedAt: alert.resolved_at ? new Date(alert.resolved_at) : undefined,
+      //   resolvedBy: alert.resolved_by
+      // }));
+
+      // Temporary return empty array until table is created
+      return [];
 
     } catch (error) {
       console.error('Failed to get job alerts:', error);
@@ -414,7 +422,8 @@ export const initializeLoggingTables = async () => {
   `;
 
   try {
-    await supabase.rpc('exec_sql', { sql: createLogsTable });
+    // TODO: Uncomment when exec_sql function is available and logging tables are needed
+    // await supabase.rpc('exec_sql', { sql: createLogsTable });
   } catch (error) {
     console.error('Failed to initialize logging tables:', error);
   }

@@ -64,8 +64,8 @@ export class CourseGenerationResilienceMonitor {
         return this.createFailedStatus(jobId, 'Cannot access job tasks', 'manual_intervention');
       }
 
-      const taskCounts = this.calculateTaskCounts(taskStats);
-      const lastActivity = new Date(job.updated_at);
+      const taskCounts = this.calculateTaskCounts(taskStats.filter(task => task.status !== null) as Array<{status: string}>);
+      const lastActivity = new Date(job.updated_at || job.created_at || Date.now());
       const timeSinceActivity = Date.now() - lastActivity.getTime();
       const timeSinceActivityMinutes = timeSinceActivity / (1000 * 60);
 
@@ -80,7 +80,7 @@ export class CourseGenerationResilienceMonitor {
         .eq('status', 'running')
         .lt('started_at', new Date(Date.now() - this.TASK_TIMEOUT_MINUTES * 60 * 1000).toISOString());
 
-      const hasStaleRunningTasks = staleRunningTasks && staleRunningTasks.length > 0;
+      const hasStaleRunningTasks = Boolean(staleRunningTasks && staleRunningTasks.length > 0);
 
       // Determine job health status
       const healthStatus = this.determineHealthStatus(
@@ -393,7 +393,7 @@ export class CourseGenerationResilienceMonitor {
     if (timeSinceActivityMinutes > this.ABANDON_THRESHOLD_MINUTES) {
       return {
         status: 'abandoned' as const,
-        recommendedAction: recoveryAttempts >= this.MAX_RECOVERY_ATTEMPTS ? 'delete_and_retry' : 'restart',
+        recommendedAction: recoveryAttempts >= this.MAX_RECOVERY_ATTEMPTS ? 'delete_and_retry' as const : 'restart' as const,
         userMessage: 'Generation has been inactive for too long. Please restart or delete and try again.',
         canAutoRecover: recoveryAttempts < this.MAX_RECOVERY_ATTEMPTS,
         errorDetails: 'Job abandoned due to inactivity'
@@ -404,7 +404,7 @@ export class CourseGenerationResilienceMonitor {
     if (timeSinceActivityMinutes > this.STUCK_THRESHOLD_MINUTES || hasStaleRunningTasks) {
       return {
         status: 'stuck' as const,
-        recommendedAction: recoveryAttempts >= this.MAX_RECOVERY_ATTEMPTS ? 'manual_intervention' : 'resume',
+        recommendedAction: recoveryAttempts >= this.MAX_RECOVERY_ATTEMPTS ? 'manual_intervention' as const : 'resume' as const,
         userMessage: 'Generation appears to be stuck. We can try to resume it automatically.',
         canAutoRecover: recoveryAttempts < this.MAX_RECOVERY_ATTEMPTS,
         errorDetails: hasStaleRunningTasks ? 'Tasks stuck in running state' : 'No progress detected'
@@ -451,7 +451,7 @@ export class CourseGenerationResilienceMonitor {
       .eq('id', jobId)
       .single();
 
-    const userActions = job?.user_actions || [];
+    const userActions = Array.isArray(job?.user_actions) ? job.user_actions : [];
     userActions.push({
       action: 'recovery_attempt',
       timestamp: new Date().toISOString(),

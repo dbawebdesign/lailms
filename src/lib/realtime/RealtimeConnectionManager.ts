@@ -162,7 +162,7 @@ export class RealtimeConnectionManager {
     const channel = this.supabase
       .channel(channelName)
       .on(
-        'postgres_changes',
+        'postgres_changes' as any,
         {
           event: config.event!,
           schema: config.schema!,

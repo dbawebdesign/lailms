@@ -36,7 +36,7 @@ export type AssessmentGradingUpdate = {
   updated_at: string;
 };
 
-export type SubscriptionCallback<T> = (payload: RealtimePostgresChangesPayload<T>) => void;
+export type SubscriptionCallback<T extends { [key: string]: any } = any> = (payload: RealtimePostgresChangesPayload<T>) => void;
 
 /**
  * Centralized service for managing Supabase Realtime subscriptions
