@@ -116,6 +116,7 @@ async function verifySetup() {
       
       // Read the route file to verify V3 usage
       const fs = await import('fs/promises');
+      const path = await import('path');
       const routeContent = await fs.readFile(
         path.join(__dirname, '..', 'src/app/api/course-generation/v2/route.ts'),
         'utf-8'
