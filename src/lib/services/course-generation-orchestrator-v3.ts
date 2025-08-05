@@ -92,47 +92,8 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
   /**
    * Override generate method to add rate limiting
    */
-  async generate(request: any): Promise<any> {
-    // Check rate limits before proceeding
-    const rateLimitCheck = await this.rateLimiter.checkRateLimit(
-      request.userId,
-      request.userRole || 'student'
-    );
-
-    if (!rateLimitCheck.allowed) {
-      await this.logger.log({
-        jobId: 'rate-limited',
-        level: 'warning',
-        message: 'Course generation rate limited',
-        source: 'CourseGenerationOrchestratorV3',
-        userId: request.userId,
-        details: {
-          reason: rateLimitCheck.reason,
-          retry_after: rateLimitCheck.retry_after,
-          current_usage: rateLimitCheck.current_usage
-        }
-      });
-
-      throw new Error(rateLimitCheck.reason || 'Rate limit exceeded');
-    }
-
-    // Increment usage counters
-    await this.rateLimiter.incrementUsage(request.userId);
-
-    try {
-      // Call parent generate method
-      const result = await super.generate(request);
-      
-      // Decrement active jobs on completion
-      await this.rateLimiter.decrementActiveJobs(request.userId);
-      
-      return result;
-    } catch (error) {
-      // Decrement active jobs on error
-      await this.rateLimiter.decrementActiveJobs(request.userId);
-      throw error;
-    }
-  }
+  // Note: The generate method was removed as it's not used.
+  // V3 orchestrator works through startOrchestration() method override.
 
   /**
    * Override executeLessonSectionTask to add V3 enhancements ONLY
