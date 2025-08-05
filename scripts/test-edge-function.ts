@@ -1,8 +1,5 @@
-import { config } from 'dotenv';
-import { resolve } from 'path';
-
-// Load environment variables
-config({ path: resolve(process.cwd(), '.env.local') });
+// Environment variables are automatically loaded by Next.js
+// No need to manually load dotenv in Next.js projects
 
 async function testEdgeFunction() {
   console.log('🧪 Testing Supabase Edge Function for V3 Course Generation\n');
