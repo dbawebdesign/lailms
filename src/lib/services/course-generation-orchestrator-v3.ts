@@ -211,7 +211,7 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
     try {
       const cacheKey = this.generateCacheKey(contentType, title, subtitle);
       
-      const { data, error } = await this.supabaseV3
+      const { data, error } = await (this.supabaseV3 as any)
         .from('course_generation_cache')
         .select('cached_content, hit_count')
         .eq('cache_key', cacheKey)
@@ -220,7 +220,7 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
 
       if (data) {
         // Increment hit count
-        await this.supabaseV3
+        await (this.supabaseV3 as any)
           .from('course_generation_cache')
           .update({ 
             hit_count: data.hit_count + 1,
@@ -252,7 +252,7 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7); // 7 day cache
 
-      await this.supabaseV3
+      await (this.supabaseV3 as any)
         .from('course_generation_cache')
         .upsert({
           cache_key: cacheKey,
