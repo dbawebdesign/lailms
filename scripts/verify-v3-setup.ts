@@ -66,7 +66,7 @@ async function verifySetup() {
       const { createSupabaseServiceClient } = await import('../src/lib/supabase/server');
       const supabase = createSupabaseServiceClient();
       
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('course_generation_jobs')
         .select('id')
         .limit(1);
@@ -97,7 +97,7 @@ async function verifySetup() {
       
       let tablesOk = true;
       for (const table of requiredTables) {
-        const { error } = await supabase.from(table).select('*').limit(1);
+        const { error } = await (supabase as any).from(table).select('*').limit(1);
         if (error) {
           console.error(`❌ Table ${table}: ${error.message}`);
           tablesOk = false;
