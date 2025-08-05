@@ -91,7 +91,7 @@ interface CircuitBreakerState {
 export class CourseGenerationOrchestratorV2 {
   private openai: OpenAI;
   private assessmentGenerator: AssessmentGenerationService;
-  private supabase: any;
+  protected supabase: any;
   
   // V2 System Components
   private taskExecutor: CourseGenerationTaskExecutor;
