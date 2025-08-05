@@ -33,12 +33,9 @@ async function testSingleUserGeneration() {
     console.log('📋 Step 1: Testing Rate Limiting');
     const rateLimiter = new CourseGenerationRateLimiter();
     
-    // Reset rate limits for test user
+    // Note: Rate limits table may not exist yet - skipping reset for now
     const supabase = createSupabaseServiceClient();
-    await supabase
-      .from('course_generation_rate_limits')
-      .delete()
-      .eq('user_id', testUserId);
+    console.log('⚠️  Skipping rate limit reset (table may not exist yet)');
     
     const rateLimitCheck = await rateLimiter.checkRateLimit(testUserId, 'teacher');
     console.log('✅ Rate limit check:', rateLimitCheck);
