@@ -142,7 +142,6 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
         await this.storeLessonSectionContent(
           task.lesson_id,
           sectionIndex,
-          sectionTitle,
           cachedContent
         );
         
