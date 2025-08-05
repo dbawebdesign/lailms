@@ -57,7 +57,7 @@ export class CourseGenerationLogger {
       }
 
       // Store in database
-      await this.supabase
+      await (this.supabase as any)
         .from('course_generation_logs')
         .insert({
           job_id: logEntry.jobId,
