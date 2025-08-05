@@ -20,7 +20,8 @@
     "deploy:functions": "npx supabase functions deploy",
     "deploy:process-document": "npx supabase functions deploy process-document",
     "verify:v3": "tsx scripts/verify-v3-setup.ts",
-    "test:v3-api": "tsx scripts/test-v3-api-endpoint.ts"
+    "test:v3-api": "tsx scripts/test-v3-api-endpoint.ts",
+    "test:edge-function": "tsx scripts/test-edge-function.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^0.0.17",

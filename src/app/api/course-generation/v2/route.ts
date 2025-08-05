@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { CourseGenerationOrchestratorV3 } from '@/lib/services/course-generation-orchestrator-v3';
 import { knowledgeBaseAnalyzer } from '@/lib/services/knowledge-base-analyzer';
 import type { CourseGenerationRequest } from '@/lib/services/course-generator';
 
@@ -141,14 +140,17 @@ export async function POST(request: NextRequest) {
       success: true, 
       jobId,
       status: 'queued',
-      version: 'v2',
-      message: 'Enhanced course generation started with v2 system. Check job status for progress.',
+      version: 'v3',
+      message: 'Course generation started. Processing via Supabase Edge Function (no timeout issues!)',
       features: [
+        'No timeout limitations',
+        'Runs on Supabase infrastructure',
         'Real-time task tracking',
         'Performance analytics', 
         'Error recovery',
         'Enhanced monitoring'
-      ]
+      ],
+      processingMethod: 'edge-function'
     });
 
   } catch (error) {
@@ -324,11 +326,25 @@ async function processV2GenerationJob(
       orchestrator: 'v2'
     });
 
-    // Use v3 orchestrator with optimizations
-    const orchestrator = new CourseGenerationOrchestratorV3(supabase);
-    await orchestrator.startOrchestration(jobId, outline, request);
+    // Call Supabase Edge Function for V3 orchestration (no timeout issues!)
+    console.log(`🚀 Invoking generate-course-v3 edge function for job ${jobId}`);
     
-    // The v2 orchestrator will handle completion status updates
+    const { data: functionData, error: functionError } = await supabase.functions.invoke('generate-course-v3', {
+      body: { 
+        jobId, 
+        outline, 
+        request 
+      }
+    });
+
+    if (functionError) {
+      console.error('Edge function invocation failed:', functionError);
+      throw new Error(`Failed to start edge function: ${functionError.message}`);
+    }
+
+    console.log(`✅ Edge function invoked successfully for job ${jobId}`, functionData);
+    
+    // The edge function will handle the orchestration and status updates
 
   } catch (error) {
     console.error('V2 generation process failed:', error);
