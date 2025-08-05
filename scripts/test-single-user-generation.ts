@@ -65,7 +65,7 @@ async function testSingleUserGeneration() {
     
     // Step 3: Create Test Job
     console.log('\n📋 Step 3: Creating Test Job');
-    const { data: job, error: jobError } = await supabase
+    const { data: job, error: jobError } = await (supabase as any)
       .from('course_generation_jobs')
       .insert({
         id: testJobId,
@@ -155,7 +155,7 @@ async function testSingleUserGeneration() {
     
     // Step 6: Verify Logging
     console.log('\n📋 Step 6: Verifying Database Logging');
-    const { data: logs } = await supabase
+    const { data: logs } = await (supabase as any)
       .from('course_generation_logs')
       .select('*')
       .eq('job_id', testJobId)
@@ -166,7 +166,7 @@ async function testSingleUserGeneration() {
     
     // Step 7: Check Rate Limit Updates
     console.log('\n📋 Step 7: Checking Rate Limit Updates');
-    const { data: rateLimit } = await supabase
+    const { data: rateLimit } = await (supabase as any)
       .from('course_generation_rate_limits')
       .select('*')
       .eq('user_id', testUserId)
@@ -183,8 +183,8 @@ async function testSingleUserGeneration() {
     
     // Cleanup
     console.log('\n🧹 Cleaning up test data...');
-    await supabase.from('course_generation_jobs').delete().eq('id', testJobId);
-    await supabase.from('course_generation_rate_limits').delete().eq('user_id', testUserId);
+    await (supabase as any).from('course_generation_jobs').delete().eq('id', testJobId);
+    await (supabase as any).from('course_generation_rate_limits').delete().eq('user_id', testUserId);
     
     console.log('\n✅ Single user test completed successfully!');
     console.log('\n📝 Summary:');
@@ -200,8 +200,8 @@ async function testSingleUserGeneration() {
     
     // Cleanup on error
     const supabase = createSupabaseServiceClient();
-    await supabase.from('course_generation_jobs').delete().eq('id', testJobId);
-    await supabase.from('course_generation_rate_limits').delete().eq('user_id', testUserId);
+    await (supabase as any).from('course_generation_jobs').delete().eq('id', testJobId);
+    await (supabase as any).from('course_generation_rate_limits').delete().eq('user_id', testUserId);
     
     process.exit(1);
   }
