@@ -51,11 +51,15 @@ async function testSingleUserGeneration() {
                    'course_generation_cache'];
     
     for (const table of tables) {
-      const { error } = await supabase.from(table).select('*').limit(1);
-      if (error) {
-        console.error(`❌ Table ${table} check failed:`, error);
-      } else {
-        console.log(`✅ Table ${table} exists and is accessible`);
+      try {
+        const { error } = await (supabase as any).from(table).select('*').limit(1);
+        if (error) {
+          console.error(`❌ Table ${table} check failed:`, error);
+        } else {
+          console.log(`✅ Table ${table} exists and is accessible`);
+        }
+      } catch (err) {
+        console.error(`❌ Table ${table} check failed:`, err);
       }
     }
     
