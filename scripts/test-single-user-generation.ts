@@ -163,10 +163,15 @@ async function testSingleUserGeneration() {
   } catch (error) {
     console.error('\n❌ Test failed:', error);
     
-    // Cleanup on error
-    const supabase = createSupabaseServiceClient();
-    await (supabase as any).from('course_generation_jobs').delete().eq('id', testJobId);
-    await (supabase as any).from('course_generation_rate_limits').delete().eq('user_id', testUserId);
+    // Cleanup on error - re-import supabase
+    try {
+      const { createSupabaseServiceClient } = await import('../src/lib/supabase/server');
+      const supabase = createSupabaseServiceClient();
+      await (supabase as any).from('course_generation_jobs').delete().eq('id', testJobId);
+      await (supabase as any).from('course_generation_rate_limits').delete().eq('user_id', testUserId);
+    } catch (cleanupError) {
+      console.error('Failed to cleanup test data:', cleanupError);
+    }
     
     process.exit(1);
   }
