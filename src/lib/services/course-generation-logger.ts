@@ -84,7 +84,6 @@ export class CourseGenerationLogger {
             severity: logEntry.level === 'critical' ? 'critical' : 'high',
             message: logEntry.message,
             details: logEntry.details || {},
-            timestamp: logEntry.timestamp,
             userId: logEntry.userId,
             resolved: false
           });
