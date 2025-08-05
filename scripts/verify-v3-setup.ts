@@ -3,11 +3,8 @@
  * Run with: npm run verify:v3
  */
 
-import path from 'path';
-import { config } from 'dotenv';
-
-// Configure environment from project root
-config({ path: path.join(__dirname, '..', '.env.local') });
+// Environment variables are automatically loaded by Next.js
+// No need to manually load dotenv in Next.js projects
 
 async function verifySetup() {
   console.log('🔍 Verifying Course Generation V3 Setup\n');

@@ -3,11 +3,8 @@
  * Run with: npx tsx scripts/test-v3-api-endpoint.ts
  */
 
-import { config } from 'dotenv';
-import path from 'path';
-
-// Load environment
-config({ path: path.join(__dirname, '..', '.env.local') });
+// Environment variables are automatically loaded by Next.js
+// No need to manually load dotenv in Next.js projects
 
 async function testV3APIEndpoint() {
   console.log('🧪 Testing V3 Course Generation API Endpoint\n');
