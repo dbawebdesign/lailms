@@ -603,29 +603,15 @@ export class CourseGenerationOrchestratorV2 {
               section_index: i,
               section_title: lesson.contentOutline[i],
               input_data: {
-                lesson: {
-                  id: lesson.id,
-                  title: lesson.title,
-                  description: lesson.description,
-                  contentType: lesson.contentType,
-                  learningObjectives: lesson.learningObjectives,
-                  contentOutline: lesson.contentOutline,
-                  estimatedDurationHours: lesson.estimatedDurationHours
-                },
+                // Store minimal but essential data for content generation
+                lessonTitle: lesson.title,
                 sectionIndex: i,
-                outline: {
-                  academicLevel: outline.academicLevel,
-                  lessonDetailLevel: outline.lessonDetailLevel,
-                  targetAudience: outline.targetAudience,
-                  prerequisites: outline.prerequisites
-                },
-                request: {
-                  baseClassId: request.baseClassId,
-                  academicLevel: request.academicLevel,
-                  lessonDetailLevel: request.lessonDetailLevel,
-                  targetAudience: request.targetAudience,
-                  prerequisites: request.prerequisites
-                }
+                sectionTitle: lesson.contentOutline[i],
+                // Essential context for proper content generation
+                academicLevel: request.academicLevel || outline.academicLevel,
+                lessonDetailLevel: request.lessonDetailLevel || outline.lessonDetailLevel || 'detailed',
+                targetAudience: request.targetAudience || outline.targetAudience,
+                // We'll fetch full lesson object from DB during execution
               },
               is_recoverable: true,
               recovery_suggestions: [
@@ -652,14 +638,9 @@ export class CourseGenerationOrchestratorV2 {
             path_id: actualPath.id,
             base_class_id: request.baseClassId,
             input_data: {
-              lesson: {
-                id: lesson.id,
-                title: lesson.title,
-                description: lesson.description,
-                learningObjectives: lesson.learningObjectives
-              },
-              academicLevel: request.academicLevel,
-              baseClassId: request.baseClassId
+              // Minimal data - fetch full lesson details during execution
+              lessonTitle: lesson.title,
+              academicLevel: request.academicLevel || outline.academicLevel
             },
             is_recoverable: true,
             recovery_suggestions: [
@@ -751,9 +732,9 @@ export class CourseGenerationOrchestratorV2 {
               path_id: path.id,
               base_class_id: request.baseClassId,
               input_data: {
+                // Store only minimal data 
                 pathTitle: path.title,
-                outline,
-                request
+                academicLevel: request.academicLevel || outline.academicLevel
               },
               is_recoverable: true,
               recovery_suggestions: [
@@ -790,9 +771,9 @@ export class CourseGenerationOrchestratorV2 {
             base_class_id: request.baseClassId,
             class_id: request.baseClassId,
             input_data: {
+              // Store only minimal data
               classTitle: request.title,
-              outline,
-              request
+              academicLevel: request.academicLevel || outline.academicLevel
             },
             is_recoverable: true,
             recovery_suggestions: [
@@ -1140,13 +1121,48 @@ export class CourseGenerationOrchestratorV2 {
     outline: CourseOutline,
     request: CourseGenerationRequest
   ): Promise<any> {
-    const { lesson, sectionIndex } = task.input_data;
-    const sectionTitle = task.section_title || lesson.contentOutline?.[sectionIndex] || `Section ${sectionIndex + 1}`;
+    // Get essential context from minimal input_data
+    const { sectionIndex, sectionTitle: inputSectionTitle, academicLevel, lessonDetailLevel, targetAudience } = task.input_data;
     
-    // Use the actual lesson_id from the task, not from the outline lesson object
+    // Use the actual lesson_id from the task
     const actualLessonId = task.lesson_id;
     if (!actualLessonId) {
       throw new Error('No lesson_id found in task definition');
+    }
+    
+    // Fetch full lesson data from database to get complete context
+    const { data: lessonData, error: lessonError } = await this.supabase
+      .from('lessons')
+      .select('*')
+      .eq('id', actualLessonId)
+      .single();
+      
+    if (lessonError || !lessonData) {
+      throw new Error(`Failed to fetch lesson data: ${lessonError?.message || 'Lesson not found'}`);
+    }
+    
+    // Build lesson object from DB data
+    const lesson = {
+      id: lessonData.id,
+      title: lessonData.title,
+      description: lessonData.description,
+      learningObjectives: lessonData.learning_objectives || [],
+      contentOutline: lessonData.content_outline || [],
+      contentType: lessonData.content_type,
+      estimatedDurationHours: lessonData.estimated_duration_hours
+    };
+    
+    const sectionTitle = inputSectionTitle || task.section_title || lesson.contentOutline?.[sectionIndex] || `Section ${sectionIndex + 1}`;
+    
+    // Merge essential context into outline if needed
+    if (academicLevel && !outline.academicLevel) {
+      outline = { ...outline, academicLevel };
+    }
+    if (lessonDetailLevel && !outline.lessonDetailLevel) {
+      outline = { ...outline, lessonDetailLevel };
+    }
+    if (targetAudience && !outline.targetAudience) {
+      outline = { ...outline, targetAudience };
     }
     
     // Get knowledge base content
