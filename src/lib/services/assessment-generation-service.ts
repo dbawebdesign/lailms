@@ -302,7 +302,7 @@ export class AssessmentGenerationService {
           question_count: finalQuestions.length,
           metadata: {
             compiled_from: assessments.length,
-            source_assessments: assessments.map(a => a.id),
+            source_assessments: assessments.map((a: any) => a.id),
             generation_method: 'compiled_from_existing'
           }
         })
