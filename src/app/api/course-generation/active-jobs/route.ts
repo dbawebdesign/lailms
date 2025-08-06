@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
         total_tasks,
         completed_tasks,
         failed_tasks,
+        pending_tasks,
+        running_tasks,
         base_classes (
           name
         )
@@ -56,6 +58,8 @@ export async function GET(request: NextRequest) {
       total_tasks: job.total_tasks,
       completed_tasks: job.completed_tasks,
       failed_tasks: job.failed_tasks,
+      pending_tasks: job.pending_tasks,
+      running_tasks: job.running_tasks,
       current_phase: (job.job_data as any)?.current_phase
     })) || [];
 

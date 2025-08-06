@@ -145,32 +145,132 @@ export class AssessmentGenerationService {
     try {
       switch (scope) {
         case 'lesson':
-          // First try lesson_sections table
-          const { data: sections, error: sectionsError } = await supabase
-            .from('lesson_sections')
-            .select('title, content, section_type')
-            .eq('lesson_id', scopeId)
-            .order('order_index') as any;
+          // Implement retry mechanism for lesson content fetching
+          const MAX_RETRIES = 5;
+          const RETRY_DELAY_MS = 3000; // 3 seconds between retries
+          let lastError: Error | null = null;
 
-          if (sectionsError) throw sectionsError;
-          
-          if (sections && sections.length > 0) {
-            content = sections.map((section: any) => 
-              `${section.title}\n${section.content}`
-            ).join('\n\n');
-          } else {
-            // Fallback: try generated_lesson_content table
-            const { data: generatedContent, error: generatedError } = await supabase
-              .from('generated_lesson_content')
-              .select('content_type, generated_content')
-              .eq('lesson_id', scopeId);
+          for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+              console.log(`📖 Assessment Generation: Attempting to fetch content for lesson ${scopeId} (attempt ${attempt}/${MAX_RETRIES})`);
+              
+              // First try lesson_sections table
+              const { data: sections, error: sectionsError } = await supabase
+                .from('lesson_sections')
+                .select('title, content, section_type')
+                .eq('lesson_id', scopeId)
+                .order('order_index') as any;
 
-            if (!generatedError && generatedContent && generatedContent.length > 0) {
-              content = generatedContent.map((item: any) => 
-                `${item.content_type}\n${JSON.stringify(item.generated_content)}`
-              ).join('\n\n---\n\n');
-            } else {
-              // Final fallback: use lesson title and description
+              if (sectionsError) {
+                console.warn(`⚠️ Attempt ${attempt}: Error fetching lesson sections for ${scopeId}:`, sectionsError.message);
+                lastError = sectionsError;
+              } else if (sections && sections.length > 0) {
+                // Content found in lesson_sections - extract text from JSONB structure
+                content = sections.map((section: any) => {
+                  let sectionText = section.title || '';
+                  
+                  // Handle JSONB content structure
+                  if (section.content) {
+                    if (typeof section.content === 'string') {
+                      // If content is a plain string
+                      sectionText += '\n' + section.content;
+                    } else if (typeof section.content === 'object') {
+                      // Extract text from the JSONB structure
+                      const contentObj = section.content;
+                      
+                      // Common fields in the lesson content structure
+                      const textFields = [
+                        'introduction',
+                        'sectionTitle',
+                        'conceptIntroduction',
+                        'detailedExplanation',
+                        'expertSummary',
+                        'bridgeToNext'
+                      ];
+                      
+                      // Extract main text fields
+                      textFields.forEach(field => {
+                        if (contentObj[field]) {
+                          sectionText += '\n' + contentObj[field];
+                        }
+                      });
+                      
+                      // Extract expert teaching content if present
+                      if (contentObj.expertTeachingContent) {
+                        const etc = contentObj.expertTeachingContent;
+                        
+                        // Expert insights
+                        if (Array.isArray(etc.expertInsights)) {
+                          sectionText += '\n\nExpert Insights:\n' + etc.expertInsights.join('\n');
+                        }
+                        
+                        // Practical examples
+                        if (Array.isArray(etc.practicalExamples)) {
+                          etc.practicalExamples.forEach((example: any) => {
+                            if (example.title) sectionText += '\n\n' + example.title;
+                            if (example.context) sectionText += '\n' + example.context;
+                            if (example.walkthrough) sectionText += '\n' + example.walkthrough;
+                            if (Array.isArray(example.keyTakeaways)) {
+                              sectionText += '\nKey Takeaways:\n' + example.keyTakeaways.join('\n');
+                            }
+                          });
+                        }
+                      }
+                      
+                      // Extract check for understanding questions
+                      if (Array.isArray(contentObj.checkForUnderstanding)) {
+                        sectionText += '\n\nCheck for Understanding:\n' + contentObj.checkForUnderstanding.join('\n');
+                      }
+                      
+                      // Extract common misconceptions
+                      if (Array.isArray(contentObj.commonMisconceptions)) {
+                        contentObj.commonMisconceptions.forEach((misc: any) => {
+                          if (misc.misconception) sectionText += '\n\nCommon Misconception: ' + misc.misconception;
+                          if (misc.correction) sectionText += '\nCorrection: ' + misc.correction;
+                        });
+                      }
+                      
+                      // Extract real world connections
+                      if (Array.isArray(contentObj.realWorldConnections)) {
+                        sectionText += '\n\nReal World Connections:\n' + contentObj.realWorldConnections.join('\n');
+                      }
+                    }
+                  }
+                  
+                  return sectionText;
+                }).join('\n\n---\n\n');
+                
+                if (content.trim().length > 0) {
+                  console.log(`✅ Successfully retrieved content from lesson_sections for ${scopeId} (${content.length} characters)`);
+                  return content;
+                }
+              }
+
+              // If no sections or empty content, try generated_lesson_content table
+              const { data: generatedContent, error: generatedError } = await supabase
+                .from('generated_lesson_content')
+                .select('content_type, generated_content')
+                .eq('lesson_id', scopeId);
+
+              if (!generatedError && generatedContent && generatedContent.length > 0) {
+                content = generatedContent.map((item: any) => 
+                  `${item.content_type}\n${JSON.stringify(item.generated_content)}`
+                ).join('\n\n---\n\n');
+                
+                if (content.trim().length > 0) {
+                  console.log(`✅ Successfully retrieved content from generated_lesson_content for ${scopeId} (${content.length} characters)`);
+                  return content;
+                }
+              }
+
+              // If still no content and this is not the last attempt, wait and retry
+              if (attempt < MAX_RETRIES) {
+                console.log(`⏳ No content found for lesson ${scopeId} yet. Waiting ${RETRY_DELAY_MS}ms before retry...`);
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+                continue;
+              }
+
+              // On final attempt, try lesson basic info as last resort
               const { data: lessonBasic, error: basicError } = await supabase
                 .from('lessons')
                 .select('title, description')
@@ -180,11 +280,28 @@ export class AssessmentGenerationService {
               if (!basicError && lessonBasic) {
                 content = `${lessonBasic.title}\n${lessonBasic.description || 'No description available'}`;
                 console.warn(`⚠️ Assessment Generation: Using basic lesson info for ${scopeId} - sections may not be generated yet`);
-              } else {
-                throw new Error(`Could not retrieve content for lesson ${scopeId}`);
+                return content;
               }
+              
+              // If we get here, no content was found after all retries
+              throw new Error(`Could not retrieve content for lesson ${scopeId} after ${MAX_RETRIES} attempts`);
+              
+            } catch (error) {
+              lastError = error as Error;
+              
+              if (attempt === MAX_RETRIES) {
+                // Final attempt failed, throw the error
+                throw lastError;
+              }
+              
+              // Log the error and continue to next attempt
+              console.warn(`⚠️ Attempt ${attempt} failed for lesson ${scopeId}:`, lastError.message);
+              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
             }
           }
+          
+          // Should not reach here, but throw error if we do
+          throw lastError || new Error(`Could not retrieve content for lesson ${scopeId}`);
           break;
 
         case 'path':
@@ -201,9 +318,33 @@ export class AssessmentGenerationService {
           if (pathError) throw pathError;
 
           content = pathLessons?.map((lesson: any) => {
-            const sectionContent = lesson.lesson_sections?.map((section: any) => 
-              `${section.title}\n${section.content}`
-            ).join('\n\n') || '';
+            const sectionContent = lesson.lesson_sections?.map((section: any) => {
+              let sectionText = section.title || '';
+              
+              // Handle JSONB content structure
+              if (section.content) {
+                if (typeof section.content === 'string') {
+                  sectionText += '\n' + section.content;
+                } else if (typeof section.content === 'object') {
+                  // Extract key text fields from JSONB
+                  const contentObj = section.content;
+                  const mainFields = ['introduction', 'conceptIntroduction', 'detailedExplanation', 'expertSummary'];
+                  
+                  mainFields.forEach(field => {
+                    if (contentObj[field]) {
+                      sectionText += '\n' + contentObj[field];
+                    }
+                  });
+                  
+                  // Add expert insights if available
+                  if (contentObj.expertTeachingContent?.expertInsights) {
+                    sectionText += '\n' + contentObj.expertTeachingContent.expertInsights.join('\n');
+                  }
+                }
+              }
+              
+              return sectionText;
+            }).join('\n\n') || '';
             return `Lesson: ${lesson.title}\n${lesson.description}\n\n${sectionContent}`;
           }).join('\n\n---\n\n') || '';
           break;
@@ -226,9 +367,33 @@ export class AssessmentGenerationService {
 
           content = classPaths?.map((path: any) => {
             const pathContent = path.lessons?.map((lesson: any) => {
-              const sectionContent = lesson.lesson_sections?.map((section: any) => 
-                `${section.title}\n${section.content}`
-              ).join('\n\n') || '';
+              const sectionContent = lesson.lesson_sections?.map((section: any) => {
+                let sectionText = section.title || '';
+                
+                // Handle JSONB content structure
+                if (section.content) {
+                  if (typeof section.content === 'string') {
+                    sectionText += '\n' + section.content;
+                  } else if (typeof section.content === 'object') {
+                    // Extract key text fields from JSONB
+                    const contentObj = section.content;
+                    const mainFields = ['introduction', 'conceptIntroduction', 'detailedExplanation', 'expertSummary'];
+                    
+                    mainFields.forEach(field => {
+                      if (contentObj[field]) {
+                        sectionText += '\n' + contentObj[field];
+                      }
+                    });
+                    
+                    // Add expert insights if available
+                    if (contentObj.expertTeachingContent?.expertInsights) {
+                      sectionText += '\n' + contentObj.expertTeachingContent.expertInsights.join('\n');
+                    }
+                  }
+                }
+                
+                return sectionText;
+              }).join('\n\n') || '';
               return `Lesson: ${lesson.title}\n${lesson.description}\n\n${sectionContent}`;
             }).join('\n\n---\n\n') || '';
             return `Module: ${path.title}\n${path.description}\n\n${pathContent}`;
