@@ -1503,18 +1503,9 @@ export default function UnifiedStudySpace() {
     const newNoteId = uuidv4();
     const noteTitle = title || 'Luna Response';
 
-    // Convert content to Tiptap JSON format
-    const tiptapJSON = {
-      type: 'doc',
-      content: content.split('\n').filter(line => line.trim() !== '').map(line => ({
-        type: 'paragraph',
-        content: [{ type: 'text', text: line }],
-      })),
-    };
-
-    if (tiptapJSON.content.length === 0) {
-      tiptapJSON.content.push({ type: 'paragraph', content: [] });
-    }
+    // Convert markdown content to Tiptap JSON format with proper formatting
+    const { markdownToTiptap } = await import('@/lib/utils/markdownToTiptap');
+    const tiptapJSON = markdownToTiptap(content);
 
     // Create and save the note immediately
     await saveNote(newNoteId, noteTitle, tiptapJSON);

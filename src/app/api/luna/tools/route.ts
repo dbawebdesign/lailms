@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import { Tables } from 'packages/types/db';
 
-import { isTeacher, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
+import { hasTeacherPermissions, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -30,7 +30,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Access denied. Profile not found.' }, { status: 403 });
     }
 
-    if (!isTeacher(profile)) {
+    if (!hasTeacherPermissions(profile)) {
+      console.error('Luna tools access denied:', {
+        userId: user.id,
+        role: profile.role,
+        activeRole: profile.active_role,
+        additionalRoles: profile.additional_roles,
+        timestamp: new Date().toISOString()
+      });
       return NextResponse.json({ error: 'Access denied. Teacher role required.' }, { status: 403 });
     }
 
