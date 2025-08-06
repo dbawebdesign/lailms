@@ -104,8 +104,9 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
     outline: any,
     request: any
   ): Promise<any> {
-    const { lesson, sectionIndex } = task.input_data;
-    const sectionTitle = task.section_title || lesson.contentOutline?.[sectionIndex] || `Section ${sectionIndex + 1}`;
+    // Get minimal data from input_data (matching V2's new structure)
+    const { sectionIndex, sectionTitle: inputSectionTitle, lessonTitle } = task.input_data;
+    const sectionTitle = inputSectionTitle || task.section_title || `Section ${sectionIndex + 1}`;
     
     try {
       // Log task start
@@ -122,10 +123,10 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
         }
       });
 
-      // Check cache for similar content
+      // Check cache for similar content using lessonTitle from input_data
       const cachedContent = await this.checkContentCache(
         'lesson_section',
-        lesson.title,
+        lessonTitle,
         sectionTitle
       );
 
@@ -148,10 +149,10 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
         return cachedContent;
       }
 
-      // Get knowledge base content
+      // Get knowledge base content using lessonTitle
       const kbContent = await this.getRelevantKnowledgeBaseContent(
         request.baseClassId,
-        lesson.title,
+        lessonTitle,
         sectionTitle,
         'kb_supplemented'
       );
@@ -163,7 +164,7 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
       if (result) {
         await this.cacheContent(
           'lesson_section',
-          lesson.title,
+          lessonTitle,
           sectionTitle,
           result
         );
