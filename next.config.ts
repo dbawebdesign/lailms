@@ -3,6 +3,24 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   
+  // Image optimization configuration to reduce log noise
+  images: {
+    // Enable static imports for better caching
+    unoptimized: false,
+    // Configure domains if you're using external images
+    domains: [],
+    // Reduce the number of generated sizes to minimize requests
+    deviceSizes: [640, 828, 1200, 1920],
+    imageSizes: [32, 64, 128, 256],
+    // Cache optimized images longer to reduce repeated requests
+    minimumCacheTTL: 86400, // 24 hours
+    // Formats to generate (webp is more efficient)
+    formats: ['image/webp', 'image/avif'],
+    // Disable optimization for static logos to prevent repeated requests
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+  },
+  
   // Disable static optimization for pages that use dynamic APIs
   experimental: {
     // This helps with bundle optimization

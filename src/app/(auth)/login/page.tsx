@@ -1,18 +1,17 @@
 import LoginForm from '@/components/auth/LoginForm'
 import Link from 'next/link'
-import Image from 'next/image'
+import { OptimizedLogo } from '@/components/ui/optimized-logo'
 import { Suspense } from 'react'
 
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-black text-white">
       <div className="mb-12">
-        <Image 
-          src="/Horizontal white text.png"
-          alt="Learnology AI Logo"
+        <OptimizedLogo 
+          variant="horizontal-white"
           width={300}
           height={80}
-          priority
+          priority={true}
         />
       </div>
       
