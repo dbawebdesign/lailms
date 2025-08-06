@@ -33,6 +33,7 @@
   "exclude": [
     "node_modules",
     "packages/functions/src/**/*",
-    "supabase/functions/**/*"
+    "supabase/functions/**/*",
+    "workers/**/*"
   ]
 }
