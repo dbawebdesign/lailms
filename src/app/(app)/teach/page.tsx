@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import WelcomeCard from "@/components/dashboard/WelcomeCard";
 import { ActiveClassItem } from "@/components/dashboard/teacher/ActiveClassItem";
-import ServerCourseGenerationWidget from '@/components/dashboard/ServerCourseGenerationWidget';
+import ServerPremiumProgressWidget from '@/components/dashboard/ServerPremiumProgressWidget';
 import HomeschoolDashboard from "@/components/dashboard/HomeschoolDashboard";
 import AutoRefreshHandler from "@/components/dashboard/AutoRefreshHandler";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -642,7 +642,7 @@ export default async function TeacherDashboardPage() {
         {/* Homeschool Dashboard */}
         <div className="container mx-auto px-6 py-8 space-y-8">
           {/* Course Generation Progress Widget */}
-          <ServerCourseGenerationWidget userId={user.id} />
+                        <ServerPremiumProgressWidget userId={user.id} />
           
           <HomeschoolDashboard 
             organizationId={organization.id}
@@ -677,7 +677,7 @@ export default async function TeacherDashboardPage() {
       {/* Main Content */}
       <div className="container mx-auto px-6 py-8 space-y-8">
         {/* Course Generation Progress Widget */}
-        <ServerCourseGenerationWidget userId={user.id} />
+                      <ServerPremiumProgressWidget userId={user.id} />
 
         {/* Teaching Progress & Insights - Moved to top for better hierarchy */}
         <div className="bg-card/50 backdrop-blur-sm border border-border/40 rounded-2xl p-6">

@@ -25,7 +25,7 @@ export function PremiumGenerationModal({
   const hasRedirected = useRef(false);
   const checkInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // Check if orchestrator has started
+  // Check if orchestrator has started and tasks are locked
   const checkOrchestratorStatus = async () => {
     if (!jobId || hasRedirected.current) return;
 
@@ -36,20 +36,36 @@ export function PremiumGenerationModal({
       if (data.success && data.job) {
         const job = data.job;
         
-        // Check if orchestrator has started (status is processing and we have tasks)
-        if (job.status === 'processing' && job.total_tasks > 0) {
-          // Safe to redirect now - orchestrator is running
-          if (!hasRedirected.current) {
-            hasRedirected.current = true;
-            setStatus('redirecting');
-            
-            // Smooth transition before redirect
-            setTimeout(() => {
-              router.push('/dashboard?from=course-generation');
-              toast.success('Course generation started! Track progress in your dashboard.');
-              onClose?.();
-            }, 1500);
-          }
+        // Wait for tasks to be locked as 'running' - this ensures the background process is stable
+        // Look for either:
+        // 1. Tasks are locked (completed_tasks > 0 or status messages indicate tasks are running)
+        // 2. Total tasks > 0 AND at least 10 seconds have passed (fallback)
+        const hasRunningTasks = job.total_tasks > 0 && (
+          job.completed_tasks > 0 || 
+          job.status === 'processing' && job.progress_percentage > 5
+        );
+        
+        // Also check the last few messages for task locking confirmation
+        const recentMessages = data.messages?.slice(-3) || [];
+        const tasksAreLocked = recentMessages.some(msg => 
+          msg?.message?.includes('Locking') || 
+          msg?.message?.includes('tasks as \'running\'') ||
+          msg?.message?.includes('Task insert payload') ||
+          msg?.message?.includes('📝 Initializing tasks')
+        );
+        
+        if ((hasRunningTasks || tasksAreLocked) && !hasRedirected.current) {
+          // Safe to redirect now - tasks are locked and running in background
+          hasRedirected.current = true;
+          setStatus('redirecting');
+          setProgress(100); // Complete the progress bar
+          
+          // Smooth transition before redirect
+          setTimeout(() => {
+            router.push('/teach?from=course-generation');
+            toast.success('Course generation is running! You can track progress in your dashboard.');
+            onClose?.();
+          }, 1500);
         }
       }
     } catch (error) {
@@ -73,9 +89,25 @@ export function PremiumGenerationModal({
         });
       }, 500);
 
+      // Fallback: Force redirect after 20 seconds if checks haven't triggered
+      const fallbackTimeout = setTimeout(() => {
+        if (!hasRedirected.current) {
+          console.log('Fallback redirect triggered after 20 seconds');
+          hasRedirected.current = true;
+          setStatus('redirecting');
+          setProgress(100);
+          setTimeout(() => {
+            router.push('/teach?from=course-generation');
+            toast.success('Course generation is running in the background!');
+            onClose?.();
+          }, 1500);
+        }
+      }, 20000);
+
       return () => {
         if (checkInterval.current) clearInterval(checkInterval.current);
         clearInterval(progressInterval);
+        clearTimeout(fallbackTimeout);
       };
     }
   }, [isOpen, jobId]);
@@ -168,9 +200,9 @@ export function PremiumGenerationModal({
                   animate={{ opacity: 1, y: 0 }}
                   className="text-2xl font-semibold text-gray-900 dark:text-white"
                 >
-                  {status === 'initializing' && 'Initializing AI Engine'}
-                  {status === 'redirecting' && 'Ready to Launch'}
-                  {status === 'ready' && 'Course Generation Started'}
+                  {status === 'initializing' && 'Initializing Course Generation'}
+                  {status === 'redirecting' && 'Background Processing Active'}
+                  {status === 'ready' && 'Course Generation Running'}
                 </motion.h2>
                 
                 <motion.p 
@@ -180,9 +212,9 @@ export function PremiumGenerationModal({
                   transition={{ delay: 0.2 }}
                   className="text-sm text-gray-600 dark:text-gray-400 max-w-sm mx-auto leading-relaxed"
                 >
-                  {status === 'initializing' && 'Setting up your personalized course generation pipeline...'}
-                  {status === 'redirecting' && 'Redirecting to your dashboard for real-time progress tracking...'}
-                  {status === 'ready' && 'Your course is being generated in the background.'}
+                  {status === 'initializing' && 'Preparing your course for background generation. This will continue even after you leave...'}
+                  {status === 'redirecting' && 'Course is now generating in the background. Taking you to your dashboard...'}
+                  {status === 'ready' && 'Your course continues generating. Check progress anytime in your dashboard.'}
                 </motion.p>
 
                 {/* Important notice - always visible */}
@@ -236,7 +268,7 @@ export function PremiumGenerationModal({
                 className="text-center"
               >
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Course generation typically takes 10-20 minutes
+                  Your course will continue generating in the background
                 </p>
               </motion.div>
             </div>
