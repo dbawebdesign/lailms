@@ -189,8 +189,9 @@ export class AssessmentGenerationService {
         .from('assessments')
         .select(`
           id,
-          scope,
-          scope_id,
+          title,
+          lesson_id,
+          path_id,
           assessment_questions (
             id,
             question_text,
@@ -205,7 +206,7 @@ export class AssessmentGenerationService {
           )
         `)
         .eq('base_class_id', params.baseClassId)
-        .in('scope', ['lesson', 'path']);
+        .or('lesson_id.not.is.null,path_id.not.is.null');
       
       if (assessmentError) {
         console.error('Error fetching assessments:', assessmentError);
@@ -229,8 +230,8 @@ export class AssessmentGenerationService {
             const enrichedQuestion = {
               ...question,
               source_assessment_id: assessment.id,
-              source_scope: assessment.scope,
-              source_scope_id: assessment.scope_id
+              source_scope: assessment.lesson_id ? 'lesson' : 'path',
+              source_scope_id: assessment.lesson_id || assessment.path_id
             };
             
             allQuestions.push(enrichedQuestion);
@@ -291,20 +292,17 @@ export class AssessmentGenerationService {
         .from('assessments')
         .insert({
           base_class_id: params.baseClassId,
-          scope: 'class',
-          scope_id: params.baseClassId,
+          assessment_type: 'class',  // Changed from 'scope' to 'assessment_type'
           title: params.assessmentTitle,
           description: params.assessmentDescription || `Comprehensive exam compiled from ${assessments.length} course assessments`,
-          time_limit: params.timeLimit || 120,
-          passing_score: params.passingScore || 70,
-          is_active: true,
-          total_points: finalQuestions.reduce((sum, q) => sum + (q.points || 1), 0),
-          question_count: finalQuestions.length,
-          metadata: {
-            compiled_from: assessments.length,
-            source_assessments: assessments.map((a: any) => a.id),
-            generation_method: 'compiled_from_existing'
-          }
+          time_limit_minutes: params.timeLimit || 120,  // Changed from 'time_limit' to 'time_limit_minutes'
+          passing_score_percentage: params.passingScore || 70,  // Changed from 'passing_score' to 'passing_score_percentage'
+          randomize_questions: true,
+          show_results_immediately: true,
+          allow_review: true,
+          ai_grading_enabled: true,
+          ai_model: 'gpt-4.1-mini'
+          // Removed non-existent columns: scope_id, is_active, total_points, question_count, metadata
         })
         .select()
         .single();
