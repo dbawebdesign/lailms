@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useUIContext } from "@/context/UIContext";
-import { OptimizedLogo } from "@/components/ui/optimized-logo";
+import { ThemeAwareLogo } from "@/components/ui/theme-aware-logo";
 import navConfig, { NavItem } from "@/config/navConfig";
 import { UserRole } from "@/lib/utils/roleUtils";
 import { cn } from "@/lib/utils";
@@ -81,8 +81,7 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
       >
         <div className="flex items-center">
           {!isNavCollapsed ? (
-            <OptimizedLogo
-              variant={resolvedTheme === 'dark' ? 'horizontal-white' : 'horizontal-white'}
+            <ThemeAwareLogo
               width={160}
               height={32}
               className="py-2"

@@ -29,14 +29,17 @@ export async function POST(request: NextRequest) {
     // Initialize and run V3 orchestrator
     const orchestrator = new CourseGenerationOrchestratorV3(supabase);
     
-    // Run the orchestration
-    await orchestrator.startOrchestration(jobId, outline, generationRequest);
+    // Start the orchestration asynchronously (don't await)
+    // This prevents the 30-second Vercel timeout
+    orchestrator.startOrchestration(jobId, outline, generationRequest).catch(error => {
+      console.error(`❌ V3 orchestration failed for job ${jobId}:`, error);
+    });
 
-    console.log(`✅ Internal V3 orchestrator completed for job ${jobId}`);
+    console.log(`✅ Internal V3 orchestrator started for job ${jobId}`);
 
     return NextResponse.json({ 
       success: true, 
-      message: 'V3 orchestration completed',
+      message: 'V3 orchestration started (background processing)',
       jobId 
     });
 

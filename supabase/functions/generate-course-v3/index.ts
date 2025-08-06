@@ -62,35 +62,24 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to update job status: ${updateError.message}`);
     }
 
-    // Get the correct base URL for the internal API call
-    // Check multiple environment variables to find the right URL
-    let baseUrl = Deno.env.get('NEXT_PUBLIC_SITE_URL') || 
-                  Deno.env.get('VERCEL_URL') || 
-                  Deno.env.get('SITE_URL');
+    // Start V3 orchestration asynchronously
+    // We'll call the internal API but NOT wait for it to complete
+    // This avoids the Edge Function 30-second timeout
+    console.log(`🔥 ASYNC PROCESSING STARTED: Function invoked, returning immediately while processing continues in background...`);
     
-    // If we have a Vercel URL but no protocol, add https
-    if (baseUrl && !baseUrl.startsWith('http')) {
-      baseUrl = `https://${baseUrl}`;
-    }
-    
-    // For local development, we need to use a different approach
-    // The edge function runs in Supabase's cloud, so it can't reach localhost
-    // We'll use the production URL or a tunnel URL for development
-    if (!baseUrl) {
-      // Default to production URL - this should work for most cases
-      baseUrl = 'https://www.learnologyai.com';
-      console.log(`⚠️ No base URL found in environment, using production: ${baseUrl}`);
-    }
-    
+    const baseUrl = 'https://www.learnologyai.com';
     const internalEndpoint = `${baseUrl}/api/internal/course-generation-v3`;
-    console.log(`📡 Calling internal V3 orchestrator at: ${internalEndpoint}`);
-
-    const orchestratorResponse = await fetch(internalEndpoint, {
+    
+    console.log(`📡 Invoking internal V3 orchestrator at: ${internalEndpoint}`);
+    
+    // Fire the request but don't await it - let it run in background
+    // This way the Edge Function returns immediately and the orchestration continues
+    fetch(internalEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${supabaseServiceKey}`,
-        'x-service-role': 'true', // Custom header to identify service calls
+        'x-service-role': 'true',
         'x-job-id': jobId
       },
       body: JSON.stringify({
@@ -98,23 +87,35 @@ Deno.serve(async (req: Request) => {
         outline,
         request
       })
+    }).then(response => {
+      if (response.ok) {
+        console.log(`✅ Background V3 orchestration started successfully for job ${jobId}`);
+      } else {
+        console.error(`❌ Background orchestration failed with status ${response.status} for job ${jobId}`);
+      }
+    }).catch(error => {
+      console.error(`❌ Background orchestration error for job ${jobId}:`, error);
+      // Try to update job status to failed
+      supabase
+        .from('course_generation_jobs')
+        .update({
+          status: 'failed',
+          error_message: `Background orchestration failed: ${error.message}`,
+          failed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId)
+        .then(() => console.log(`Updated job ${jobId} status to failed`))
+        .catch(err => console.error(`Failed to update job status:`, err));
     });
 
-    if (!orchestratorResponse.ok) {
-      const errorText = await orchestratorResponse.text();
-      console.error(`❌ Internal orchestrator failed: ${orchestratorResponse.status} - ${errorText}`);
-      throw new Error(`Internal orchestrator failed: ${orchestratorResponse.status} - ${errorText}`);
-    }
-
-    const result = await orchestratorResponse.json();
-    console.log(`✅ V3 orchestration completed for job ${jobId}`);
+    console.log(`🚀 V3 Edge Function returning immediately - orchestration continues in background for job ${jobId}`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         jobId,
-        message: 'Course generation completed successfully',
-        result 
+        message: 'V3 orchestration started in background - processing will continue asynchronously'
       }),
       { 
         status: 200,

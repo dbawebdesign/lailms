@@ -7,6 +7,7 @@ import { LunaContextRegistration } from "@/components/providers/LunaContextRegis
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Analytics } from "@vercel/analytics/react";
+import { LogoPreloader } from "@/components/ui/logo-preloader";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -165,6 +166,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <LogoPreloader />
           <UIContextProvider>
             <LunaContextRegistration>
               {children}
