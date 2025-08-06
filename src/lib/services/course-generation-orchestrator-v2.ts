@@ -104,23 +104,25 @@ export class CourseGenerationOrchestratorV2 {
   // Circuit breakers for external services
   private circuitBreakers: Map<string, CircuitBreakerState> = new Map();
   private circuitBreakerConfig: CircuitBreakerConfig = {
-    failureThreshold: 5,
-    resetTimeoutMs: 60000, // 1 minute
-    halfOpenMaxCalls: 3
+    failureThreshold: 8, // Increased threshold to reduce false positives
+    resetTimeoutMs: 300000, // 5 minutes to allow API recovery
+    halfOpenMaxCalls: 5 // More attempts in half-open state
   };
   
-  // Retry configuration
+  // Retry configuration - enhanced for better reliability
   private retryConfig: RetryConfig = {
-    maxAttempts: 3,
-    baseDelayMs: 1000,
-    maxDelayMs: 30000,
-    backoffMultiplier: 2,
+    maxAttempts: 5, // More attempts for complex content generation
+    baseDelayMs: 2000, // Start with longer delay
+    maxDelayMs: 60000, // Up to 1 minute delay
+    backoffMultiplier: 2.5, // More aggressive backoff
     retryableErrors: [
       'timeout',
       'rate_limit',
       'temporary_failure',
       'network_error',
-      'service_unavailable'
+      'service_unavailable',
+      'connection_error',
+      'api_timeout'
     ]
   };
   
@@ -874,12 +876,12 @@ export class CourseGenerationOrchestratorV2 {
     let finalStatus: 'completed' | 'failed' = 'failed';
     const startTime = Date.now();
     
-    // BULLETPROOF EXECUTION WITH GUARANTEED STATUS UPDATE
+    // BULLETPROOF EXECUTION WITH INTELLIGENT RETRY
     try {
       // Execute the task based on type with timeout protection
       const taskPromise = this.executeTaskByType(task, outline, request);
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Task execution timeout after 5 minutes')), 300000)
+        setTimeout(() => reject(new Error('Task execution timeout after 8 minutes')), 480000) // Increased timeout
       );
       
       result = await Promise.race([taskPromise, timeoutPromise]);
@@ -888,7 +890,24 @@ export class CourseGenerationOrchestratorV2 {
     } catch (taskError) {
       console.error(`❌ Task ${task.task_identifier} failed:`, taskError);
       error = taskError;
-      finalStatus = 'failed';
+      
+      // Check if we should retry based on error type and retry count
+      const shouldRetry = await this.shouldRetryTask(task, taskError);
+      
+      if (shouldRetry) {
+        console.log(`🔄 Task ${task.task_identifier} will be retried (${task.current_retry_count + 1}/${this.retryConfig.maxAttempts})`);
+        
+        // Calculate exponential backoff delay
+        const delay = this.calculateRetryDelay(task.current_retry_count);
+        console.log(`⏱️ Waiting ${delay}ms before retry...`);
+        
+        // Update task for retry
+        await this.scheduleTaskRetry(task, delay, taskError);
+        return; // Don't mark as failed, let it retry
+      } else {
+        console.log(`❌ Task ${task.task_identifier} will not be retried - max attempts reached or non-retryable error`);
+        finalStatus = 'failed';
+      }
     }
     
     const duration = Date.now() - startTime;
@@ -1102,15 +1121,16 @@ export class CourseGenerationOrchestratorV2 {
       }
     }
     
-    // Promise.race timeout (OpenAI doesn't support AbortController signal)
-    // Reduced timeout for faster failure recovery and better performance
+    // Promise.race timeout with exponential backoff support
+    // Increased timeout for better reliability while maintaining performance
+    const timeoutMs = 120000; // 2 minutes for complex content generation
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('OpenAI API call timed out after 60 seconds')), 60000)
+      setTimeout(() => reject(new Error(`OpenAI API call timed out after ${timeoutMs/1000} seconds`)), timeoutMs)
     );
 
     try {
       console.log(`➡️ Sending request to OpenAI for model: ${params.model}`);
-      console.log(`🕐 Setting 45-second timeout for OpenAI call`);
+      console.log(`🕐 Setting ${timeoutMs/1000}-second timeout for OpenAI call`);
 
       const result = await Promise.race([
         this.openai.chat.completions.create(params),
@@ -1128,13 +1148,24 @@ export class CourseGenerationOrchestratorV2 {
       return result as any; // Cast because Promise.race returns Promise<unknown>
       
     } catch (error) {
-      console.error(`❌ OpenAI API call failed: ${error.message}`);
-      // Only record circuit breaker failures for actual API issues, not configuration errors
-      const errorSeverity = this.classifyErrorSeverity(error);
-      if (errorSeverity !== 'low') {
-      this.recordCircuitBreakerFailure('openai');
+      console.error(`❌ OpenAI API call failed: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Classify error type for better handling
+      const errorType = this.classifyOpenAIError(error);
+      console.log(`🔍 Error classified as: ${errorType}`);
+      
+      // Only record circuit breaker failures for retryable API issues
+      if (this.shouldRecordCircuitBreakerFailure(errorType)) {
+        this.recordCircuitBreakerFailure('openai');
       }
-      throw error;
+      
+      // Add error metadata for better debugging
+      const enhancedError = new Error(error instanceof Error ? error.message : String(error));
+      (enhancedError as any).errorType = errorType;
+      (enhancedError as any).retryable = this.isRetryableError(errorType);
+      (enhancedError as any).originalError = error;
+      
+      throw enhancedError;
     }
   }
 
@@ -1351,6 +1382,153 @@ export class CourseGenerationOrchestratorV2 {
       circuitBreaker.failureCount = 0;
       circuitBreaker.lastFailureTime = undefined;
       circuitBreaker.nextAttemptTime = undefined;
+    }
+  }
+
+  /**
+   * Enhanced error classification for OpenAI API calls
+   */
+  private classifyOpenAIError(error: any): string {
+    const message = error?.message || String(error);
+    
+    // Timeout errors
+    if (message.includes('timed out') || message.includes('timeout')) {
+      return 'timeout';
+    }
+    
+    // Rate limiting
+    if (message.includes('rate limit') || error?.status === 429) {
+      return 'rate_limit';
+    }
+    
+    // Network/connection errors
+    if (message.includes('network') || message.includes('connection') || 
+        message.includes('ECONNRESET') || message.includes('ECONNREFUSED')) {
+      return 'network_error';
+    }
+    
+    // API service errors
+    if (error?.status >= 500 && error?.status < 600) {
+      return 'service_unavailable';
+    }
+    
+    // Authentication errors (not retryable)
+    if (error?.status === 401 || error?.status === 403) {
+      return 'auth_error';
+    }
+    
+    // Bad request errors (not retryable)
+    if (error?.status === 400) {
+      return 'bad_request';
+    }
+    
+    // Circuit breaker errors (not retryable immediately)
+    if (message.includes('Circuit breaker is open')) {
+      return 'circuit_breaker';
+    }
+    
+    // Default to temporary failure for unknown errors
+    return 'temporary_failure';
+  }
+
+  /**
+   * Determine if error should trigger circuit breaker
+   */
+  private shouldRecordCircuitBreakerFailure(errorType: string): boolean {
+    // Don't trigger circuit breaker for these error types
+    const nonCircuitBreakerErrors = [
+      'auth_error',
+      'bad_request',
+      'circuit_breaker'
+    ];
+    
+    return !nonCircuitBreakerErrors.includes(errorType);
+  }
+
+  /**
+   * Determine if error is retryable
+   */
+  private isRetryableError(errorType: string): boolean {
+    const retryableErrors = [
+      'timeout',
+      'rate_limit',
+      'network_error',
+      'service_unavailable',
+      'temporary_failure'
+    ];
+    
+    return retryableErrors.includes(errorType);
+  }
+
+  /**
+   * Determine if a task should be retried based on error type and retry count
+   */
+  private async shouldRetryTask(task: TaskDefinition, error: any): Promise<boolean> {
+    // Don't retry if we've exceeded max attempts
+    if (task.current_retry_count >= this.retryConfig.maxAttempts) {
+      return false;
+    }
+
+    // Get error type from enhanced error
+    const errorType = (error as any).errorType || this.classifyOpenAIError(error);
+    
+    // Don't retry non-retryable errors
+    if (!this.isRetryableError(errorType)) {
+      console.log(`❌ Error type '${errorType}' is not retryable`);
+      return false;
+    }
+
+    // Special handling for circuit breaker errors - wait longer before retry
+    if (errorType === 'circuit_breaker') {
+      console.log(`⏳ Circuit breaker error - will retry after extended delay`);
+      return true;
+    }
+
+    console.log(`✅ Error type '${errorType}' is retryable`);
+    return true;
+  }
+
+  /**
+   * Calculate exponential backoff delay for retries
+   */
+  private calculateRetryDelay(retryCount: number): number {
+    const baseDelay = this.retryConfig.baseDelayMs;
+    const multiplier = this.retryConfig.backoffMultiplier;
+    const maxDelay = this.retryConfig.maxDelayMs;
+    
+    // Add jitter to prevent thundering herd
+    const jitter = Math.random() * 1000;
+    const delay = Math.min(
+      baseDelay * Math.pow(multiplier, retryCount) + jitter,
+      maxDelay
+    );
+    
+    return Math.floor(delay);
+  }
+
+  /**
+   * Schedule a task for retry with delay
+   */
+  private async scheduleTaskRetry(task: TaskDefinition, delayMs: number, error: any): Promise<void> {
+    try {
+      // Update task with retry information
+      await this.supabase
+        .from('course_generation_tasks')
+        .update({
+          status: 'pending',
+          current_retry_count: task.current_retry_count + 1,
+          error_details: error instanceof Error ? error.message : String(error),
+          next_retry_at: new Date(Date.now() + delayMs).toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', task.id);
+
+      console.log(`🔄 Task ${task.task_identifier} scheduled for retry in ${delayMs}ms`);
+      
+    } catch (updateError) {
+      console.error(`❌ Failed to schedule task retry:`, updateError);
+      // If we can't schedule retry, mark as failed
+      await this.bulletproofUpdateTaskStatus(task, 'failed', null, 0, error);
     }
   }
 

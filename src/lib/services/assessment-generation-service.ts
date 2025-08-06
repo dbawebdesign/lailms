@@ -145,18 +145,46 @@ export class AssessmentGenerationService {
     try {
       switch (scope) {
         case 'lesson':
-          // Get all lesson sections content
+          // First try lesson_sections table
           const { data: sections, error: sectionsError } = await supabase
             .from('lesson_sections')
             .select('title, content, section_type')
             .eq('lesson_id', scopeId)
-            .order('order_index') as any; // Complex query with joins, using any cast
+            .order('order_index') as any;
 
           if (sectionsError) throw sectionsError;
           
-          content = sections?.map((section: any) => 
-            `${section.title}\n${section.content}`
-          ).join('\n\n') || '';
+          if (sections && sections.length > 0) {
+            content = sections.map((section: any) => 
+              `${section.title}\n${section.content}`
+            ).join('\n\n');
+          } else {
+            // Fallback: try generated_lesson_content table
+            const { data: generatedContent, error: generatedError } = await supabase
+              .from('generated_lesson_content')
+              .select('content_type, generated_content')
+              .eq('lesson_id', scopeId);
+
+            if (!generatedError && generatedContent && generatedContent.length > 0) {
+              content = generatedContent.map((item: any) => 
+                `${item.content_type}\n${JSON.stringify(item.generated_content)}`
+              ).join('\n\n---\n\n');
+            } else {
+              // Final fallback: use lesson title and description
+              const { data: lessonBasic, error: basicError } = await supabase
+                .from('lessons')
+                .select('title, description')
+                .eq('id', scopeId)
+                .single();
+
+              if (!basicError && lessonBasic) {
+                content = `${lessonBasic.title}\n${lessonBasic.description || 'No description available'}`;
+                console.warn(`⚠️ Assessment Generation: Using basic lesson info for ${scopeId} - sections may not be generated yet`);
+              } else {
+                throw new Error(`Could not retrieve content for lesson ${scopeId}`);
+              }
+            }
+          }
           break;
 
         case 'path':

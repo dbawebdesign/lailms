@@ -17,7 +17,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { triggerCelebration } from '@/components/ui/confetti';
 import { RealTimeProgress } from '@/components/ui/real-time-progress';
-import { SimpleCourseGenerationModal } from '@/components/ui/simple-course-generation-modal';
+import { PremiumGenerationModal } from '@/components/course-generation/PremiumGenerationModal';
 import { 
   estimateCourseGenerationTime, 
   formatEstimatedTime, 
@@ -138,13 +138,12 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
   const [error, setError] = useState<string | null>(null);
   const [generationJob, setGenerationJob] = useState<any>(null);
   const [showTimeEstimate, setShowTimeEstimate] = useState(false);
-  const [showGenerationModal, setShowGenerationModal] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   const handleModalComplete = useCallback(() => {
-    setShowGenerationModal(false);
-    // Redirect to dashboard with course creation flag for auto-refresh
-    router.push('/teach?from=course-creation');
-  }, [router]);
+    setShowPremiumModal(false);
+    // Modal handles its own redirect to dashboard
+  }, []);
 
   const loadKnowledgeBaseAnalysis = useCallback(async () => {
     try {
@@ -301,10 +300,11 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
           id: data.jobId,
           status: data.status,
           progress: 0,
-          estimatedMinutes: timeEstimate?.estimatedMinutes
+          estimatedMinutes: timeEstimate?.estimatedMinutes,
+          baseClassId: baseClassId
         });
-        // Show the generation modal instead of progress UI
-        setShowGenerationModal(true);
+        // Show the premium generation modal
+        setShowPremiumModal(true);
       } else {
         setError(data.error || 'Failed to start course generation');
       }
@@ -971,10 +971,11 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
       </div>
 
       {/* Course Generation Modal */}
-      <SimpleCourseGenerationModal
-        isOpen={showGenerationModal}
-        onComplete={handleModalComplete}
+            <PremiumGenerationModal 
+        isOpen={showPremiumModal}
         jobId={generationJob?.id}
+        baseClassId={baseClassId}
+        onClose={handleModalComplete}
       />
     </div>
   );
