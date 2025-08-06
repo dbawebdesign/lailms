@@ -3653,32 +3653,55 @@ DETAILED LESSON DETAIL GUIDANCE:
         return;
       }
 
-      console.log(`🎯 Generating final exam for class: ${classTitle}`);
+      console.log(`🎯 Compiling final exam from existing questions for class: ${classTitle}`);
 
       const questionsPerExam = request.assessmentSettings?.questionsPerExam || 25;
-      const assessmentParams = {
-        scope: 'class' as const,
-        scopeId: baseClassId,
+      
+      // First try to compile exam from existing questions
+      const compileParams = {
         baseClassId: baseClassId,
-        questionCount: questionsPerExam,
         assessmentTitle: `${classTitle} - Final Exam`,
-        assessmentDescription: `Comprehensive final exam covering all course material from: ${classTitle}`,
-        questionTypes: this.getQuestionTypesForLevel(request.academicLevel),
-        difficulty: this.mapAcademicLevelToDifficulty(request.academicLevel),
+        assessmentDescription: `Comprehensive final exam compiled from lesson and path assessments for: ${classTitle}`,
+        questionCount: questionsPerExam,
         timeLimit: 120,
         passingScore: 70,
-        onProgress: (message: string) => console.log(`📝 Final Exam Generation: ${message}`)
+        onProgress: (message: string) => console.log(`📝 Final Exam Compilation: ${message}`)
       };
 
-      console.log(`📝 Starting assessment generation with params:`, assessmentParams);
+      console.log(`📝 Starting exam compilation with params:`, compileParams);
 
       try {
-        await this.assessmentGenerator.generateAssessment(assessmentParams);
-        console.log(`✅ Created final exam for class: ${classTitle}`);
+        // Try compiling from existing questions first
+        await this.assessmentGenerator.compileExamFromExistingQuestions(compileParams);
+        console.log(`✅ Successfully compiled final exam from existing questions for class: ${classTitle}`);
         console.log(`✅ Class exam task completed: ${task.task_identifier}`);
-      } catch (error) {
-        console.error(`❌ Failed to generate class exam:`, error);
-        throw error;
+      } catch (compileError) {
+        console.error(`⚠️ Failed to compile exam from existing questions:`, compileError);
+        console.log(`🔄 Attempting fallback to traditional exam generation...`);
+        
+        // Fallback to traditional generation if compilation fails
+        const fallbackParams = {
+          scope: 'class' as const,
+          scopeId: baseClassId,
+          baseClassId: baseClassId,
+          questionCount: questionsPerExam,
+          assessmentTitle: `${classTitle} - Final Exam`,
+          assessmentDescription: `Comprehensive final exam covering all course material from: ${classTitle}`,
+          questionTypes: this.getQuestionTypesForLevel(request.academicLevel),
+          difficulty: this.mapAcademicLevelToDifficulty(request.academicLevel),
+          timeLimit: 120,
+          passingScore: 70,
+          onProgress: (message: string) => console.log(`📝 Final Exam Generation (Fallback): ${message}`)
+        };
+        
+        try {
+          await this.assessmentGenerator.generateAssessment(fallbackParams);
+          console.log(`✅ Created final exam using fallback generation for class: ${classTitle}`);
+          console.log(`✅ Class exam task completed: ${task.task_identifier}`);
+        } catch (fallbackError) {
+          console.error(`❌ Both compilation and fallback generation failed:`, fallbackError);
+          throw fallbackError;
+        }
       }
       
     } catch (error) {

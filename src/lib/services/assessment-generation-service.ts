@@ -166,6 +166,203 @@ export class AssessmentGenerationService {
     }
   }
 
+  /**
+   * Create a class exam by pulling questions from existing lesson and path assessments
+   * This avoids content length issues and reuses already generated questions
+   */
+  async compileExamFromExistingQuestions(params: {
+    baseClassId: string;
+    assessmentTitle: string;
+    assessmentDescription?: string;
+    questionCount: number;
+    timeLimit?: number;
+    passingScore?: number;
+    onProgress?: (message: string) => void;
+  }): Promise<Assessment> {
+    const { onProgress } = params;
+    
+    try {
+      onProgress?.('Fetching existing assessment questions from lessons and paths...');
+      
+      // 1. Get all lesson and path assessments for this base class
+      const { data: assessments, error: assessmentError } = await this.supabase
+        .from('assessments')
+        .select(`
+          id,
+          scope,
+          scope_id,
+          assessment_questions (
+            id,
+            question_text,
+            question_type,
+            options,
+            correct_answer,
+            answer_key,
+            sample_response,
+            grading_rubric,
+            points,
+            ai_grading_enabled
+          )
+        `)
+        .eq('base_class_id', params.baseClassId)
+        .in('scope', ['lesson', 'path']);
+      
+      if (assessmentError) {
+        console.error('Error fetching assessments:', assessmentError);
+        throw new Error(`Failed to fetch existing assessments: ${assessmentError.message}`);
+      }
+      
+      if (!assessments || assessments.length === 0) {
+        throw new Error('No existing assessments found to compile exam from');
+      }
+      
+      onProgress?.(`Found ${assessments.length} existing assessments with questions`);
+      
+      // 2. Collect all questions and categorize by type
+      const allQuestions: any[] = [];
+      const questionsByType = new Map<string, any[]>();
+      
+      for (const assessment of assessments) {
+        if (assessment.assessment_questions && Array.isArray(assessment.assessment_questions)) {
+          for (const question of assessment.assessment_questions) {
+            // Add source information to each question
+            const enrichedQuestion = {
+              ...question,
+              source_assessment_id: assessment.id,
+              source_scope: assessment.scope,
+              source_scope_id: assessment.scope_id
+            };
+            
+            allQuestions.push(enrichedQuestion);
+            
+            // Categorize by type
+            const type = question.question_type || 'unknown';
+            if (!questionsByType.has(type)) {
+              questionsByType.set(type, []);
+            }
+            questionsByType.get(type)!.push(enrichedQuestion);
+          }
+        }
+      }
+      
+      onProgress?.(`Collected ${allQuestions.length} total questions across ${questionsByType.size} types`);
+      
+      if (allQuestions.length === 0) {
+        throw new Error('No questions found in existing assessments');
+      }
+      
+      // 3. Select a diverse set of questions for the exam
+      const selectedQuestions: any[] = [];
+      const targetCount = Math.min(params.questionCount, allQuestions.length);
+      
+      // Try to get a balanced mix of question types
+      const typesArray = Array.from(questionsByType.keys());
+      const questionsPerType = Math.floor(targetCount / typesArray.length);
+      const remainder = targetCount % typesArray.length;
+      
+      // First, select evenly from each type
+      for (const [index, type] of typesArray.entries()) {
+        const typeQuestions = questionsByType.get(type)!;
+        const countForThisType = questionsPerType + (index < remainder ? 1 : 0);
+        
+        // Randomly select questions from this type
+        const shuffled = [...typeQuestions].sort(() => Math.random() - 0.5);
+        const selected = shuffled.slice(0, Math.min(countForThisType, typeQuestions.length));
+        selectedQuestions.push(...selected);
+      }
+      
+      // If we need more questions, randomly select from all remaining
+      if (selectedQuestions.length < targetCount) {
+        const remaining = allQuestions.filter(q => !selectedQuestions.includes(q));
+        const shuffled = [...remaining].sort(() => Math.random() - 0.5);
+        const needed = targetCount - selectedQuestions.length;
+        selectedQuestions.push(...shuffled.slice(0, needed));
+      }
+      
+      // Shuffle the final selection for random ordering
+      const finalQuestions = selectedQuestions
+        .sort(() => Math.random() - 0.5)
+        .slice(0, targetCount);
+      
+      onProgress?.(`Selected ${finalQuestions.length} diverse questions for the exam`);
+      
+      // 4. Create the exam assessment
+      const { data: assessment, error: createError } = await this.supabase
+        .from('assessments')
+        .insert({
+          base_class_id: params.baseClassId,
+          scope: 'class',
+          scope_id: params.baseClassId,
+          title: params.assessmentTitle,
+          description: params.assessmentDescription || `Comprehensive exam compiled from ${assessments.length} course assessments`,
+          time_limit: params.timeLimit || 120,
+          passing_score: params.passingScore || 70,
+          is_active: true,
+          total_points: finalQuestions.reduce((sum, q) => sum + (q.points || 1), 0),
+          question_count: finalQuestions.length,
+          metadata: {
+            compiled_from: assessments.length,
+            source_assessments: assessments.map(a => a.id),
+            generation_method: 'compiled_from_existing'
+          }
+        })
+        .select()
+        .single();
+      
+      if (createError) {
+        console.error('Error creating exam assessment:', createError);
+        throw new Error(`Failed to create exam assessment: ${createError.message}`);
+      }
+      
+      onProgress?.(`Created exam assessment: ${assessment.id}`);
+      
+      // 5. Insert the selected questions
+      const questionsToInsert = finalQuestions.map((q, index) => ({
+        assessment_id: assessment.id,
+        question_text: q.question_text,
+        question_type: q.question_type,
+        options: q.options,
+        correct_answer: q.correct_answer,
+        answer_key: q.answer_key,
+        sample_response: q.sample_response,
+        grading_rubric: q.grading_rubric,
+        points: q.points || 1,
+        order_index: index,
+        required: true,
+        ai_grading_enabled: q.ai_grading_enabled !== false,
+        metadata: {
+          source_assessment_id: q.source_assessment_id,
+          source_scope: q.source_scope,
+          source_scope_id: q.source_scope_id,
+          original_question_id: q.id
+        }
+      }));
+      
+      const { error: insertError } = await this.supabase
+        .from('assessment_questions')
+        .insert(questionsToInsert);
+      
+      if (insertError) {
+        console.error('Error inserting exam questions:', insertError);
+        // Try to clean up the assessment
+        await this.supabase
+          .from('assessments')
+          .delete()
+          .eq('id', assessment.id);
+        throw new Error(`Failed to insert exam questions: ${insertError.message}`);
+      }
+      
+      onProgress?.(`Successfully compiled exam with ${finalQuestions.length} questions from existing assessments`);
+      
+      return assessment;
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      onProgress?.(`Error compiling exam: ${errorMessage}`);
+      throw error;
+    }
+  }
+
   private async getContentForScope(scope: 'lesson' | 'path' | 'class', scopeId: string): Promise<string> {
     let content = '';
 
