@@ -23,7 +23,7 @@ export function PremiumGenerationModal({
   const [status, setStatus] = useState<'initializing' | 'redirecting' | 'ready'>('initializing');
   const [progress, setProgress] = useState(0);
   const hasRedirected = useRef(false);
-  const checkInterval = useRef<NodeJS.Timeout>();
+  const checkInterval = useRef<NodeJS.Timeout | null>(null);
 
   // Check if orchestrator has started
   const checkOrchestratorStatus = async () => {
@@ -79,6 +79,23 @@ export function PremiumGenerationModal({
       };
     }
   }, [isOpen, jobId]);
+
+  // Prevent users from leaving during critical initialization
+  useEffect(() => {
+    if (isOpen && status === 'initializing') {
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        e.preventDefault();
+        e.returnValue = 'Your course is being initialized. Leaving now may interrupt the process.';
+        return e.returnValue;
+      };
+
+      window.addEventListener('beforeunload', handleBeforeUnload);
+
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      };
+    }
+  }, [isOpen, status]);
 
   if (!isOpen) return null;
 
@@ -161,12 +178,30 @@ export function PremiumGenerationModal({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.2 }}
-                  className="text-sm text-gray-600 dark:text-gray-400 max-w-sm mx-auto"
+                  className="text-sm text-gray-600 dark:text-gray-400 max-w-sm mx-auto leading-relaxed"
                 >
                   {status === 'initializing' && 'Setting up your personalized course generation pipeline...'}
                   {status === 'redirecting' && 'Redirecting to your dashboard for real-time progress tracking...'}
                   {status === 'ready' && 'Your course is being generated in the background.'}
                 </motion.p>
+
+                {/* Important notice - always visible */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg"
+                >
+                  <div className="flex items-start space-x-2">
+                    <svg className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <div className="text-xs text-amber-700 dark:text-amber-300">
+                      <p className="font-medium mb-1">Please don't refresh or leave this page</p>
+                      <p className="text-amber-600 dark:text-amber-400">You'll be automatically redirected to your dashboard shortly to track progress.</p>
+                    </div>
+                  </div>
+                </motion.div>
               </div>
 
               {/* Progress Bar */}
