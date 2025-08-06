@@ -315,26 +315,35 @@ export class AssessmentGenerationService {
       onProgress?.(`Created exam assessment: ${assessment.id}`);
       
       // 5. Insert the selected questions
-      const questionsToInsert = finalQuestions.map((q, index) => ({
-        assessment_id: assessment.id,
-        question_text: q.question_text,
-        question_type: q.question_type,
-        options: q.options,
-        correct_answer: q.correct_answer,
-        answer_key: q.answer_key,
-        sample_response: q.sample_response,
-        grading_rubric: q.grading_rubric,
-        points: q.points || 1,
-        order_index: index,
-        required: true,
-        ai_grading_enabled: q.ai_grading_enabled !== false,
-        metadata: {
-          source_assessment_id: q.source_assessment_id,
-          source_scope: q.source_scope,
-          source_scope_id: q.source_scope_id,
-          original_question_id: q.id
-        }
-      }));
+      const questionsToInsert = finalQuestions.map((q, index) => {
+        // Add source tracking to grading_rubric if it exists, otherwise create new object
+        const gradingRubric = q.grading_rubric || {};
+        const enrichedRubric = {
+          ...gradingRubric,
+          _source_metadata: {
+            source_assessment_id: q.source_assessment_id,
+            source_scope: q.source_scope,
+            source_scope_id: q.source_scope_id,
+            original_question_id: q.id
+          }
+        };
+        
+        return {
+          assessment_id: assessment.id,
+          question_text: q.question_text,
+          question_type: q.question_type,
+          options: q.options,
+          correct_answer: q.correct_answer,
+          answer_key: q.answer_key,
+          sample_response: q.sample_response,
+          grading_rubric: enrichedRubric,  // Store metadata within grading_rubric JSONB
+          points: q.points || 1,
+          order_index: index,
+          required: true,
+          ai_grading_enabled: q.ai_grading_enabled !== false
+          // Removed metadata field - doesn't exist in table
+        };
+      });
       
       const { error: insertError } = await this.supabase
         .from('assessment_questions')
