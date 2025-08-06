@@ -279,6 +279,33 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
   }
 
   /**
+   * Override getRelevantKnowledgeBaseContent to use service client
+   */
+  protected async getRelevantKnowledgeBaseContent(
+    baseClassId: string,
+    title: string,
+    description: string,
+    generationMode: string
+  ): Promise<any> {
+    // Import the knowledge base analyzer here to avoid circular imports
+    const { knowledgeBaseAnalyzer } = await import('./knowledge-base-analyzer');
+    
+    // Use the knowledge base analyzer with our service client
+    const searchResults = await knowledgeBaseAnalyzer.searchKnowledgeBaseForGeneration(
+      baseClassId,
+      `${title} ${description}`,
+      generationMode as 'kb_only' | 'kb_priority' | 'kb_supplemented',
+      {
+        totalChunks: generationMode === 'kb_only' ? 50 : 30,
+        courseScope: 'outline'
+      },
+      this.supabaseV3 // Pass the service client
+    );
+    
+    return searchResults;
+  }
+
+  /**
    * Track API performance metrics
    */
   private async trackAPIPerformance(

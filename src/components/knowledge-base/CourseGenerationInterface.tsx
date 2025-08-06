@@ -17,7 +17,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { triggerCelebration } from '@/components/ui/confetti';
 import { RealTimeProgress } from '@/components/ui/real-time-progress';
-import { CourseGenerationModal } from '@/components/ui/course-generation-modal';
+import { SimpleCourseGenerationModal } from '@/components/ui/simple-course-generation-modal';
 import { 
   estimateCourseGenerationTime, 
   formatEstimatedTime, 
@@ -971,9 +971,8 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
       </div>
 
       {/* Course Generation Modal */}
-      <CourseGenerationModal
+      <SimpleCourseGenerationModal
         isOpen={showGenerationModal}
-        jobId={generationJob?.id}
         onComplete={handleModalComplete}
       />
     </div>

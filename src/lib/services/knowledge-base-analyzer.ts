@@ -61,13 +61,13 @@ export class KnowledgeBaseAnalyzer {
     });
   }
 
-  private getSupabaseClient() {
-    return createSupabaseServerClient();
+  private getSupabaseClient(providedClient?: any) {
+    return providedClient || createSupabaseServerClient();
   }
 
-  async analyzeKnowledgeBase(baseClassId: string): Promise<KnowledgeBaseAnalysis> {
+  async analyzeKnowledgeBase(baseClassId: string, providedClient?: any): Promise<KnowledgeBaseAnalysis> {
     // 1. Get documents and chunks data
-    const supabase = this.getSupabaseClient();
+    const supabase = this.getSupabaseClient(providedClient);
     const { data: documents, error: docsError } = await supabase
       .from('documents')
       .select(`
@@ -248,7 +248,8 @@ Provide analysis in JSON format:
   async searchKnowledgeBase(
     baseClassId: string,
     query: string,
-    limit: number = 10
+    limit: number = 10,
+    providedClient?: any
   ): Promise<Array<{
     id: string;
     content: string;
@@ -259,7 +260,7 @@ Provide analysis in JSON format:
   }>> {
     try {
       // First, get the organization ID for the base class
-      const supabase = this.getSupabaseClient();
+      const supabase = this.getSupabaseClient(providedClient);
       const { data: baseClass, error: baseClassError } = await supabase
         .from('base_classes')
         .select('organisation_id')
@@ -319,7 +320,8 @@ Provide analysis in JSON format:
     context?: {
       totalChunks?: number;
       courseScope?: 'outline' | 'lesson' | 'module';
-    }
+    },
+    providedClient?: any
   ): Promise<Array<{
     id: string;
     content: string;
@@ -330,7 +332,7 @@ Provide analysis in JSON format:
     search_strategy?: string;
   }>> {
     try {
-      const supabase = this.getSupabaseClient();
+      const supabase = this.getSupabaseClient(providedClient);
       
       // Get base class organization info
       const { data: baseClass, error: baseClassError } = await supabase
