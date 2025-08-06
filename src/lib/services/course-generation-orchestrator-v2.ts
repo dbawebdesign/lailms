@@ -841,6 +841,9 @@ export class CourseGenerationOrchestratorV2 {
     const maxConsecutiveFailures = 10;
     let batchCount = 0;
     
+    // Start the stale task monitor
+    this.startStaleTaskMonitor(jobId);
+    
     while (continueExecution) {
       try {
         // Get next batch of ready tasks - increased for better performance
@@ -1596,6 +1599,73 @@ export class CourseGenerationOrchestratorV2 {
   }
 
   /**
+   * Monitor and cleanup stale tasks that have been running too long
+   */
+  private startStaleTaskMonitor(jobId: string): void {
+    const TASK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+    const CHECK_INTERVAL_MS = 30 * 1000; // Check every 30 seconds
+    
+    console.log(`🔍 Starting stale task monitor for job ${jobId} (checking every 30s for tasks > 5min)`);
+    
+    const interval = setInterval(async () => {
+      try {
+        // Find tasks that have been running for too long
+        const { data: staleTasks, error } = await this.supabase
+          .from('course_generation_tasks')
+          .select('*')
+          .eq('job_id', jobId)
+          .eq('status', 'running')
+          .lt('started_at', new Date(Date.now() - TASK_TIMEOUT_MS).toISOString());
+        
+        if (error) {
+          console.error('Error checking for stale tasks:', error);
+          return;
+        }
+        
+        if (staleTasks && staleTasks.length > 0) {
+          console.log(`⏰ Found ${staleTasks.length} stale tasks that have been running for over 5 minutes`);
+          
+          for (const task of staleTasks) {
+            console.log(`🔴 Marking stale task ${task.task_identifier} as failed (running since ${task.started_at})`);
+            
+            // Force mark as failed
+            await this.bulletproofUpdateTaskStatus(
+              task,
+              'failed',
+              null,
+              TASK_TIMEOUT_MS,
+              new Error('Task exceeded 5-minute timeout'),
+              jobId
+            );
+          }
+        }
+        
+        // Check if job is still active
+        const { data: job } = await this.supabase
+          .from('course_generation_jobs')
+          .select('status')
+          .eq('id', jobId)
+          .single();
+        
+        // Stop monitoring if job is complete or failed
+        if (job?.status === 'completed' || job?.status === 'failed') {
+          console.log(`📊 Stopping stale task monitor for job ${jobId} (status: ${job.status})`);
+          clearInterval(interval);
+        }
+        
+      } catch (error) {
+        console.error('Error in stale task monitor:', error);
+      }
+    }, CHECK_INTERVAL_MS);
+    
+    // Clean up monitor after 2 hours max
+    setTimeout(() => {
+      clearInterval(interval);
+      console.log(`⏰ Stale task monitor timeout reached for job ${jobId}`);
+    }, 2 * 60 * 60 * 1000);
+  }
+
+  /**
    * Schedule a task for retry with delay
    */
   private async scheduleTaskRetry(task: TaskDefinition, delayMs: number, error: any): Promise<void> {
@@ -1992,7 +2062,21 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
         }
       }
       
-      console.log(`✅ Successfully stored section ${sectionIndex} for lesson ${lessonId}: ${sectionTitle}`);
+      // Verify the section was actually saved by querying it back
+      // This ensures the data is committed before we mark the task as complete
+      const { data: verifySection, error: verifyError } = await this.supabase
+        .from('lesson_sections')
+        .select('id, lesson_id, order_index, title')
+        .eq('lesson_id', lessonId)
+        .eq('order_index', sectionIndex)
+        .single();
+        
+      if (verifyError || !verifySection) {
+        console.error(`❌ Failed to verify lesson section was saved:`, verifyError);
+        throw new Error(`Failed to verify lesson section was saved: ${verifyError?.message || 'Section not found'}`);
+      }
+      
+      console.log(`✅ Successfully stored and verified section ${sectionIndex} for lesson ${lessonId}: ${sectionTitle} (ID: ${verifySection.id})`);
       
     } catch (error) {
       console.error(`❌ Error storing lesson section content:`, error);
@@ -3268,8 +3352,10 @@ DETAILED LESSON DETAIL GUIDANCE:
       console.log(`🔍 Verifying lesson sections exist for ${lessonId} before generating assessment...`);
       const supabase = this.supabase || createSupabaseServiceClient();
       
-      // Add a short delay to ensure database writes are committed
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Add a delay to ensure database writes are committed (same as mind maps/brainbytes)
+      // This is critical for ensuring lesson sections are available
+      console.log(`⏳ Waiting 3 seconds for database commits before assessment generation...`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
       const { data: sections, error: sectionsError } = await supabase
         .from('lesson_sections')
@@ -3293,7 +3379,10 @@ DETAILED LESSON DETAIL GUIDANCE:
       
       // Import and use the same service V1 uses
       const { AssessmentGenerationService } = await import('@/lib/services/assessment-generation-service');
-      const assessmentGenerator = new AssessmentGenerationService();
+      
+      // CRITICAL: Pass the service role client to bypass RLS
+      // This is what mind maps and brainbytes do correctly
+      const assessmentGenerator = new AssessmentGenerationService(this.supabase);
 
       // Use the exact same parameters V1 uses
       const questionsPerLesson = request.assessmentSettings?.questionsPerLesson || 5;

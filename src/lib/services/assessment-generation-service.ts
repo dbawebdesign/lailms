@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { Tables } from '../../../packages/types/db';
 import OpenAI from 'openai';
 import { encode } from 'gpt-tokenizer';
@@ -97,9 +98,32 @@ export class AssessmentGenerationService {
       maxRetries: 3,
     });
     
-    // If a supabase client is provided, use it; otherwise create a new one
-    // This allows the orchestrator to pass its service role client
-    this.supabase = supabaseClient || createSupabaseServerClient();
+    // If a supabase client is provided, use it; otherwise create service role client
+    // This is critical for bypassing RLS in background jobs
+    if (supabaseClient) {
+      console.log(`🔧 AssessmentGenerationService: Using provided Supabase client`);
+      this.supabase = supabaseClient;
+    } else {
+      console.log(`⚠️ AssessmentGenerationService: Creating service role client to bypass RLS`);
+      
+      // Create service role client to bypass RLS
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      
+      if (serviceRoleKey && supabaseUrl) {
+        const { createClient } = require('@supabase/supabase-js');
+        this.supabase = createClient(supabaseUrl, serviceRoleKey, {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        });
+        console.log(`✅ AssessmentGenerationService: Created service role client`);
+      } else {
+        console.error(`❌ AssessmentGenerationService: Service role key not available, falling back to server client`);
+        this.supabase = createSupabaseServerClient();
+      }
+    }
   }
 
   async generateAssessment(params: AssessmentGenerationParams): Promise<Assessment> {
@@ -157,6 +181,9 @@ export class AssessmentGenerationService {
             try {
               console.log(`📖 Assessment Generation: Attempting to fetch content for lesson ${scopeId} (attempt ${attempt}/${MAX_RETRIES})`);
               
+              // Debug: Check if we have the right Supabase client
+              console.log(`🔍 Using Supabase client, checking lesson_sections for: ${scopeId}`);
+              
               // First try lesson_sections table
               const { data: sections, error: sectionsError } = await this.supabase
                 .from('lesson_sections')
@@ -164,10 +191,15 @@ export class AssessmentGenerationService {
                 .eq('lesson_id', scopeId)
                 .order('order_index') as any;
 
+              // Log query results for debugging
+              console.log(`📊 Query result - sections:`, sections ? `${sections.length} found` : 'null', `error:`, sectionsError ? 'yes' : 'no');
+              
               if (sectionsError) {
-                console.warn(`⚠️ Attempt ${attempt}: Error fetching lesson sections for ${scopeId}:`, sectionsError.message);
+                console.error(`❌ Attempt ${attempt}: Database error fetching lesson sections for ${scopeId}:`, sectionsError);
+                console.error(`❌ Error details:`, JSON.stringify(sectionsError));
                 lastError = sectionsError;
               } else if (sections && sections.length > 0) {
+                console.log(`✅ Found ${sections.length} sections for lesson ${scopeId}`);
                 // Content found in lesson_sections - extract text from JSONB structure
                 content = sections.map((section: any) => {
                   let sectionText = section.title || '';
