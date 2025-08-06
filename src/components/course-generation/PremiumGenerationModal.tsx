@@ -36,33 +36,61 @@ export function PremiumGenerationModal({
       if (data.success && data.job) {
         const job = data.job;
         
-        // Wait for tasks to be locked as 'running' - this ensures the background process is stable
-        // Look for either:
-        // 1. Tasks are locked (completed_tasks > 0 or status messages indicate tasks are running)
-        // 2. Total tasks > 0 AND at least 10 seconds have passed (fallback)
-        const hasRunningTasks = job.total_tasks > 0 && (
-          job.completed_tasks > 0 || 
-          job.status === 'processing' && job.progress_percentage > 5
-        );
-        
         // Check specifically for the task locking message - this is the critical point
-        const recentMessages = data.messages?.slice(-5) || [];
-        const tasksAreLocked = recentMessages.some((msg: any) => {
-          const hasLockingMessage = msg?.message?.includes('🔒 Locking') && msg?.message?.includes("tasks as 'running'");
-          if (hasLockingMessage) {
-            console.log('Found task locking message:', msg.message);
+        // The exact format is: "🔒 Locking {number} tasks as 'running'..."
+        const recentMessages = data.messages?.slice(-10) || []; // Check last 10 messages to be sure
+        let tasksAreLocked = false;
+        
+        for (const msg of recentMessages) {
+          const message = msg?.message || '';
+          
+          // Check for the exact locking message pattern
+          // Format: "🔒 Locking {number} tasks as 'running'..."
+          if (message.includes('🔒 Locking') && message.includes("tasks as 'running'")) {
+            console.log('Found task locking message:', message);
+            tasksAreLocked = true;
+            break;
           }
-          return hasLockingMessage;
-        });
+          
+          // Also check for alternative formats that might appear
+          if (message.includes('🔒') && message.includes('Locking') && message.includes('tasks')) {
+            console.log('Found alternative locking message:', message);
+            tasksAreLocked = true;
+            break;
+          }
+          
+          // Check for task initialization completion
+          if (message.includes('📝 Initializing tasks') || message.includes('Task insert payload')) {
+            console.log('Found task initialization message:', message);
+            // Don't redirect yet, but note that initialization is happening
+          }
+        }
+        
+        // Also check if we have running tasks as a secondary indicator
+        const hasRunningTasks = job.total_tasks > 0 && (
+          job.running_tasks > 0 || 
+          job.completed_tasks > 0 ||
+          (job.status === 'processing' && job.progress_percentage > 0)
+        );
         
         // Log current status for debugging
         if (data.messages?.length > 0) {
-          console.log('Latest message:', data.messages[data.messages.length - 1]?.message);
+          const latestMessage = data.messages[data.messages.length - 1]?.message;
+          console.log('Latest message:', latestMessage);
+          console.log('Job status:', {
+            status: job.status,
+            total_tasks: job.total_tasks,
+            running_tasks: job.running_tasks,
+            completed_tasks: job.completed_tasks,
+            progress: job.progress_percentage
+          });
         }
         
-        // Only redirect once we see the specific locking message
-        if (tasksAreLocked && !hasRedirected.current) {
-          console.log('Tasks are locked! Initiating redirect...');
+        // Redirect when we see the locking message OR when we have clear evidence of running tasks
+        if ((tasksAreLocked || (hasRunningTasks && job.running_tasks > 0)) && !hasRedirected.current) {
+          console.log('Tasks are ready! Initiating redirect...');
+          console.log('Redirect triggered by:', tasksAreLocked ? 'Locking message' : 'Running tasks detected');
+          
           // Safe to redirect now - tasks are locked and running in background
           hasRedirected.current = true;
           setStatus('redirecting');

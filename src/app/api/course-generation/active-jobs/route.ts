@@ -27,8 +27,6 @@ export async function GET(request: NextRequest) {
         total_tasks,
         completed_tasks,
         failed_tasks,
-        pending_tasks,
-        running_tasks,
         base_classes (
           name
         )
@@ -44,24 +42,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 });
     }
 
-    // Transform data for the widget
-    const transformedJobs = jobs?.map(job => ({
-      id: job.id,
-      status: job.status,
-      progress: job.progress_percentage || 0,
-      baseClassId: job.base_class_id,
-      baseClassName: job.base_classes?.name || 'Unknown Course',
-      title: (job.job_data as any)?.title || job.base_classes?.name || 'Course Generation',
-      error: job.error_message,
-      createdAt: job.created_at,
-      updatedAt: job.updated_at,
-      total_tasks: job.total_tasks,
-      completed_tasks: job.completed_tasks,
-      failed_tasks: job.failed_tasks,
-      pending_tasks: job.pending_tasks,
-      running_tasks: job.running_tasks,
-      current_phase: (job.job_data as any)?.current_phase
-    })) || [];
+    // Transform data for the widget and calculate pending/running tasks
+    const transformedJobs = await Promise.all(jobs?.map(async (job) => {
+      // Get task statistics for this job to calculate pending and running tasks
+      const { data: taskStats } = await supabase
+        .from('course_generation_tasks')
+        .select('status')
+        .eq('job_id', job.id);
+      
+      const pending_tasks = taskStats?.filter(t => t.status === 'pending').length || 0;
+      const running_tasks = taskStats?.filter(t => t.status === 'running').length || 0;
+      
+      return {
+        id: job.id,
+        status: job.status,
+        progress: job.progress_percentage || 0,
+        baseClassId: job.base_class_id,
+        baseClassName: job.base_classes?.name || 'Unknown Course',
+        title: (job.job_data as any)?.title || job.base_classes?.name || 'Course Generation',
+        error: job.error_message,
+        createdAt: job.created_at,
+        updatedAt: job.updated_at,
+        total_tasks: job.total_tasks,
+        completed_tasks: job.completed_tasks,
+        failed_tasks: job.failed_tasks,
+        pending_tasks,
+        running_tasks,
+        current_phase: (job.job_data as any)?.current_phase
+      };
+    }) || []);
 
     return NextResponse.json({ 
       success: true, 

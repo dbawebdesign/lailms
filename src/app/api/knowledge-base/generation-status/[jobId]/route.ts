@@ -51,6 +51,16 @@ export async function GET(
     const totalTasks = taskStats?.length || 0;
     const completedTasks = taskStats?.filter(t => t.status === 'completed').length || 0;
     const failedTasks = taskStats?.filter(t => t.status === 'failed').length || 0;
+    const runningTasks = taskStats?.filter(t => t.status === 'running').length || 0;
+    const pendingTasks = taskStats?.filter(t => t.status === 'pending').length || 0;
+
+    // Get recent log messages for this job
+    const { data: messages } = await supabase
+      .from('course_generation_logs')
+      .select('message, created_at, log_level')
+      .eq('job_id', jobId)
+      .order('created_at', { ascending: false })
+      .limit(20);
 
     return NextResponse.json({
       success: true,
@@ -58,9 +68,12 @@ export async function GET(
         ...job,
         total_tasks: totalTasks,
         completed_tasks: completedTasks,
-        failed_tasks: failedTasks
+        failed_tasks: failedTasks,
+        running_tasks: runningTasks,
+        pending_tasks: pendingTasks
       },
-      courseOutline
+      courseOutline,
+      messages: messages || []
     });
 
   } catch (error) {
