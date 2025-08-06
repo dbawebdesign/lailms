@@ -36,60 +36,56 @@ export function PremiumGenerationModal({
       if (data.success && data.job) {
         const job = data.job;
         
-        // Check specifically for the task locking message - this is the critical point
-        // The exact format is: "🔒 Locking {number} tasks as 'running'..."
-        const recentMessages = data.messages?.slice(-10) || []; // Check last 10 messages to be sure
-        let tasksAreLocked = false;
+        // Check for the task locking message in logs
+        const recentMessages = data.messages?.slice(-20) || []; // Check last 20 messages
+        let tasksLockedInLogs = false;
         
         for (const msg of recentMessages) {
           const message = msg?.message || '';
           
           // Check for the exact locking message pattern
-          // Format: "🔒 Locking {number} tasks as 'running'..."
           if (message.includes('🔒 Locking') && message.includes("tasks as 'running'")) {
-            console.log('Found task locking message:', message);
-            tasksAreLocked = true;
+            console.log('✅ Found task locking message:', message);
+            tasksLockedInLogs = true;
             break;
           }
           
-          // Also check for alternative formats that might appear
-          if (message.includes('🔒') && message.includes('Locking') && message.includes('tasks')) {
-            console.log('Found alternative locking message:', message);
-            tasksAreLocked = true;
+          // Also check for lesson section generation (strong indicator tasks are running)
+          if (message.includes('[INFO] CourseGenerationOrchestratorV3: Starting lesson section generation')) {
+            console.log('✅ Lesson generation started - tasks are definitely running!');
+            tasksLockedInLogs = true;
             break;
-          }
-          
-          // Check for task initialization completion
-          if (message.includes('📝 Initializing tasks') || message.includes('Task insert payload')) {
-            console.log('Found task initialization message:', message);
-            // Don't redirect yet, but note that initialization is happening
           }
         }
         
-        // Also check if we have running tasks as a secondary indicator
-        const hasRunningTasks = job.total_tasks > 0 && (
-          job.running_tasks > 0 || 
-          job.completed_tasks > 0 ||
-          (job.status === 'processing' && job.progress_percentage > 0)
-        );
+        // Check if we have actual running tasks in the database - this is the key indicator
+        const hasRunningTasksInDB = job.running_tasks > 0;
         
         // Log current status for debugging
-        if (data.messages?.length > 0) {
-          const latestMessage = data.messages[data.messages.length - 1]?.message;
-          console.log('Latest message:', latestMessage);
-          console.log('Job status:', {
-            status: job.status,
-            total_tasks: job.total_tasks,
-            running_tasks: job.running_tasks,
-            completed_tasks: job.completed_tasks,
-            progress: job.progress_percentage
-          });
-        }
+        console.log('🔍 Checking redirect conditions:', {
+          tasks_locked_in_logs: tasksLockedInLogs,
+          running_tasks_in_db: hasRunningTasksInDB,
+          job_status: job.status,
+          total_tasks: job.total_tasks,
+          running_tasks: job.running_tasks,
+          completed_tasks: job.completed_tasks,
+          pending_tasks: job.pending_tasks,
+          progress: job.progress_percentage,
+          latest_message: data.messages?.[data.messages.length - 1]?.message?.substring(0, 100)
+        });
         
-        // Redirect when we see the locking message OR when we have clear evidence of running tasks
-        if ((tasksAreLocked || (hasRunningTasks && job.running_tasks > 0)) && !hasRedirected.current) {
-          console.log('Tasks are ready! Initiating redirect...');
-          console.log('Redirect triggered by:', tasksAreLocked ? 'Locking message' : 'Running tasks detected');
+        // ONLY redirect when we have running tasks in the database
+        // This is the most reliable indicator that tasks are actually executing
+        const safeToRedirect = hasRunningTasksInDB || tasksLockedInLogs;
+        
+        if (safeToRedirect && !hasRedirected.current) {
+          console.log('🚀 Tasks are running in database! Safe to redirect...');
+          console.log('📊 Redirect triggered by:', {
+            running_tasks_in_db: hasRunningTasksInDB,
+            tasks_locked_in_logs: tasksLockedInLogs,
+            running_count: job.running_tasks,
+            completed_count: job.completed_tasks
+          });
           
           // Safe to redirect now - tasks are locked and running in background
           hasRedirected.current = true;
@@ -102,6 +98,18 @@ export function PremiumGenerationModal({
             toast.success('Course generation is running! You can track progress in your dashboard.');
             onClose?.();
           }, 1500);
+        } else if (job.total_tasks > 0 && job.status === 'processing') {
+          // Tasks are being prepared but not yet running
+          console.log('⏳ Tasks are being prepared, waiting for them to start running...', {
+            total_tasks: job.total_tasks,
+            running_tasks: job.running_tasks,
+            pending_tasks: job.pending_tasks
+          });
+        } else if (job.status === 'processing') {
+          console.log('⌛ Waiting for task initialization...', {
+            status: job.status,
+            total_tasks: job.total_tasks
+          });
         }
       }
     } catch (error) {
@@ -125,11 +133,11 @@ export function PremiumGenerationModal({
         });
       }, 500);
 
-      // Fallback: Force redirect after 5 minutes if checks haven't triggered
+      // Fallback: Force redirect after 4 minutes if checks haven't triggered
       // This gives plenty of time for task locking to complete even under heavy load
       const fallbackTimeout = setTimeout(() => {
         if (!hasRedirected.current) {
-          console.log('Fallback redirect triggered after 5 minutes');
+          console.log('⏰ Fallback redirect triggered after 4 minutes');
           hasRedirected.current = true;
           setStatus('redirecting');
           setProgress(100);
@@ -139,7 +147,7 @@ export function PremiumGenerationModal({
             onClose?.();
           }, 1500);
         }
-      }, 300000); // 5 minutes
+      }, 240000); // 4 minutes
 
       return () => {
         if (checkInterval.current) clearInterval(checkInterval.current);
