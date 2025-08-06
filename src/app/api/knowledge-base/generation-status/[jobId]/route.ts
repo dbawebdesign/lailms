@@ -55,7 +55,8 @@ export async function GET(
     const pendingTasks = taskStats?.filter(t => t.status === 'pending').length || 0;
 
     // Get recent log messages for this job
-    const { data: messages } = await supabase
+    // Note: Using type assertion as course_generation_logs is not in TypeScript types yet
+    const { data: messages } = await (supabase as any)
       .from('course_generation_logs')
       .select('message, created_at, log_level')
       .eq('job_id', jobId)
