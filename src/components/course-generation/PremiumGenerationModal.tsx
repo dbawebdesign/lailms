@@ -47,7 +47,7 @@ export function PremiumGenerationModal({
         
         // Also check the last few messages for task locking confirmation
         const recentMessages = data.messages?.slice(-3) || [];
-        const tasksAreLocked = recentMessages.some(msg => 
+        const tasksAreLocked = recentMessages.some((msg: any) => 
           msg?.message?.includes('Locking') || 
           msg?.message?.includes('tasks as \'running\'') ||
           msg?.message?.includes('Task insert payload') ||
