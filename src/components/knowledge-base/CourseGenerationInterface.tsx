@@ -974,6 +974,7 @@ export default function CourseGenerationInterface({ baseClassId, baseClassInfo, 
       <SimpleCourseGenerationModal
         isOpen={showGenerationModal}
         onComplete={handleModalComplete}
+        jobId={generationJob?.id}
       />
     </div>
   );

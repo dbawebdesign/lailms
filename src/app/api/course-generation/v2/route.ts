@@ -293,33 +293,46 @@ async function processV2GenerationJob(
   supabase: any
 ): Promise<void> {
   try {
+    console.log(`🔧 Starting V2 generation job processing for ${jobId}`);
+    
     // Update job status to processing
     await updateJobStatus(jobId, 'processing', 5, supabase);
+    console.log(`✅ Updated job ${jobId} status to processing (5%)`);
+    
 
     // Step 1: Knowledge base analysis (15% progress)
+    console.log(`📊 Starting KB analysis for ${jobId}`);
     const kbAnalysis = await knowledgeBaseAnalyzer.analyzeKnowledgeBase(request.baseClassId);
     await updateJobStatus(jobId, 'processing', 15, supabase);
+    console.log(`✅ KB analysis complete for ${jobId} (15%)`);
 
     // Step 2: Determine generation mode (25% progress)
     const generationMode = request.generationMode || kbAnalysis.recommendedGenerationMode;
     await updateJobStatus(jobId, 'processing', 25, supabase);
+    console.log(`✅ Generation mode determined: ${generationMode} for ${jobId} (25%)`);
 
     // Step 3: Generate course outline (45% progress)
-    // Note: We'll need to import the generateCourseOutline method or create a v2 version
+    console.log(`📝 Generating course outline for ${jobId}`);
     const { CourseGenerator } = await import('@/lib/services/course-generator');
     const tempGenerator = new CourseGenerator();
     const outline = await (tempGenerator as any).generateCourseOutline(request, kbAnalysis, generationMode);
     await updateJobStatus(jobId, 'processing', 45, supabase);
+    console.log(`✅ Course outline generated for ${jobId} (45%)`);
 
     // Step 4: Save course outline (55% progress)
+    console.log(`💾 Saving course outline for ${jobId}`);
     const courseOutlineId = await (tempGenerator as any).saveCourseOutline(outline, request);
     await updateJobStatus(jobId, 'processing', 55, supabase);
+    console.log(`✅ Course outline saved: ${courseOutlineId} for ${jobId} (55%)`);
 
     // Step 5: Create basic LMS entities (70% progress)
+    console.log(`🏗️ Creating basic LMS entities for ${jobId}`);
     await (tempGenerator as any).createBasicLMSEntities(courseOutlineId, outline, request);
     await updateJobStatus(jobId, 'processing', 70, supabase);
+    console.log(`✅ Basic LMS entities created for ${jobId} (70%)`);
 
     // Step 6: Start v2 orchestrated content generation (85% progress)
+    console.log(`🚀 Preparing to invoke V3 Edge Function for ${jobId}`);
     await updateJobStatus(jobId, 'processing', 85, supabase, null, { 
       message: 'Starting enhanced v2 orchestrated content generation...',
       courseOutlineId,
@@ -347,7 +360,12 @@ async function processV2GenerationJob(
     // The edge function will handle the orchestration and status updates
 
   } catch (error) {
-    console.error('V2 generation process failed:', error);
+    console.error(`❌ V2 generation process failed for job ${jobId}:`, error);
+    console.error(`❌ Error details:`, {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      jobId
+    });
     await updateJobStatus(jobId, 'failed', 0, supabase, error instanceof Error ? error.message : 'Unknown error');
     throw error;
   }

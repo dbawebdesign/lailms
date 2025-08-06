@@ -9,46 +9,115 @@ import Image from 'next/image';
 interface SimpleCourseGenerationModalProps {
   isOpen: boolean;
   onComplete?: () => void;
+  jobId?: string; // Add jobId to track generation progress
 }
 
-export function SimpleCourseGenerationModal({ isOpen, onComplete }: SimpleCourseGenerationModalProps) {
+export function SimpleCourseGenerationModal({ isOpen, onComplete, jobId }: SimpleCourseGenerationModalProps) {
   const [progress, setProgress] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('Initializing course generation...');
   const router = useRouter();
 
   useEffect(() => {
     if (!isOpen) {
       setProgress(0);
       setIsCompleted(false);
+      setStatusMessage('Initializing course generation...');
       return;
     }
 
-    // Start the 7-second countdown
-    const duration = 7000; // 7 seconds
-    const interval = 50; // Update every 50ms for smooth animation
-    const increment = (interval / duration) * 100;
+    // If no jobId provided, fall back to 7-second timer (legacy behavior)
+    if (!jobId) {
+      const duration = 7000; // 7 seconds
+      const interval = 50; // Update every 50ms for smooth animation
+      const increment = (interval / duration) * 100;
 
-    const timer = setInterval(() => {
-      setProgress(prev => {
-        const newProgress = prev + increment;
-        if (newProgress >= 100) {
-          clearInterval(timer);
-          setIsCompleted(true);
+      const timer = setInterval(() => {
+        setProgress(prev => {
+          const newProgress = prev + increment;
+          if (newProgress >= 100) {
+            clearInterval(timer);
+            setIsCompleted(true);
+            
+            // Redirect to dashboard after a brief delay
+            setTimeout(() => {
+              router.push('/dashboard');
+              onComplete?.();
+            }, 1000);
+            
+            return 100;
+          }
+          return newProgress;
+        });
+      }, interval);
+
+      return () => clearInterval(timer);
+    }
+
+    // New behavior: Poll job status until completion
+    let pollTimer: NodeJS.Timeout;
+    
+    const checkJobStatus = async () => {
+      try {
+        const response = await fetch(`/api/knowledge-base/generation-status/${jobId}`);
+        const data = await response.json();
+
+        if (data.success && data.job) {
+          const job = data.job;
+          const jobProgress = job.progress_percentage || 0;
           
-          // Redirect to dashboard after a brief delay
-          setTimeout(() => {
-            router.push('/dashboard');
-            onComplete?.();
-          }, 1000);
+          setProgress(jobProgress);
           
-          return 100;
+          // Update status message based on job progress
+          if (jobProgress < 25) {
+            setStatusMessage('Analyzing knowledge base...');
+          } else if (jobProgress < 50) {
+            setStatusMessage('Generating course outline...');
+          } else if (jobProgress < 85) {
+            setStatusMessage('Creating course structure...');
+          } else if (jobProgress < 100) {
+            setStatusMessage('Launching advanced generation...');
+          }
+
+          if (job.status === 'completed') {
+            setProgress(100);
+            setStatusMessage('Course generation completed!');
+            setIsCompleted(true);
+            
+            // Redirect to dashboard after completion
+            setTimeout(() => {
+              router.push('/dashboard');
+              onComplete?.();
+            }, 1500);
+            
+            return; // Stop polling
+          } else if (job.status === 'failed') {
+            setStatusMessage('Course generation failed. Redirecting...');
+            setTimeout(() => {
+              router.push('/dashboard');
+              onComplete?.();
+            }, 2000);
+            return; // Stop polling
+          }
         }
-        return newProgress;
-      });
-    }, interval);
+      } catch (error) {
+        console.error('Failed to check job status:', error);
+        setStatusMessage('Checking generation status...');
+      }
 
-    return () => clearInterval(timer);
-  }, [isOpen, router, onComplete]);
+      // Continue polling if job is still processing
+      pollTimer = setTimeout(checkJobStatus, 2000); // Poll every 2 seconds
+    };
+
+    // Start polling immediately
+    checkJobStatus();
+
+    return () => {
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+      }
+    };
+  }, [isOpen, router, onComplete, jobId]);
 
   if (!isOpen) return null;
 
@@ -98,7 +167,7 @@ export function SimpleCourseGenerationModal({ isOpen, onComplete }: SimpleCourse
               {isCompleted ? (
                 "Redirecting you to the dashboard where you can track the course generation progress..."
               ) : (
-                "Setting up your course generation process. You'll be redirected to the dashboard to monitor progress in real-time."
+                statusMessage
               )}
             </p>
           </div>
