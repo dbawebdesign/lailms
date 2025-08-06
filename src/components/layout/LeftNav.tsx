@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useUIContext } from "@/context/UIContext";
+import { OptimizedLogo } from "@/components/ui/optimized-logo";
 import navConfig, { NavItem } from "@/config/navConfig";
 import { UserRole } from "@/lib/utils/roleUtils";
 import { cn } from "@/lib/utils";
@@ -53,9 +54,6 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
     (item) => item.roles.includes(userRole) && item.isBottom
   );
 
-  const fullLogoSrc = mounted && resolvedTheme === 'dark'
-    ? "/Horizontal white text.png"
-    : "/Horizontal black text.png";
   const iconLogoSrc = "/web-app-manifest-512x512.png";
 
   const handleNavItemClick = (item: NavItem, e: React.MouseEvent) => {
@@ -77,15 +75,14 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
     >
       <div
         className={cn(
-          "h-14 sm:h-16 shrink-0 flex items-center border-b border-[#E0E0E0] dark:border-[#333333]",
-          isNavCollapsed ? "justify-center w-full px-0" : "justify-between w-full px-4"
+          "h-14 sm:h-16 shrink-0 flex items-center border-b border-[#E0E0E0] dark:border-[#333333] w-full",
+          isNavCollapsed ? "justify-center px-0" : "justify-between px-4"
         )}
       >
         <div className="flex items-center">
           {!isNavCollapsed ? (
-            <Image
-              src={fullLogoSrc}
-              alt="Learnology AI"
+            <OptimizedLogo
+              variant={resolvedTheme === 'dark' ? 'horizontal-white' : 'horizontal-white'}
               width={160}
               height={32}
               className="py-2"

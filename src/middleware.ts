@@ -2,8 +2,19 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  // Skip middleware for image optimization requests to reduce log noise
-  if (request.nextUrl.pathname.startsWith('/_next/image')) {
+  // Skip middleware entirely for image optimization and static requests to reduce log noise
+  if (
+    request.nextUrl.pathname.startsWith('/_next/image') ||
+    request.nextUrl.pathname.startsWith('/_next/static') ||
+    request.nextUrl.pathname.startsWith('/favicon') ||
+    request.nextUrl.pathname.endsWith('.png') ||
+    request.nextUrl.pathname.endsWith('.jpg') ||
+    request.nextUrl.pathname.endsWith('.jpeg') ||
+    request.nextUrl.pathname.endsWith('.gif') ||
+    request.nextUrl.pathname.endsWith('.webp') ||
+    request.nextUrl.pathname.endsWith('.svg') ||
+    request.nextUrl.pathname.endsWith('.ico')
+  ) {
     return NextResponse.next()
   }
 
@@ -76,8 +87,9 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - any image files (.png, .jpg, .jpeg, .gif, .webp, .svg)
      * Feel free to modify this pattern to include more paths.
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(png|jpg|jpeg|gif|webp|svg|ico)).*)',
   ],
 } 
