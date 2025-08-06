@@ -45,16 +45,24 @@ export function PremiumGenerationModal({
           job.status === 'processing' && job.progress_percentage > 5
         );
         
-        // Also check the last few messages for task locking confirmation
-        const recentMessages = data.messages?.slice(-3) || [];
-        const tasksAreLocked = recentMessages.some((msg: any) => 
-          msg?.message?.includes('Locking') || 
-          msg?.message?.includes('tasks as \'running\'') ||
-          msg?.message?.includes('Task insert payload') ||
-          msg?.message?.includes('📝 Initializing tasks')
-        );
+        // Check specifically for the task locking message - this is the critical point
+        const recentMessages = data.messages?.slice(-5) || [];
+        const tasksAreLocked = recentMessages.some((msg: any) => {
+          const hasLockingMessage = msg?.message?.includes('🔒 Locking') && msg?.message?.includes("tasks as 'running'");
+          if (hasLockingMessage) {
+            console.log('Found task locking message:', msg.message);
+          }
+          return hasLockingMessage;
+        });
         
-        if ((hasRunningTasks || tasksAreLocked) && !hasRedirected.current) {
+        // Log current status for debugging
+        if (data.messages?.length > 0) {
+          console.log('Latest message:', data.messages[data.messages.length - 1]?.message);
+        }
+        
+        // Only redirect once we see the specific locking message
+        if (tasksAreLocked && !hasRedirected.current) {
+          console.log('Tasks are locked! Initiating redirect...');
           // Safe to redirect now - tasks are locked and running in background
           hasRedirected.current = true;
           setStatus('redirecting');
@@ -89,10 +97,11 @@ export function PremiumGenerationModal({
         });
       }, 500);
 
-      // Fallback: Force redirect after 20 seconds if checks haven't triggered
+      // Fallback: Force redirect after 5 minutes if checks haven't triggered
+      // This gives plenty of time for task locking to complete even under heavy load
       const fallbackTimeout = setTimeout(() => {
         if (!hasRedirected.current) {
-          console.log('Fallback redirect triggered after 20 seconds');
+          console.log('Fallback redirect triggered after 5 minutes');
           hasRedirected.current = true;
           setStatus('redirecting');
           setProgress(100);
@@ -102,7 +111,7 @@ export function PremiumGenerationModal({
             onClose?.();
           }, 1500);
         }
-      }, 20000);
+      }, 300000); // 5 minutes
 
       return () => {
         if (checkInterval.current) clearInterval(checkInterval.current);
