@@ -193,12 +193,19 @@ export class CourseGenerationRateLimiter {
    */
   async decrementActiveJobs(userId: string): Promise<void> {
     try {
-      await this.supabase
+      // Get current value and update it
+      const { data } = await this.supabase
         .from('course_generation_rate_limits')
-        .update({ 
-          active_jobs: this.supabase.sql`GREATEST(active_jobs - 1, 0)`
-        })
-        .eq('user_id', userId);
+        .select('active_jobs')
+        .eq('user_id', userId)
+        .single();
+      
+      if (data && data.active_jobs && data.active_jobs > 0) {
+        await this.supabase
+          .from('course_generation_rate_limits')
+          .update({ active_jobs: data.active_jobs - 1 })
+          .eq('user_id', userId);
+      }
     } catch (error) {
       console.error('Failed to decrement active jobs:', error);
     }
@@ -334,10 +341,10 @@ export class CourseGenerationRateLimiter {
 
       return {
         current: {
-          minute: data.minute_count,
-          hour: data.hour_count,
-          day: data.day_count,
-          active_jobs: data.active_jobs
+          minute: data.minute_count || 0,
+          hour: data.hour_count || 0,
+          day: data.day_count || 0,
+          active_jobs: data.active_jobs || 0
         },
         limits: {
           minute: limits.requests_per_minute,
@@ -346,10 +353,10 @@ export class CourseGenerationRateLimiter {
           concurrent_jobs: limits.concurrent_jobs
         },
         percentages: {
-          minute: (data.minute_count / limits.requests_per_minute) * 100,
-          hour: (data.hour_count / limits.requests_per_hour) * 100,
-          day: (data.day_count / limits.requests_per_day) * 100,
-          concurrent: (data.active_jobs / limits.concurrent_jobs) * 100
+          minute: ((data.minute_count || 0) / limits.requests_per_minute) * 100,
+          hour: ((data.hour_count || 0) / limits.requests_per_hour) * 100,
+          day: ((data.day_count || 0) / limits.requests_per_day) * 100,
+          concurrent: ((data.active_jobs || 0) / limits.concurrent_jobs) * 100
         }
       };
 

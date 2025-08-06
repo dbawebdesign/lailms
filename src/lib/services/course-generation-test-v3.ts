@@ -84,7 +84,7 @@ export async function testV3Optimizations() {
 
   const validation = validateWithDetails(LessonSectionContentSchema, sampleContent);
   
-  if (validation.success) {
+  if (validation.success && validation.data) {
     console.log('✅ Content validation passed!');
     console.log('Validated data keys:', Object.keys(validation.data));
   } else {
