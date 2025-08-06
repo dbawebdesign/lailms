@@ -21,6 +21,7 @@ import {
 // Enhanced interfaces for the new system
 export interface TaskDefinition {
   id: string;
+  job_id: string;
   task_identifier: string;
   task_type: 'lesson_section' | 'lesson_assessment' | 'lesson_mind_map' | 'lesson_brainbytes' | 'path_quiz' | 'class_exam' | 'knowledge_analysis' | 'outline_generation' | 'content_validation';
   status: 'pending' | 'queued' | 'running' | 'completed' | 'failed' | 'skipped' | 'retrying' | 'cancelled';
@@ -172,7 +173,8 @@ export class CourseGenerationOrchestratorV2 {
       timeout: 180000, // 3 minutes
       maxRetries: 0, // We'll handle retries ourselves
     });
-    this.assessmentGenerator = new AssessmentGenerationService();
+    // Pass the service role client to AssessmentGenerationService
+    this.assessmentGenerator = new AssessmentGenerationService(this.supabase);
     
     // Initialize V2 system components
     this.taskExecutor = new CourseGenerationTaskExecutor();
@@ -362,6 +364,67 @@ export class CourseGenerationOrchestratorV2 {
       console.error(`❌ Orchestration failed for job ${jobId}:`, error);
       await this.handleCriticalFailure(jobId, error);
       throw error; // Re-throw to prevent false success
+    }
+  }
+
+  /**
+   * Finalize generation and update job status based on task completion
+   */
+  protected async finalizeGeneration(jobId: string): Promise<void> {
+    console.log(`🏁 Finalizing generation for job ${jobId}`);
+    
+    // Get all tasks to determine final status
+    const { data: tasks, error } = await this.supabase
+      .from('course_generation_tasks')
+      .select('status')
+      .eq('job_id', jobId);
+    
+    if (error) {
+      console.error(`Failed to fetch tasks for finalization: ${error.message}`);
+      return;
+    }
+    
+    if (!tasks || tasks.length === 0) {
+      console.warn(`No tasks found for job ${jobId}`);
+      return;
+    }
+    
+    const totalCount = tasks.length;
+    const completedCount = tasks.filter(t => t.status === 'completed').length;
+    const failedCount = tasks.filter(t => t.status === 'failed').length;
+    const pendingCount = tasks.filter(t => t.status === 'pending').length;
+    const runningCount = tasks.filter(t => t.status === 'running').length;
+    const finishedCount = completedCount + failedCount;
+    
+    // Job is complete when all tasks are either completed or failed
+    if (finishedCount === totalCount) {
+      const finalStatus = failedCount === totalCount ? 'failed' : 'completed';
+      const successRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+      
+      // Update job with final status
+      await this.supabase
+        .from('course_generation_jobs')
+        .update({
+          status: finalStatus,
+          progress_percentage: 100,
+          error_message: failedCount > 0 
+            ? `Completed with ${failedCount} failed tasks (${successRate.toFixed(1)}% success rate)`
+            : null,
+          updated_at: new Date().toISOString(),
+          result_data: {
+            total_tasks: totalCount,
+            completed_tasks: completedCount,
+            failed_tasks: failedCount,
+            success_rate: successRate,
+            completion_time: new Date().toISOString()
+          }
+        })
+        .eq('id', jobId);
+        
+      console.log(`✅ Job ${jobId} marked as ${finalStatus} (${completedCount}/${totalCount} tasks successful)`);
+    } else {
+      // Job is not complete yet - log the status
+      console.log(`⏳ Job ${jobId} not yet complete: ${finishedCount}/${totalCount} tasks finished (${pendingCount} pending, ${runningCount} running)`);
     }
   }
 
@@ -913,7 +976,7 @@ export class CourseGenerationOrchestratorV2 {
     const duration = Date.now() - startTime;
     
     // BULLETPROOF STATUS UPDATE - This MUST succeed
-    await this.bulletproofUpdateTaskStatus(task, finalStatus, result, duration, error);
+    await this.bulletproofUpdateTaskStatus(task, finalStatus, result, duration, error, jobId);
     console.log(`✅ Task ${task.task_identifier} ${finalStatus} in ${duration}ms`);
   }
 
@@ -951,7 +1014,8 @@ export class CourseGenerationOrchestratorV2 {
     status: 'completed' | 'failed',
     result: any,
     duration: number,
-    error?: any
+    error?: any,
+    jobId?: string
   ): Promise<void> {
     console.log(`🔧 BULLETPROOF: Updating task ${task.task_identifier} to ${status}`);
     
@@ -989,7 +1053,7 @@ export class CourseGenerationOrchestratorV2 {
       console.warn(`⚠️ BULLETPROOF: Method 1 exception, trying method 2:`, method1Error);
     }
 
-    // Try method 2: Direct table update
+    // Try method 2: Direct table update by task ID (UUID)
     try {
       const { error: updateError } = await this.supabase
         .from('course_generation_tasks')
@@ -1000,7 +1064,7 @@ export class CourseGenerationOrchestratorV2 {
           updated_at: new Date().toISOString(),
           ...(result && { output_data: result }),
           ...(error && { 
-            error_message: error.message,
+            error_message: error.message || 'Unknown error',
             error_details: { stack: error.stack }
           })
         })
@@ -1011,12 +1075,37 @@ export class CourseGenerationOrchestratorV2 {
         return;
       }
       
-      console.warn(`⚠️ BULLETPROOF: Method 2 failed, trying method 3:`, updateError);
+      console.warn(`⚠️ BULLETPROOF: Method 2 failed, trying method 3 with task_identifier:`, updateError);
     } catch (method2Error) {
       console.warn(`⚠️ BULLETPROOF: Method 2 exception, trying method 3:`, method2Error);
     }
 
-    // Try method 3: Emergency minimal update
+    // Try method 3: Update by task_identifier if ID fails
+    try {
+      const { error: identifierError } = await this.supabase
+        .from('course_generation_tasks')
+        .update({
+          status: status,
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          ...(error && { 
+            error_message: error.message || 'Unknown error'
+          })
+        })
+        .eq('task_identifier', task.task_identifier)
+        .eq('job_id', jobId || task.job_id);
+      
+      if (!identifierError) {
+        console.log(`✅ BULLETPROOF: Successfully updated task ${task.task_identifier} to ${status} (method 3 - by identifier)`);
+        return;
+      }
+      
+      console.error(`🚨 BULLETPROOF: Method 3 failed for task ${task.task_identifier}:`, identifierError);
+    } catch (method3Error) {
+      console.error(`🚨 BULLETPROOF: Method 3 exception for task ${task.task_identifier}:`, method3Error);
+    }
+    
+    // Try method 4: Emergency minimal update
     try {
       const { error: emergencyError } = await this.supabase
         .from('course_generation_tasks')
@@ -1027,13 +1116,13 @@ export class CourseGenerationOrchestratorV2 {
         .eq('id', task.id);
       
       if (!emergencyError) {
-        console.log(`✅ BULLETPROOF: Successfully updated task ${task.task_identifier} to ${status} (method 3 - emergency)`);
+        console.log(`✅ BULLETPROOF: Successfully updated task ${task.task_identifier} to ${status} (method 4 - emergency)`);
         return;
       }
       
       console.error(`🚨 BULLETPROOF: All methods failed for task ${task.task_identifier}:`, emergencyError);
-    } catch (method3Error) {
-      console.error(`🚨 BULLETPROOF: Emergency method failed for task ${task.task_identifier}:`, method3Error);
+    } catch (method4Error) {
+      console.error(`🚨 BULLETPROOF: Emergency method failed for task ${task.task_identifier}:`, method4Error);
     }
     
     // This should never happen, but if it does, we've logged everything
@@ -1528,7 +1617,7 @@ export class CourseGenerationOrchestratorV2 {
     } catch (updateError) {
       console.error(`❌ Failed to schedule task retry:`, updateError);
       // If we can't schedule retry, mark as failed
-      await this.bulletproofUpdateTaskStatus(task, 'failed', null, 0, error);
+      await this.bulletproofUpdateTaskStatus(task, 'failed', null, 0, error, undefined);
     }
   }
 
@@ -3174,6 +3263,30 @@ DETAILED LESSON DETAIL GUIDANCE:
       if (!lessonId) {
         throw new Error('No lesson_id provided for assessment task');
       }
+
+      // First, verify that lesson sections actually exist in the database
+      console.log(`🔍 Verifying lesson sections exist for ${lessonId} before generating assessment...`);
+      const supabase = this.supabase || createSupabaseServiceClient();
+      
+      // Add a short delay to ensure database writes are committed
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const { data: sections, error: sectionsError } = await supabase
+        .from('lesson_sections')
+        .select('id, title')
+        .eq('lesson_id', lessonId);
+      
+      if (sectionsError) {
+        console.error(`❌ Error checking lesson sections: ${sectionsError.message}`);
+        throw new Error(`Cannot generate assessment - failed to verify lesson sections: ${sectionsError.message}`);
+      }
+      
+      if (!sections || sections.length === 0) {
+        console.warn(`⚠️ No lesson sections found for ${lessonId}, will retry later`);
+        throw new Error(`Cannot generate assessment - no lesson sections found for lesson ${lessonId}`);
+      }
+      
+      console.log(`✅ Found ${sections.length} lesson sections for ${lessonId}`);
 
       // V1 EXACT MATCH: Use AssessmentGenerationService like V1 does
       console.log(`📝 Using V1 AssessmentGenerationService for lesson: ${lessonId}`);

@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
 import { knowledgeBaseAnalyzer, KnowledgeBaseAnalysis, COURSE_GENERATION_MODES } from './knowledge-base-analyzer';
 import { knowledgeExtractor, ConceptMap, CourseStructureSuggestion } from './knowledge-extractor';
@@ -104,16 +105,36 @@ export class CourseGenerator {
   private openai: OpenAI;
   private assessmentGenerator: AssessmentGenerationService;
   private kbContentCache: Map<string, any[]> = new Map(); // Cache for KB content to avoid repeated searches
+  private supabase: any;
 
   constructor() {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
-    this.assessmentGenerator = new AssessmentGenerationService();
+    
+    // Create service role client for better compatibility
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    
+    if (serviceRoleKey && supabaseUrl) {
+      // Use service role client if available (for edge functions)
+      this.supabase = createClient(supabaseUrl, serviceRoleKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+    } else {
+      // Fall back to server client for regular API routes
+      this.supabase = createSupabaseServerClient();
+    }
+    
+    // Pass the supabase client to AssessmentGenerationService
+    this.assessmentGenerator = new AssessmentGenerationService(this.supabase);
   }
 
   private getSupabaseClient() {
-    return createSupabaseServerClient();
+    return this.supabase;
   }
 
   async generateCourse(request: CourseGenerationRequest): Promise<GenerationJob> {

@@ -69,6 +69,7 @@ export class CourseGenerationOrchestrator {
   private assessmentGenerator: AssessmentGenerationService;
   private orchestrationStates: Map<string, OrchestrationState> = new Map();
   private kbContentCache: Map<string, any[]> = new Map();
+  private supabase: any;
 
   constructor() {
     this.openai = new OpenAI({
@@ -76,7 +77,26 @@ export class CourseGenerationOrchestrator {
       timeout: 120000, // 2 minutes timeout
       maxRetries: 2, // Built-in retry mechanism
     });
-    this.assessmentGenerator = new AssessmentGenerationService();
+    
+    // Create service role client for better compatibility
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    
+    if (serviceRoleKey && supabaseUrl) {
+      // Use service role client if available (for edge functions)
+      this.supabase = createClient(supabaseUrl, serviceRoleKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+    } else {
+      // Fall back to server client for regular API routes
+      this.supabase = createSupabaseServerClient();
+    }
+    
+    // Pass the supabase client to AssessmentGenerationService
+    this.assessmentGenerator = new AssessmentGenerationService(this.supabase);
   }
 
   /**
@@ -146,7 +166,7 @@ export class CourseGenerationOrchestrator {
   }
 
   private getSupabaseClient() {
-    return createSupabaseServerClient();
+    return this.supabase;
   }
 
   /**

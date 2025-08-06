@@ -89,17 +89,21 @@ const limit = pLimit(3); // Limit concurrent API calls
 
 export class AssessmentGenerationService {
   private openai: OpenAI;
+  private supabase: any;
 
-  constructor() {
+  constructor(supabaseClient?: any) {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       maxRetries: 3,
     });
+    
+    // If a supabase client is provided, use it; otherwise create a new one
+    // This allows the orchestrator to pass its service role client
+    this.supabase = supabaseClient || createSupabaseServerClient();
   }
 
   async generateAssessment(params: AssessmentGenerationParams): Promise<Assessment> {
     const { onProgress } = params;
-    const supabase = createSupabaseServerClient();
     
     onProgress?.(`Starting assessment generation for ${params.scope}: ${params.scopeId}`);
 
@@ -139,7 +143,6 @@ export class AssessmentGenerationService {
   }
 
   private async getContentForScope(scope: 'lesson' | 'path' | 'class', scopeId: string): Promise<string> {
-    const supabase = createSupabaseServerClient();
     let content = '';
 
     try {
@@ -155,7 +158,7 @@ export class AssessmentGenerationService {
               console.log(`📖 Assessment Generation: Attempting to fetch content for lesson ${scopeId} (attempt ${attempt}/${MAX_RETRIES})`);
               
               // First try lesson_sections table
-              const { data: sections, error: sectionsError } = await supabase
+              const { data: sections, error: sectionsError } = await this.supabase
                 .from('lesson_sections')
                 .select('title, content, section_type')
                 .eq('lesson_id', scopeId)
@@ -247,7 +250,7 @@ export class AssessmentGenerationService {
               }
 
               // If no sections or empty content, try generated_lesson_content table
-              const { data: generatedContent, error: generatedError } = await supabase
+              const { data: generatedContent, error: generatedError } = await this.supabase
                 .from('generated_lesson_content')
                 .select('content_type, generated_content')
                 .eq('lesson_id', scopeId);
@@ -271,7 +274,7 @@ export class AssessmentGenerationService {
               }
 
               // On final attempt, try lesson basic info as last resort
-              const { data: lessonBasic, error: basicError } = await supabase
+              const { data: lessonBasic, error: basicError } = await this.supabase
                 .from('lessons')
                 .select('title, description')
                 .eq('id', scopeId)
@@ -306,7 +309,7 @@ export class AssessmentGenerationService {
 
         case 'path':
           // Get all lessons in the path, then their sections
-          const { data: pathLessons, error: pathError } = await supabase
+          const { data: pathLessons, error: pathError } = await this.supabase
             .from('lessons')
             .select(`
               title, description,
@@ -351,7 +354,7 @@ export class AssessmentGenerationService {
 
         case 'class':
           // Get all content from the base class
-          const { data: classPaths, error: classError } = await supabase
+          const { data: classPaths, error: classError } = await this.supabase
             .from('paths')
             .select(`
               title, description,
@@ -821,7 +824,7 @@ Begin by analyzing the content for key testable concepts, then generate question
         ai_model: 'gpt-4.1-mini'
       };
 
-      const { data: assessment, error: assessmentError } = await supabase
+      const { data: assessment, error: assessmentError } = await this.supabase
         .from('assessments')
         .insert(assessmentData)
         .select()
@@ -845,7 +848,7 @@ Begin by analyzing the content for key testable concepts, then generate question
         ai_grading_enabled: ['short_answer', 'essay'].includes(q.question_type)
       }));
 
-      const { error: questionsError } = await supabase
+      const { error: questionsError } = await this.supabase
         .from('assessment_questions')
         .insert(questionsData);
 
@@ -1064,10 +1067,8 @@ Focus on extracting concepts that can be assessed through questions.`;
 
   // Utility method to get assessment results
   async getAssessmentResults(assessmentId: string): Promise<any> {
-    const supabase = createSupabaseServerClient();
-
     try {
-      const { data: attempts, error } = await supabase
+      const { data: attempts, error } = await this.supabase
         .from('student_attempts')
         .select(`
           *,
@@ -1101,11 +1102,9 @@ Focus on extracting concepts that can be assessed through questions.`;
 
   // Get assessment analytics
   async getAssessmentAnalytics(assessmentId: string): Promise<any> {
-    const supabase = createSupabaseServerClient();
-
     try {
       // Get summary statistics
-      const { data: attempts, error: attemptsError } = (await supabase
+      const { data: attempts, error: attemptsError } = (await this.supabase
         .from('student_attempts')
         .select('percentage_score, status, time_spent_minutes')
         .eq('assessment_id', assessmentId)
@@ -1123,7 +1122,7 @@ Focus on extracting concepts that can be assessed through questions.`;
       const passRate = totalAttempts > 0 ? (passedCount / totalAttempts) * 100 : 0;
 
       // Get question-level analytics
-      const { data: responses, error: responsesError } = (await supabase
+      const { data: responses, error: responsesError } = (await this.supabase
         .from('student_responses')
         .select(`
           question_id,
