@@ -49,14 +49,14 @@ export async function GET(request: NextRequest) {
       progress: job.progress_percentage || 0,
       baseClassId: job.base_class_id,
       baseClassName: job.base_classes?.name || 'Unknown Course',
-      title: job.job_data?.title || job.base_classes?.name || 'Course Generation',
+      title: (job.job_data as any)?.title || job.base_classes?.name || 'Course Generation',
       error: job.error_message,
       createdAt: job.created_at,
       updatedAt: job.updated_at,
       total_tasks: job.total_tasks,
       completed_tasks: job.completed_tasks,
       failed_tasks: job.failed_tasks,
-      current_phase: job.job_data?.current_phase
+      current_phase: (job.job_data as any)?.current_phase
     })) || [];
 
     return NextResponse.json({ 
