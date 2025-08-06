@@ -32,6 +32,7 @@
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": [
     "node_modules",
-    "packages/functions/src/**/*"
+    "packages/functions/src/**/*",
+    "supabase/functions/**/*"
   ]
 }
