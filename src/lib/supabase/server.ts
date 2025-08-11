@@ -13,6 +13,8 @@ export const createSupabaseServerClient = () => {
   // Try to use Next.js request-scoped cookies when available.
   // In non-Next contexts (e.g., Render worker), fall back to a plain client.
   try {
+    // Validate that a request store exists; this will throw outside Next request scope
+    cookies();
     return createServerClient<Database>(url, anon, {
       cookies: {
         async get(name: string) {
