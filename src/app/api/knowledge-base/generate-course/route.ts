@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 import { CourseGenerationOrchestratorV2 } from '@/lib/services/course-generation-orchestrator-v2';
 import { knowledgeBaseAnalyzer } from '@/lib/services/knowledge-base-analyzer';
 import type { CourseGenerationRequest } from '@/lib/services/course-generator';
@@ -111,18 +111,26 @@ export async function POST(request: NextRequest) {
 
     const jobId = jobData.id;
 
-    // Start async processing with complete v2 orchestrator
-    processCompleteV2GenerationJob(jobId, generationRequest, supabase).catch(error => {
-      console.error('Complete V2 Course generation failed:', error);
-      updateJobStatus(jobId, 'failed', 0, supabase, error.message);
-    });
+    // Enqueue the job and return immediately
+    const serviceClient = createSupabaseServiceClient();
+    const { error: enqueueError } = await (serviceClient as any)
+      .from('course_generation_queue')
+      .insert({ job_id: jobId, status: 'queued', priority: 5 });
+
+    if (enqueueError) {
+      console.error('Failed to enqueue generation job:', enqueueError);
+      return NextResponse.json(
+        { error: 'Failed to enqueue generation job' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ 
       success: true, 
       jobId,
       status: 'queued',
       version: 'v2',
-      message: 'Knowledge-base course generation started with enhanced v2 system. Check job status for progress.',
+      message: 'Course generation queued for background processing.',
       features: [
         'Real-time task tracking',
         'Performance analytics', 

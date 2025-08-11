@@ -2014,17 +2014,17 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
                          sectionTitle.toLowerCase().includes('conclusion') ? 'summary' : 
                          'main_content';
       
-      // Insert the lesson section
+      // Upsert the lesson section for idempotency (unique key: lesson_id + order_index)
       const { error: insertError } = await this.supabase
         .from('lesson_sections')
-        .insert({
+        .upsert({
           lesson_id: lessonId,
           title: sectionTitle,
           content: sanitizedContent,
           section_type: sectionType,
           order_index: sectionIndex,
           created_by: lesson.created_by
-        });
+        }, { onConflict: 'lesson_id,order_index' });
       
       if (insertError) {
         console.error(`❌ Database insertion error for section ${sectionIndex}:`, insertError);
@@ -2054,14 +2054,14 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
           
           const { error: retryError } = await this.supabase
             .from('lesson_sections')
-            .insert({
+            .upsert({
               lesson_id: lessonId,
               title: sectionTitle,
               content: simplifiedContent,
               section_type: sectionType,
               order_index: sectionIndex,
               created_by: lesson.created_by
-            });
+            }, { onConflict: 'lesson_id,order_index' });
             
           if (retryError) {
             console.error(`❌ Failed to create simplified section: ${retryError.message}`);

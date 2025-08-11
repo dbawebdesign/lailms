@@ -95,7 +95,7 @@ export class AssessmentGenerationService {
   constructor(supabaseClient?: any) {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
-      maxRetries: 3,
+      maxRetries: 0,
     });
     
     // If a supabase client is provided, use it; otherwise create service role client

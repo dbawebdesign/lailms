@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { CourseGenerationOrchestratorV3 } from '../../src/lib/services/course-generation-orchestrator-v3';
+import { knowledgeBaseAnalyzer } from '../../src/lib/services/knowledge-base-analyzer';
+import { CourseGenerator } from '../../src/lib/services/course-generator';
 
 
 const WORKER_ID = process.env.WORKER_ID || `worker-${Date.now()}`;
@@ -60,22 +62,14 @@ class CourseGenerationWorker {
       return;
     }
     
-    const { id: queueId, job_id: jobId } = queueItem[0];
+    const { id: queueId, job_id: jobId, job: jobPayload } = queueItem[0];
     console.log(`📋 Processing job ${jobId} (queue: ${queueId})`);
     
     try {
-      // Get job details
-      const { data: job, error: jobError } = await supabase
-        .from('course_generation_jobs')
-        .select(`
-          *,
-          course_outlines!generation_job_id (*)
-        `)
-        .eq('id', jobId)
-        .single();
-        
-      if (jobError || !job) {
-        throw new Error(`Job not found: ${jobId}`);
+      // Use atomic payload returned by RPC to avoid a second read
+      const job = jobPayload as any;
+      if (!job || job.id !== jobId) {
+        throw new Error(`Job payload missing or mismatched for ${jobId}`);
       }
       
       // Check if job is already completed
@@ -85,18 +79,54 @@ class CourseGenerationWorker {
         return;
       }
       
-      // Get course outline
-      const outline = job.course_outlines[0];
+      // Try to load an existing outline for this job
+      let outline: any = null;
+      {
+        const { data: outlines } = await supabase
+          .from('course_outlines')
+          .select('*')
+          .eq('generation_job_id', jobId)
+          .limit(1);
+        outline = outlines?.[0] || null;
+      }
+
+      // If no outline exists, perform pre-orchestration steps end-to-end here
       if (!outline) {
-        throw new Error(`No outline found for job ${jobId}`);
+        console.log(`🧭 No outline found for job ${jobId}. Generating outline and LMS entities in worker...`);
+
+        // Construct request from stored job_data
+        const request = job.job_data as any;
+
+        // 1) Analyze knowledge base (if baseClassId present)
+        let kbAnalysis: any = null;
+        if (request?.baseClassId) {
+          kbAnalysis = await knowledgeBaseAnalyzer.analyzeKnowledgeBase(request.baseClassId);
+        }
+
+        // 2) Determine generation mode
+        const generationMode = request?.generationMode || kbAnalysis?.recommendedGenerationMode || 'general';
+
+        // 3) Generate course outline
+        const generator = new CourseGenerator();
+        const generatedOutline = await (generator as any).generateCourseOutline(request, kbAnalysis, generationMode);
+
+        // 4) Save course outline
+        const courseOutlineId = await (generator as any).saveCourseOutline(generatedOutline, request);
+        console.log(`💾 Saved course outline ${courseOutlineId} for job ${jobId}`);
+
+        // 5) Create basic LMS entities (paths, lessons)
+        await (generator as any).createBasicLMSEntities(courseOutlineId, generatedOutline, request);
+        console.log(`🏗️ Created basic LMS entities for job ${jobId}`);
+
+        outline = generatedOutline;
       }
       
-      // Start orchestration
+      // Start orchestration with the available outline and original request config
       console.log(`🎼 Starting orchestration for job ${jobId}`);
       await this.orchestrator.startOrchestration(
         jobId,
         outline,
-        job.generation_config
+        job.generation_config || job.job_data
       );
       
       // Mark queue item as completed

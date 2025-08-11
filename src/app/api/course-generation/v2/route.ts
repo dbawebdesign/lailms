@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 import { knowledgeBaseAnalyzer } from '@/lib/services/knowledge-base-analyzer';
 import type { CourseGenerationRequest } from '@/lib/services/course-generator';
 
@@ -130,27 +130,27 @@ export async function POST(request: NextRequest) {
 
     const jobId = jobData.id;
 
-    // Start async processing with v2 orchestrator
-    processV2GenerationJob(jobId, generationRequest, supabase).catch(error => {
-      console.error('V2 Course generation failed:', error);
-      updateJobStatus(jobId, 'failed', 0, supabase, error.message);
-    });
+    // Enqueue the job for the background worker and return immediately
+    const serviceClient = createSupabaseServiceClient();
+    const { error: enqueueError } = await (serviceClient as any)
+      .from('course_generation_queue')
+      .insert({ job_id: jobId, status: 'queued', priority: 5 });
+
+    if (enqueueError) {
+      console.error('Failed to enqueue generation job:', enqueueError);
+      return NextResponse.json(
+        { error: 'Failed to enqueue generation job' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ 
       success: true, 
       jobId,
       status: 'queued',
       version: 'v3',
-      message: 'Course generation started. Processing via Supabase Edge Function (no timeout issues!)',
-      features: [
-        'No timeout limitations',
-        'Runs on Supabase infrastructure',
-        'Real-time task tracking',
-        'Performance analytics', 
-        'Error recovery',
-        'Enhanced monitoring'
-      ],
-      processingMethod: 'edge-function'
+      message: 'Course generation queued for background processing',
+      processingMethod: 'render-worker'
     });
 
   } catch (error) {
