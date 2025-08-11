@@ -1,9 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { CourseGenerationOrchestratorV3 } from '../../src/lib/services/course-generation-orchestrator-v3';
-import dotenv from 'dotenv';
 
-// Load environment variables
-dotenv.config();
 
 const WORKER_ID = process.env.WORKER_ID || `worker-${Date.now()}`;
 const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || '5000');
