@@ -79,6 +79,9 @@ class CourseGenerationWorker {
         return;
       }
       
+      // Compute the generation request once (ensure baseClassId, etc.)
+      const generationRequest = (job && job.job_data) ? job.job_data : (job.generation_config || {});
+
       // Try to load an existing outline for this job
       let outline: any = null;
       {
@@ -95,7 +98,7 @@ class CourseGenerationWorker {
         console.log(`🧭 No outline found for job ${jobId}. Generating outline and LMS entities in worker...`);
 
         // Construct request from stored job_data
-        const request = job.job_data as any;
+        const request = generationRequest as any;
 
         // 1) Analyze knowledge base (if baseClassId present)
         let kbAnalysis: any = null;
@@ -126,7 +129,7 @@ class CourseGenerationWorker {
       await this.orchestrator.startOrchestration(
         jobId,
         outline,
-        job.generation_config || job.job_data
+        generationRequest
       );
       
       // Mark queue item as completed

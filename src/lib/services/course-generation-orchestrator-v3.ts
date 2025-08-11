@@ -66,23 +66,43 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
   protected async finalizeGeneration(jobId: string): Promise<void> {
     console.log(`🏁 V3: Finalizing generation for job ${jobId}`);
     
-    // First, get the courseOutlineId from the job's course outlines
-    const { data: courseOutlines } = await this.supabase
-      .from('course_outlines')
-      .select('id')
-      .eq('generation_job_id', jobId)
-      .single();
-    
-    if (courseOutlines?.id) {
-      // Update job with courseOutlineId in result_data
-      await this.supabase
-        .from('course_generation_jobs')
-        .update({
-          result_data: { courseOutlineId: courseOutlines.id }
-        })
-        .eq('id', jobId);
-      
-      console.log(`✅ V3: Stored courseOutlineId ${courseOutlines.id} in job result_data`);
+    try {
+      // If we already captured an outline id earlier, persist it
+      if (this.courseOutlineId) {
+        await this.supabase
+          .from('course_generation_jobs')
+          .update({ result_data: { courseOutlineId: this.courseOutlineId } })
+          .eq('id', jobId);
+        console.log(`✅ V3: Stored courseOutlineId ${this.courseOutlineId} in job result_data`);
+      } else {
+        // Otherwise, resolve the outline by base_class_id associated with this job
+        const { data: jobRow } = await this.supabase
+          .from('course_generation_jobs')
+          .select('id, base_class_id, job_data')
+          .eq('id', jobId)
+          .single();
+
+        const baseClassId = jobRow?.base_class_id || jobRow?.job_data?.baseClassId;
+        if (baseClassId) {
+          const { data: outlineRow } = await this.supabase
+            .from('course_outlines')
+            .select('id')
+            .eq('base_class_id', baseClassId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (outlineRow?.id) {
+            await this.supabase
+              .from('course_generation_jobs')
+              .update({ result_data: { courseOutlineId: outlineRow.id } })
+              .eq('id', jobId);
+            console.log(`✅ V3: Stored courseOutlineId ${outlineRow.id} in job result_data`);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('V3 finalizeGeneration: outline resolution skipped due to error:', e);
     }
     
     // Call parent method to complete the job
