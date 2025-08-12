@@ -2028,7 +2028,16 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
       
       if (insertError) {
         console.error(`❌ Database insertion error for section ${sectionIndex}:`, insertError);
-        
+
+        // If ON CONFLICT target is invalid (missing unique index), surface a clear error to trigger retry
+        // PostgreSQL code 42P10: "there is no unique or exclusion constraint matching the ON CONFLICT specification"
+        if (insertError.code === '42P10' || insertError.message?.includes('no unique or exclusion constraint')) {
+          throw new Error(
+            `Lesson section upsert requires a unique index on (lesson_id, order_index). ` +
+            `Please add a unique index on public.lesson_sections(lesson_id, order_index) and retry. Original error: ${insertError.message}`
+          );
+        }
+
         // Handle stack depth limit exceeded specifically (following V1 pattern)
         if (insertError.code === '54001' || insertError.message?.includes('stack depth limit exceeded')) {
           console.warn(`Stack depth limit exceeded for section ${sectionIndex}, attempting simplified content...`);
@@ -2065,17 +2074,17 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
             
           if (retryError) {
             console.error(`❌ Failed to create simplified section: ${retryError.message}`);
-            // Don't throw - let the task be marked as failed gracefully
-            return null;
+            // Bubble up so the task is marked failed and retried later
+            throw new Error(`Failed to create simplified section for lesson ${lessonId}, section ${sectionIndex}: ${retryError.message}`);
           }
           
           console.log(`✅ Created simplified section ${sectionIndex} for lesson ${lessonId}`);
           return;
-        } else {
-          // For other database errors, log and return null to allow graceful failure
-          console.error(`❌ Failed to insert lesson section ${sectionIndex} for lesson ${lessonId}:`, insertError);
-          return null;
         }
+
+        // For all other database errors, throw so the task fails and can be retried
+        console.error(`❌ Failed to insert lesson section ${sectionIndex} for lesson ${lessonId}:`, insertError);
+        throw new Error(`Failed to insert lesson section: ${insertError.message}`);
       }
       
       // Verify the section was actually saved by querying it back
