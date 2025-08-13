@@ -3,7 +3,6 @@ import AppShell from "@/components/layout/AppShell";
 import { UIContextProvider } from "@/context/UIContext";
 import { LunaContextRegistration } from "@/components/providers/LunaContextRegistration";
 import { AskLunaProvider } from "@/context/AskLunaContext";
-import { SurveyIntegration } from "@/components/onboarding/SurveyIntegration";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from 'next/navigation';
 import type { UserRole } from "@/lib/utils/roleUtils";
@@ -79,7 +78,6 @@ export default async function AppPagesLayout({
         <AskLunaProvider>
           <AppShell userRole={userRole}>
             {children}
-            <SurveyIntegration userRole={userRole} profile={profile} />
             <AdminMessageModal />
           </AppShell>
         </AskLunaProvider>
