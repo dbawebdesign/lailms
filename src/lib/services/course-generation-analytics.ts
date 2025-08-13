@@ -207,25 +207,36 @@ export class CourseGenerationAnalyticsService {
 
     const analytics: CourseGenerationAnalyticsInsert = {
       job_id: jobId,
-      total_generation_time_seconds: totalExecutionTime,
-      average_task_time_seconds: avgTaskTime,
-      success_rate: successRate,
-      api_calls_made: apiCallsFromBuffer,
+      // Integers must be coerced to avoid numeric strings being cast into integer columns
+      total_generation_time_seconds: Math.round(totalExecutionTime),
+      average_task_time_seconds: avgTaskTime, // numeric
+      success_rate: successRate, // numeric
+      api_calls_made: Math.round(apiCallsFromBuffer),
       api_calls_failed: errors?.length || 0,
-      tokens_consumed: tokensFromBuffer,
-      estimated_cost_usd: estimatedCost,
-      cache_hit_rate: cacheHitRate,
-      total_sections_generated: tasks.filter(t => t.task_type === 'lesson_section' && t.status === 'completed').length,
-      total_lessons_generated: this.countUniqueValues(tasks.filter(t => t.status === 'completed'), 'lesson_id'),
-      total_assessments_generated: tasks.filter(t => t.task_type.includes('assessment') && t.status === 'completed').length,
-      content_quality_score: qualityMetrics.overallQuality,
-      user_satisfaction_score: qualityMetrics.userSatisfactionPrediction,
-      peak_memory_usage_mb: Math.max(...this.systemMetricsBuffer.map(m => m.memoryUsage)),
-      avg_cpu_usage_percent: avgSystemMetrics.avgCpuUsage,
-      database_queries_count: this.estimateDatabaseQueries(tasks.length),
-      baseline_time_comparison_percent: baselineComparison.timeComparison,
-      previous_job_improvement_percent: await this.calculateImprovementRate(jobId),
-      knowledge_base_size_mb: await this.getKnowledgeBaseSize(job.base_class_id)
+      tokens_consumed: Math.round(tokensFromBuffer),
+      estimated_cost_usd: estimatedCost, // numeric
+      cache_hit_rate: cacheHitRate, // numeric
+      total_sections_generated: Number(
+        tasks.filter(t => t.task_type === 'lesson_section' && t.status === 'completed').length
+      ),
+      total_lessons_generated: Number(
+        this.countUniqueValues(tasks.filter(t => t.status === 'completed'), 'lesson_id')
+      ),
+      total_assessments_generated: Number(
+        tasks.filter(t => t.task_type.includes('assessment') && t.status === 'completed').length
+      ),
+      content_quality_score: qualityMetrics.overallQuality, // numeric
+      user_satisfaction_score: Math.round(qualityMetrics.userSatisfactionPrediction), // integer
+      peak_memory_usage_mb: Math.round(
+        this.systemMetricsBuffer.length > 0
+          ? Math.max(...this.systemMetricsBuffer.map(m => m.memoryUsage || 0))
+          : 0
+      ),
+      avg_cpu_usage_percent: avgSystemMetrics.avgCpuUsage, // numeric
+      database_queries_count: Math.round(this.estimateDatabaseQueries(tasks.length)),
+      baseline_time_comparison_percent: baselineComparison.timeComparison, // numeric
+      previous_job_improvement_percent: await this.calculateImprovementRate(jobId), // numeric
+      knowledge_base_size_mb: await this.getKnowledgeBaseSize(job.base_class_id) // numeric
     };
 
     return analytics;

@@ -2015,6 +2015,7 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
                          'main_content';
       
       // Upsert the lesson section for idempotency (unique key: lesson_id + order_index)
+      // First try normal upsert
       const { error: insertError } = await this.supabase
         .from('lesson_sections')
         .upsert({
@@ -2038,47 +2039,60 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
           );
         }
 
-        // Handle stack depth limit exceeded specifically (following V1 pattern)
+        // Handle stack depth limit exceeded specifically
         if (insertError.code === '54001' || insertError.message?.includes('stack depth limit exceeded')) {
-          console.warn(`Stack depth limit exceeded for section ${sectionIndex}, attempting simplified content...`);
-          
-          // Retry with heavily simplified V1 format content
-          const simplifiedContent = {
-            sectionTitle: sectionTitle,
-            introduction: `This section covers ${sectionTitle}.`,
-            expertTeachingContent: {
-              conceptIntroduction: `Let's explore ${sectionTitle}.`,
-              detailedExplanation: typeof sanitizedContent.expertTeachingContent?.detailedExplanation === 'string' 
-                ? sanitizedContent.expertTeachingContent.detailedExplanation.substring(0, 3000) 
-                : `This section provides essential information about ${sectionTitle}.`,
-              expertInsights: ["Key concept for understanding"],
-              practicalExamples: [],
-              realWorldConnections: [],
-              commonMisconceptions: []
-            },
-            checkForUnderstanding: ["How does this concept apply?"],
-            expertSummary: `We have covered the fundamentals of ${sectionTitle}.`,
-            bridgeToNext: "This prepares us for the next section."
-          };
-          
-          const { error: retryError } = await this.supabase
-            .from('lesson_sections')
-            .upsert({
-              lesson_id: lessonId,
-              title: sectionTitle,
-              content: simplifiedContent,
-              section_type: sectionType,
-              order_index: sectionIndex,
-              created_by: lesson.created_by
-            }, { onConflict: 'lesson_id,order_index' });
-            
-          if (retryError) {
-            console.error(`❌ Failed to create simplified section: ${retryError.message}`);
-            // Bubble up so the task is marked failed and retried later
-            throw new Error(`Failed to create simplified section for lesson ${lessonId}, section ${sectionIndex}: ${retryError.message}`);
+          console.warn(`Stack depth limit exceeded for section ${sectionIndex}. Retrying via safe RPC...`);
+
+          // Try RPC that temporarily disables heavy triggers to avoid deep recursion
+          const { error: rpcError } = await this.supabase.rpc('safe_upsert_lesson_section', {
+            p_lesson_id: lessonId,
+            p_order_index: sectionIndex,
+            p_title: sectionTitle,
+            p_content: sanitizedContent,
+            p_section_type: sectionType,
+            p_created_by: lesson.created_by
+          });
+
+          if (rpcError) {
+            console.warn(`RPC upsert failed, attempting simplified content via RPC...`, rpcError);
+
+            const simplifiedContent = {
+              sectionTitle: sectionTitle,
+              introduction: `This section covers ${sectionTitle}.`,
+              expertTeachingContent: {
+                conceptIntroduction: `Let's explore ${sectionTitle}.`,
+                detailedExplanation: typeof sanitizedContent.expertTeachingContent?.detailedExplanation === 'string'
+                  ? sanitizedContent.expertTeachingContent.detailedExplanation.substring(0, 3000)
+                  : `This section provides essential information about ${sectionTitle}.`,
+                expertInsights: ["Key concept for understanding"],
+                practicalExamples: [],
+                realWorldConnections: [],
+                commonMisconceptions: []
+              },
+              checkForUnderstanding: ["How does this concept apply?"],
+              expertSummary: `We have covered the fundamentals of ${sectionTitle}.`,
+              bridgeToNext: "This prepares us for the next section."
+            };
+
+            const { error: rpcRetryError } = await this.supabase.rpc('safe_upsert_lesson_section', {
+              p_lesson_id: lessonId,
+              p_order_index: sectionIndex,
+              p_title: sectionTitle,
+              p_content: simplifiedContent,
+              p_section_type: sectionType,
+              p_created_by: lesson.created_by
+            });
+
+            if (rpcRetryError) {
+              console.error(`❌ Failed to create simplified section via RPC: ${rpcRetryError.message}`);
+              throw new Error(`Failed to create simplified section for lesson ${lessonId}, section ${sectionIndex}: ${rpcRetryError.message}`);
+            }
+
+            console.log(`✅ Created simplified section ${sectionIndex} for lesson ${lessonId} via RPC`);
+            return;
           }
-          
-          console.log(`✅ Created simplified section ${sectionIndex} for lesson ${lessonId}`);
+
+          console.log(`✅ Upserted section ${sectionIndex} for lesson ${lessonId} via safe RPC`);
           return;
         }
 
