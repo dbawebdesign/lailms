@@ -84,8 +84,9 @@ export default function StreamlinedCourseCreator({
   const [baseClassId, setBaseClassId] = useState<string | null>(existingBaseClassId || null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Function to wait for all documents associated with a base class to be processed
-  const waitForDocumentProcessing = async (baseClassId: string, organisationId: string): Promise<void> => {
+	// Function to wait for all documents associated with a base class to be processed
+	// Enhanced: polls chunk-level progress so the UI shows movement during long PDFs
+	const waitForDocumentProcessing = async (baseClassId: string, organisationId: string): Promise<void> => {
     const maxWaitTime = 10 * 60 * 1000; // 10 minutes max wait
     const pollInterval = 3000; // Check every 3 seconds
     const startTime = Date.now();
@@ -94,7 +95,7 @@ export default function StreamlinedCourseCreator({
         // Fetch documents associated with this base class
         const { data: documents, error } = await supabase
           .from('documents')
-          .select('id, status, file_name, metadata')
+					.select('id, status, file_name, metadata')
           .eq('organisation_id', organisationId)
           .eq('base_class_id', baseClassId);
 
@@ -107,7 +108,7 @@ export default function StreamlinedCourseCreator({
           throw new Error('No documents found for this course');
         }
 
-        // Check if all documents are processed
+				// Check if all documents are processed
         const processingDocuments = documents.filter((doc: any) => 
           doc.status === 'queued' || doc.status === 'processing'
         );
@@ -127,14 +128,45 @@ export default function StreamlinedCourseCreator({
           throw new Error(`Document processing failed: ${errorMessages}`);
         }
 
-        // If all documents are completed, we're done
-        if (processingDocuments.length === 0) {
-          console.log('All documents processed successfully');
-          return;
-        }
+				// If all documents are completed, we're done
+				if (processingDocuments.length === 0) {
+					console.log('All documents processed successfully');
+					setProcessingMessage(`Processing complete (${completedDocuments.length}/${documents.length})`);
+					setProgress(90);
+					return;
+				}
 
-        // Update progress message with specific info
-        setProcessingMessage(`Processing documents... (${completedDocuments.length}/${documents.length} complete)`);
+				// Enhanced progress: compute chunk-level summarization progress across all documents
+				let totalChunks = 0;
+				let completedChunks = 0;
+				for (const d of documents) {
+					// Total chunks for document
+					const { count: docTotalCount } = await supabase
+						.from('document_chunks')
+						.select('id', { count: 'exact', head: true })
+						.eq('document_id', d.id);
+					// Completed summarized chunks for document
+					const { count: docCompletedCount } = await supabase
+						.from('document_chunks')
+						.select('id', { count: 'exact', head: true })
+						.eq('document_id', d.id)
+						.eq('summary_status', 'completed');
+
+					totalChunks += docTotalCount || 0;
+					completedChunks += docCompletedCount || 0;
+				}
+
+				if (totalChunks > 0) {
+					const chunkPct = Math.floor((completedChunks / totalChunks) * 100);
+					setProcessingMessage(`Summarizing chunks… ${completedChunks}/${totalChunks} (${chunkPct}%) • Documents: ${completedDocuments.length}/${documents.length} complete`);
+					// Map chunk progress into progress bar range [50, 90]
+					const bar = 50 + Math.floor(40 * (completedChunks / totalChunks));
+					setProgress(bar);
+				} else {
+					// Chunking phase (no chunks yet) – show document progress
+					setProcessingMessage(`Chunking and embedding… • Documents: ${completedDocuments.length}/${documents.length} complete`);
+					setProgress(55);
+				}
 
         // Wait before next check
         await new Promise(resolve => setTimeout(resolve, pollInterval));

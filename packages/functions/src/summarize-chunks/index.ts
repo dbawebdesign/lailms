@@ -33,137 +33,401 @@ interface ChunkRecord {
   organisation_id?: string; // Added to potentially fetch if needed for document_summaries
 }
 
+// Helper: robustly extract text from GPT-5-nano Responses API payloads
+function extractResponseText(result: any): string {
+  console.log('GPT-5-nano response structure:', JSON.stringify(result, null, 2));
+  
+  if (!result) return '';
+  
+  // Check if response is incomplete due to max_output_tokens
+  if (result.status === 'incomplete' && result.incomplete_details?.reason === 'max_output_tokens') {
+    console.warn('GPT-5-nano response incomplete due to max_output_tokens limit');
+    // Try to extract any partial content that might exist
+  }
+  
+  // Handle direct text response
+  if (typeof result === 'string') return result.trim();
+  if (typeof result.text === 'string') return result.text.trim();
+  if (typeof result.output_text === 'string') return result.output_text.trim();
+  
+  // Handle output array format - look for message types
+  if (Array.isArray(result.output)) {
+    for (const item of result.output) {
+      // Look for message type outputs with content
+      if (item.type === 'message' && item.content) {
+        if (Array.isArray(item.content)) {
+          for (const contentItem of item.content) {
+            if (contentItem.type === 'output_text' && contentItem.text) {
+              return contentItem.text.trim();
+            }
+            if (contentItem.type === 'text' && contentItem.text) {
+              return contentItem.text.trim();
+            }
+          }
+        } else if (typeof item.content === 'string') {
+          return item.content.trim();
+        }
+      }
+      // Look for direct text outputs
+      if (item.type === 'output_text' && item.text) {
+        return item.text.trim();
+      }
+      if (item.type === 'text' && item.text) {
+        return item.text.trim();
+      }
+      // Skip reasoning type outputs as they don't contain the final text
+      if (item.type === 'reasoning') {
+        continue;
+      }
+    }
+  }
+  
+  // Handle content array format
+  if (Array.isArray(result.content)) {
+    for (const contentItem of result.content) {
+      if (contentItem.type === 'output_text' && contentItem.text) {
+        return contentItem.text.trim();
+      }
+      if (contentItem.type === 'text' && contentItem.text) {
+        return contentItem.text.trim();
+      }
+    }
+  }
+  
+  // Handle message format
+  if (result.message && typeof result.message === 'string') {
+    return result.message.trim();
+  }
+  
+  console.warn('Could not extract text from GPT-5-nano response. Status:', result.status, 'Incomplete reason:', result.incomplete_details?.reason);
+  return '';
+}
+
+async function callGpt5Nano(
+  messages: Array<{ role: 'system' | 'user'; content: string }>,
+  apiKey: string,
+  maxTokens: number
+): Promise<string> {
+  const resp = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-5-nano',
+      input: messages,
+      max_output_tokens: maxTokens,
+      reasoning: {
+        effort: 'low'  // Use low reasoning effort for simple summarization tasks
+      }
+    }),
+  });
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`OpenAI Responses error (${resp.status}): ${body}`);
+  }
+  const result = await resp.json();
+  const text = extractResponseText(result);
+  if (!text) {
+    // If no text extracted, provide more context about the failure
+    const status = result.status || 'unknown';
+    const reason = result.incomplete_details?.reason || 'unknown';
+    throw new Error(`Empty response text. Status: ${status}, Reason: ${reason}`);
+  }
+  return text;
+}
+
 /**
- * Summarizes a single text chunk using OpenAI's GPT-4.1-mini model
+ * Summarizes a single text chunk using preferred model flow
  */
 async function summarizeChunk(content: string, apiKey: string): Promise<string> {
-  try {
-    const url = 'https://api.openai.com/v1/chat/completions';
+  const messages = [
+    { role: 'system' as const, content: 'You are a highly efficient summarizer. Create clear, concise summaries that capture the key information while being brief.' },
+    { role: 'user' as const, content: `Provide a brief, factual summary of the following text (no more than 2-3 sentences):\n\n${content}` },
+  ];
+  return await callGpt5Nano(messages, apiKey, 400); // Increased from 150 to account for reasoning overhead
+}
+
+/**
+ * Batch summarization with progressive database updates for better UI feedback
+ */
+async function summarizeChunksBatchWithProgressiveUpdates(
+  chunks: ChunkRecord[], 
+  apiKey: string, 
+  supabase: any,
+  onProgress?: (completedInBatch: number) => void
+): Promise<Map<string, string>> {
+  const batchSize = 10; // Process up to 10 chunks per API call
+  const results = new Map<string, string>();
+  
+  console.log(`Starting batch summarization with progressive updates for ${chunks.length} chunks in batches of ${batchSize}`);
+  
+  for (let i = 0; i < chunks.length; i += batchSize) {
+    const batch = chunks.slice(i, i + batchSize);
+    console.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(chunks.length / batchSize)} with ${batch.length} chunks`);
     
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4.1-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a highly efficient summarizer. Create clear, concise summaries that capture the key information while being brief.'
-          },
-          {
-            role: 'user',
-            content: `Provide a brief, factual summary of the following text (no more than 2-3 sentences):\n\n${content}`
+    try {
+      // Create a single prompt with multiple chunks
+      const chunksText = batch.map((chunk, idx) => 
+        `CHUNK ${idx + 1} (ID: ${chunk.id}):\n${chunk.content}\n`
+      ).join('\n---\n\n');
+      
+      const messages = [
+        { 
+          role: 'system' as const, 
+          content: 'You are a highly efficient batch summarizer. For each chunk provided, create a clear, concise summary (2-3 sentences max). Format your response as: "CHUNK 1 SUMMARY: [summary]\\nCHUNK 2 SUMMARY: [summary]" etc.' 
+        },
+        { 
+          role: 'user' as const, 
+          content: `Summarize each of the following text chunks. Provide exactly ${batch.length} summaries in the specified format:\n\n${chunksText}` 
+        },
+      ];
+      
+      const batchResponse = await callGpt5Nano(messages, apiKey, 800 + (batch.length * 100)); // Dynamic token allocation
+      
+      // Parse the batch response to extract individual summaries
+      const summaries = parseBatchSummaryResponse(batchResponse, batch);
+      
+      // Immediately update database for this batch
+      let batchCompletedCount = 0;
+      for (const chunk of batch) {
+        const summary = summaries.get(chunk.id);
+        
+        if (summary) {
+          try {
+            const { error: updateError } = await supabase
+              .from('document_chunks')
+              .update({
+                chunk_summary: summary,
+                summary_status: 'completed',
+                section_summary_status: chunk.section_identifier ? 'pending' : null 
+              })
+              .eq('id', chunk.id);
+            
+            if (updateError) {
+              console.error(`Failed to update chunk ${chunk.id}:`, updateError);
+            } else {
+              results.set(chunk.id, summary);
+              batchCompletedCount++;
+            }
+          } catch (updateError) {
+            console.error(`Error updating chunk ${chunk.id} in database:`, updateError);
+            await supabase
+              .from('document_chunks')
+              .update({ summary_status: 'error' })
+              .eq('id', chunk.id);
           }
-        ],
-        temperature: 0.3, // Lower temperature for more factual/deterministic outputs
-        max_tokens: 150   // Keep summaries concise
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`OpenAI API error (${response.status}): ${errorBody}`);
+        } else {
+          console.warn(`No summary generated for chunk ${chunk.id} in batch processing`);
+          await supabase
+            .from('document_chunks')
+            .update({ summary_status: 'error' })
+            .eq('id', chunk.id);
+        }
+      }
+      
+      // Call progress callback for UI updates
+      if (onProgress && batchCompletedCount > 0) {
+        onProgress(batchCompletedCount);
+      }
+      
+      console.log(`Batch ${Math.floor(i / batchSize) + 1} completed: ${batchCompletedCount}/${batch.length} chunks summarized and updated in database`);
+      
+    } catch (error) {
+      console.error(`Error in batch ${Math.floor(i / batchSize) + 1}:`, error);
+      
+      // Fallback to individual processing for this batch
+      console.log(`Falling back to individual processing for batch ${Math.floor(i / batchSize) + 1}`);
+      let individualCompletedCount = 0;
+      for (const chunk of batch) {
+        try {
+          const summary = await summarizeChunk(chunk.content, apiKey);
+          
+          const { error: updateError } = await supabase
+            .from('document_chunks')
+            .update({
+              chunk_summary: summary,
+              summary_status: 'completed',
+              section_summary_status: chunk.section_identifier ? 'pending' : null 
+            })
+            .eq('id', chunk.id);
+          
+          if (updateError) {
+            console.error(`Failed to update chunk ${chunk.id}:`, updateError);
+          } else {
+            results.set(chunk.id, summary);
+            individualCompletedCount++;
+          }
+        } catch (individualError) {
+          console.error(`Failed to summarize chunk ${chunk.id} individually:`, individualError);
+          await supabase
+            .from('document_chunks')
+            .update({ summary_status: 'error' })
+            .eq('id', chunk.id);
+        }
+      }
+      
+      // Call progress callback for fallback completions
+      if (onProgress && individualCompletedCount > 0) {
+        onProgress(individualCompletedCount);
+      }
     }
     
-    const result = await response.json();
-    return result.choices[0].message.content.trim();
-  } catch (error) {
-    console.error('Error generating summary:', error);
-    throw error;
+    // Small delay between batches to avoid rate limiting
+    if (i + batchSize < chunks.length) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
   }
+  
+  console.log(`Batch summarization with progressive updates completed. Successfully processed ${results.size}/${chunks.length} chunks`);
+  return results;
+}
+
+/**
+ * Original batch summarization function (kept for backwards compatibility)
+ */
+async function summarizeChunksBatch(chunks: ChunkRecord[], apiKey: string): Promise<Map<string, string>> {
+  const batchSize = 10; // Process up to 10 chunks per API call
+  const results = new Map<string, string>();
+  
+  console.log(`Starting batch summarization for ${chunks.length} chunks in batches of ${batchSize}`);
+  
+  for (let i = 0; i < chunks.length; i += batchSize) {
+    const batch = chunks.slice(i, i + batchSize);
+    console.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(chunks.length / batchSize)} with ${batch.length} chunks`);
+    
+    try {
+      // Create a single prompt with multiple chunks
+      const chunksText = batch.map((chunk, idx) => 
+        `CHUNK ${idx + 1} (ID: ${chunk.id}):\n${chunk.content}\n`
+      ).join('\n---\n\n');
+      
+      const messages = [
+        { 
+          role: 'system' as const, 
+          content: 'You are a highly efficient batch summarizer. For each chunk provided, create a clear, concise summary (2-3 sentences max). Format your response as: "CHUNK 1 SUMMARY: [summary]\\nCHUNK 2 SUMMARY: [summary]" etc.' 
+        },
+        { 
+          role: 'user' as const, 
+          content: `Summarize each of the following text chunks. Provide exactly ${batch.length} summaries in the specified format:\n\n${chunksText}` 
+        },
+      ];
+      
+      const batchResponse = await callGpt5Nano(messages, apiKey, 800 + (batch.length * 100)); // Dynamic token allocation
+      
+      // Parse the batch response to extract individual summaries
+      const summaries = parseBatchSummaryResponse(batchResponse, batch);
+      
+      // Add successful summaries to results
+      summaries.forEach((summary, chunkId) => {
+        if (summary) {
+          results.set(chunkId, summary);
+        }
+      });
+      
+      console.log(`Batch ${Math.floor(i / batchSize) + 1} completed: ${summaries.size}/${batch.length} chunks summarized`);
+      
+    } catch (error) {
+      console.error(`Error in batch ${Math.floor(i / batchSize) + 1}:`, error);
+      
+      // Fallback to individual processing for this batch
+      console.log(`Falling back to individual processing for batch ${Math.floor(i / batchSize) + 1}`);
+      for (const chunk of batch) {
+        try {
+          const summary = await summarizeChunk(chunk.content, apiKey);
+          results.set(chunk.id, summary);
+        } catch (individualError) {
+          console.error(`Failed to summarize chunk ${chunk.id} individually:`, individualError);
+        }
+      }
+    }
+    
+    // Small delay between batches to avoid rate limiting
+    if (i + batchSize < chunks.length) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+  
+  console.log(`Batch summarization completed. Successfully processed ${results.size}/${chunks.length} chunks`);
+  return results;
+}
+
+/**
+ * Helper function to parse batch summary responses from GPT-5-nano
+ */
+function parseBatchSummaryResponse(response: string, chunks: ChunkRecord[]): Map<string, string> {
+  const results = new Map<string, string>();
+  
+  try {
+    // Look for patterns like "CHUNK 1 SUMMARY:", "CHUNK 2 SUMMARY:", etc.
+    const summaryPattern = /CHUNK\s+(\d+)\s+SUMMARY:\s*([^\n]+(?:\n(?!CHUNK\s+\d+\s+SUMMARY:)[^\n]*)*)/gi;
+    let match;
+    
+    while ((match = summaryPattern.exec(response)) !== null) {
+      const chunkIndex = parseInt(match[1]) - 1; // Convert to 0-based index
+      const summary = match[2].trim();
+      
+      if (chunkIndex >= 0 && chunkIndex < chunks.length && summary) {
+        const chunkId = chunks[chunkIndex].id;
+        results.set(chunkId, summary);
+      }
+    }
+    
+    // If pattern matching failed, try alternative parsing approaches
+    if (results.size === 0) {
+      console.warn('Primary parsing failed, trying alternative approaches');
+      
+      // Try splitting by numbers or other delimiters
+      const lines = response.split('\n').filter(line => line.trim());
+      let currentChunkIndex = 0;
+      
+      for (const line of lines) {
+        if (line.trim() && currentChunkIndex < chunks.length) {
+          // Clean up the line (remove numbering, colons, etc.)
+          const cleanedSummary = line.replace(/^\d+[\.:)\-]?\s*/, '').replace(/^CHUNK\s*\d+[\s\-:]*/, '').trim();
+          
+          if (cleanedSummary && cleanedSummary.length > 10) { // Ensure it's a meaningful summary
+            results.set(chunks[currentChunkIndex].id, cleanedSummary);
+            currentChunkIndex++;
+          }
+        }
+      }
+    }
+    
+  } catch (parseError) {
+    console.error('Error parsing batch summary response:', parseError);
+  }
+  
+  return results;
 }
 
 /**
  * Creates a section summary from multiple chunk summaries
  */
 async function summarizeSection(chunkContents: string[], sectionIdentifier: string, apiKey: string): Promise<string> {
-  try {
-    const combinedContents = chunkContents.join('\n\n'); // Combine original chunk contents for section summary
-    
-    const url = 'https://api.openai.com/v1/chat/completions';
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4.1-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a highly efficient summarizer. Create clear, concise summaries that capture the key information while being brief.'
-          },
-          {
-            role: 'user',
-            content: `These are text segments from the "${sectionIdentifier}" section of a document. Create a concise section summary that captures the key points (maximum 3-4 sentences):\n\n${combinedContents}`
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 200
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`OpenAI API error (${response.status}): ${errorBody}`);
-    }
-    
-    const result = await response.json();
-    return result.choices[0].message.content.trim();
-  } catch (error) {
-    console.error('Error generating section summary:', error);
-    throw error;
-  }
+  const combinedContents = chunkContents.join('\n\n');
+  const messages = [
+    { role: 'system' as const, content: 'You are a highly efficient summarizer. Create clear, concise summaries that capture the key information while being brief.' },
+    { role: 'user' as const, content: `These are text segments from the "${sectionIdentifier}" section of a document. Create a concise section summary that captures the key points (maximum 3-4 sentences):\n\n${combinedContents}` },
+  ];
+  return await callGpt5Nano(messages, apiKey, 500); // Increased from 200 to account for reasoning overhead
 }
 
 /**
  * Creates a document-level summary from section summaries
  */
-async function summarizeDocument(sectionSummaries: { section: string, summary: string }[], documentId: string, apiKey: string): Promise<string> {
-  try {
-    const formattedSections = sectionSummaries.map(s => `${s.section || 'Unnamed section'}:\n${s.summary}`).join('\n\n');
-    
-    const url = 'https://api.openai.com/v1/chat/completions';
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4.1-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a highly efficient summarizer. Create clear, concise summaries that capture the key information while being brief.'
-          },
-          {
-            role: 'user',
-            content: `These are summaries of different sections of a document. Create a comprehensive but concise document summary (4-5 sentences maximum):\n\n${formattedSections}`
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 250
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`OpenAI API error (${response.status}): ${errorBody}`);
-    }
-    
-    const result = await response.json();
-    return result.choices[0].message.content.trim();
-  } catch (error) {
-    console.error('Error generating document summary:', error);
-    throw error;
-  }
+async function summarizeDocument(
+  sectionSummaries: { section: string, summary: string }[],
+  documentId: string,
+  apiKey: string
+): Promise<string> {
+  const formattedSections = sectionSummaries.map(s => `${s.section || 'Unnamed section'}:\n${s.summary}`).join('\n\n');
+  const messages = [
+    { role: 'system' as const, content: 'You are a highly efficient summarizer. Create clear, concise summaries that capture the key information while being brief.' },
+    { role: 'user' as const, content: `These are summaries of different sections of a document. Create a comprehensive but concise document summary (4-5 sentences maximum):\n\n${formattedSections}` },
+  ];
+  return await callGpt5Nano(messages, apiKey, 600); // Increased from 250 to account for reasoning overhead
 }
 
 // Main function handler
@@ -271,33 +535,85 @@ serve(async (req: Request) => {
       
       console.log(`Found ${chunks.length} chunks to summarize for document ${documentId}`);
       
-      // Process each chunk
-      for (const chunk of chunks as ChunkRecord[]) {
+      // Choose between batch processing (>30 chunks) or individual processing
+      if (chunks.length > 30) {
+        console.log(`Using batch processing for ${chunks.length} chunks (threshold: 30)`);
+        
         try {
-          console.log(`Summarizing chunk ${chunk.id} (${chunk.chunk_index}) for document ${documentId}`);
-          const summary = await summarizeChunk(chunk.content, openaiApiKey);
+          const batchResults = await summarizeChunksBatchWithProgressiveUpdates(
+            chunks as ChunkRecord[], 
+            openaiApiKey, 
+            supabase,
+            (completed: number) => {
+              response.summarized += completed;
+              console.log(`Progressive update: ${response.summarized}/${chunks.length} chunks completed`);
+            }
+          );
           
-          // Update the chunk with its summary
-          const { error: updateError } = await supabase
-            .from('document_chunks')
-            .update({
-              chunk_summary: summary,
-              summary_status: 'completed',
-              section_summary_status: chunk.section_identifier ? 'pending' : null 
-            })
-            .eq('id', chunk.id);
+        } catch (batchError) {
+          console.error('Batch processing failed completely, falling back to individual processing:', batchError);
           
-          if (updateError) {
-            console.error(`Failed to update chunk ${chunk.id}:`, updateError);
-          } else {
-            response.summarized++;
+          // Fallback to individual processing for all chunks
+          for (const chunk of chunks as ChunkRecord[]) {
+            try {
+              console.log(`Fallback: Summarizing chunk ${chunk.id} (${chunk.chunk_index}) individually`);
+              const summary = await summarizeChunk(chunk.content, openaiApiKey);
+              
+              const { error: updateError } = await supabase
+                .from('document_chunks')
+                .update({
+                  chunk_summary: summary,
+                  summary_status: 'completed',
+                  section_summary_status: chunk.section_identifier ? 'pending' : null 
+                })
+                .eq('id', chunk.id);
+              
+              if (updateError) {
+                console.error(`Failed to update chunk ${chunk.id}:`, updateError);
+              } else {
+                response.summarized++;
+              }
+            } catch (error: any) {
+              console.error(`Error summarizing chunk ${chunk.id}:`, error);
+              await supabase
+                .from('document_chunks')
+                .update({ summary_status: 'error' })
+                .eq('id', chunk.id);
+            }
           }
-        } catch (error: any) { // Typed error
-          console.error(`Error summarizing chunk ${chunk.id}:`, error);
-          await supabase
-            .from('document_chunks')
-            .update({ summary_status: 'error' })
-            .eq('id', chunk.id);
+        }
+        
+      } else {
+        console.log(`Using individual processing for ${chunks.length} chunks (threshold: 30)`);
+        
+        // Process each chunk individually (original logic)
+        for (const chunk of chunks as ChunkRecord[]) {
+          try {
+            console.log(`Summarizing chunk ${chunk.id} (${chunk.chunk_index}) for document ${documentId}`);
+            const summary = await summarizeChunk(chunk.content, openaiApiKey);
+            
+            // Update the chunk with its summary
+            const { error: updateError } = await supabase
+              .from('document_chunks')
+              .update({
+                chunk_summary: summary,
+                summary_status: 'completed',
+                section_summary_status: chunk.section_identifier ? 'pending' : null 
+              })
+              .eq('id', chunk.id);
+            
+            if (updateError) {
+              console.error(`Failed to update chunk ${chunk.id}:`, updateError);
+            } else {
+              response.summarized++;
+            }
+          } catch (error: any) { // Typed error
+            console.error(`Error summarizing chunk ${chunk.id}:`, error);
+            await supabase
+              .from('document_chunks')
+              .update({ summary_status: 'error' })
+              .eq('id', chunk.id);
+          }
         }
       }
       
@@ -487,7 +803,7 @@ async function finalizeDocumentProcessing(
         summary: documentSummaryText,
         summary_level: 'document',
         status: 'completed',
-        model_used: 'gpt-4.1-mini', // Assuming this model is used by summarizeDocument
+        model_used: 'gpt-5-nano',
         updated_at: new Date().toISOString(), 
       }, { onConflict: 'document_id, summary_level' });
 

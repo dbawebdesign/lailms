@@ -507,51 +507,33 @@ const BaseClassEditor: React.FC<BaseClassEditorProps> = ({ baseClass, onSave }) 
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {isCheckingContent ? 'Checking content...' : 'Checking mind map...'}
                 </Button>
-              ) : hasGeneratedContent ? (
-                existingMindMap ? (
-                  <Button 
-                    onClick={handleViewBaseClassMindMap} 
-                    disabled={isGeneratingContent || isGeneratingMindMap}
-                    className="flex-shrink-0"
-                  >
-                    View Base Class Mind Map
-                  </Button>
-                ) : (
-                  <Button 
-                    onClick={handleGenerateBaseClassMindMap} 
-                    disabled={isGeneratingContent || isGeneratingMindMap}
-                    className="flex-shrink-0"
-                  >
-                    {isGeneratingMindMap ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Generating Mind Map...
-                      </>
-                    ) : (
-                      'Generate Base Class Mind Map'
-                    )}
-                  </Button>
-                )
               ) : (
-                <Button 
-                  onClick={handleCreateAllLessonContent} 
-                  disabled={isGeneratingContent || isGeneratingMindMap}
-                  className="flex-shrink-0"
-                >
-                  {isGeneratingContent && totalToProcessForStream > 0 && processedSoFarForStream < totalToProcessForStream ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {`Generating (${processedSoFarForStream}/${totalToProcessForStream})`}
-                    </>
-                  ) : isGeneratingContent ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {currentGeneratingMessage || 'Initializing...'}
-                    </>
+                hasGeneratedContent && (
+                  existingMindMap ? (
+                    <Button 
+                      onClick={handleViewBaseClassMindMap} 
+                      disabled={isGeneratingContent || isGeneratingMindMap}
+                      className="flex-shrink-0"
+                    >
+                      View Base Class Mind Map
+                    </Button>
                   ) : (
-                    'Create all lesson content'
-                  )}
-                </Button>
+                    <Button 
+                      onClick={handleGenerateBaseClassMindMap} 
+                      disabled={isGeneratingContent || isGeneratingMindMap}
+                      className="flex-shrink-0"
+                    >
+                      {isGeneratingMindMap ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Generating Mind Map...
+                        </>
+                      ) : (
+                        'Generate Base Class Mind Map'
+                      )}
+                    </Button>
+                  )
+                )
               )}
             </div>
 

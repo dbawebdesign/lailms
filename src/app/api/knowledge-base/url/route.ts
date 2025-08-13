@@ -135,18 +135,21 @@ export async function POST(request: Request) {
       console.warn('Supabase URL or Anon Key not configured for function invocation. Skipping.');
     } else {
       const invokeClient = createClient(supabaseUrl, supabaseAnonKey);
-      const { error: invokeError } = await invokeClient.functions.invoke(
-        'process-document',
-        {
+      // Fire-and-forget invocation to avoid API timeout while long-running processing happens in background
+      invokeClient.functions
+        .invoke('process-document', {
           body: { documentId: insertedDocumentId }
-        }
-      );
-
-      if (invokeError) {
-        console.error('Failed to invoke process-document function:', invokeError);
-      } else {
-        console.log('process-document function invoked successfully for URL.');
-      }
+        })
+        .then(({ error: invokeError }) => {
+          if (invokeError) {
+            console.error('Failed to invoke process-document function:', invokeError);
+          } else {
+            console.log('process-document function invoked successfully for URL.');
+          }
+        })
+        .catch((error) => {
+          console.error('Unexpected error during process-document invocation:', error);
+        });
     }
 
     return NextResponse.json({ 

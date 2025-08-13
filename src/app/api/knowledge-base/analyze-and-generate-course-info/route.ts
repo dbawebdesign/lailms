@@ -29,7 +29,7 @@ async function waitForDocumentProcessing(
   supabase: ReturnType<typeof createSupabaseServerClient>, 
   organisationId: string, 
   baseClassId: string,
-  maxWaitTime: number = 120000 // 2 minutes max wait
+  maxWaitTime: number = 10 * 60 * 1000 // 10 minutes max wait
 ): Promise<Document[]> {
   const startTime = Date.now();
   
@@ -71,7 +71,8 @@ async function waitForDocumentProcessing(
       }
       
       if (completedDocs.length > 0 && processingDocs.length > 0) {
-        // Some completed, some still processing - wait a bit more
+        // Friendly status update: still processing N docs
+        console.log(`Waiting for remaining documents to finish: ${processingDocs.length} still processing`);
         await new Promise(resolve => setTimeout(resolve, 3000));
         continue;
       }
@@ -125,13 +126,29 @@ export async function POST(request: NextRequest) {
 
     console.log(`Starting comprehensive analysis for base class ${baseClassId}`);
 
-    // Wait for all documents to be processed
+    // Wait for all documents to be processed (up to 10 minutes). If timeout, return friendly message with remaining count.
     const documents = await waitForDocumentProcessing(supabase, organisationId, baseClassId);
 
     if (!documents || documents.length === 0) {
+      // Determine how many are still processing to give a friendly UI message
+      const { data: allDocs } = await supabase
+        .from('documents')
+        .select('id, status')
+        .eq('organisation_id', organisationId)
+        .eq('base_class_id', baseClassId);
+
+      const total = allDocs?.length || 0;
+      const remaining = (allDocs || []).filter((d: any) => d.status === 'queued' || d.status === 'processing').length;
       return NextResponse.json(
-        { error: 'No processed documents found for this base class. Please ensure documents are uploaded and processing has completed.' }, 
-        { status: 400 }
+        { 
+          success: false,
+          pending: remaining,
+          total,
+          error: remaining > 0 
+            ? `Still processing ${remaining} of ${total} document(s).` 
+            : 'No processed documents found for this base class. Please ensure documents are uploaded and processing has completed.'
+        }, 
+        { status: 202 }
       );
     }
 
