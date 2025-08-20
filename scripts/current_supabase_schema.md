@@ -1,6 +1,64 @@
 # Current Supabase Schema
 
+## Latest Updates (Sub-Account Support)
+
+- **profiles table enhancements for sub-accounts:**
+  - `is_sub_account` (BOOLEAN, default FALSE) - Indicates if this is a sub-account (student without auth)
+  - `parent_account_id` (UUID) - Links sub-accounts to their parent account
+  - Students are now created as sub-accounts without separate auth accounts
+  - Parents can switch between family member accounts using the account switcher
+
+- **New RLS Policies:**
+  - "Parents can manage their sub-accounts" - Allows parent accounts to manage student profiles
+  - "Parents can create sub-accounts" - Allows parents to create student profiles
+
 ## Recent Updates
+
+### Homeschool Family Structure Enhancement (2025-01-30)
+Added comprehensive family account structure for homeschool users:
+
+- **Schema Changes:**
+  - Added `max_students` (integer, default 4) to `organisations` table for student limits
+  - Added `subscription_status` (text, default 'pending') to track subscription state
+  - Added `subscription_started_at` and `subscription_expires_at` for subscription management
+  - Added `family_id` to `profiles` table to link students to families
+  - Added `is_primary_parent` (boolean) to identify primary family account holder
+  - Added `onboarding_completed` and `onboarding_step` for tracking onboarding progress
+  - Made `username` column nullable in `profiles` table (homeschool accounts don't require usernames)
+
+- **New Tables:**
+  - `family_students`: Links students to their family accounts
+  - `coop_members`: Tracks families that are part of homeschool co-ops
+
+- **Row Level Security Policies Added:**
+  - **Organisations Table:**
+    - Users can create their own organisation
+    - Users can update their own organisation
+    - Users can view organisations (for joining co-ops)
+  
+  - **Organisation Units Table:**
+    - Users can create units for their organisation
+    - Users can view and update units in their organisation
+  
+  - **Homeschool Family Info Table:**
+    - Primary parents can create, view, and update family info
+    - Family members can view family info
+  
+  - **Family Students Table:**
+    - Parents can add and manage students in their family
+    - Students can view their family association
+  
+  - **Invite Codes Table:**
+    - Modified trigger function to use SECURITY DEFINER for system-level access
+    - Homeschool organizations (individual_family, homeschool_coop) skip invite code generation
+    - System can create invite codes through triggers
+
+- **Features:**
+  - **Family Account Structure**: Primary parent account manages student accounts
+  - **Student Limits**: Enforces max 4 students per standard family account
+  - **Co-op Support**: Families can join homeschool co-ops/networks
+  - **Onboarding Tracking**: Progressive onboarding flow state management
+  - **RLS Policies**: Secure access control for family and co-op data
 
 ### Stripe Payment Integration (2025-01-29)
 Added comprehensive payment tracking and Stripe integration for homeschool signup flow:

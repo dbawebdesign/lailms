@@ -1,19 +1,18 @@
 import { Suspense } from 'react'
 import { Metadata } from 'next'
-import HomeschoolSignupForm from '@/components/auth/HomeschoolSignupForm'
-import { Loader2 } from 'lucide-react'
+import HomeschoolOnboarding from '@/components/auth/HomeschoolOnboarding'
 
 export const metadata = {
-  title: 'Homeschool Signup | Learnology AI',
-  description: 'Create your homeschool organization account with Learnology AI',
+  title: 'Setup Your Homeschool | Learnology AI',
+  description: 'Create your personalized homeschool learning environment',
 }
 
-function LoadingSpinner() {
+function LoadingState() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center space-y-4">
-        <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-        <p className="text-neutral-600 dark:text-neutral-400">Loading signup form...</p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-950 dark:to-black">
+      <div className="text-center space-y-3">
+        <div className="w-12 h-12 border-2 border-neutral-200 dark:border-neutral-800 border-t-neutral-900 dark:border-t-white rounded-full animate-spin mx-auto" />
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 font-light">Preparing your experience...</p>
       </div>
     </div>
   )
@@ -21,8 +20,8 @@ function LoadingSpinner() {
 
 export default function HomeschoolSignupPage() {
   return (
-    <Suspense fallback={<LoadingSpinner />}>
-      <HomeschoolSignupForm />
+    <Suspense fallback={<LoadingState />}>
+      <HomeschoolOnboarding />
     </Suspense>
   )
 } 

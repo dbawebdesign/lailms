@@ -5,6 +5,7 @@ import { ActiveCourseItemProps } from "@/components/dashboard/student/ActiveCour
 import { Tables } from "packages/types/db";
 import { calculateOverallProgress } from "@/lib/student/progress.server";
 import { isStudent, getEffectiveRole, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
+import { getActiveProfile } from '@/lib/auth/family-helpers';
 
 // Helper function to fetch Active Courses data
 async function getActiveCoursesData(supabase: any, userId: string): Promise<ActiveCourseItemProps[]> {
@@ -79,23 +80,16 @@ async function getActiveCoursesData(supabase: any, userId: string): Promise<Acti
 export async function GET() {
   try {
     const supabase = createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      console.error('Auth error or no user:', authError);
+    
+    // Get the active profile (handles both regular users and sub-accounts)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
+      console.error('No active profile found');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select(PROFILE_ROLE_FIELDS)
-      .eq("user_id", user.id)
-      .single<Tables<"profiles">>();
-
-    if (profileError || !profile) {
-      console.error("Error fetching student profile:", profileError);
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
-    }
+    
+    const { profile, isSubAccount } = activeProfileData;
     
     if (!isStudent(profile)) {
       const currentRole = getEffectiveRole(profile);
@@ -103,8 +97,8 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized - not a student' }, { status: 403 });
     }
     
-    const userName = profile.first_name || user.email || "Learner";
-    const activeCourses = await getActiveCoursesData(supabase, user.id);
+    const userName = profile.first_name || "Learner";
+    const activeCourses = await getActiveCoursesData(supabase, profile.user_id);
     const currentRole = getEffectiveRole(profile);
 
     return NextResponse.json({

@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { triggerChatLogout } from "@/utils/chatPersistence";
 import { Tables } from "packages/types/db";
 import { PROFILE_ROLE_FIELDS, UserProfile } from "@/lib/utils/roleUtils";
+import FamilyAccountSwitcher from "@/components/ui/FamilyAccountSwitcher";
 
 // Custom hover class for consistent brand styling
 const buttonHoverClass = "hover:bg-gradient-to-r hover:from-[#6B5DE5]/5 hover:to-[#6B5DE5]/10";
@@ -53,6 +54,8 @@ const Header = () => {
   const router = useRouter();
   const supabase = createClient();
 
+  const [isHomeschoolUser, setIsHomeschoolUser] = useState(false);
+
   useEffect(() => {
     setMounted(true);
     const fetchUser = async () => {
@@ -60,15 +63,18 @@ const Header = () => {
       if (session?.user?.email) {
         setUserEmail(session.user.email);
         
-        // Fetch user profile with roles
+        // Fetch user profile with roles and organization info
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select(PROFILE_ROLE_FIELDS + ', first_name, last_name')
+          .select(PROFILE_ROLE_FIELDS + ', first_name, last_name, organisations(organisation_type)')
           .eq('user_id', session.user.id)
-          .single<UserProfile>();
+          .single<UserProfile & { organisations: { organisation_type: string } }>();
           
         if (profile && !error) {
           setUserProfile(profile);
+          // Check if this is a homeschool user
+          const orgType = profile.organisations?.organisation_type;
+          setIsHomeschoolUser(orgType === 'individual_family' || orgType === 'homeschool_coop');
         }
       }
     };
@@ -184,50 +190,54 @@ const Header = () => {
           <Bell className="h-5 w-5" />
         </Button>
         
-        {/* Role Switcher - Only show for users with multiple roles */}
-        {hasMultipleRoles && currentRole && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={cn("flex items-center space-x-2 h-8", buttonHoverClass)}
-                disabled={isRoleSwitching}
-              >
-                {(() => {
-                  const IconComponent = roleIcons[currentRole as keyof typeof roleIcons];
-                  return IconComponent ? <IconComponent className="h-4 w-4" /> : <User className="h-4 w-4" />;
-                })()}
-                <span className="text-sm font-medium">
-                  {roleDisplayNames[currentRole as keyof typeof roleDisplayNames] || currentRole}
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Switch Role</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {availableRoles.map((role) => {
-                const IconComponent = roleIcons[role as keyof typeof roleIcons];
-                const isActive = role === currentRole;
-                
-                return (
-                  <DropdownMenuItem
-                    key={role}
-                    onClick={() => handleRoleSwitch(role as UserProfile['role'])}
-                    disabled={isActive || isRoleSwitching}
-                    className={cn(
-                      "flex items-center space-x-2",
-                      isActive && "bg-neutral-100 dark:bg-neutral-800"
-                    )}
-                  >
-                    {IconComponent && <IconComponent className="h-4 w-4" />}
-                    <span>{roleDisplayNames[role as keyof typeof roleDisplayNames] || role}</span>
-                    {isActive && <span className="ml-auto text-xs text-muted-foreground">Active</span>}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+        {/* Family Account Switcher for Homeschool Users, Role Switcher for Others */}
+        {isHomeschoolUser ? (
+          <FamilyAccountSwitcher />
+        ) : (
+          hasMultipleRoles && currentRole && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={cn("flex items-center space-x-2 h-8", buttonHoverClass)}
+                  disabled={isRoleSwitching}
+                >
+                  {(() => {
+                    const IconComponent = roleIcons[currentRole as keyof typeof roleIcons];
+                    return IconComponent ? <IconComponent className="h-4 w-4" /> : <User className="h-4 w-4" />;
+                  })()}
+                  <span className="text-sm font-medium">
+                    {roleDisplayNames[currentRole as keyof typeof roleDisplayNames] || currentRole}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Switch Role</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {availableRoles.map((role) => {
+                  const IconComponent = roleIcons[role as keyof typeof roleIcons];
+                  const isActive = role === currentRole;
+                  
+                  return (
+                    <DropdownMenuItem
+                      key={role}
+                      onClick={() => handleRoleSwitch(role as UserProfile['role'])}
+                      disabled={isActive || isRoleSwitching}
+                      className={cn(
+                        "flex items-center space-x-2",
+                        isActive && "bg-neutral-100 dark:bg-neutral-800"
+                      )}
+                    >
+                      {IconComponent && <IconComponent className="h-4 w-4" />}
+                      <span>{roleDisplayNames[role as keyof typeof roleDisplayNames] || role}</span>
+                      {isActive && <span className="ml-auto text-xs text-muted-foreground">Active</span>}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )
         )}
         
         {/* User Profile Dropdown */}

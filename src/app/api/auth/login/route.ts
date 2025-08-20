@@ -38,13 +38,13 @@ export async function POST(req: NextRequest) {
       }
     )
 
-    // Define the expected type for the profile data including the related organisation
-    type ProfileWithOrgAndRole = {
+        // Define the expected type for the profile data including the related organisation
+type ProfileWithOrgAndRole = {
       user_id: string;
       organisation_id: string | null;
       role: string;
       active_role: string | null;
-      organisations: { abbr: string } | null;
+      organisations: { abbr: string; organisation_type: string } | null;
     }
 
     console.log('Login API: Looking up profile for username:', username);
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
         organisation_id,
         role,
         active_role,
-        organisations (abbr)
+        organisations (abbr, organisation_type)
       `)
       .eq('username', username)
       .single<ProfileWithOrgAndRole>()
@@ -98,11 +98,12 @@ export async function POST(req: NextRequest) {
     // Calculate effective role (active_role if set, otherwise base role)
     const effectiveRole = profileData.active_role || profileData.role;
 
-    // Return success with user data and effective role
+    // Return success with user data, effective role, and organization type
     return NextResponse.json({
       user: data.user,
       session: data.session,
       role: effectiveRole,
+      organisation_type: profileData.organisations?.organisation_type,
     })
   } catch (error) {
     console.error('Error in login API route:', error)

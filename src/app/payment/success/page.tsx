@@ -32,7 +32,7 @@ function PaymentSuccessContent() {
   }, [searchParams]);
 
   const handleContinue = () => {
-    router.push('/login?payment=success');
+    router.push('/homeschool');
   };
 
   return (
@@ -67,7 +67,7 @@ function PaymentSuccessContent() {
                 Your account has been activated and you can now access all premium features.
               </p>
               <Button onClick={handleContinue} className="w-full">
-                Continue to Login
+                Continue to Dashboard
               </Button>
             </>
           )}
