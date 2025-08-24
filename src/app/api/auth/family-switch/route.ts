@@ -26,6 +26,24 @@ export async function POST(request: NextRequest) {
       )
     }
     
+    // Check if switching back to parent account
+    if (targetUserId === user.id) {
+      // Clear the active family member cookie
+      const response = NextResponse.json({
+        success: true,
+        redirectUrl: '/homeschool',
+        user: {
+          id: user.id,
+          role: 'teacher'
+        }
+      })
+      
+      // Clear the cookie
+      response.cookies.delete('active_family_member')
+      
+      return response
+    }
+    
     // Get current user's profile to check family relationship
     const { data: currentProfile } = await supabase
       .from('profiles')

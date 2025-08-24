@@ -1,31 +1,29 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Image from 'next/image';
+import { getActiveProfile } from '@/lib/auth/family-helpers';
+import { getEffectiveRole } from '@/lib/utils/roleUtils';
 
 export default async function DashboardPage() {
-  const supabase = createSupabaseServerClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  // Get the active profile (handles both regular users and sub-accounts)
+  const activeProfileData = await getActiveProfile();
+  
+  if (!activeProfileData) {
     redirect('/login')
   }
-
-  // Get user profile to check organization type
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select(`
-      role,
-      active_role,
-      organisations (
-        organisation_type
-      )
-    `)
-    .eq('user_id', user.id)
+  
+  const { profile, isSubAccount } = activeProfileData;
+  
+  // Get organization info if needed
+  const supabase = createSupabaseServerClient()
+  const { data: orgData } = await supabase
+    .from('organisations')
+    .select('organisation_type')
+    .eq('id', profile.organisation_id)
     .single()
-
-  if (profile) {
-    const userRole = (profile.active_role || profile.role)?.toLowerCase()
-    const orgType = profile.organisations?.organisation_type
+  
+  const userRole = getEffectiveRole(profile)?.toLowerCase()
+  const orgType = orgData?.organisation_type
     
     // Redirect homeschool users to their dedicated dashboard
     if (orgType === 'individual_family' || orgType === 'homeschool_coop') {
