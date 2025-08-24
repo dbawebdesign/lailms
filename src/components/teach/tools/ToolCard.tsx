@@ -19,7 +19,8 @@ import {
   Sparkles,
   Clock,
   ArrowRight,
-  FolderOpen
+  FolderOpen,
+  Gamepad2
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -34,7 +35,8 @@ const iconMap = {
   Zap,
   BarChart3,
   Brain,
-  Sparkles
+  Sparkles,
+  Gamepad2
 };
 
 interface ToolCardProps {

@@ -622,6 +622,15 @@ export default async function TeacherDashboardPage() {
 
   const userName = profile.first_name || 'Teacher';
 
+  // Check if user has created any base classes
+  const { data: baseClasses } = await supabase
+    .from('base_classes')
+    .select('id')
+    .eq('user_id', user.id)
+    .limit(1);
+
+  const hasBaseClasses = baseClasses && baseClasses.length > 0;
+
   // Check if this is a homeschool organization
   const isHomeschoolOrg = organization?.organisation_type === 'individual_family' || organization?.organisation_type === 'coop_network';
 
@@ -635,7 +644,7 @@ export default async function TeacherDashboardPage() {
         {/* Header Section */}
         <div className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container mx-auto px-6 py-8">
-            <WelcomeCard userName={userName} userRole={currentRole} />
+            <WelcomeCard userName={userName} userRole={currentRole} hasBaseClasses={hasBaseClasses} />
           </div>
         </div>
 
@@ -670,7 +679,7 @@ export default async function TeacherDashboardPage() {
       {/* Header Section */}
       <div className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-6 py-8">
-          <WelcomeCard userName={userName} userRole={currentRole} />
+          <WelcomeCard userName={userName} userRole={currentRole} hasBaseClasses={hasBaseClasses} />
         </div>
       </div>
 

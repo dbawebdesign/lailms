@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Users, Clock } from 'lucide-react';
 import { format } from 'date-fns';
+import { FamilyStudentSelector } from '@/components/teach/FamilyStudentSelector';
 // Define the type locally since the import is not available
 interface ClassInstanceCreationData {
   name: string;
@@ -47,6 +48,9 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
     period: '',
     capacity: undefined as number | undefined,
   });
+  
+  // Student selection state
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +86,29 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
 
       const newInstance = await response.json();
       
+      // If students were selected, enroll them in the class
+      if (selectedStudents.length > 0) {
+        try {
+          await Promise.all(
+            selectedStudents.map(studentId =>
+              fetch(`/api/teach/instances/${newInstance.id}/enrollments`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  profile_id: studentId,
+                  role: 'student'
+                }),
+              })
+            )
+          );
+        } catch (enrollmentError) {
+          console.error('Error enrolling students:', enrollmentError);
+          // Don't fail the whole operation, just log the error
+        }
+      }
+      
       // Reset form
       setFormData({
         name: '',
@@ -90,6 +117,7 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
         period: '',
         capacity: undefined,
       });
+      setSelectedStudents([]);
 
       onInstanceCreated?.(newInstance.id);
       onClose();
@@ -110,6 +138,7 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
         period: '',
         capacity: undefined,
       });
+      setSelectedStudents([]);
       setError(null);
       onClose();
     }
@@ -206,6 +235,20 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
               className="w-full"
               min="1"
               max="200"
+            />
+          </div>
+
+          {/* Student Selection */}
+          <div className="space-y-2">
+            <Label>Add Family Students</Label>
+            <p className="text-sm text-muted-foreground mb-2">
+              Select students from your family to automatically enroll them in this class.
+            </p>
+            <FamilyStudentSelector
+              selectedStudents={selectedStudents}
+              onStudentsChange={setSelectedStudents}
+              disabled={isLoading}
+              placeholder="Select students to enroll..."
             />
           </div>
 

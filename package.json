@@ -137,7 +137,8 @@
     "uuid": "^11.1.0",
     "yjs": "^13.6.27",
     "youtube-transcript-api": "^3.0.2",
-    "zod": "^3.25.67"
+    "zod": "^3.25.67",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@ariakit/react": "^0.4.17",

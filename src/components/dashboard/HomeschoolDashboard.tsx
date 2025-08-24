@@ -212,195 +212,320 @@ export default function HomeschoolDashboard({
         </Button>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="hover-card cursor-pointer hover-bg-light">
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
-              <GraduationCap className="h-5 w-5 text-blue-600 hover-icon" />
-              <div>
-                <p className="text-2xl font-bold hover-text-highlight">{students.length}</p>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">Students</p>
+      {activeCourses === 0 ? (
+        /* First Time User Layout - No Base Classes Created */
+        <div className="space-y-6">
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+                  <Link href="/teach/knowledge-base/create">
+                    <BookOpen className="h-6 w-6 hover-icon text-blue-600" />
+                    <span className="text-sm font-medium">Create Course</span>
+                    <span className="text-xs text-neutral-500">Start with AI</span>
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+                  <Link href="/homeschool/add-students">
+                    <Users className="h-6 w-6 hover-icon text-green-600" />
+                    <span className="text-sm font-medium">Add Students</span>
+                    <span className="text-xs text-neutral-500">Manage family</span>
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+                  <Link href="/teach/gradebook">
+                    <GraduationCap className="h-6 w-6 hover-icon text-purple-600" />
+                    <span className="text-sm font-medium">Gradebook</span>
+                    <span className="text-xs text-neutral-500">Track progress</span>
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+                  <Link href="/teach/tools">
+                    <Settings className="h-6 w-6 hover-icon text-orange-600" />
+                    <span className="text-sm font-medium">Teacher Tools</span>
+                    <span className="text-xs text-neutral-500">Manage settings</span>
+                  </Link>
+                </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="hover-card cursor-pointer hover-bg-light">
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
-              <UserPlus className="h-5 w-5 text-green-600 hover-icon" />
-              <div>
-                <p className="text-2xl font-bold hover-text-highlight">{activeStudentCodes.length}</p>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">Active Codes</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="hover-card cursor-pointer hover-bg-light">
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
-              <BookOpen className="h-5 w-5 text-purple-600 hover-icon" />
-              <div>
-                <p className="text-2xl font-bold hover-text-highlight">{activeCourses}</p>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">Active Courses</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
 
-      {/* Invite Codes Section */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center space-x-2">
-              <UserPlus className="h-5 w-5" />
-              <span>Student Invite Codes</span>
-            </CardTitle>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAllCodes(!showAllCodes)}
-              >
-                {showAllCodes ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-                {showAllCodes ? 'Hide Used' : 'Show All'}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {displayedCodes.length === 0 ? (
-            <div className="text-center py-8">
-              <UserPlus className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-neutral-600 dark:text-neutral-400 mb-2">
-                No {showAllCodes ? '' : 'active '}invite codes
-              </h3>
-              <p className="text-neutral-500 dark:text-neutral-400 mb-4">
-                Invite codes are automatically generated by the system when needed
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {displayedCodes.map((code) => {
-                const statusInfo = getCodeStatus(code)
-                const StatusIcon = statusInfo.icon
-                
-                return (
-                  <div key={code.id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <GraduationCap className="h-4 w-4 text-blue-600" />
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <code className="font-mono text-sm font-semibold">{code.code}</code>
-                          <Badge variant="outline" className={statusInfo.color}>
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {statusInfo.status}
-                          </Badge>
+          {/* Students Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <GraduationCap className="h-5 w-5" />
+                <span>Your Students</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {students.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-neutral-600 dark:text-neutral-400 mb-2">
+                    No students yet
+                  </h3>
+                  <p className="text-neutral-500 dark:text-neutral-400 mb-4">
+                    Add your first student to get started
+                  </p>
+                  <Button asChild variant="outline">
+                    <Link href="/homeschool/add-students">
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Add Your First Student
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {students.map((student) => (
+                    <div key={student.id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                            {student.first_name?.charAt(0) || student.username?.charAt(0)}
+                          </span>
                         </div>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                          Created {new Date(code.created_at).toLocaleDateString()}
-                          {code.expires_at && ` • Expires ${new Date(code.expires_at).toLocaleDateString()}`}
+                        <div>
+                          <p className="font-medium">
+                            {student.first_name} {student.last_name}
+                          </p>
+                          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                            @{student.username}
+                            {student.grade_level && ` • Grade ${student.grade_level}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                          Joined {new Date(student.created_at).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => copyToClipboard(code.code, 'Invite code')}
-                      disabled={code.used_at !== null}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Students Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <GraduationCap className="h-5 w-5" />
-            <span>Your Students</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {students.length === 0 ? (
-            <div className="text-center py-8">
-              <Users className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-neutral-600 dark:text-neutral-400 mb-2">
-                No students yet
-              </h3>
-              <p className="text-neutral-500 dark:text-neutral-400 mb-4">
-                Students will appear here once they join using invite codes
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {students.map((student) => (
-                <div key={student.id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                        {student.first_name?.charAt(0) || student.username?.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-medium">
-                        {student.first_name} {student.last_name}
-                      </p>
-                      <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                        @{student.username}
-                        {student.grade_level && ` • Grade ${student.grade_level}`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                      Joined {new Date(student.created_at).toLocaleDateString()}
-                    </p>
+          {/* Big Call to Action */}
+          <Card className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-2 border-dashed border-blue-200 dark:border-blue-800">
+            <CardContent className="pt-12 pb-12">
+              <div className="text-center">
+                <BookOpen className="h-16 w-16 text-blue-600 mx-auto mb-6" />
+                <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-4">
+                  Ready to create your first class?
+                </h2>
+                <p className="text-neutral-600 dark:text-neutral-400 max-w-md mx-auto mb-8">
+                  Let's get started with AI-powered course creation. It only takes a few minutes to build a complete curriculum.
+                </p>
+                <Button asChild size="lg" className="px-8 py-6 text-lg">
+                  <Link href="/teach/knowledge-base/create">
+                    <BookOpen className="mr-3 h-5 w-5" />
+                    Create Your First Class
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        /* Existing User Layout - Has Base Classes */
+        <div className="space-y-6">
+          {/* Quick Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="hover-card cursor-pointer hover-bg-light">
+              <CardContent className="pt-6">
+                <div className="flex items-center space-x-2">
+                  <GraduationCap className="h-5 w-5 text-blue-600 hover-icon" />
+                  <div>
+                    <p className="text-2xl font-bold hover-text-highlight">{students.length}</p>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400">Students</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
-              <Link href="/teach/knowledge-base/create">
-                <BookOpen className="h-6 w-6 hover-icon" />
-                <span className="text-sm">Create Course</span>
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
-              <Link href="/teach/gradebook">
-                <GraduationCap className="h-6 w-6 hover-icon" />
-                <span className="text-sm">View Gradebook</span>
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
-              <Link href="/teach/tools">
-                <Settings className="h-6 w-6 hover-icon" />
-                <span className="text-sm">Teacher Tools</span>
-              </Link>
-            </Button>
+              </CardContent>
+            </Card>
+            
+            <Card className="hover-card cursor-pointer hover-bg-light">
+              <CardContent className="pt-6">
+                <div className="flex items-center space-x-2">
+                  <UserPlus className="h-5 w-5 text-green-600 hover-icon" />
+                  <div>
+                    <p className="text-2xl font-bold hover-text-highlight">{activeStudentCodes.length}</p>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400">Active Codes</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="hover-card cursor-pointer hover-bg-light">
+              <CardContent className="pt-6">
+                <div className="flex items-center space-x-2">
+                  <BookOpen className="h-5 w-5 text-purple-600 hover-icon" />
+                  <div>
+                    <p className="text-2xl font-bold hover-text-highlight">{activeCourses}</p>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400">Active Courses</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Invite Codes Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <UserPlus className="h-5 w-5" />
+                  <span>Student Invite Codes</span>
+                </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAllCodes(!showAllCodes)}
+                  >
+                    {showAllCodes ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                    {showAllCodes ? 'Hide Used' : 'Show All'}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {displayedCodes.length === 0 ? (
+                <div className="text-center py-8">
+                  <UserPlus className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-neutral-600 dark:text-neutral-400 mb-2">
+                    No {showAllCodes ? '' : 'active '}invite codes
+                  </h3>
+                  <p className="text-neutral-500 dark:text-neutral-400 mb-4">
+                    Invite codes are automatically generated by the system when needed
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {displayedCodes.map((code) => {
+                    const statusInfo = getCodeStatus(code)
+                    const StatusIcon = statusInfo.icon
+                    
+                    return (
+                      <div key={code.id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <GraduationCap className="h-4 w-4 text-blue-600" />
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <code className="font-mono text-sm font-semibold">{code.code}</code>
+                              <Badge variant="outline" className={statusInfo.color}>
+                                <StatusIcon className="h-3 w-3 mr-1" />
+                                {statusInfo.status}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                              Created {new Date(code.created_at).toLocaleDateString()}
+                              {code.expires_at && ` • Expires ${new Date(code.expires_at).toLocaleDateString()}`}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(code.code, 'Invite code')}
+                          disabled={code.used_at !== null}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Students Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <GraduationCap className="h-5 w-5" />
+                <span>Your Students</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {students.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-neutral-600 dark:text-neutral-400 mb-2">
+                    No students yet
+                  </h3>
+                  <p className="text-neutral-500 dark:text-neutral-400 mb-4">
+                    Students will appear here once they join using invite codes
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {students.map((student) => (
+                    <div key={student.id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                            {student.first_name?.charAt(0) || student.username?.charAt(0)}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            {student.first_name} {student.last_name}
+                          </p>
+                          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                            @{student.username}
+                            {student.grade_level && ` • Grade ${student.grade_level}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                          Joined {new Date(student.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+                  <Link href="/teach/knowledge-base/create">
+                    <BookOpen className="h-6 w-6 hover-icon" />
+                    <span className="text-sm">Create Course</span>
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+                  <Link href="/teach/gradebook">
+                    <GraduationCap className="h-6 w-6 hover-icon" />
+                    <span className="text-sm">View Gradebook</span>
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+                  <Link href="/teach/tools">
+                    <Settings className="h-6 w-6 hover-icon" />
+                    <span className="text-sm">Teacher Tools</span>
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 } 

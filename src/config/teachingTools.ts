@@ -66,6 +66,84 @@ export const teachingTools: TeachingTool[] = [
     ]
   },
   {
+    id: 'activities-creator',
+    name: 'Activities Creator',
+    description: 'Create engaging educational activities with detailed instructions and materials',
+    category: 'content-creation',
+    icon: 'Gamepad2',
+    complexity: 'simple',
+    estimatedTime: '3-5 minutes',
+    outputFormats: ['pdf', 'docx', 'html'],
+    keywords: ['activities', 'engagement', 'hands-on', 'interactive', 'learning'],
+    isPopular: true,
+    apiEndpoint: '/api/tools/activities-creator',
+    inputFields: [
+      {
+        id: 'subject',
+        label: 'Subject',
+        type: 'text',
+        placeholder: 'e.g., Mathematics, English, Science, History',
+        required: true,
+        description: 'The subject area for this activity'
+      },
+      {
+        id: 'gradeLevel',
+        label: 'Grade Level',
+        type: 'select',
+        options: ['K', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
+        required: true
+      },
+      {
+        id: 'topic',
+        label: 'Topic/Concept',
+        type: 'text',
+        placeholder: 'e.g., Fractions, Photosynthesis, Character Development',
+        required: true,
+        description: 'The specific topic or concept the activity should focus on'
+      },
+      {
+        id: 'activityType',
+        label: 'Activity Type',
+        type: 'select',
+        options: ['Hands-on Experiment', 'Group Project', 'Game/Competition', 'Creative Arts', 'Role Play', 'Problem Solving', 'Research Activity', 'Interactive Discussion'],
+        required: true
+      },
+      {
+        id: 'duration',
+        label: 'Duration',
+        type: 'select',
+        options: ['15-20 minutes', '30-45 minutes', '1 hour', '2+ hours (multi-day)'],
+        required: true
+      },
+      {
+        id: 'groupSize',
+        label: 'Group Size',
+        type: 'select',
+        options: ['Individual', 'Pairs', 'Small Groups (3-5)', 'Large Groups (6+)', 'Whole Class'],
+        defaultValue: 'Small Groups (3-5)'
+      },
+      {
+        id: 'learningObjectives',
+        label: 'Learning Objectives',
+        type: 'textarea',
+        placeholder: 'What should students learn or be able to do after this activity?',
+        required: true,
+        description: 'List the main learning goals for this activity'
+      }
+    ],
+    examples: [
+      'Fraction Pizza Party for 4th Grade Math',
+      'Ecosystem Food Web Activity for 6th Grade Science',
+      'Historical Timeline Role Play for 8th Grade Social Studies'
+    ],
+    tips: [
+      'Include clear step-by-step instructions',
+      'Consider available materials and classroom setup',
+      'Build in assessment opportunities during the activity',
+      'Plan for different learning styles and abilities'
+    ]
+  },
+  {
     id: 'iep-generator',
     name: 'IEP Generator',
     description: 'Generate Individualized Education Program goals and accommodations',

@@ -40,6 +40,7 @@ import { RubricDisplay } from './RubricDisplay';
 import { MindMapDisplay } from './MindMapDisplay';
 import { BrainBytesDisplay } from './BrainBytesDisplay';
 import { QuizDisplay } from './QuizDisplay';
+import { ActivitiesDisplay } from './ActivitiesDisplay';
 import { teacherToolLibraryService } from '@/lib/services/teacherToolLibrary';
 import { 
   TeacherToolCreationInput, 
@@ -591,6 +592,23 @@ What would you like to improve or expand on?`,
         }
         break;
         
+      case 'activities-creator':
+        const activityTopic = formData.topic;
+        const activitySubject = formData.subject;
+        const activityGradeLevel = formData.gradeLevel;
+        const activityType = formData.activityType;
+        
+        if (activityTopic && activityType && activityGradeLevel) {
+          title = `${activityTopic} ${activityType} - Grade ${activityGradeLevel}`;
+        } else if (activityTopic && activityGradeLevel) {
+          title = `${activityTopic} Activity - Grade ${activityGradeLevel}`;
+        } else if (activityTopic) {
+          title = `${activityTopic} Activity`;
+        } else if (activitySubject && activityGradeLevel) {
+          title = `${activitySubject} Activity - Grade ${activityGradeLevel}`;
+        }
+        break;
+        
       default:
         // Generic fallback for other tools
         const topic = formData.topic || formData.centralTopic || formData.concept || formData.subject;
@@ -636,6 +654,15 @@ What would you like to improve or expand on?`,
         if (formData.centralTopic) parts.push(`Topic: ${formData.centralTopic}`);
         if (formData.gradeLevel) parts.push(`Grade: ${formData.gradeLevel}`);
         if (formData.subject) parts.push(`Subject: ${formData.subject}`);
+        break;
+        
+      case 'activities-creator':
+        if (formData.subject) parts.push(`Subject: ${formData.subject}`);
+        if (formData.topic) parts.push(`Topic: ${formData.topic}`);
+        if (formData.gradeLevel) parts.push(`Grade: ${formData.gradeLevel}`);
+        if (formData.activityType) parts.push(`Type: ${formData.activityType}`);
+        if (formData.duration) parts.push(`Duration: ${formData.duration}`);
+        if (formData.groupSize) parts.push(`Group Size: ${formData.groupSize}`);
         break;
         
       default:
@@ -1259,6 +1286,14 @@ What would you like to improve or expand on?`,
                 />
               ) : result && tool.id === 'quiz-generator' ? (
                 <QuizDisplay 
+                  content={result.content} 
+                  metadata={result.metadata}
+                  onCopy={copyToClipboard}
+                  copiedItems={copiedItems}
+                  onRefineWithLuna={handleRubricRefinement}
+                />
+              ) : result && tool.id === 'activities-creator' ? (
+                <ActivitiesDisplay 
                   content={result.content} 
                   metadata={result.metadata}
                   onCopy={copyToClipboard}

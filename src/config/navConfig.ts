@@ -39,8 +39,8 @@ export type NavItem = {
 // Helper function to create common bottom items
 const createBottomNavItems = (roles: UserRole[]): NavItem[] => [
   {
-    title: "Help",
-    href: "/help",
+    title: "Quick Guide",
+    href: "/quick-guide",
     icon: HelpCircle,
     roles: roles,
     isBottom: true,

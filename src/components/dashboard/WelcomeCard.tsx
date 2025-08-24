@@ -10,6 +10,7 @@ import { AIInsight } from '@/lib/services/ai-insights';
 interface WelcomeCardProps {
   userName: string;
   userRole: UserRole;
+  hasBaseClasses?: boolean;
 }
 
 // Helper to get a more descriptive role title
@@ -24,7 +25,7 @@ const getRoleTitle = (role: UserRole) => {
   }
 };
 
-const WelcomeCard: React.FC<WelcomeCardProps> = ({ userName, userRole }) => {
+const WelcomeCard: React.FC<WelcomeCardProps> = ({ userName, userRole, hasBaseClasses = true }) => {
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -124,74 +125,90 @@ const WelcomeCard: React.FC<WelcomeCardProps> = ({ userName, userRole }) => {
 
       {/* AI Insights Section */}
       <div className="space-y-2">
-        {isLoading ? (
-          <div className="flex items-start p-3 bg-white/10 dark:bg-black/10 rounded-lg border border-white/20 backdrop-blur-sm animate-pulse">
-            <div className="h-5 w-5 bg-white/20 rounded mr-3 flex-shrink-0 mt-0.5"></div>
-            <div className="flex-1">
-              <div className="h-3 bg-white/20 rounded w-1/3 mb-1"></div>
-              <div className="h-3 bg-white/20 rounded w-2/3"></div>
-            </div>
-          </div>
-        ) : insights.length > 0 ? (
-          insights.map((insight, index) => (
-            <div key={insight.id} className="flex items-start p-3 bg-white/10 dark:bg-black/10 rounded-lg border border-white/20 backdrop-blur-sm">
-              <div className="text-white/90 flex-shrink-0 mt-0.5 mr-3">
-                {getInsightIcon(insight.icon)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-sm font-semibold text-white truncate">
-                    {insight.title}
-                  </h3>
-                  <div className="flex items-center space-x-1 ml-2">
-                    {index === 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={refreshInsights}
-                        disabled={isRefreshing}
-                        className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-white/10"
-                      >
-                        <RefreshCw className={cn("h-3 w-3", isRefreshing && "animate-spin")} />
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => dismissInsight(insight.id)}
-                      className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-white/10"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-                <p className="text-xs text-white/70">
-                  {insight.message}
-                </p>
-              </div>
-            </div>
-          ))
-        ) : (
+        {!hasBaseClasses && userRole === 'teacher' ? (
+          /* Show only "Create your first class" message for new teacher users */
           <div className="flex items-start p-3 bg-white/10 dark:bg-black/10 rounded-lg border border-white/20 backdrop-blur-sm">
             <Sparkles className="h-4 w-4 mr-3 text-white/90 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-semibold text-white">AI Powered Insights</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={refreshInsights}
-                  disabled={isRefreshing}
-                  className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-white/10"
-                >
-                  <RefreshCw className={cn("h-3 w-3", isRefreshing && "animate-spin")} />
-                </Button>
-              </div>
+              <h3 className="text-sm font-semibold text-white mb-1">Get Started</h3>
               <p className="text-xs text-white/70">
-                Click refresh to get personalized insights based on your activity!
+                Create your first class to unlock AI-powered insights and personalized recommendations!
               </p>
             </div>
           </div>
+        ) : (
+          /* Show regular AI insights for users with base classes */
+          <>
+            {isLoading ? (
+              <div className="flex items-start p-3 bg-white/10 dark:bg-black/10 rounded-lg border border-white/20 backdrop-blur-sm animate-pulse">
+                <div className="h-5 w-5 bg-white/20 rounded mr-3 flex-shrink-0 mt-0.5"></div>
+                <div className="flex-1">
+                  <div className="h-3 bg-white/20 rounded w-1/3 mb-1"></div>
+                  <div className="h-3 bg-white/20 rounded w-2/3"></div>
+                </div>
+              </div>
+            ) : insights.length > 0 ? (
+              insights.map((insight, index) => (
+                <div key={insight.id} className="flex items-start p-3 bg-white/10 dark:bg-black/10 rounded-lg border border-white/20 backdrop-blur-sm">
+                  <div className="text-white/90 flex-shrink-0 mt-0.5 mr-3">
+                    {getInsightIcon(insight.icon)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="text-sm font-semibold text-white truncate">
+                        {insight.title}
+                      </h3>
+                      <div className="flex items-center space-x-1 ml-2">
+                        {index === 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={refreshInsights}
+                            disabled={isRefreshing}
+                            className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-white/10"
+                          >
+                            <RefreshCw className={cn("h-3 w-3", isRefreshing && "animate-spin")} />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => dismissInsight(insight.id)}
+                          className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-white/10"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-white/70">
+                      {insight.message}
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex items-start p-3 bg-white/10 dark:bg-black/10 rounded-lg border border-white/20 backdrop-blur-sm">
+                <Sparkles className="h-4 w-4 mr-3 text-white/90 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-sm font-semibold text-white">AI Powered Insights</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={refreshInsights}
+                      disabled={isRefreshing}
+                      className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-white/10"
+                    >
+                      <RefreshCw className={cn("h-3 w-3", isRefreshing && "animate-spin")} />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-white/70">
+                    Click refresh to get personalized insights based on your activity!
+                  </p>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -980,7 +980,7 @@ export default function HomeschoolOnboarding() {
           <CardHeader>
             <Progress value={getProgress()} className="mb-4" />
             <CardTitle>Complete Your Setup</CardTitle>
-            <CardDescription>Start your 14-day free trial</CardDescription>
+            <CardDescription>Start your 7-day free trial</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
@@ -1006,7 +1006,15 @@ export default function HomeschoolOnboarding() {
             </div>
 
             <div className="text-center">
-              <p className="text-2xl font-bold">$29/month</p>
+              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg mb-4">
+                <p className="text-sm font-semibold text-green-700 dark:text-green-300 mb-1">
+                  7-Day Free Trial
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  No payment needed until your trial ends
+                </p>
+              </div>
+              <p className="text-2xl font-bold">$40/month</p>
               <p className="text-sm text-muted-foreground">Cancel anytime</p>
             </div>
 

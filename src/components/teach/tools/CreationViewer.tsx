@@ -23,6 +23,7 @@ import { RubricDisplay } from './RubricDisplay';
 import { MindMapDisplay } from './MindMapDisplay';
 import { BrainBytesDisplay } from './BrainBytesDisplay';
 import { QuizDisplay } from './QuizDisplay';
+import { ActivitiesDisplay } from './ActivitiesDisplay';
 import { teacherToolLibraryService } from '@/lib/services/teacherToolLibrary';
 import { TeacherToolCreation, ToolCreationContent } from '@/types/teachingTools';
 
@@ -205,6 +206,17 @@ export function CreationViewer({ creationId, onBack }: CreationViewerProps) {
       case 'quiz-generator':
         return (
           <QuizDisplay
+            content={contentString}
+            metadata={creation.metadata}
+            onCopy={copyToClipboard}
+            copiedItems={copiedItems}
+            onRefineWithLuna={handleRefineWithLuna}
+          />
+        );
+
+      case 'activities-creator':
+        return (
+          <ActivitiesDisplay
             content={contentString}
             metadata={creation.metadata}
             onCopy={copyToClipboard}

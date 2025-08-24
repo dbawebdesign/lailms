@@ -26,6 +26,7 @@ import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ClassInstanceHeader } from "@/components/teach/ClassInstanceHeader";
+import { ClassInstanceStudentManager } from "@/components/teach/ClassInstanceStudentManager";
 import { Tables } from "packages/types/db";
 import { PROFILE_ROLE_FIELDS, hasTeacherPermissions } from "@/lib/utils/roleUtils";
 
@@ -622,58 +623,70 @@ export default async function ClassInstancePage({
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold">Student Management</h3>
-              <p className="text-muted-foreground">Monitor your enrolled students</p>
+              <p className="text-muted-foreground">Add family students or monitor enrolled students</p>
             </div>
             <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border">
-              <span className="text-sm text-muted-foreground">Students enroll with code:</span>
+              <span className="text-sm text-muted-foreground">Legacy enrollment code:</span>
               <code className="font-mono text-sm font-semibold">{classInstance.enrollmentCode}</code>
             </div>
           </div>
 
-          <Card>
-            <CardContent className="p-0">
-              <div className="divide-y">
-                {studentPerformance.map((student) => (
-                  <div key={student.id} className="p-4 md:p-6 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <h4 className="font-semibold">{student.name}</h4>
-                        <p className="text-sm text-muted-foreground">{student.email}</p>
-                        <div className="flex items-center gap-2">
-                          <Badge 
-                            variant="secondary" 
-                            className={`text-xs ${getStudentStatusColor(student.status)}`}
-                          >
-                            {student.status.replace('_', ' ')}
-                          </Badge>
-                          {student.lastActivity && (
-                            <span className="text-xs text-muted-foreground">
-                              Last active: {format(new Date(student.lastActivity), 'MMM d')}
-                            </span>
+          {/* Family Student Management */}
+          <ClassInstanceStudentManager classInstanceId={classInstance.id} />
+
+          {/* Student Performance Overview */}
+          {studentPerformance.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Student Performance Overview</CardTitle>
+                <CardDescription>
+                  Monitor progress and activity for enrolled students
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y">
+                  {studentPerformance.map((student) => (
+                    <div key={student.id} className="p-4 md:p-6 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <h4 className="font-semibold">{student.name}</h4>
+                          <p className="text-sm text-muted-foreground">{student.email}</p>
+                          <div className="flex items-center gap-2">
+                            <Badge 
+                              variant="secondary" 
+                              className={`text-xs ${getStudentStatusColor(student.status)}`}
+                            >
+                              {student.status.replace('_', ' ')}
+                            </Badge>
+                            {student.lastActivity && (
+                              <span className="text-xs text-muted-foreground">
+                                Last active: {format(new Date(student.lastActivity), 'MMM d')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right space-y-2">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Overall Progress</p>
+                            <div className="flex items-center gap-2">
+                              <Progress value={student.overallProgress} className="w-20" />
+                              <span className="text-sm font-medium">{student.overallProgress}%</span>
+                            </div>
+                          </div>
+                          {student.quizAverage && (
+                            <div>
+                              <p className="text-sm text-muted-foreground">Quiz Average</p>
+                              <p className="text-sm font-medium">{student.quizAverage}%</p>
+                            </div>
                           )}
                         </div>
                       </div>
-                      <div className="text-right space-y-2">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Overall Progress</p>
-                          <div className="flex items-center gap-2">
-                            <Progress value={student.overallProgress} className="w-20" />
-                            <span className="text-sm font-medium">{student.overallProgress}%</span>
-                          </div>
-                        </div>
-                        {student.quizAverage && (
-                          <div>
-                            <p className="text-sm text-muted-foreground">Quiz Average</p>
-                            <p className="text-sm font-medium">{student.quizAverage}%</p>
-                          </div>
-                        )}
-                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="progress" className="space-y-6">

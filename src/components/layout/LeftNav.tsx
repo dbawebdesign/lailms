@@ -12,6 +12,7 @@ import { UserRole } from "@/lib/utils/roleUtils";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useQuickGuide } from "@/hooks/use-quick-guide";
 import {
   Tooltip,
   TooltipContent,
@@ -25,6 +26,7 @@ interface LeftNavProps {
 
 const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
   const { isNavCollapsed, toggleNavCollapsed, setNavCollapsed, openFeedbackModal } = useUIContext();
+  const { openQuickGuide } = useQuickGuide();
   const pathname = usePathname();
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -73,6 +75,9 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
     if (item.href === '/feedback') {
       e.preventDefault();
       openFeedbackModal({ category: 'feedback', priority: 'medium' });
+    } else if (item.href === '/quick-guide') {
+      e.preventDefault();
+      openQuickGuide();
     }
     // For other items, let the Link handle the navigation naturally
   };
@@ -147,6 +152,7 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
               <TooltipTrigger asChild>
                 <Link
                   href={item.href}
+                  onClick={(e) => handleNavItemClick(item, e)}
                   className={cn(
                     "flex items-center py-2 px-3 rounded-md text-sm font-medium transition-colors",
                     pathname === item.href
@@ -192,22 +198,22 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
                         ? "bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white"
                         : "text-muted-foreground hover:bg-gradient-to-r hover:from-[#6B5DE5]/5 hover:to-[#6B5DE5]/10 hover:text-foreground",
                       isNavCollapsed ? "justify-center" : "w-full",
-                      // Add animation for Help link
-                      item.title === "Help" && animateHelp && "animate-pulse ring-2 ring-blue-500 ring-offset-2 ring-offset-background"
+                      // Add animation for Quick Guide link
+                      item.title === "Quick Guide" && animateHelp && "animate-pulse ring-2 ring-blue-500 ring-offset-2 ring-offset-background"
                     )}
                   >
                     <item.icon
                       className={cn(
                         "h-5 w-5 flex-shrink-0",
                         pathname === item.href ? "text-white" : "text-muted-foreground",
-                        item.title === "Help" && animateHelp && "text-blue-500"
+                        item.title === "Quick Guide" && animateHelp && "text-blue-500"
                       )}
                     />
                     {!isNavCollapsed && (
                       <span className="ml-3 truncate">{item.title}</span>
                     )}
-                    {/* Tooltip for Help link when animating */}
-                    {item.title === "Help" && animateHelp && !isNavCollapsed && (
+                    {/* Tooltip for Quick Guide link when animating */}
+                    {item.title === "Quick Guide" && animateHelp && !isNavCollapsed && (
                       <span className="absolute -right-2 -top-2 flex h-3 w-3">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>

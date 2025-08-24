@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Analytics } from "@vercel/analytics/react";
 import { LogoPreloader } from "@/components/ui/logo-preloader";
+import { QuickGuideProvider } from "@/components/layout/QuickGuideProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -170,6 +171,7 @@ export default function RootLayout({
           <UIContextProvider>
             <LunaContextRegistration>
               {children}
+              <QuickGuideProvider />
             </LunaContextRegistration>
           </UIContextProvider>
         </ThemeProvider>

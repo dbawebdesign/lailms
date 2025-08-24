@@ -83,67 +83,150 @@ export default function HomeschoolDashboardClient({
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Quick Stats - Minimal Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="p-6 border-neutral-200/50 dark:border-neutral-800/50 bg-white/50 dark:bg-neutral-900/50 backdrop-blur">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-light">{students.length}</p>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Students</p>
-              </div>
-              <Users className="h-8 w-8 text-neutral-300 dark:text-neutral-700" />
-            </div>
-          </Card>
-          
-          <Card className="p-6 border-neutral-200/50 dark:border-neutral-800/50 bg-white/50 dark:bg-neutral-900/50 backdrop-blur">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-light">{courses.length}</p>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Active Courses</p>
-              </div>
-              <BookOpen className="h-8 w-8 text-neutral-300 dark:text-neutral-700" />
-            </div>
-          </Card>
-          
-          <Card className="p-6 border-neutral-200/50 dark:border-neutral-800/50 bg-white/50 dark:bg-neutral-900/50 backdrop-blur">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-light">0</p>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">This Week</p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-neutral-300 dark:text-neutral-700" />
-            </div>
-          </Card>
-        </div>
-
-        {/* Main Action Area */}
         {isFirstTime ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center py-16"
-          >
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-light text-neutral-900 dark:text-white mb-3">
-                Ready to create your first class?
-              </h2>
-              <p className="text-neutral-500 dark:text-neutral-400 max-w-md mx-auto">
-                Let's get started with AI-powered course creation. It only takes a few minutes.
-              </p>
+          /* First Time User Layout */
+          <div className="space-y-8">
+            {/* Quick Actions */}
+            <div>
+              <h2 className="text-lg font-light text-neutral-900 dark:text-white mb-4">Quick Actions</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Button variant="ghost" className="h-auto p-4 justify-start flex-col items-start" asChild>
+                  <Link href="/teach/knowledge-base/create">
+                    <Sparkles className="h-5 w-5 mb-2 text-blue-500" />
+                    <span className="font-medium">Create Class</span>
+                    <span className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Start with AI</span>
+                  </Link>
+                </Button>
+                <Button variant="ghost" className="h-auto p-4 justify-start flex-col items-start" asChild>
+                  <Link href="/homeschool/add-students">
+                    <Users className="h-5 w-5 mb-2 text-green-500" />
+                    <span className="font-medium">Add Students</span>
+                    <span className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Manage family</span>
+                  </Link>
+                </Button>
+                <Button variant="ghost" className="h-auto p-4 justify-start flex-col items-start" asChild>
+                  <Link href="/teach/gradebook">
+                    <BarChart3 className="h-5 w-5 mb-2 text-purple-500" />
+                    <span className="font-medium">Gradebook</span>
+                    <span className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Track progress</span>
+                  </Link>
+                </Button>
+                <Button variant="ghost" className="h-auto p-4 justify-start flex-col items-start" asChild>
+                  <Link href="/teach/schedule">
+                    <Calendar className="h-5 w-5 mb-2 text-orange-500" />
+                    <span className="font-medium">Schedule</span>
+                    <span className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Plan lessons</span>
+                  </Link>
+                </Button>
+              </div>
             </div>
-            
-            <Button
-              size="lg"
-              className="bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 px-8 py-6 text-lg font-light rounded-xl shadow-xl hover:shadow-2xl transition-all"
-              asChild
+
+            {/* Students Section */}
+            <div>
+              <h2 className="text-lg font-light text-neutral-900 dark:text-white mb-4">Your Students</h2>
+              <Card className="p-6 border-neutral-200/50 dark:border-neutral-800/50 bg-white/50 dark:bg-neutral-900/50 backdrop-blur">
+                <div className="space-y-4">
+                  {students.length > 0 ? (
+                    students.map((student) => (
+                      <div key={student.id} className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-medium">
+                          {student.firstName.charAt(0)}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-neutral-900 dark:text-white">
+                            {student.firstName} {student.lastName}
+                          </p>
+                          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                            Grade {student.gradeLevel}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <GraduationCap className="h-12 w-12 text-neutral-300 dark:text-neutral-700 mx-auto mb-3" />
+                      <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">
+                        No students added yet
+                      </p>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href="/homeschool/add-students">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Your First Student
+                        </Link>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </div>
+
+            {/* Big Call to Action */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center justify-center py-16 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-2xl border border-neutral-200/50 dark:border-neutral-800/50"
             >
-              <Link href="/teach/knowledge-base/create">
-                <Sparkles className="mr-3 h-5 w-5" />
-                Create Your First Class
-              </Link>
-            </Button>
-          </motion.div>
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-light text-neutral-900 dark:text-white mb-3">
+                  Ready to create your first class?
+                </h2>
+                <p className="text-neutral-500 dark:text-neutral-400 max-w-md mx-auto">
+                  Let's get started with AI-powered course creation. It only takes a few minutes.
+                </p>
+              </div>
+              
+              <Button
+                size="lg"
+                className="bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 px-8 py-6 text-lg font-light rounded-xl shadow-xl hover:shadow-2xl transition-all"
+                asChild
+              >
+                <Link href="/teach/knowledge-base/create">
+                  <Sparkles className="mr-3 h-5 w-5" />
+                  Create Your First Class
+                </Link>
+              </Button>
+            </motion.div>
+          </div>
         ) : (
+          /* Existing User Layout */
+          <div className="space-y-8">
+            {/* Quick Stats - Minimal Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="p-6 border-neutral-200/50 dark:border-neutral-800/50 bg-white/50 dark:bg-neutral-900/50 backdrop-blur">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-3xl font-light">{students.length}</p>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Students</p>
+                  </div>
+                  <Users className="h-8 w-8 text-neutral-300 dark:text-neutral-700" />
+                </div>
+              </Card>
+              
+              <Card className="p-6 border-neutral-200/50 dark:border-neutral-800/50 bg-white/50 dark:bg-neutral-900/50 backdrop-blur">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-3xl font-light">{courses.length}</p>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Active Courses</p>
+                  </div>
+                  <BookOpen className="h-8 w-8 text-neutral-300 dark:text-neutral-700" />
+                </div>
+              </Card>
+              
+              <Card className="p-6 border-neutral-200/50 dark:border-neutral-800/50 bg-white/50 dark:bg-neutral-900/50 backdrop-blur">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-3xl font-light">0</p>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">This Week</p>
+                  </div>
+                  <TrendingUp className="h-8 w-8 text-neutral-300 dark:text-neutral-700" />
+                </div>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* Existing user content continues */}
+        {!isFirstTime && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Recent Courses */}
             <div className="lg:col-span-2">
