@@ -1,17 +1,22 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { HierarchicalProgressService } from "@/lib/services/hierarchical-progress-service";
+import { getActiveProfile } from '@/lib/auth/family-helpers';
 
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ assessmentId: string }> }
 ) {
     const supabase = createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    
+    // Get the active profile (handles both regular users and sub-accounts)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    
+    const { profile } = activeProfileData;
 
     const { assessmentId } = await params;
     
@@ -37,14 +42,14 @@ export async function POST(
         // Use hierarchical progress service for proper updates
         const progressService = new HierarchicalProgressService(true);
         
-        await progressService.updateAssessmentProgress(assessmentId, user.id, {
+        await progressService.updateAssessmentProgress(assessmentId, profile.user_id, {
             status,
             progressPercentage,
             lastPosition
         });
 
         // Fetch the updated progress record
-        const updatedProgress = await progressService.getProgress(user.id, 'assessment', assessmentId);
+        const updatedProgress = await progressService.getProgress(profile.user_id, 'assessment', assessmentId);
 
         return NextResponse.json({ 
             success: true, 
@@ -65,17 +70,20 @@ export async function GET(
     { params }: { params: Promise<{ assessmentId: string }> }
 ) {
     const supabase = createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    
+    // Get the active profile (handles both regular users and sub-accounts)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
+    
+    const { profile } = activeProfileData;
     const { assessmentId } = await params;
 
     try {
         const progressService = new HierarchicalProgressService(true);
-        const progress = await progressService.getProgress(user.id, 'assessment', assessmentId);
+        const progress = await progressService.getProgress(profile.user_id, 'assessment', assessmentId);
 
         return NextResponse.json({ progress });
 

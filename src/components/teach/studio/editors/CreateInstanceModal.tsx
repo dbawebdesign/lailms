@@ -5,9 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Users, Clock } from 'lucide-react';
+
+import { Loader2, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { FamilyStudentSelector } from '@/components/teach/FamilyStudentSelector';
 // Define the type locally since the import is not available
@@ -15,8 +14,6 @@ interface ClassInstanceCreationData {
   name: string;
   start_date?: string;
   end_date?: string;
-  period?: string;
-  capacity?: number;
   baseClassId?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -45,8 +42,6 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
     name: '',
     startDate: undefined as Date | undefined,
     endDate: undefined as Date | undefined,
-    period: '',
-    capacity: undefined as number | undefined,
   });
   
   // Student selection state
@@ -67,8 +62,6 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
         name: formData.name.trim(),
         start_date: formData.startDate?.toISOString(),
         end_date: formData.endDate?.toISOString(),
-        period: formData.period || undefined,
-        capacity: formData.capacity || undefined,
       };
 
       const response = await fetch(`/api/teach/base-classes/${baseClassId}/instances`, {
@@ -135,8 +128,6 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
         name: '',
         startDate: undefined,
         endDate: undefined,
-        period: '',
-        capacity: undefined,
       });
       setSelectedStudents([]);
       setError(null);
@@ -206,37 +197,7 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
             </div>
           </div>
 
-          {/* Period/Schedule */}
-          <div className="space-y-2">
-            <Label htmlFor="period">Period/Schedule</Label>
-            <Input
-              id="period"
-              placeholder="e.g., Period 3, Mon/Wed/Fri 10:00 AM, Block A"
-              value={formData.period}
-              onChange={(e) => setFormData(prev => ({ ...prev, period: e.target.value }))}
-              disabled={isLoading}
-              className="w-full"
-            />
-          </div>
 
-          {/* Capacity */}
-          <div className="space-y-2">
-            <Label htmlFor="capacity">Class Capacity</Label>
-            <Input
-              id="capacity"
-              type="number"
-              placeholder="e.g., 25"
-              value={formData.capacity || ''}
-              onChange={(e) => setFormData(prev => ({ 
-                ...prev, 
-                capacity: e.target.value ? parseInt(e.target.value) : undefined 
-              }))}
-              disabled={isLoading}
-              className="w-full"
-              min="1"
-              max="200"
-            />
-          </div>
 
           {/* Student Selection */}
           <div className="space-y-2">

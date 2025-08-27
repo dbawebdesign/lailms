@@ -28,8 +28,8 @@ export default async function DashboardPage() {
     // Redirect homeschool users to their dedicated dashboard
     if (orgType === 'individual_family' || orgType === 'homeschool_coop') {
       if (userRole === 'teacher') {
-        console.log('Dashboard: Redirecting homeschool teacher to /homeschool')
-        redirect('/homeschool')
+        console.log('Dashboard: Redirecting teacher to /teach')
+        redirect('/teach')
       } else if (userRole === 'student') {
         redirect('/learn')
       }

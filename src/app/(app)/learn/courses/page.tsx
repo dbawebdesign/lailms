@@ -91,12 +91,6 @@ export default function CoursesPage() {
     <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">My Courses</h1>
-        <Button asChild>
-          <Link href="/learn/enroll">
-            Enroll in Course
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-        </Button>
       </div>
 
       {courses.length === 0 ? (
@@ -106,14 +100,8 @@ export default function CoursesPage() {
               <GraduationCap className="mx-auto h-12 w-12 text-muted-foreground/50" />
               <h2 className="mt-4 text-xl font-semibold">No Courses Yet</h2>
               <p className="mt-2 text-muted-foreground">
-                You haven't enrolled in any courses yet. Use an enrollment code to get started.
+                You haven't been added to any courses yet. Your teacher will add you to classes when they're ready.
               </p>
-              <Button asChild className="mt-4">
-                <Link href="/learn/enroll">
-                  Enroll Now
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
             </div>
           </CardContent>
         </Card>

@@ -94,7 +94,7 @@ export default function AddStudentsPage() {
               ))}
               
               <div className="pt-4">
-                <Button onClick={() => router.push('/homeschool')} className="w-full">
+                <Button onClick={() => router.push('/teach')} className="w-full">
                   Go to Dashboard
                 </Button>
               </div>

@@ -6,10 +6,17 @@ import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/s
  * Returns the actual profile that should be used for the current request
  */
 export async function getActiveProfile() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createSupabaseServerClient()
   const supabaseAdmin = createSupabaseServiceClient()
   
+  // Get the current authenticated user first
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  
+  if (authError || !user) {
+    return null
+  }
+
   // First check if there's an active family member cookie (for sub-accounts)
   const activeMemberId = cookieStore.get('active_family_member')?.value
   
@@ -24,22 +31,34 @@ export async function getActiveProfile() {
       .single()
     
     if (subProfile && !error) {
-      console.log('Found sub-account profile:', subProfile)
-      return {
-        profile: subProfile,
-        isSubAccount: true,
-        parentId: subProfile.parent_account_id
+      // SAFEGUARD: Verify the sub-account belongs to the current authenticated user's family
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('family_id, organisation_id')
+        .eq('user_id', user.id)
+        .single()
+      
+      if (currentProfile) {
+        const sameFamily = (currentProfile.family_id && subProfile.family_id === currentProfile.family_id) ||
+                          (currentProfile.organisation_id && subProfile.organisation_id === currentProfile.organisation_id)
+        
+        if (sameFamily) {
+          console.log('Found valid sub-account profile:', subProfile)
+          return {
+            profile: subProfile,
+            isSubAccount: true,
+            parentId: subProfile.parent_account_id
+          }
+        } else {
+          console.warn('Sub-account does not belong to current user family, clearing cookie')
+          // Clear the invalid cookie
+          cookieStore.delete('active_family_member')
+        }
       }
     }
   }
   
-  // Otherwise, get the regular authenticated user
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  
-  if (authError || !user) {
-    return null
-  }
-  
+  // Get the regular authenticated user profile
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('*')
@@ -60,7 +79,7 @@ export async function getActiveProfile() {
 /**
  * Clear the active family member cookie
  */
-export function clearActiveFamilyMember() {
-  const cookieStore = cookies()
+export async function clearActiveFamilyMember() {
+  const cookieStore = await cookies()
   cookieStore.delete('active_family_member')
 }

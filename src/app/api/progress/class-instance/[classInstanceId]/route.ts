@@ -1,23 +1,27 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { updateClassInstanceProgress } from "@/lib/student/progress.server";
+import { getActiveProfile } from '@/lib/auth/family-helpers';
 
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ classInstanceId: string }> }
 ) {
     const supabase = createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    
+    // Get the active profile (handles both regular users and sub-accounts)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
+    
+    const { profile } = activeProfileData;
     const { classInstanceId } = await params;
     
     try {
         const body = await request.json();
-        const { userId = user.id } = body;
+        const { userId = profile.user_id } = body;
 
         // Verify the user has access to this class instance
         const { data: enrollment, error: enrollmentError } = await supabase

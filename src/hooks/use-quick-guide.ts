@@ -13,3 +13,4 @@ export const useQuickGuide = create<QuickGuideStore>((set) => ({
   closeQuickGuide: () => set({ isOpen: false }),
   toggleQuickGuide: () => set((state) => ({ isOpen: !state.isOpen })),
 }));
+

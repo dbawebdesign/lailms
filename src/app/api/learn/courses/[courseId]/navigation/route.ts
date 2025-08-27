@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getActiveProfile } from '@/lib/auth/family-helpers';
 import { NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
@@ -8,11 +9,15 @@ export async function GET(
     { params }: { params: Promise<{ courseId: string }> }
 ) {
     const supabase = createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    
+    // Get the active profile (handles both regular users and sub-accounts)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    
+    const { profile } = activeProfileData;
 
     // Await params in Next.js 15
     const { courseId } = await params;
@@ -35,11 +40,11 @@ export async function GET(
         const { data: enrollment, error: enrollmentError } = await supabase
             .from('rosters')
             .select('id, class_instance_id')
-            .eq('profile_id', user.id)
+            .eq('profile_id', profile.user_id)
             .in('class_instance_id', classInstanceIds)
             .maybeSingle();
 
-        console.log('Enrollment check:', { enrollment, enrollmentError, userId: user.id, courseId, classInstanceIds });
+        console.log('Enrollment check:', { enrollment, enrollmentError, userId: profile.user_id, courseId, classInstanceIds });
 
         if (enrollmentError) {
             console.error('Enrollment error:', enrollmentError);
@@ -122,7 +127,7 @@ export async function GET(
         const { data: progressData, error: progressError } = await supabase
             .from('progress')
             .select('item_id, item_type, status, progress_percentage, last_position')
-            .eq('user_id', user.id)
+            .eq('user_id', profile.user_id)
             .in('item_id', allItemIds);
 
         if (progressError) throw progressError;
@@ -132,7 +137,7 @@ export async function GET(
         const { data: assessmentAttempts, error: attemptsError } = await supabase
             .from('student_attempts')
             .select('assessment_id, percentage_score, passed, status')
-            .eq('student_id', user.id)
+            .eq('student_id', profile.user_id)
             .in('assessment_id', assessmentIds)
             .order('created_at', { ascending: false });
 

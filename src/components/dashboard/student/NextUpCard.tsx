@@ -36,11 +36,11 @@ const NextUpCard: React.FC<NextUpCardProps> = ({
         <BookOpenCheck className="h-8 w-8 text-muted-foreground mb-3" />
         <h2 className="text-xl font-semibold mb-2">No Active Lessons</h2>
         <p className="text-muted-foreground mb-4">
-          You don't have any active lessons right now. Enroll in a class to get started!
+          You don't have any active lessons right now. Your teacher will add you to classes when they're ready.
         </p>
-        <Link href="/learn/enroll">
+        <Link href="/learn/courses">
           <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-            Enroll in a Class <ArrowRight className="ml-2 h-4 w-4" />
+            View My Courses <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </Link>
       </div>

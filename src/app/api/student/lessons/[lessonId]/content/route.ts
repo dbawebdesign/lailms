@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getActiveProfile } from '@/lib/auth/family-helpers';
 
 export async function GET(
   request: NextRequest,
@@ -17,14 +18,17 @@ export async function GET(
 
     const supabase = createSupabaseServerClient();
 
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    // Get the active profile (handles both regular users and sub-accounts)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       );
     }
+    
+    const { profile } = activeProfileData;
 
     // Fetch comprehensive lesson data
     const { data: lesson, error: lessonError } = await supabase
@@ -79,7 +83,7 @@ export async function GET(
     const { data: progress } = await supabase
       .from('progress')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', profile.user_id)
       .eq('item_id', lessonId)
       .eq('item_type', 'lesson')
       .single();

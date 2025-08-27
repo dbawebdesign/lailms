@@ -401,8 +401,8 @@ export default function HomeschoolOnboarding() {
       .single()
 
     if (profile?.onboarding_completed) {
-      // Redirect completed homeschool users to their dashboard
-      router.push('/homeschool')
+      // Redirect completed users to their dashboard
+      router.push('/teach')
     } else if (profile?.onboarding_step) {
       setCurrentStep(profile.onboarding_step as OnboardingStep)
     }
@@ -1006,16 +1006,14 @@ export default function HomeschoolOnboarding() {
             </div>
 
             <div className="text-center">
-              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg mb-4">
-                <p className="text-sm font-semibold text-green-700 dark:text-green-300 mb-1">
+              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg mb-4">
+                <p className="text-lg font-semibold text-green-700 dark:text-green-300 mb-2">
                   7-Day Free Trial
                 </p>
-                <p className="text-xs text-green-600 dark:text-green-400">
+                <p className="text-sm text-green-600 dark:text-green-400">
                   No payment needed until your trial ends
                 </p>
               </div>
-              <p className="text-2xl font-bold">$40/month</p>
-              <p className="text-sm text-muted-foreground">Cancel anytime</p>
             </div>
 
             <Button 

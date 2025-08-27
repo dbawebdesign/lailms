@@ -32,7 +32,7 @@ function PaymentSuccessContent() {
   }, [searchParams]);
 
   const handleContinue = () => {
-    router.push('/homeschool');
+    router.push('/teach');
   };
 
   return (

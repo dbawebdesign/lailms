@@ -54,8 +54,8 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
   useEffect(() => {
     const handleAnimateHelp = () => {
       setAnimateHelp(true);
-      // Remove animation after 5 seconds
-      setTimeout(() => setAnimateHelp(false), 5000);
+      // Remove animation after 8 seconds for better visibility
+      setTimeout(() => setAnimateHelp(false), 8000);
     };
 
     window.addEventListener('animateHelpLink', handleAnimateHelp);
@@ -199,7 +199,7 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
                         : "text-muted-foreground hover:bg-gradient-to-r hover:from-[#6B5DE5]/5 hover:to-[#6B5DE5]/10 hover:text-foreground",
                       isNavCollapsed ? "justify-center" : "w-full",
                       // Add animation for Quick Guide link
-                      item.title === "Quick Guide" && animateHelp && "animate-pulse ring-2 ring-blue-500 ring-offset-2 ring-offset-background"
+                      item.title === "Quick Guide" && animateHelp && "animate-pulse ring-2 ring-blue-500 ring-offset-2 ring-offset-background bg-blue-50 dark:bg-blue-950/20"
                     )}
                   >
                     <item.icon

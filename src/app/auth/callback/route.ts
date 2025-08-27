@@ -36,12 +36,8 @@ export async function GET(request: NextRequest) {
             redirectPath = '/learn'
             break
           case 'TEACHER':
-            // Check if this is a homeschool teacher
-            if (orgType === 'individual_family' || orgType === 'homeschool_coop') {
-              redirectPath = '/homeschool'
-            } else {
-              redirectPath = '/teach'
-            }
+            // All teachers go to /teach regardless of organization type
+            redirectPath = '/teach'
             break
           case 'ADMIN':
             redirectPath = '/school'

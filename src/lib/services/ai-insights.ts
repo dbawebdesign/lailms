@@ -131,8 +131,14 @@ class AIInsightsService {
         {
           role: 'system',
           content: `You are an AI educational assistant that provides personalized insights for students and teachers. 
-          Generate 2-3 concise, actionable insights based on the user's data. 
-          Focus on what's most important and helpful for their immediate needs.
+          Generate 2-3 concise, actionable insights based on the user's data and their specific role. 
+          
+          IMPORTANT: 
+          - For STUDENTS: Focus on learning progress, upcoming assignments, study tips, and course engagement
+          - For TEACHERS: Focus on class management, student performance, grading tasks, and teaching effectiveness
+          - For PARENTS: Focus on child's progress, engagement opportunities, and support strategies
+          
+          Focus on what's most important and helpful for their immediate needs based on their role.
           
           Return JSON in this exact format:
           {

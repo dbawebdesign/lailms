@@ -4,36 +4,20 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { 
-  UserPlus, 
+  UserPlus,
   GraduationCap, 
-  Copy, 
   BookOpen, 
   Users,
   Settings,
-  RefreshCw,
-  Eye,
-  EyeOff,
-  CheckCircle,
-  Clock,
-  AlertCircle
+  RefreshCw
 } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import { createClient } from '@/lib/supabase/client'
-import { useInviteCodeClipboard } from '@/hooks/useClipboard'
 
-interface InviteCode {
-  id: string
-  code: string
-  role: string
-  created_at: string
-  expires_at?: string
-  used_at?: string
-  status?: string
-}
 
 interface Student {
   id: string
@@ -56,13 +40,10 @@ export default function HomeschoolDashboard({
   organizationName, 
   userRole 
 }: HomeschoolDashboardProps) {
-  const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [activeCourses, setActiveCourses] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
-  const [showAllCodes, setShowAllCodes] = useState(false)
   const supabase = createClient()
-  const { copy: copyToClipboard } = useInviteCodeClipboard()
 
   useEffect(() => {
     fetchDashboardData()
@@ -78,18 +59,7 @@ export default function HomeschoolDashboard({
         return
       }
 
-      // Fetch invite codes
-      const { data: codes, error: codesError } = await supabase
-        .from('invite_codes')
-        .select('*')
-        .eq('organisation_id', organizationId)
-        .order('created_at', { ascending: false })
 
-      if (codesError) {
-        console.error('Error fetching invite codes:', codesError)
-      } else {
-        setInviteCodes(codes || [])
-      }
 
       // Fetch students (profiles with student role in this organization)
       const { data: studentProfiles, error: studentsError } = await supabase
@@ -174,22 +144,7 @@ export default function HomeschoolDashboard({
   //   }
   // }
 
-  const getCodeStatus = (code: InviteCode) => {
-    if (code.used_at) {
-      return { status: 'used', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100', icon: CheckCircle }
-    }
-    if (code.expires_at && new Date(code.expires_at) < new Date()) {
-      return { status: 'expired', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100', icon: AlertCircle }
-    }
-    return { status: 'active', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100', icon: Clock }
-  }
 
-  const activeStudentCodes = inviteCodes.filter(code => 
-    code.role === 'student' && !code.used_at && 
-    (!code.expires_at || new Date(code.expires_at) > new Date())
-  )
-
-  const displayedCodes = showAllCodes ? inviteCodes : activeStudentCodes
 
   return (
     <div className="space-y-6">
@@ -336,7 +291,7 @@ export default function HomeschoolDashboard({
         /* Existing User Layout - Has Base Classes */
         <div className="space-y-6">
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card className="hover-card cursor-pointer hover-bg-light">
               <CardContent className="pt-6">
                 <div className="flex items-center space-x-2">
@@ -344,18 +299,6 @@ export default function HomeschoolDashboard({
                   <div>
                     <p className="text-2xl font-bold hover-text-highlight">{students.length}</p>
                     <p className="text-sm text-neutral-600 dark:text-neutral-400">Students</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="hover-card cursor-pointer hover-bg-light">
-              <CardContent className="pt-6">
-                <div className="flex items-center space-x-2">
-                  <UserPlus className="h-5 w-5 text-green-600 hover-icon" />
-                  <div>
-                    <p className="text-2xl font-bold hover-text-highlight">{activeStudentCodes.length}</p>
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400">Active Codes</p>
                   </div>
                 </div>
               </CardContent>
@@ -374,76 +317,7 @@ export default function HomeschoolDashboard({
             </Card>
           </div>
 
-          {/* Invite Codes Section */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center space-x-2">
-                  <UserPlus className="h-5 w-5" />
-                  <span>Student Invite Codes</span>
-                </CardTitle>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAllCodes(!showAllCodes)}
-                  >
-                    {showAllCodes ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-                    {showAllCodes ? 'Hide Used' : 'Show All'}
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {displayedCodes.length === 0 ? (
-                <div className="text-center py-8">
-                  <UserPlus className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-neutral-600 dark:text-neutral-400 mb-2">
-                    No {showAllCodes ? '' : 'active '}invite codes
-                  </h3>
-                  <p className="text-neutral-500 dark:text-neutral-400 mb-4">
-                    Invite codes are automatically generated by the system when needed
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {displayedCodes.map((code) => {
-                    const statusInfo = getCodeStatus(code)
-                    const StatusIcon = statusInfo.icon
-                    
-                    return (
-                      <div key={code.id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <GraduationCap className="h-4 w-4 text-blue-600" />
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <code className="font-mono text-sm font-semibold">{code.code}</code>
-                              <Badge variant="outline" className={statusInfo.color}>
-                                <StatusIcon className="h-3 w-3 mr-1" />
-                                {statusInfo.status}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                              Created {new Date(code.created_at).toLocaleDateString()}
-                              {code.expires_at && ` • Expires ${new Date(code.expires_at).toLocaleDateString()}`}
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyToClipboard(code.code, 'Invite code')}
-                          disabled={code.used_at !== null}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+
 
           {/* Students Section */}
           <Card>

@@ -297,8 +297,8 @@ export default function UnifiedStudySpace() {
         if (user) {
           console.log('🔐 User authenticated:', user.id);
           setCurrentUser(user);
-          await loadUserCourses(user.id);
-          await loadUserStudySpaces(user.id);
+          await loadUserCourses(); // Uses API that handles family account switching
+          await loadUserStudySpaces(); // Updated to use active profile
           // Don't load notes until a study space is selected
           // Don't create study session until user selects a course/space
         }
@@ -312,79 +312,86 @@ export default function UnifiedStudySpace() {
     initializeUser();
   }, []);
 
-  // Load user's enrolled courses and class instances
-  const loadUserCourses = async (userId: string) => {
+  // Load user's enrolled courses and class instances using API (handles family account switching)
+  const loadUserCourses = async () => {
     try {
       setIsLoadingCourses(true);
       
-      // Use the exact same query pattern as the working student dashboard API
-      const { data: enrollments, error: enrollmentError } = await supabase
-        .from('rosters')
-        .select(`
-          id,
-          role,
-          joined_at,
-          class_instances!inner (
-            id,
-            name,
-            enrollment_code,
-            start_date,
-            end_date,
-            status,
-            settings,
-            base_classes!inner (
-              id,
-              name,
-              description
-            )
-          )
-        `)
-        .eq('profile_id', userId)
-        .eq('role', 'student');
+      console.log('📚 Loading courses via API...');
+      
+      // Use the API endpoint that properly handles family account switching
+      const response = await fetch('/api/learn/courses', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
 
-      if (enrollmentError) {
-        console.error('Error loading enrollments:', enrollmentError);
+      if (!response.ok) {
+        console.error('Error loading courses from API:', response.status, response.statusText);
+        setCourses([]);
         return;
       }
 
-      console.log('Study space enrollments:', enrollments);
+      const coursesData = await response.json();
+      console.log('Study space courses from API:', coursesData);
 
-      if (enrollments && enrollments.length > 0) {
-        const courseData: Course[] = enrollments.map((enrollment: any) => {
-          const classInstance = enrollment.class_instances;
-          const baseClass = classInstance.base_classes;
-          
-          console.log('Processing enrollment:', { classInstance, baseClass });
+      if (coursesData && coursesData.length > 0) {
+        const courseData: Course[] = coursesData.map((course: any) => {
+          console.log('Processing course:', course);
           
           return {
-            id: classInstance.id,
-            name: classInstance.name || baseClass.name,
-            title: classInstance.name || baseClass.name, // Use name instead of title
-            description: baseClass.description || 'No description available',
+            id: course.id,
+            name: course.name,
+            title: course.name,
+            description: course.baseClass?.description || 'No description available',
             instructor: 'Instructor', // TODO: Get actual instructor info
             progress: 0, // TODO: Calculate actual progress
             color: getRandomColor(),
-            base_class_id: baseClass.id
+            base_class_id: course.baseClass?.id
           };
         });
 
-        console.log('Processed course data:', courseData);
+        console.log('Processed course data for study space:', courseData);
         setCourses(courseData);
       } else {
-        console.log('No enrollments found for user:', userId);
+        console.log('No courses found from API');
         setCourses([]);
       }
     } catch (error) {
       console.error('Error loading courses:', error);
+      setCourses([]);
     } finally {
       setIsLoadingCourses(false);
     }
   };
 
-  // Load user's study spaces
-  const loadUserStudySpaces = async (userId: string) => {
+  // Load user's study spaces (using active profile for family account switching)
+  const loadUserStudySpaces = async () => {
     try {
-      console.log('📚 Loading study spaces for user:', userId);
+      // Determine the active user ID (handles family account switching)
+      let activeUserId: string;
+      
+      // Check for active family member cookie
+      const activeFamilyMemberCookie = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('active_family_member='));
+      const activeFamilyMemberId = activeFamilyMemberCookie?.split('=')[1];
+      
+      if (activeFamilyMemberId) {
+        activeUserId = activeFamilyMemberId;
+        console.log('📚 Loading study spaces for active family member:', activeUserId);
+      } else {
+        // Fall back to authenticated user
+        const { data: { user } } = await supabase.auth.getUser();
+        activeUserId = user?.id || '';
+        console.log('📚 Loading study spaces for authenticated user:', activeUserId);
+      }
+      
+      if (!activeUserId) {
+        console.error('No active user ID found');
+        return;
+      }
       
       const { data: spaces, error } = await supabase
         .from('study_spaces')
@@ -395,7 +402,7 @@ export default function UnifiedStudySpace() {
             name
           )
         `)
-        .eq('user_id', userId)
+        .eq('user_id', activeUserId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -2768,7 +2775,7 @@ export default function UnifiedStudySpace() {
                     {isLoadingCourses ? (
                       <div className="pl-6 py-2 text-sm text-muted-foreground">Loading courses...</div>
                     ) : courses.length === 0 ? (
-                      <div className="pl-6 py-2 text-sm text-muted-foreground">No enrolled courses found</div>
+                      <div className="pl-6 py-2 text-sm text-muted-foreground">No courses available yet</div>
                     ) : (
                       courses.map((course) => (
                       <SelectItem key={course.id} value={course.id} className="pl-6">

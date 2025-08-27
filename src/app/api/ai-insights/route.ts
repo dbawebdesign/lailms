@@ -1,17 +1,23 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { aiInsightsService } from '@/lib/services/ai-insights';
+import { getActiveProfile } from '@/lib/auth/family-helpers';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    
+    // Get the active profile (handles both regular users and family member switching)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const insights = await aiInsightsService.getUserInsights(supabase, user.id);
+    
+    const { profile } = activeProfileData;
+    
+    // Use the active profile's user_id for insights generation
+    const insights = await aiInsightsService.getUserInsights(supabase, profile.user_id);
     
     return NextResponse.json({ insights });
   } catch (error: any) {
@@ -38,17 +44,21 @@ export async function POST(request: NextRequest) {
 
     // Handle authenticated user requests
     const supabase = createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    
+    // Get the active profile (handles both regular users and family member switching)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
+    const { profile } = activeProfileData;
 
     if (action === 'refresh') {
-      const insights = await aiInsightsService.refreshInsights(supabase, user.id);
+      const insights = await aiInsightsService.refreshInsights(supabase, profile.user_id);
       return NextResponse.json({ insights });
     } else if (action === 'dismiss' && insightId) {
-      await aiInsightsService.dismissInsights(supabase, user.id, insightId);
+      await aiInsightsService.dismissInsights(supabase, profile.user_id, insightId);
       return NextResponse.json({ success: true });
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

@@ -20,3 +20,4 @@ export const VisuallyHidden = React.forwardRef<HTMLSpanElement, VisuallyHiddenPr
 )
 
 VisuallyHidden.displayName = "VisuallyHidden"
+

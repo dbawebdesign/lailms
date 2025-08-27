@@ -95,14 +95,33 @@ export async function POST(request: Request) {
       // Attempt to create bucket if it doesn't exist
       if (uploadError.message.includes('Bucket not found')) {
         console.log(`Attempting to create bucket: ${bucketName}`);
-        const { error: createBucketError } = await supabase.storage.createBucket(
+        
+        // Use service role client for bucket creation
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        
+        if (!supabaseUrl || !serviceRoleKey) {
+          throw new Error('Service role key not configured for bucket creation');
+        }
+        
+        const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
+        
+        const { error: createBucketError } = await adminSupabase.storage.createBucket(
           bucketName,
-          { public: false }
+          { 
+            public: false,
+            allowedMimeTypes: ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+            fileSizeLimit: 10485760 // 10MB limit
+          }
         );
+        
         if (createBucketError && !createBucketError.message.includes('already exists')) {
           throw new Error(`Failed to create bucket: ${createBucketError.message}`);
         }
-        // Retry upload
+        
+        console.log(`Bucket ${bucketName} created successfully`);
+        
+        // Retry upload with the regular client now that bucket exists
         const { error: retryUploadError } = await supabase.storage
           .from(bucketName)
           .upload(filePath, file);

@@ -1,41 +1,30 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { aiInsightsService } from '@/lib/services/ai-insights';
+import { getActiveProfile } from '@/lib/auth/family-helpers';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { isTeacher, isStudent, PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
 export async function GET(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    
+    // Get the active profile (handles both regular users and family member switching)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
+    const { profile, isSubAccount } = activeProfileData;
 
-    console.log('🔍 Debug: Starting AI insights debug for user:', user.id);
-
-    // Step 1: Check if user profile exists
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json({ 
-        error: 'Profile not found', 
-        details: profileError?.message,
-        step: 'profile_lookup'
-      }, { status: 404 });
-    }
-
+    console.log('🔍 Debug: Starting AI insights debug for user:', profile.user_id, isSubAccount ? '(sub-account)' : '(main account)');
     console.log('✅ Debug: Profile found:', profile.first_name, profile.last_name, profile.role);
 
     // Step 2: Check existing insights
     const { data: existingInsights, error: insightsError } = await supabase
       .from('ai_insights')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', profile.user_id)
       .eq('is_dismissed', false)
       .gte('expires_at', new Date().toISOString());
 
@@ -55,7 +44,7 @@ export async function GET(request: NextRequest) {
               base_classes (name, description)
             )
           `)
-          .eq('profile_id', user.id)
+          .eq('profile_id', profile.user_id)
           .eq('role', 'student');
 
         userData = {
@@ -76,7 +65,7 @@ export async function GET(request: NextRequest) {
               base_classes (name, description)
             )
           `)
-          .eq('profile_id', user.id)
+          .eq('profile_id', profile.user_id)
           .eq('role', 'teacher');
 
         userData = {
@@ -109,13 +98,13 @@ export async function GET(request: NextRequest) {
     // Step 5: Try generating insights
     try {
       console.log('🔄 Debug: Attempting to generate insights...');
-      const insights = await aiInsightsService.getUserInsights(supabase, user.id);
+      const insights = await aiInsightsService.getUserInsights(supabase, profile.user_id);
       console.log('✅ Debug: Insights generated:', insights.length);
 
       return NextResponse.json({
         success: true,
         debug: {
-          userId: user.id,
+          userId: profile.user_id,
           profile: {
             name: `${profile.first_name} ${profile.last_name}`,
             role: profile.role

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ChevronDown, User, GraduationCap, LogOut, Settings } from 'lucide-react'
 import { toast } from 'sonner'
+import { triggerChatLogout } from '@/utils/chatPersistence'
 
 interface FamilyMember {
   id: string
@@ -36,6 +37,20 @@ export default function FamilyAccountSwitcher() {
 
   useEffect(() => {
     loadFamilyMembers()
+  }, [])
+
+  // Listen for cookie changes to update the current user display
+  useEffect(() => {
+    const handleCookieChange = () => {
+      loadFamilyMembers()
+    }
+
+    // Listen for storage events (though cookies don't trigger these, we'll use a custom event)
+    window.addEventListener('familyMemberChanged', handleCookieChange)
+    
+    return () => {
+      window.removeEventListener('familyMemberChanged', handleCookieChange)
+    }
   }, [])
 
   const loadFamilyMembers = async () => {
@@ -73,6 +88,14 @@ export default function FamilyAccountSwitcher() {
         return
       }
 
+      // Check for active family member cookie to determine who is currently active
+      const activeFamilyMemberCookie = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('active_family_member='))
+      const activeFamilyMemberId = activeFamilyMemberCookie?.split('=')[1]
+      
+      console.log('Active family member from cookie:', activeFamilyMemberId)
+
       // Get all family members - both through family_id and organisation_id
       let allProfiles = []
       
@@ -106,14 +129,19 @@ export default function FamilyAccountSwitcher() {
 
       // Format all members
       allProfiles.forEach(member => {
-        const isCurrent = member.user_id === user.id
+        // Determine if this member is currently active
+        // If there's an active family member cookie, use that; otherwise, default to authenticated user
+        const isCurrent = activeFamilyMemberId 
+          ? member.user_id === activeFamilyMemberId 
+          : member.user_id === user.id
+          
         const formattedMember: FamilyMember = {
           id: member.user_id,
           firstName: member.first_name || (member.role === 'teacher' ? 'Teacher' : 'Student'),
           lastName: member.last_name || '',
           role: member.role as 'teacher' | 'student',
           gradeLevel: member.grade_level,
-          email: isCurrent ? user.email : undefined,
+          email: member.user_id === user.id ? user.email : undefined, // Only show email for authenticated user
           isCurrent
         }
         
@@ -143,14 +171,24 @@ export default function FamilyAccountSwitcher() {
         if (familyStudents) {
           familyStudents.forEach(fs => {
             if (fs.profiles && !members.find(m => m.id === fs.student_id)) {
-              members.push({
+              const isCurrent = activeFamilyMemberId 
+                ? fs.student_id === activeFamilyMemberId 
+                : false // Family students are never the authenticated user
+                
+              const formattedMember: FamilyMember = {
                 id: fs.student_id,
                 firstName: fs.profiles.first_name || 'Student',
                 lastName: fs.profiles.last_name || '',
                 role: 'student',
                 gradeLevel: fs.profiles.grade_level,
-                isCurrent: false
-              })
+                isCurrent
+              }
+              
+              members.push(formattedMember)
+              
+              if (isCurrent) {
+                setCurrentUser(formattedMember)
+              }
             }
           })
         }
@@ -196,11 +234,16 @@ export default function FamilyAccountSwitcher() {
         )
         setCurrentUser(targetMember)
         
+        // Dispatch custom event to notify other components
+        window.dispatchEvent(new CustomEvent('familyMemberChanged', { 
+          detail: { memberId, member: targetMember } 
+        }))
+        
         // Redirect based on role
         if (targetMember.role === 'student') {
           router.push('/learn')
         } else {
-          router.push('/homeschool')
+          router.push('/teach')
         }
         
         // Force a page refresh to update all components
@@ -215,6 +258,16 @@ export default function FamilyAccountSwitcher() {
   }
 
   const handleSignOut = async () => {
+    // Trigger chat history cleanup before logout
+    triggerChatLogout();
+    
+    // Clear family member cookie before logout
+    try {
+      await fetch('/api/auth/clear-family-cookie', { method: 'POST' });
+    } catch (error) {
+      console.warn('Failed to clear family cookie:', error);
+    }
+    
     await supabase.auth.signOut()
     router.push('/login')
   }
@@ -225,9 +278,35 @@ export default function FamilyAccountSwitcher() {
     )
   }
 
-  // Don't show anything if no family members found (non-homeschool account)
+  // Show basic user menu if no family members found (non-homeschool account)
   if (!currentUser || familyMembers.length === 0) {
-    return null
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="flex items-center space-x-2 h-8"
+          >
+            <User className="h-4 w-4" />
+            <span className="text-sm font-medium">Account</span>
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col space-y-1">
+              <p className="text-sm font-medium leading-none">My Account</p>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleSignOut}>
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Sign Out</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
   }
 
   return (

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getActiveProfile } from '@/lib/auth/family-helpers';
 
 /**
  * GET /api/study-spaces/content/status?baseClassId=xxx
@@ -9,11 +10,14 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
     
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    // Get the active profile (handles both regular users and sub-accounts)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
+    const { profile } = activeProfileData;
 
     const { searchParams } = new URL(request.url);
     const baseClassId = searchParams.get('baseClassId');
@@ -24,16 +28,10 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Get user's organization and verify access
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('organisation_id, role, active_role')
-      .eq('user_id', user.id!)
-      .single();
-
-    if (!profile || !profile.organisation_id) {
+    // Verify organization access
+    if (!profile.organisation_id) {
       return NextResponse.json({ 
-        error: 'User profile not found or missing organization' 
+        error: 'User profile missing organization' 
       }, { status: 404 });
     }
 
@@ -57,7 +55,7 @@ export async function GET(request: NextRequest) {
       const { data: enrollment } = await supabase
         .from('rosters')
         .select('id')
-        .eq('profile_id', user.id!)
+        .eq('profile_id', profile.user_id)
         .eq('role', 'student')
         .limit(1);
 

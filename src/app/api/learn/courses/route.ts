@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getActiveProfile } from '@/lib/auth/family-helpers';
 import { Tables } from 'packages/types/db';
 
 interface EnrollmentWithClassInstance {
@@ -26,10 +27,14 @@ export async function GET() {
   const supabase = createSupabaseServerClient();
 
   try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    // Get the active profile (handles both regular users and sub-accounts)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
+    
+    const { profile } = activeProfileData;
 
     // Get user's enrolled courses
     const { data: enrollments, error: enrollmentsError } = await supabase
@@ -53,7 +58,7 @@ export async function GET() {
           )
         )
       `)
-      .eq('profile_id', user.id)
+      .eq('profile_id', profile.user_id)
       .eq('role', 'student')
       .returns<EnrollmentWithClassInstance[]>();
 

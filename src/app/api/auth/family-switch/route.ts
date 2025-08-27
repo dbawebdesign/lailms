@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       // Clear the active family member cookie
       const response = NextResponse.json({
         success: true,
-        redirectUrl: '/homeschool',
+        redirectUrl: '/teach',
         user: {
           id: user.id,
           role: 'teacher'
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       // Set a cookie to track which family member is active
       const response = NextResponse.json({
         success: true,
-        redirectUrl: targetProfile.role === 'student' ? '/learn' : '/homeschool',
+        redirectUrl: targetProfile.role === 'student' ? '/learn' : '/teach',
         user: {
           id: targetProfile.user_id,
           firstName: targetProfile.first_name,
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       
       // Set cookie to track active sub-account
       response.cookies.set('active_family_member', targetUserId, {
-        httpOnly: true,
+        httpOnly: false, // Allow client-side access for family switcher component
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 7 // 7 days
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
       // For now, just redirect based on role
       return NextResponse.json({
         success: true,
-        redirectUrl: targetProfile.role === 'student' ? '/learn' : '/homeschool',
+        redirectUrl: targetProfile.role === 'student' ? '/learn' : '/teach',
         user: {
           id: targetProfile.user_id,
           firstName: targetProfile.first_name,

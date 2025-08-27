@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { User, Bell, Moon, Sun, MessageSquare, LogOut, Mail, Crown, Shield, GraduationCap, BookOpen, Users } from "lucide-react";
+import { User, Bell, Moon, Sun, MessageSquare, Mail, Crown, Shield, GraduationCap, BookOpen, Users } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useUIContext } from "@/context/UIContext";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { triggerChatLogout } from "@/utils/chatPersistence";
+
 import { Tables } from "packages/types/db";
 import { PROFILE_ROLE_FIELDS, UserProfile } from "@/lib/utils/roleUtils";
 import FamilyAccountSwitcher from "@/components/ui/FamilyAccountSwitcher";
@@ -48,7 +48,6 @@ const Header = () => {
   const { isPanelVisible, togglePanelVisible } = useUIContext();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isRoleSwitching, setIsRoleSwitching] = useState(false);
   const router = useRouter();
@@ -61,7 +60,6 @@ const Header = () => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email) {
-        setUserEmail(session.user.email);
         
         // Fetch user profile with roles and organization info
         const { data: profile, error } = await supabase
@@ -81,13 +79,7 @@ const Header = () => {
     fetchUser();
   }, [supabase]);
 
-  const handleLogout = async () => {
-    // Trigger chat history cleanup before logout
-    triggerChatLogout();
-    
-    await supabase.auth.signOut();
-    router.push("/login");
-  };
+
 
   const handleRoleSwitch = async (newRole: UserProfile['role']) => {
     if (!userProfile || isRoleSwitching) return;
@@ -190,93 +182,55 @@ const Header = () => {
           <Bell className="h-5 w-5" />
         </Button>
         
-        {/* Family Account Switcher for Homeschool Users, Role Switcher for Others */}
-        {isHomeschoolUser ? (
-          <FamilyAccountSwitcher />
-        ) : (
-          hasMultipleRoles && currentRole && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className={cn("flex items-center space-x-2 h-8", buttonHoverClass)}
-                  disabled={isRoleSwitching}
-                >
-                  {(() => {
-                    const IconComponent = roleIcons[currentRole as keyof typeof roleIcons];
-                    return IconComponent ? <IconComponent className="h-4 w-4" /> : <User className="h-4 w-4" />;
-                  })()}
-                  <span className="text-sm font-medium">
-                    {roleDisplayNames[currentRole as keyof typeof roleDisplayNames] || currentRole}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>Switch Role</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {availableRoles.map((role) => {
-                  const IconComponent = roleIcons[role as keyof typeof roleIcons];
-                  const isActive = role === currentRole;
-                  
-                  return (
-                    <DropdownMenuItem
-                      key={role}
-                      onClick={() => handleRoleSwitch(role as UserProfile['role'])}
-                      disabled={isActive || isRoleSwitching}
-                      className={cn(
-                        "flex items-center space-x-2",
-                        isActive && "bg-neutral-100 dark:bg-neutral-800"
-                      )}
-                    >
-                      {IconComponent && <IconComponent className="h-4 w-4" />}
-                      <span>{roleDisplayNames[role as keyof typeof roleDisplayNames] || role}</span>
-                      {isActive && <span className="ml-auto text-xs text-muted-foreground">Active</span>}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )
-        )}
+        {/* Family Account Switcher for Homeschool Users */}
+        <FamilyAccountSwitcher />
         
-        {/* User Profile Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              aria-label="User Menu"
-              className={buttonHoverClass}
-            >
-              <User className="h-5 w-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">My Account</p>
-                {userEmail && (
-                  <p className="text-xs leading-none text-muted-foreground">
-                    {userEmail}
-                  </p>
-                )}
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {/* Possible future items: Profile, Settings */}
-            {/* 
-            <DropdownMenuItem onSelect={() => router.push('/profile')}>
-              <User className="mr-2 h-4 w-4" />
-              <span>Profile</span>
-            </DropdownMenuItem>
-            */}
-            <DropdownMenuItem onSelect={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Role Switcher for Non-Homeschool Users with Multiple Roles */}
+        {!isHomeschoolUser && hasMultipleRoles && currentRole && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={cn("flex items-center space-x-2 h-8", buttonHoverClass)}
+                disabled={isRoleSwitching}
+              >
+                {(() => {
+                  const IconComponent = roleIcons[currentRole as keyof typeof roleIcons];
+                  return IconComponent ? <IconComponent className="h-4 w-4" /> : <User className="h-4 w-4" />;
+                })()}
+                <span className="text-sm font-medium">
+                  {roleDisplayNames[currentRole as keyof typeof roleDisplayNames] || currentRole}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Switch Role</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {availableRoles.map((role) => {
+                const IconComponent = roleIcons[role as keyof typeof roleIcons];
+                const isActive = role === currentRole;
+                
+                return (
+                  <DropdownMenuItem
+                    key={role}
+                    onClick={() => handleRoleSwitch(role as UserProfile['role'])}
+                    disabled={isActive || isRoleSwitching}
+                    className={cn(
+                      "flex items-center space-x-2",
+                      isActive && "bg-neutral-100 dark:bg-neutral-800"
+                    )}
+                  >
+                    {IconComponent && <IconComponent className="h-4 w-4" />}
+                    <span>{roleDisplayNames[role as keyof typeof roleDisplayNames] || role}</span>
+                    {isActive && <span className="ml-auto text-xs text-muted-foreground">Active</span>}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
         
         {/* AI Panel Toggle Button - Enhanced for visibility */}
         <Button

@@ -143,25 +143,16 @@ export default function StudentDashboardPage() {
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground">You are not currently enrolled in any active courses. Explore and join a new course!</p>
+            <p className="text-muted-foreground">You are not currently enrolled in any active courses. Your teacher will add you to classes when they're ready.</p>
           )}
         </div>
       </div>
 
       {/* Bottom section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <div className="bg-card p-6 rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-3">Achievements</h2>
           <p className="text-muted-foreground">Your recent badges and achievements.</p>
-        </div>
-        <div className="bg-card p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-3">Join a Class</h2>
-          <p className="text-muted-foreground mb-4">Enroll in new classes using enrollment codes from your instructors.</p>
-          <Link href="/learn/enroll">
-            <Button className="w-full">
-              Enroll with Code
-            </Button>
-          </Link>
         </div>
       </div>
     </div>
