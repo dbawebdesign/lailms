@@ -11,6 +11,8 @@
 - **New RLS Policies:**
   - "Parents can manage their sub-accounts" - Allows parent accounts to manage student profiles
   - "Parents can create sub-accounts" - Allows parents to create student profiles
+  - **Progress table family support** - Updated RLS policies to allow parents to manage progress for their sub-accounts
+  - **Assessment tables family support** - Updated RLS policies for student_attempts and student_responses to support family accounts
 
 ## Recent Updates
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, CheckCircle, Zap, Users, BookOpen, Brain, TrendingUp, Shield, Star, Play, ChevronRight, GraduationCap, Home, School, Sparkles, Target, Award, Lightbulb, MessageCircle, Menu, X } from 'lucide-react'
+import { ArrowRight, CheckCircle, Zap, Users, BookOpen, Brain, TrendingUp, Shield, Star, Play, ChevronRight, GraduationCap, Home, School, Sparkles, Target, Award, Lightbulb, MessageCircle, Menu, X, Facebook, Instagram, Linkedin, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ShinyButton } from '@/components/ui/shiny-button'
 import AnimatedGridBackground from '@/components/layout/AnimatedGridBackground'
@@ -125,7 +125,6 @@ export default function LandingPage() {
             <Link href="#homeschool" className="text-gray-300 hover:text-white transition-colors">Homeschool</Link>
             <Link href="#features" className="text-gray-300 hover:text-white transition-colors">Features</Link>
             <Link href="#pricing" className="text-gray-300 hover:text-white transition-colors">Pricing</Link>
-            <Link href="/homeschool-signup" className="text-gray-300 hover:text-white transition-colors">Expo</Link>
             <button 
               onClick={() => setIsContactModalOpen(true)}
               className="text-gray-300 hover:text-white transition-colors"
@@ -184,13 +183,7 @@ export default function LandingPage() {
             >
               Pricing
             </Link>
-            <Link 
-              href="/homeschool-signup" 
-              className="text-gray-300 hover:text-white transition-colors py-2 font-medium"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Expo
-            </Link>
+
             <button 
               onClick={() => {
                 setIsContactModalOpen(true);
@@ -1109,6 +1102,48 @@ export default function LandingPage() {
                 <h4 className="font-semibold text-white">Resources</h4>
                 <div className="space-y-2 text-sm text-gray-400">
                   <div><Link href="/help" className="hover:text-white transition-colors">Video Guides</Link></div>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <h4 className="font-semibold text-white">Follow Us</h4>
+                <div className="flex space-x-4">
+                  <a 
+                    href="https://www.facebook.com/p/Learnology-AI-61573064702124/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-lg bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] hover:opacity-80 transition-opacity"
+                    aria-label="Follow us on Facebook"
+                  >
+                    <Facebook className="w-5 h-5 text-white" />
+                  </a>
+                  <a 
+                    href="https://www.instagram.com/learnologyai/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-lg bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] hover:opacity-80 transition-opacity"
+                    aria-label="Follow us on Instagram"
+                  >
+                    <Instagram className="w-5 h-5 text-white" />
+                  </a>
+                  <a 
+                    href="https://www.linkedin.com/company/learnology-ai"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-lg bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] hover:opacity-80 transition-opacity"
+                    aria-label="Follow us on LinkedIn"
+                  >
+                    <Linkedin className="w-5 h-5 text-white" />
+                  </a>
+                  <a 
+                    href="https://www.tiktok.com/@learnologyai"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-lg bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] hover:opacity-80 transition-opacity"
+                    aria-label="Follow us on TikTok"
+                  >
+                    <Video className="w-5 h-5 text-white" />
+                  </a>
                 </div>
               </div>
             </div>

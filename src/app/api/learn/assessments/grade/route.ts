@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { AIGradingService } from '@/lib/services/ai-grading-service';
+import { getActiveProfile } from '@/lib/auth/family-helpers';
 
 interface GradeAttemptRequest {
   attemptId: string;
@@ -10,11 +11,14 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
     
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    // Get the active profile (handles both regular users and sub-accounts)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
+    const { profile } = activeProfileData;
 
     const body: GradeAttemptRequest = await request.json();
     const { attemptId } = body;
@@ -31,7 +35,7 @@ export async function POST(request: NextRequest) {
         assessment:assessments(*)
       `)
       .eq('id', attemptId)
-      .eq('student_id', user.id)
+      .eq('student_id', profile.user_id)
       .single();
 
     if (attemptError || !attempt) {
@@ -95,11 +99,14 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
     
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    // Get the active profile (handles both regular users and sub-accounts)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
+    const { profile } = activeProfileData;
 
     const { searchParams } = new URL(request.url);
     const attemptId = searchParams.get('attemptId');
@@ -113,7 +120,7 @@ export async function GET(request: NextRequest) {
       .from('student_attempts')
       .select('id, ai_grading_status, ai_graded_at, percentage_score, passed')
       .eq('id', attemptId)
-      .eq('student_id', user.id)
+      .eq('student_id', profile.user_id)
       .single();
 
     if (attemptError || !attempt) {

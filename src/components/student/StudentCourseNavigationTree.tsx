@@ -303,6 +303,12 @@ export default function StudentCourseNavigationTree({
       }
     };
     
+    const scoreClass = isPassed 
+      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+      : isFailed 
+      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+      : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+    
     return (
       <button
         onClick={handleClick}
@@ -354,12 +360,7 @@ export default function StudentCourseNavigationTree({
               {isAccessible && (
                 <div className="flex items-center space-x-2 text-xs text-gray-500 ml-4">
                   {assessment.score !== null && assessment.score !== undefined && (
-                    <span className={cn(
-                      "px-2 py-1 rounded-full text-xs font-medium",
-                      isPassed && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
-                      isFailed && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
-                      !isPassed && !isFailed && "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                    )}>
+                    <span className={cn("px-2 py-1 rounded-full text-xs font-medium", scoreClass)}>
                       {assessment.score}%
                     </span>
                   )}
@@ -478,27 +479,39 @@ export default function StudentCourseNavigationTree({
               const isAccessible = isPathAccessible(path, index);
               const isCompleted = path.completed;
               
+              const pathContainerClasses = isCompleted 
+                ? "bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 border-emerald-200 dark:border-emerald-800/30"
+                : isAccessible 
+                ? "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-white/5"
+                : "bg-gray-50/50 dark:bg-gray-800/30 border-gray-200/50 dark:border-gray-700/50 opacity-60 cursor-not-allowed";
+
+              const iconContainerClasses = isCompleted 
+                ? "bg-gradient-to-br from-emerald-500 to-green-600"
+                : isAccessible 
+                ? "bg-gradient-to-br from-blue-500 to-purple-600"
+                : "bg-gray-400 dark:bg-gray-600";
+
+              const progressBarClasses = isCompleted 
+                ? "bg-gradient-to-r from-emerald-500 to-green-500"
+                : "bg-gradient-to-r from-blue-500 to-purple-600";
+              
+              const lessonCountClasses = isCompleted 
+                ? "text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30"
+                : isAccessible 
+                ? "text-gray-500 bg-gray-100 dark:bg-gray-800"
+                : "text-gray-400 bg-gray-100/50 dark:bg-gray-800/50";
+
               return (
                 <button
                   key={path.id}
                   onClick={() => navigateToPath(path, index)}
                   disabled={!isAccessible}
-                  className={cn(
-                    "w-full text-left p-4 rounded-xl border transition-all duration-200 group relative",
-                    isCompleted && "bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 border-emerald-200 dark:border-emerald-800/30",
-                    isAccessible && !isCompleted && "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-white/5",
-                    !isAccessible && "bg-gray-50/50 dark:bg-gray-800/30 border-gray-200/50 dark:border-gray-700/50 opacity-60 cursor-not-allowed"
-                  )}
+                  className={cn("w-full text-left p-4 rounded-xl border transition-all duration-200 group relative", pathContainerClasses)}
                 >
                   <div className="space-y-3">
                     {/* Top row: Icon + Title */}
                     <div className="flex items-center space-x-3">
-                      <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center",
-                        isCompleted && "bg-gradient-to-br from-emerald-500 to-green-600",
-                        isAccessible && !isCompleted && "bg-gradient-to-br from-blue-500 to-purple-600",
-                        !isAccessible && "bg-gray-400 dark:bg-gray-600"
-                      )}>
+                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", iconContainerClasses)}>
                         {isCompleted ? (
                           <CheckCircle2 className="w-4 h-4 text-white" />
                         ) : !isAccessible ? (
@@ -557,11 +570,7 @@ export default function StudentCourseNavigationTree({
                             : "bg-gray-200 dark:bg-gray-700"
                         )}>
                           <div 
-                            className={cn(
-                              "h-1.5 rounded-full transition-all duration-300",
-                              isCompleted && "bg-gradient-to-r from-emerald-500 to-green-500",
-                              !isCompleted && "bg-gradient-to-r from-blue-500 to-purple-600"
-                            )}
+                            className={cn("h-1.5 rounded-full transition-all duration-300", progressBarClasses)}
                             style={{ width: `${path.progress}%` }}
                           />
                         </div>
@@ -578,12 +587,7 @@ export default function StudentCourseNavigationTree({
                       </div>
                       
                       <div className="flex items-center space-x-2 ml-4">
-                        <span className={cn(
-                          "text-xs px-2 py-1 rounded-full",
-                          isCompleted && "text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30",
-                          isAccessible && !isCompleted && "text-gray-500 bg-gray-100 dark:bg-gray-800",
-                          !isAccessible && "text-gray-400 bg-gray-100/50 dark:bg-gray-800/50"
-                        )}>
+                        <span className={cn("text-xs px-2 py-1 rounded-full", lessonCountClasses)}>
                           {path.lessons.length} lesson{path.lessons.length !== 1 ? 's' : ''}
                         </span>
                         {path.assessments.length > 0 && (
@@ -718,6 +722,20 @@ export default function StudentCourseNavigationTree({
               const isAccessible = isLessonAccessible(lesson, index, selectedPath.lessons);
               const isCompleted = lesson.completed || lesson.status === 'completed';
               
+              const lessonContainerClasses = !isAccessible 
+                ? "bg-gray-100/50 dark:bg-gray-800/30 border-gray-200/50 dark:border-gray-700/50 cursor-not-allowed"
+                : isCompleted 
+                ? "bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-emerald-200 dark:border-emerald-800/50"
+                : selectedItemId === lesson.id && selectedItemType === 'lesson' 
+                ? "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"
+                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-white/5";
+
+              const quizCountClasses = !isAccessible 
+                ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500"
+                : isCompleted 
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                : "bg-gray-100 dark:bg-gray-800";
+
               return (
                 <div key={lesson.id} className="space-y-1">
                   <button
@@ -727,13 +745,7 @@ export default function StudentCourseNavigationTree({
                       }
                     }}
                     disabled={!isAccessible}
-                    className={cn(
-                      "w-full text-left p-4 rounded-lg border transition-all duration-200 group",
-                      !isAccessible && "bg-gray-100/50 dark:bg-gray-800/30 border-gray-200/50 dark:border-gray-700/50 cursor-not-allowed",
-                      isCompleted && "bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-emerald-200 dark:border-emerald-800/50",
-                      selectedItemId === lesson.id && selectedItemType === 'lesson' && "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
-                      isAccessible && !isCompleted && !(selectedItemId === lesson.id && selectedItemType === 'lesson') && "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-white/5"
-                    )}
+                    className={cn("w-full text-left p-4 rounded-lg border transition-all duration-200 group", lessonContainerClasses)}
                   >
                     <div className="flex items-center space-x-3">
                       <div className="flex items-center space-x-3">
@@ -780,12 +792,7 @@ export default function StudentCourseNavigationTree({
                           
                           <div className="flex items-center space-x-3 text-xs text-gray-500 ml-4">
                             {lesson.assessments.length > 0 && (
-                              <span className={cn(
-                                "px-2 py-1 rounded-full",
-                                !isAccessible && "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500",
-                                isCompleted && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
-                                isAccessible && !isCompleted && "bg-gray-100 dark:bg-gray-800"
-                              )}>
+                              <span className={cn("px-2 py-1 rounded-full", quizCountClasses)}>
                                 {lesson.assessments.length} quiz{lesson.assessments.length !== 1 ? 'zes' : ''}
                               </span>
                             )}

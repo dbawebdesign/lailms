@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getActiveProfile } from '@/lib/auth/family-helpers'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,14 +15,16 @@ export async function GET(request: NextRequest) {
 
     const supabase = createSupabaseServerClient();
 
-    // Get the current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      console.log('Auth error in status API:', authError);
+    // Get the active profile (handles both regular users and sub-accounts)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
+      console.log('Auth error in status API: No active profile found');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    console.log('User authenticated:', user.id);
+    
+    const { profile } = activeProfileData;
+    console.log('User authenticated:', profile.user_id);
 
     // Get the attempt with assessment details
     const { data: attempt, error: attemptError } = await supabase
@@ -35,11 +38,11 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('id', attemptId)
-      .eq('student_id', user.id) // Use student_id instead of user_id
+      .eq('student_id', profile.user_id) // Use student_id instead of user_id
       .single();
 
     if (attemptError || !attempt) {
-      console.log('Attempt not found error:', attemptError, 'attemptId:', attemptId, 'userId:', user.id);
+      console.log('Attempt not found error:', attemptError, 'attemptId:', attemptId, 'userId:', profile.user_id);
       return NextResponse.json({ error: 'Attempt not found' }, { status: 404 });
     }
 

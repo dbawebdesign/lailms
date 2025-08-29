@@ -224,15 +224,7 @@ export default function StreamlinedCourseCreator({
     try {
       new URL(urlInput); // Validate URL
       
-      // Check if it's a YouTube URL and reject it
-      if (urlInput.includes('youtube.com') || urlInput.includes('youtu.be')) {
-        toast({
-          title: 'YouTube URLs not supported',
-          description: 'YouTube video processing is coming soon. Please use other webpage URLs.',
-          variant: 'destructive',
-        });
-        return;
-      }
+      // YouTube URLs are now supported with LangChain integration!
       
       const newItem: QueuedItem = {
         id: crypto.randomUUID(),
@@ -515,7 +507,7 @@ export default function StreamlinedCourseCreator({
                   className="bg-background border-border focus:border-primary focus:ring-primary"
                 />
                 <p className="text-sm text-muted-foreground mt-2">
-                  YouTube video processing coming soon
+                  Supports PDFs, websites, and YouTube videos
                 </p>
               </div>
               <Button

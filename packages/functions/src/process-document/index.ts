@@ -1,6 +1,8 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { YoutubeTranscript } from 'npm:youtube-transcript'; // Added for YouTube
+import { YoutubeTranscript } from 'npm:youtube-transcript';
+// @ts-ignore
+import Innertube from 'https://deno.land/x/youtubei@v10.5.0-deno/deno.ts';
 // Use pdfjs-serverless - specifically built for Deno edge functions and serverless environments
 // @ts-ignore
 import { getDocument } from 'https://esm.sh/pdfjs-serverless@1.0.1';
@@ -1057,201 +1059,74 @@ function htmlToText(html: string): string {
   return text;
 }
 
-async function extractTranscriptFromYouTube(url: string): Promise<{ transcript?: string; error?: boolean; message?: string }> {
-  console.log(`Attempting to fetch transcript for YouTube URL: ${url}`);
-  
-  // Strategy 1: Try to get existing YouTube transcripts first
+// Helper: Extract transcript from YouTube using Deno-youtubei
+async function extractTranscriptFromYouTube(url: string): Promise<{ transcript?: string; videoMetadata?: any; error?: boolean; message?: string }> {
+  console.log(`Attempting to fetch transcript for YouTube URL using Deno-youtubei: ${url}`);
   try {
-    console.log(`Strategy 1: Attempting to fetch existing YouTube transcripts for ${url}`);
-    
-    // First attempt: Default language
-    let transcriptResponse = await YoutubeTranscript.fetchTranscript(url);
+    const youtube = await Innertube.create();
+    const video = await youtube.getInfo(url);
 
-    // If default fails or is empty, try explicitly with English
-    if (!transcriptResponse || transcriptResponse.length === 0) {
-      console.warn(`No transcript found with default language for ${url}. Retrying with lang: 'en'.`);
-      try {
-        transcriptResponse = await YoutubeTranscript.fetchTranscript(url, { lang: 'en' });
-      } catch (langErr) {
-        console.warn(`Fetching with lang: 'en' also failed for ${url}:`, langErr instanceof Error ? langErr.message : String(langErr));
-      }
+    if (!video.captions) {
+      throw new Error('No captions/transcript available for this video.');
     }
 
-    // Try additional languages that commonly have transcripts
-    if (!transcriptResponse || transcriptResponse.length === 0) {
-      const languagesToTry = ['es', 'fr', 'de', 'pt', 'it', 'ja', 'ko', 'zh', 'ru'];
-      for (const lang of languagesToTry) {
-        try {
-          console.log(`Trying language: ${lang} for ${url}`);
-          transcriptResponse = await YoutubeTranscript.fetchTranscript(url, { lang });
-          if (transcriptResponse && transcriptResponse.length > 0) {
-            console.log(`Found transcript in language: ${lang}`);
-            break;
-          }
-        } catch (err) {
-          // Continue to next language
-          continue;
-        }
-      }
-    }
+    const transcriptResponse = await video.getTranscript();
 
-    if (transcriptResponse && transcriptResponse.length > 0) {
-    const fullTranscript = transcriptResponse.map(t => t.text).join(' ');
-      console.log(`Strategy 1 SUCCESS: Fetched transcript of ~${fullTranscript.length} characters for ${url}.`);
-    return { transcript: fullTranscript, error: false };
+    if (!transcriptResponse || transcriptResponse.transcript.content.length === 0) {
+      throw new Error('Transcript is available but could not be retrieved or is empty.');
     }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.warn(`Strategy 1 FAILED for ${url}: ${errorMessage}`);
     
-    // If it's not a "transcript disabled" error, return early with the error
-    if (!errorMessage.includes('Transcript is disabled on this video') && 
-        !errorMessage.includes('transcriptsDisabled') && 
-        !errorMessage.includes('video not found') &&
-        !errorMessage.includes('No transcript found') &&
-        !errorMessage.includes('subtitles are disabled') &&
-        !errorMessage.includes('Subtitles are disabled')) {
-      return { error: true, message: `Failed to fetch YouTube transcript from ${url}: ${errorMessage}` };
-    }
-  }
+    const transcript = transcriptResponse.transcript.content.map((cue: any) => cue.text).join('\n');
+    
+    const videoMetadata = {
+      title: video.basic_info.title,
+      author: video.basic_info.author,
+      description: video.basic_info.short_description,
+      view_count: video.basic_info.view_count,
+      length: video.basic_info.duration,
+      publish_date: video.basic_info.start_timestamp,
+      source: url
+    };
+    
+    console.log(`Successfully extracted transcript using Deno-youtubei from ${url}: ${transcript.length} characters`);
+    console.log(`Video metadata:`, {
+      title: videoMetadata.title,
+      author: videoMetadata.author,
+      length: videoMetadata.length,
+      view_count: videoMetadata.view_count
+    });
 
-  // Strategy 2: Try to fetch video info and download audio for transcription
-  console.log(`Strategy 2: Attempting to extract audio and transcribe for ${url}`);
-  
-  try {
-    // Extract video ID from URL
-    const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^&\n?#]+)/);
-    if (!videoIdMatch) {
-      throw new Error('Could not extract video ID from YouTube URL');
-    }
-    const videoId = videoIdMatch[1];
-    
-    // Try to get basic video info first to check if it's accessible
-    const videoInfoResponse = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
-    
-    if (!videoInfoResponse.ok) {
-      throw new Error(`Video not accessible or may be private/deleted (HTTP ${videoInfoResponse.status})`);
-    }
-    
-    const videoInfo = await videoInfoResponse.json();
-    console.log(`Video accessible: ${videoInfo.title}`);
-    
-    // For now, we'll log that we would attempt audio extraction here
-    // In a full implementation, this would use yt-dlp or similar to download audio
-    console.log(`Strategy 2: Would attempt audio download for video: ${videoInfo.title} (${videoId})`);
-    console.log(`Strategy 2: Audio transcription with Whisper not implemented in edge function environment`);
+    return { 
+      transcript,
+      videoMetadata
+    };
     
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.warn(`Strategy 2 FAILED for ${url}: ${errorMessage}`);
-  }
+    console.error(`Deno-youtubei processing failed for ${url}:`, errorMessage);
+    
+    let userFriendlyMessage = `Unable to process this YouTube video: ${errorMessage}`;
 
-  // Strategy 3: Try alternative approaches with different user agents
-  console.log(`Strategy 3: Attempting alternative transcript extraction methods for ${url}`);
-  
-  try {
-    const alternativeResult = await tryAlternativeTranscriptMethods(url);
-    if (alternativeResult) {
-      console.log(`Strategy 3 SUCCESS: Alternative method found transcript for ${url}, length: ${alternativeResult.length}`);
-      return { transcript: alternativeResult, error: false };
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.warn(`Strategy 3 FAILED for ${url}: ${errorMessage}`);
-  }
-
-  // All strategies failed - provide helpful error message
-  const finalMessage = `Unable to extract transcript for this YouTube video. This can happen when:
-• The video has transcripts/captions disabled by the creator
-• The video is private, unlisted, or restricted
+    if (errorMessage.includes('No captions/transcript available')) {
+       userFriendlyMessage = `This YouTube video does not have captions/transcripts available. This can happen when:
+• The video creator has disabled captions
 • The video is too new and auto-generated captions haven't been created yet
-• Regional restrictions prevent access
-• The video has been deleted or made unavailable
-
-URL: ${url}
-
-To successfully add YouTube videos to your knowledge base, try:
-• Using videos that have captions enabled
-• Checking if the video is publicly accessible
-• Waiting if the video was recently uploaded (auto-captions take time)
-• Contacting the video creator to enable captions`;
-
-  console.error(`All transcript extraction strategies failed for ${url}`);
-  return { error: true, message: finalMessage };
-}
-
-// Helper function to try alternative transcript extraction methods
-async function tryAlternativeTranscriptMethods(url: string): Promise<string | null> {
-  try {
-    console.log(`Trying alternative transcript methods for ${url}`);
-    
-    // Try with different approaches to the youtube-transcript library
-    // Sometimes different configurations or timing can work
-    
-    // Method 1: Try with explicit country codes
-    const countryCodes = ['US', 'GB', 'CA', 'AU'];
-    for (const country of countryCodes) {
-      try {
-        console.log(`Trying with country code: ${country}`);
-        // Note: The youtube-transcript library might not support country codes directly
-        // but we can try different approaches
-        const transcriptResponse = await YoutubeTranscript.fetchTranscript(url, { 
-          lang: 'en',
-          // We'd add country parameter if supported
-        });
-        
-        if (transcriptResponse && transcriptResponse.length > 0) {
-          const fullTranscript = transcriptResponse.map(t => t.text).join(' ');
-          console.log(`Alternative method success with country ${country}`);
-          return fullTranscript;
-        }
-      } catch (err) {
-        // Continue to next country
-        continue;
-      }
+• The video is in a language that doesn't support auto-captions`;
+    } else if (errorMessage.includes('private') || errorMessage.includes('restricted') || errorMessage.includes('deleted')) {
+       userFriendlyMessage = `This YouTube video cannot be accessed. It may be:
+• Private or unlisted
+• Restricted in your region
+• Deleted or made unavailable`;
     }
 
-    // Method 2: Try to extract from video page HTML
-    try {
-      console.log(`Attempting to parse video page HTML for transcript data`);
-      
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-        }
-      });
-      
-      if (response.ok) {
-        const html = await response.text();
-        
-        // Look for caption track URLs in the page
-        const captionMatches = html.match(/"captionTracks":\s*(\[.*?\])/);
-        if (captionMatches) {
-          console.log('Found caption tracks in page HTML');
-          // In a full implementation, we'd parse these URLs and fetch the caption files
-          // For now, just log that we found them
-        }
-        
-        // Look for transcript data
-        const transcriptMatches = html.match(/"transcriptRenderer".*?"cueGroups":\s*(\[.*?\])/);
-        if (transcriptMatches) {
-          console.log('Found transcript renderer data in page HTML');
-          // In a full implementation, we'd parse this data
-        }
-      }
-    } catch (htmlError) {
-      console.warn('HTML parsing approach failed:', htmlError);
-    }
-    
-    return null;
-    
-  } catch (error) {
-    console.error('All alternative methods failed:', error);
-    return null;
+    return { 
+      error: true, 
+      message: `${userFriendlyMessage}\n\nURL: ${url}`
+    };
   }
 }
+
+// Note: Alternative transcript methods removed - using LangChain YoutubeLoader instead
 
 async function transcribeAudio(filePath: string, supabase: SupabaseClient, bucketName: string, openaiApiKey: string): Promise<string> {
   console.log(`Attempting to transcribe audio: ${filePath} in bucket ${bucketName}`);
@@ -1463,7 +1338,7 @@ const chunkText = async (
   } else if (documentType === 'youtube') {
     // Assuming transcript format: "HH:MM:SS.mmm --> HH:MM:SS.mmm\ntext\n\nHH:MM:SS.mmm..."
     // Or "timestamp\ntext"
-    const segments = fullText.split(/\n\n(?=\d{1,2}:\d{2}:\d{2}\.\d{3})|(\d{1,2}:\d{2}(?:\.\d{1,3})?(?: -)?\s)/); // Split by VTT cue timing or simpler "timestamp\ntext"
+    const segments = fullText.split(/\n\n(?=\d{1,2}:\d{2}:\d{2}\.\d{3})|\n(\d{1,2}:\d{2}(?:\.\d{1,3})?(?: -)?\s)/); // Split by VTT cue timing or simpler "timestamp\ntext"
     let charOffset = 0;
     for (const segment of segments) {
         if (!segment.trim()) continue;
@@ -1737,10 +1612,21 @@ serve(async (req: Request) => {
         extractedText = transcriptResult.transcript || '';
         extractedText = sanitizeTextForDatabase(extractedText);
         
+        // Merge the video metadata from the new library with existing metadata
+        const newVideoMetadata = transcriptResult.videoMetadata || {};
+        const mergedVideoMetadata = {
+          ...videoMetadata,
+          ...newVideoMetadata,
+          // Ensure we have the video ID
+          video_id: videoId,
+          // Mark as processed by the new library
+          processed_with: 'youtube-transcript'
+        };
+        
         // Update metadata with success information
         const successMetadata = {
-          ...videoMetadata,
-          final_strategy_used: 'transcript_fetch_multilang', // We could track which strategy actually worked
+          ...mergedVideoMetadata,
+          final_strategy_used: 'youtube-transcript',
           processing_outcome: 'success',
           transcript_length: extractedText.length,
           processing_stage: 'chunking'

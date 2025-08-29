@@ -5,6 +5,7 @@ import { emitProgressUpdate } from '@/lib/utils/progressEvents'
 import { ProgressService } from '@/lib/services/progressService'
 import { HierarchicalProgressService } from '@/lib/services/hierarchical-progress-service'
 import { AIGradingService } from '@/lib/services/ai-grading-service'
+import { getActiveProfile } from '@/lib/auth/family-helpers'
 
 type Assessment = Tables<'assessments'>
 type AssessmentQuestion = Tables<'assessment_questions'>
@@ -25,11 +26,14 @@ export async function PUT(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
     
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
+    // Get the active profile (handles both regular users and sub-accounts)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    
+    const { profile } = activeProfileData;
 
     const body: SubmitAssessmentRequest = await request.json()
     const { attemptId, responses, timeSpent, isSubmission } = body
@@ -46,7 +50,7 @@ export async function PUT(request: NextRequest) {
         assessment:assessments(*)
       `)
       .eq('id', attemptId)
-      .eq('student_id', user.id)
+      .eq('student_id', profile.user_id)
       .single<StudentAttempt & { assessment: Assessment }>()
 
     if (attemptError || !attempt) {

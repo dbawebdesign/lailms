@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { Tables, TablesInsert } from '../../../../../../packages/types/db'
+import { getActiveProfile } from '@/lib/auth/family-helpers'
 
 type Assessment = Tables<'assessments'>
 type AssessmentQuestion = Tables<'assessment_questions'>
@@ -116,15 +117,18 @@ export async function POST(request: NextRequest) {
     
     const supabase = createSupabaseServerClient()
     
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      console.log(`[${requestId}] Unauthorized: ${userError?.message || 'No user'}`);
+    // Get the active profile (handles both regular users and sub-accounts)
+    const activeProfileData = await getActiveProfile();
+    
+    if (!activeProfileData) {
+      console.log(`[${requestId}] Unauthorized: No active profile found`);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    
+    const { profile } = activeProfileData;
 
     const { assessmentId } = await request.json()
-    console.log(`[${requestId}] Assessment ID: ${assessmentId}, User ID: ${user.id}`);
+    console.log(`[${requestId}] Assessment ID: ${assessmentId}, User ID: ${profile.user_id}`);
 
     if (!assessmentId) {
       console.log(`[${requestId}] Missing assessment ID`);
@@ -146,7 +150,7 @@ export async function POST(request: NextRequest) {
     console.log(`[${requestId}] Found assessment: ${assessment.title}`);
 
     // NEW: Verify that the user is enrolled in the course for this assessment
-    const { isEnrolled, error: enrollmentError } = await verifyEnrollment(supabase, user.id, assessment);
+    const { isEnrolled, error: enrollmentError } = await verifyEnrollment(supabase, profile.user_id, assessment);
     if (!isEnrolled) {
       console.log(`[${requestId}] Enrollment verification failed: ${enrollmentError}`);
       return NextResponse.json({ error: enrollmentError || 'You are not enrolled in this course.' }, { status: 403 });
@@ -160,7 +164,7 @@ export async function POST(request: NextRequest) {
       .from('student_attempts')
       .select('*')
       .eq('assessment_id', assessmentId)
-      .eq('student_id', user.id)
+      .eq('student_id', profile.user_id)
       .order('attempt_number', { ascending: false })
       .returns<StudentAttempt[]>()
 
@@ -231,7 +235,7 @@ export async function POST(request: NextRequest) {
     // Create a new attempt record with 'in_progress' status
     const attemptData: TablesInsert<'student_attempts'> = {
       assessment_id: assessmentId,
-      student_id: user.id,
+      student_id: profile.user_id,
       attempt_number: currentAttemptNumber,
       status: 'in_progress',
       started_at: new Date().toISOString(),
