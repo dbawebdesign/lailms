@@ -5,6 +5,8 @@ import type { StudioBaseClass, Path, Lesson, LessonSection } from '@/types/lesso
 import { ChevronRight, ChevronDown, FileText, GripVertical, Info as InfoIcon, FoldVertical, UnfoldVertical, BookOpen } from 'lucide-react';
 import { UpdatedContentWrapper } from '@/components/ui/content-update-indicator';
 import { Button } from '@/components/ui/button';
+import HoverInsertionWrapper from './HoverInsertionWrapper';
+import InsertionModal, { InsertionFormData } from './InsertionModal';
 
 // NEW: DND Kit imports
 import {
@@ -40,6 +42,10 @@ interface StudioNavigationTreeProps {
   onReorderSections: (lessonId: string, activeSectionId: string, overSectionId: string) => Promise<void>;
   // NEW: Prop for recently updated items
   recentlyUpdatedItems?: Set<string>;
+  // NEW: Props for insertion functionality
+  onInsertPath?: (data: InsertionFormData, position: 'above' | 'below', referenceId?: string) => Promise<void>;
+  onInsertLesson?: (data: InsertionFormData, position: 'above' | 'below', pathId: string, referenceId?: string) => Promise<void>;
+  onInsertSection?: (data: InsertionFormData, position: 'above' | 'below', lessonId: string, referenceId?: string) => Promise<void>;
 }
 
 // NEW: SortableItem component for Paths
@@ -56,6 +62,10 @@ const SortablePathItem: React.FC<{
   onReorderSections: (lessonId: string, activeSectionId: string, overSectionId: string) => Promise<void>; // Pass down
   expandedLessons: Set<string>; // To manage lesson expansion state
   recentlyUpdatedItems?: Set<string>; // NEW: For visual feedback
+  // NEW: Props for insertion functionality
+  onInsertPath?: (data: InsertionFormData, position: 'above' | 'below', referenceId?: string) => Promise<void>;
+  onInsertLesson?: (data: InsertionFormData, position: 'above' | 'below', pathId: string, referenceId?: string) => Promise<void>;
+  onInsertSection?: (data: InsertionFormData, position: 'above' | 'below', lessonId: string, referenceId?: string) => Promise<void>;
 }> = ({ 
   path, 
   isExpanded, 
@@ -67,7 +77,10 @@ const SortablePathItem: React.FC<{
   onReorderLessons,
   onReorderSections,
   expandedLessons,
-  recentlyUpdatedItems
+  recentlyUpdatedItems,
+  onInsertPath,
+  onInsertLesson,
+  onInsertSection
 }) => {
   const { 
     attributes,
@@ -105,9 +118,32 @@ const SortablePathItem: React.FC<{
 
   const isRecentlyUpdated = recentlyUpdatedItems?.has(path.id) || false;
 
+  const handleInsertPathAbove = () => {
+    onInsertPath?.(
+      { title: '', description: '' },
+      'above',
+      path.id
+    );
+  };
+
+  const handleInsertPathBelow = () => {
+    onInsertPath?.(
+      { title: '', description: '' },
+      'below',
+      path.id
+    );
+  };
+
   return (
     <UpdatedContentWrapper isUpdated={isRecentlyUpdated}>
-      <li ref={setNodeRef} style={style} className="py-0.5 bg-background rounded-md shadow-sm mb-1 list-none">
+      <HoverInsertionWrapper
+        itemType="path"
+        itemId={path.id}
+        onInsertAbove={handleInsertPathAbove}
+        onInsertBelow={handleInsertPathBelow}
+        disabled={!onInsertPath}
+      >
+        <li ref={setNodeRef} style={style} className="py-0.5 bg-background rounded-md shadow-sm mb-1 list-none">
         <div className="flex items-center justify-between hover:bg-muted/50 rounded-t-md">
           <div className="flex items-center flex-grow">
             <button 
@@ -153,6 +189,8 @@ const SortablePathItem: React.FC<{
                     expandedSections={new Set()} // Placeholder for when sections are sortable
                     onToggleExpandSection={() => {}} // Placeholder
                     recentlyUpdatedItems={recentlyUpdatedItems}
+                    onInsertLesson={onInsertLesson}
+                    onInsertSection={onInsertSection}
                   />
                 ))}
                 {lessons.length === 0 && (
@@ -162,7 +200,8 @@ const SortablePathItem: React.FC<{
             </SortableContext>
           </DndContext>
         )}
-      </li>
+        </li>
+      </HoverInsertionWrapper>
     </UpdatedContentWrapper>
   );
 };
@@ -181,7 +220,10 @@ const SortableLessonItem: React.FC<{
   expandedSections: Set<string>;
   onToggleExpandSection: (section: LessonSection) => void;
   recentlyUpdatedItems?: Set<string>; // NEW: For visual feedback
-}> = ({ lesson, pathId, isExpanded, selectedItemId, onSelectItem, handleLessonHeaderClick, onReorderSections, expandedSections, onToggleExpandSection, recentlyUpdatedItems }) => {
+  // NEW: Props for insertion functionality
+  onInsertLesson?: (data: InsertionFormData, position: 'above' | 'below', pathId: string, referenceId?: string) => Promise<void>;
+  onInsertSection?: (data: InsertionFormData, position: 'above' | 'below', lessonId: string, referenceId?: string) => Promise<void>;
+}> = ({ lesson, pathId, isExpanded, selectedItemId, onSelectItem, handleLessonHeaderClick, onReorderSections, expandedSections, onToggleExpandSection, recentlyUpdatedItems, onInsertLesson, onInsertSection }) => {
   const { 
     attributes,
     listeners,
@@ -220,9 +262,34 @@ const SortableLessonItem: React.FC<{
 
   const isRecentlyUpdated = recentlyUpdatedItems?.has(lesson.id) || false;
 
+  const handleInsertLessonAbove = () => {
+    onInsertLesson?.(
+      { title: '', description: '' },
+      'above',
+      pathId,
+      lesson.id
+    );
+  };
+
+  const handleInsertLessonBelow = () => {
+    onInsertLesson?.(
+      { title: '', description: '' },
+      'below',
+      pathId,
+      lesson.id
+    );
+  };
+
   return (
     <UpdatedContentWrapper isUpdated={isRecentlyUpdated}>
-      <li ref={setNodeRef} style={style} className="py-0.5 rounded-md mb-0.5 list-none bg-background">
+      <HoverInsertionWrapper
+        itemType="lesson"
+        itemId={lesson.id}
+        onInsertAbove={handleInsertLessonAbove}
+        onInsertBelow={handleInsertLessonBelow}
+        disabled={!onInsertLesson}
+      >
+        <li ref={setNodeRef} style={style} className="py-0.5 rounded-md mb-0.5 list-none bg-background">
         <div className="flex items-center justify-between hover:bg-muted/30 rounded-t-md">
           <div className="flex items-center flex-grow">
             <button 
@@ -263,6 +330,7 @@ const SortableLessonItem: React.FC<{
                     lessonId={lesson.id}
                     selectedItemId={selectedItemId}
                     onSelectItem={onSelectItem}
+                    onInsertSection={onInsertSection}
                   />
                 ))}
               </ul>
@@ -272,7 +340,8 @@ const SortableLessonItem: React.FC<{
         {isExpanded && (!lesson.sections || lesson.sections.length === 0) && (
           <p className="pl-5 pt-1 text-xs text-muted-foreground">No sections in this lesson yet, or still loading.</p>
         )}
-      </li>
+        </li>
+      </HoverInsertionWrapper>
     </UpdatedContentWrapper>
   );
 };
@@ -283,7 +352,9 @@ const SortableSectionItem: React.FC<{
   lessonId: string;
   selectedItemId: string | null;
   onSelectItem: (type: string, itemData: LessonSection) => void;
-}> = ({ section, lessonId, selectedItemId, onSelectItem }) => {
+  // NEW: Props for insertion functionality
+  onInsertSection?: (data: InsertionFormData, position: 'above' | 'below', lessonId: string, referenceId?: string) => Promise<void>;
+}> = ({ section, lessonId, selectedItemId, onSelectItem, onInsertSection }) => {
   const {
     attributes,
     listeners,
@@ -301,8 +372,33 @@ const SortableSectionItem: React.FC<{
     listStyle: 'none',
   };
 
+  const handleInsertSectionAbove = () => {
+    onInsertSection?.(
+      { title: '', description: '' },
+      'above',
+      lessonId,
+      section.id
+    );
+  };
+
+  const handleInsertSectionBelow = () => {
+    onInsertSection?.(
+      { title: '', description: '' },
+      'below',
+      lessonId,
+      section.id
+    );
+  };
+
   return (
-    <li ref={setNodeRef} style={style} className="py-0.5 list-none rounded-md bg-background/80 hover:bg-muted/50 mb-0.5">
+    <HoverInsertionWrapper
+      itemType="section"
+      itemId={section.id}
+      onInsertAbove={handleInsertSectionAbove}
+      onInsertBelow={handleInsertSectionBelow}
+      disabled={!onInsertSection}
+    >
+      <li ref={setNodeRef} style={style} className="py-0.5 list-none rounded-md bg-background/80 hover:bg-muted/50 mb-0.5">
       <div className={`flex items-center text-xs cursor-pointer rounded ${selectedItemId === section.id ? 'bg-accent/70 text-accent-foreground font-medium' : ''}`}>
         <button
           {...attributes}
@@ -320,7 +416,8 @@ const SortableSectionItem: React.FC<{
           {section.title}
         </div>
       </div>
-    </li>
+      </li>
+    </HoverInsertionWrapper>
   );
 };
 
@@ -335,9 +432,26 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
   onReorderLessons, // This is the main handler for lesson REORDERING
   onReorderSections, // NEW: Main handler for section REORDERING
   recentlyUpdatedItems,
+  onInsertPath,
+  onInsertLesson,
+  onInsertSection,
 }) => {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [expandedLessons, setExpandedLessons] = useState<Set<string>>(new Set());
+  
+  // NEW: Modal state for insertion
+  const [insertionModal, setInsertionModal] = useState<{
+    isOpen: boolean;
+    itemType: 'path' | 'lesson' | 'section';
+    position: 'above' | 'below';
+    referenceId?: string;
+    pathId?: string;
+    lessonId?: string;
+  }>({
+    isOpen: false,
+    itemType: 'path',
+    position: 'above'
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { 
@@ -458,6 +572,62 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
     }
   };
 
+  // NEW: Insertion handlers that open the modal
+  const handleInsertPath = (data: InsertionFormData, position: 'above' | 'below', referenceId?: string) => {
+    setInsertionModal({
+      isOpen: true,
+      itemType: 'path',
+      position,
+      referenceId
+    });
+  };
+
+  const handleInsertLesson = (data: InsertionFormData, position: 'above' | 'below', pathId: string, referenceId?: string) => {
+    setInsertionModal({
+      isOpen: true,
+      itemType: 'lesson',
+      position,
+      referenceId,
+      pathId
+    });
+  };
+
+  const handleInsertSection = (data: InsertionFormData, position: 'above' | 'below', lessonId: string, referenceId?: string) => {
+    setInsertionModal({
+      isOpen: true,
+      itemType: 'section',
+      position,
+      referenceId,
+      lessonId
+    });
+  };
+
+  // NEW: Handle modal submission
+  const handleModalSubmit = async (data: InsertionFormData) => {
+    const { itemType, position, referenceId, pathId, lessonId } = insertionModal;
+    
+    try {
+      switch (itemType) {
+        case 'path':
+          await onInsertPath?.(data, position, referenceId);
+          break;
+        case 'lesson':
+          if (pathId) {
+            await onInsertLesson?.(data, position, pathId, referenceId);
+          }
+          break;
+        case 'section':
+          if (lessonId) {
+            await onInsertSection?.(data, position, lessonId, referenceId);
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Error inserting item:', error);
+      throw error; // Re-throw to let modal handle the error
+    }
+  };
+
   return (
     <div className="space-y-1 text-sm">
       {/* Base Class Item - Not sortable */}
@@ -528,6 +698,9 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
                   onReorderSections={onReorderSections} // Ensure this is passed
                   expandedLessons={expandedLessons} // Ensure this is passed
                   recentlyUpdatedItems={recentlyUpdatedItems}
+                  onInsertPath={handleInsertPath}
+                  onInsertLesson={handleInsertLesson}
+                  onInsertSection={handleInsertSection}
                 />
               ))}
             </ul>
@@ -537,6 +710,15 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
       {(!baseClass.paths || baseClass.paths.length === 0) && (
         <p className="p-3 text-xs text-muted-foreground">No paths defined for this base class yet.</p>
       )}
+
+      {/* Insertion Modal */}
+      <InsertionModal
+        isOpen={insertionModal.isOpen}
+        onClose={() => setInsertionModal(prev => ({ ...prev, isOpen: false }))}
+        itemType={insertionModal.itemType}
+        position={insertionModal.position}
+        onSubmit={handleModalSubmit}
+      />
     </div>
   );
 };

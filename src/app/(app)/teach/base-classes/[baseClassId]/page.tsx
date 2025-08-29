@@ -933,6 +933,272 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
     }
   };
 
+  // NEW: Insertion handlers
+  const handleInsertPath = async (data: { title: string; description: string }, position: 'above' | 'below', referenceId?: string) => {
+    if (!studioBaseClass) return;
+    
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Calculate order index based on position and reference
+      let orderIndex = 0;
+      if (referenceId && studioBaseClass.paths) {
+        const referencePath = studioBaseClass.paths.find(p => p.id === referenceId);
+        if (referencePath) {
+          const referenceOrder = referencePath.order_index || 0;
+          if (position === 'above') {
+            // Insert above: use reference order minus 1, but ensure it's not negative
+            orderIndex = Math.max(0, referenceOrder - 1);
+          } else {
+            // Insert below: use reference order plus 1
+            orderIndex = referenceOrder + 1;
+          }
+        } else {
+          // Append to end if reference not found
+          const maxOrder = Math.max(...studioBaseClass.paths.map(p => p.order_index || 0));
+          orderIndex = maxOrder + 1;
+        }
+      }
+
+      const { data: newPath, error } = await supabase
+        .from('paths')
+        .insert({
+          base_class_id: studioBaseClass.id,
+          organisation_id: studioBaseClass.organisation_id,
+          title: data.title,
+          description: data.description,
+          order_index: orderIndex,
+          creator_user_id: user.id
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update local state
+      setStudioBaseClass(prev => {
+        if (!prev) return null;
+        const newPaths = [...(prev.paths || []), { ...newPath, lessons: [] }];
+        return { ...prev, paths: newPaths };
+      });
+
+      console.log('Successfully inserted new path:', newPath.title);
+    } catch (error: any) {
+      console.error('Error inserting path:', error);
+      setError(`Failed to insert path: ${error.message}`);
+    }
+  };
+
+  const handleInsertLesson = async (data: { title: string; description: string }, position: 'above' | 'below', pathId: string, referenceId?: string) => {
+    if (!studioBaseClass) return;
+    
+    try {
+      console.log('Inserting lesson with data:', { data, position, pathId, referenceId });
+      
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Calculate order index
+      let orderIndex = 0;
+      const path = studioBaseClass.paths?.find(p => p.id === pathId);
+      
+      if (referenceId && path?.lessons) {
+        const referenceLesson = path.lessons.find(l => l.id === referenceId);
+        if (referenceLesson) {
+          const referenceOrder = referenceLesson.order_index || 0;
+          if (position === 'above') {
+            // Insert above: use reference order minus 1, but ensure it's not negative
+            orderIndex = Math.max(0, referenceOrder - 1);
+          } else {
+            // Insert below: use reference order plus 1
+            orderIndex = referenceOrder + 1;
+          }
+        } else {
+          // Reference lesson not found, append to end
+          const maxOrder = path.lessons.length > 0 
+            ? Math.max(...path.lessons.map(l => l.order_index || 0))
+            : 0;
+          orderIndex = maxOrder + 1;
+        }
+      } else if (path?.lessons && path.lessons.length > 0) {
+        // No reference, append to end
+        const maxOrder = Math.max(...path.lessons.map(l => l.order_index || 0));
+        orderIndex = maxOrder + 1;
+      }
+
+      console.log('Calculated order index:', orderIndex);
+
+      const insertData = {
+        path_id: pathId,
+        title: data.title,
+        description: data.description,
+        order_index: orderIndex,
+        creator_user_id: user.id
+      };
+
+      console.log('Inserting lesson with data:', insertData);
+
+      const { data: newLesson, error } = await supabase
+        .from('lessons')
+        .insert(insertData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw new Error(`Database error: ${error.message || error.details || JSON.stringify(error)}`);
+      }
+
+      if (!newLesson) {
+        throw new Error('No lesson data returned from database');
+      }
+
+      console.log('Successfully created lesson:', newLesson);
+
+      // Update local state
+      setStudioBaseClass(prev => {
+        if (!prev || !prev.paths) return prev;
+        return {
+          ...prev,
+          paths: prev.paths.map(p => 
+            p.id === pathId 
+              ? { ...p, lessons: [...(p.lessons || []), { ...newLesson, sections: [] }] }
+              : p
+          )
+        };
+      });
+
+      console.log('Successfully inserted new lesson:', newLesson.title);
+    } catch (error: any) {
+      console.error('Full error object:', error);
+      console.error('Error message:', error?.message);
+      console.error('Error details:', error?.details);
+      console.error('Error hint:', error?.hint);
+      
+      const errorMessage = error?.message || error?.details || error?.hint || 'Unknown database error';
+      setError(`Failed to insert lesson: ${errorMessage}`);
+      
+      // Re-throw with better error message
+      throw new Error(`Failed to insert lesson: ${errorMessage}`);
+    }
+  };
+
+  const handleInsertSection = async (data: { title: string; description: string; shouldGenerate?: boolean }, position: 'above' | 'below', lessonId: string, referenceId?: string) => {
+    if (!studioBaseClass) return;
+    
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      if (data.shouldGenerate) {
+        // Use the AI generation endpoint
+        const response = await fetch('/api/teach/sections/generate-single', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lessonId,
+            sectionTitle: data.title,
+            sectionDescription: data.description,
+            insertPosition: position,
+            referenceItemId: referenceId
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to generate section');
+        }
+
+        const result = await response.json();
+        const newSection = result.data;
+
+        // Update local state
+        setStudioBaseClass(prev => {
+          if (!prev || !prev.paths) return prev;
+          return {
+            ...prev,
+            paths: prev.paths.map(p => ({
+              ...p,
+              lessons: p.lessons?.map(l => 
+                l.id === lessonId 
+                  ? { ...l, sections: [...(l.sections || []), newSection] }
+                  : l
+              ) || []
+            }))
+          };
+        });
+
+        console.log('Successfully generated and inserted new section:', newSection.title);
+      } else {
+        // Manual creation without AI generation
+        let orderIndex = 0;
+        const lesson = studioBaseClass.paths
+          ?.flatMap(p => p.lessons || [])
+          .find(l => l.id === lessonId);
+        
+        if (referenceId && lesson?.sections) {
+          const referenceSection = lesson.sections.find(s => s.id === referenceId);
+          if (referenceSection) {
+            const referenceOrder = referenceSection.order_index || 0;
+            if (position === 'above') {
+              // Insert above: use reference order minus 1, but ensure it's not negative
+              orderIndex = Math.max(0, referenceOrder - 1);
+            } else {
+              // Insert below: use reference order plus 1
+              orderIndex = referenceOrder + 1;
+            }
+          } else {
+            const maxOrder = Math.max(...lesson.sections.map(s => s.order_index || 0));
+            orderIndex = maxOrder + 1;
+          }
+        }
+
+        const { data: newSection, error } = await supabase
+          .from('lesson_sections')
+          .insert({
+            lesson_id: lessonId,
+            title: data.title,
+            content: { text: data.description || '' },
+            section_type: 'core_concept',
+            order_index: orderIndex,
+            created_by: user.id
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Update local state
+        setStudioBaseClass(prev => {
+          if (!prev || !prev.paths) return prev;
+          return {
+            ...prev,
+            paths: prev.paths.map(p => ({
+              ...p,
+              lessons: p.lessons?.map(l => 
+                l.id === lessonId 
+                  ? { ...l, sections: [...(l.sections || []), newSection] }
+                  : l
+              ) || []
+            }))
+          };
+        });
+
+        console.log('Successfully inserted new section:', newSection.title);
+      }
+    } catch (error: any) {
+      console.error('Error inserting section:', error);
+      setError(`Failed to insert section: ${error.message}`);
+    }
+  };
+
   const renderEditor = () => {
     if (!selectedItem || !selectedItem.data && selectedItem.type !== 'knowledgebase') { // Allow data to be null for knowledgebase if baseClass is passed
       if (isLoading) return <p className="p-6 text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin inline-block"/>Loading editor...</p>;
@@ -1075,6 +1341,9 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
                     onReorderLessons={handleReorderLessons}
                     onReorderSections={handleReorderSections}
                     recentlyUpdatedItems={recentlyUpdatedItems}
+                    onInsertPath={handleInsertPath}
+                    onInsertLesson={handleInsertLesson}
+                    onInsertSection={handleInsertSection}
                   />
                 </div>
               )}
