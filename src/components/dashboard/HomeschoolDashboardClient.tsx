@@ -89,33 +89,41 @@ export default function HomeschoolDashboardClient({
             {/* Quick Actions */}
             <div>
               <h2 className="text-lg font-light text-neutral-900 dark:text-white mb-4">Quick Actions</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button variant="ghost" className="h-auto p-4 justify-start flex-col items-start" asChild>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <Button variant="ghost" className="h-auto min-h-[120px] p-6 justify-center flex-col items-center text-center space-y-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors" asChild>
                   <Link href="/teach/knowledge-base/create">
-                    <Sparkles className="h-5 w-5 mb-2 text-blue-500" />
-                    <span className="font-medium">Create Class</span>
-                    <span className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Start with AI</span>
+                    <Sparkles className="h-8 w-8 text-blue-500" />
+                    <div className="space-y-1">
+                      <span className="font-medium text-sm">Create Class</span>
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400">Start with AI</span>
+                    </div>
                   </Link>
                 </Button>
-                <Button variant="ghost" className="h-auto p-4 justify-start flex-col items-start" asChild>
+                <Button variant="ghost" className="h-auto min-h-[120px] p-6 justify-center flex-col items-center text-center space-y-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors" asChild>
                   <Link href="/homeschool/add-students">
-                    <Users className="h-5 w-5 mb-2 text-green-500" />
-                    <span className="font-medium">Add Students</span>
-                    <span className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Manage family</span>
+                    <Users className="h-8 w-8 text-green-500" />
+                    <div className="space-y-1">
+                      <span className="font-medium text-sm">Add Students</span>
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400">Manage family</span>
+                    </div>
                   </Link>
                 </Button>
-                <Button variant="ghost" className="h-auto p-4 justify-start flex-col items-start" asChild>
+                <Button variant="ghost" className="h-auto min-h-[120px] p-6 justify-center flex-col items-center text-center space-y-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors" asChild>
                   <Link href="/teach/gradebook">
-                    <BarChart3 className="h-5 w-5 mb-2 text-purple-500" />
-                    <span className="font-medium">Gradebook</span>
-                    <span className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Track progress</span>
+                    <BarChart3 className="h-8 w-8 text-purple-500" />
+                    <div className="space-y-1">
+                      <span className="font-medium text-sm">Gradebook</span>
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400">Track progress</span>
+                    </div>
                   </Link>
                 </Button>
-                <Button variant="ghost" className="h-auto p-4 justify-start flex-col items-start" asChild>
+                <Button variant="ghost" className="h-auto min-h-[120px] p-6 justify-center flex-col items-center text-center space-y-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors" asChild>
                   <Link href="/teach/schedule">
-                    <Calendar className="h-5 w-5 mb-2 text-orange-500" />
-                    <span className="font-medium">Schedule</span>
-                    <span className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Plan lessons</span>
+                    <Calendar className="h-8 w-8 text-orange-500" />
+                    <div className="space-y-1">
+                      <span className="font-medium text-sm">Schedule</span>
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400">Plan lessons</span>
+                    </div>
                   </Link>
                 </Button>
               </div>

@@ -176,33 +176,41 @@ export default function HomeschoolDashboard({
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
                   <Link href="/teach/knowledge-base/create">
-                    <BookOpen className="h-6 w-6 hover-icon text-blue-600" />
-                    <span className="text-sm font-medium">Create Course</span>
-                    <span className="text-xs text-neutral-500">Start with AI</span>
+                    <BookOpen className="h-8 w-8 hover-icon text-blue-600" />
+                    <div className="text-center space-y-1">
+                      <span className="text-sm font-medium block">Create Course</span>
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400 block">Start with AI</span>
+                    </div>
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+                <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
                   <Link href="/homeschool/add-students">
-                    <Users className="h-6 w-6 hover-icon text-green-600" />
-                    <span className="text-sm font-medium">Add Students</span>
-                    <span className="text-xs text-neutral-500">Manage family</span>
+                    <Users className="h-8 w-8 hover-icon text-green-600" />
+                    <div className="text-center space-y-1">
+                      <span className="text-sm font-medium block">Add Students</span>
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400 block">Manage family</span>
+                    </div>
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+                <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
                   <Link href="/teach/gradebook">
-                    <GraduationCap className="h-6 w-6 hover-icon text-purple-600" />
-                    <span className="text-sm font-medium">Gradebook</span>
-                    <span className="text-xs text-neutral-500">Track progress</span>
+                    <GraduationCap className="h-8 w-8 hover-icon text-purple-600" />
+                    <div className="text-center space-y-1">
+                      <span className="text-sm font-medium block">Gradebook</span>
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400 block">Track progress</span>
+                    </div>
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+                <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
                   <Link href="/teach/tools">
-                    <Settings className="h-6 w-6 hover-icon text-orange-600" />
-                    <span className="text-sm font-medium">Teacher Tools</span>
-                    <span className="text-xs text-neutral-500">Manage settings</span>
+                    <Settings className="h-8 w-8 hover-icon text-orange-600" />
+                    <div className="text-center space-y-1">
+                      <span className="text-sm font-medium block">Teacher Tools</span>
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400 block">Manage settings</span>
+                    </div>
                   </Link>
                 </Button>
               </div>
@@ -376,23 +384,23 @@ export default function HomeschoolDashboard({
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
                   <Link href="/teach/knowledge-base/create">
-                    <BookOpen className="h-6 w-6 hover-icon" />
-                    <span className="text-sm">Create Course</span>
+                    <BookOpen className="h-8 w-8 hover-icon" />
+                    <span className="text-sm font-medium">Create Course</span>
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
                   <Link href="/teach/gradebook">
-                    <GraduationCap className="h-6 w-6 hover-icon" />
-                    <span className="text-sm">View Gradebook</span>
+                    <GraduationCap className="h-8 w-8 hover-icon" />
+                    <span className="text-sm font-medium">View Gradebook</span>
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2 hover-button-glow">
+                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
                   <Link href="/teach/tools">
-                    <Settings className="h-6 w-6 hover-icon" />
-                    <span className="text-sm">Teacher Tools</span>
+                    <Settings className="h-8 w-8 hover-icon" />
+                    <span className="text-sm font-medium">Teacher Tools</span>
                   </Link>
                 </Button>
               </div>
