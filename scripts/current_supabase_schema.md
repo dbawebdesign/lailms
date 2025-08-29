@@ -16,6 +16,13 @@
 
 ## Recent Updates
 
+### Lesson Section Reordering Fix (2025-01-31)
+Fixed the `reorder_lesson_sections` function to resolve stack depth errors and constraint violations:
+- Updated the function to use 0-based indexing to match frontend expectations
+- Implemented two-phase update process to avoid unique constraint violations on (lesson_id, order_index)
+- First phase moves sections to temporary high order_index values, second phase sets final 0-based values
+- This resolves stack depth errors that occurred during section reordering in the studio interface
+
 ### Homeschool Family Structure Enhancement (2025-01-30)
 Added comprehensive family account structure for homeschool users:
 

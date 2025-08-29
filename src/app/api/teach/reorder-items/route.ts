@@ -42,47 +42,38 @@ export async function POST(request: NextRequest) {
     try {
       switch (itemType) {
         case 'path':
-          // Update paths order_index
-          for (let i = 0; i < orderedIds.length; i++) {
-            const { error: updateError } = await supabase
-              .from('paths')
-              .update({ order_index: i })
-              .eq('id', orderedIds[i])
-              .eq('base_class_id', parentId);
-            
-            if (updateError) {
-              throw new Error(`Failed to update path ${orderedIds[i]}: ${updateError.message}`);
-            }
+          // Use dedicated reorder function for paths
+          const { error: pathError } = await supabase.rpc('reorder_paths', {
+            _base_class_id: parentId,
+            _ordered_ids: orderedIds
+          });
+          
+          if (pathError) {
+            throw new Error(`Failed to reorder paths: ${pathError.message}`);
           }
           break;
           
         case 'lesson':
-          // Update lessons order_index
-          for (let i = 0; i < orderedIds.length; i++) {
-            const { error: updateError } = await supabase
-              .from('lessons')
-              .update({ order_index: i })
-              .eq('id', orderedIds[i])
-              .eq('path_id', parentId);
-            
-            if (updateError) {
-              throw new Error(`Failed to update lesson ${orderedIds[i]}: ${updateError.message}`);
-            }
+          // Use dedicated reorder function for lessons
+          const { error: lessonError } = await supabase.rpc('reorder_lessons', {
+            _path_id: parentId,
+            _ordered_ids: orderedIds
+          });
+          
+          if (lessonError) {
+            throw new Error(`Failed to reorder lessons: ${lessonError.message}`);
           }
           break;
           
         case 'section':
-          // Update lesson_sections order_index
-          for (let i = 0; i < orderedIds.length; i++) {
-            const { error: updateError } = await supabase
-              .from('lesson_sections')
-              .update({ order_index: i })
-              .eq('id', orderedIds[i])
-              .eq('lesson_id', parentId);
-            
-            if (updateError) {
-              throw new Error(`Failed to update section ${orderedIds[i]}: ${updateError.message}`);
-            }
+          // Use dedicated reorder function for lesson sections
+          const { error: sectionError } = await supabase.rpc('reorder_lesson_sections', {
+            _lesson_id: parentId,
+            _ordered_ids: orderedIds
+          });
+          
+          if (sectionError) {
+            throw new Error(`Failed to reorder sections: ${sectionError.message}`);
           }
           break;
           

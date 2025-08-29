@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
+import React, { useEffect, useState, use, useRef } from 'react';
 import { supabase } from '@/utils/supabase/browser'; // Corrected Supabase client import path
 import type { StudioBaseClass, Path, Lesson, LessonSection } from '@/types/lesson';
 import { Loader2, Menu, Info } from 'lucide-react'; // For loading indicator and menu icon, added Info for Knowledge Base
@@ -51,6 +51,9 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
 
   // State to track recently updated items for visual feedback
   const [recentlyUpdatedItems, setRecentlyUpdatedItems] = useState<Set<string>>(new Set());
+
+  // Ref to prevent multiple simultaneous reorder operations
+  const isReorderingSectionRef = useRef(false);
 
   // Real-time updates hook
   const { lastUpdate } = useRealTimeContentUpdates((entity, entityId, updatedData, eventType = 'update') => {
@@ -176,6 +179,11 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
         });
       }
     } else if (entity === 'section') {
+      // Skip section updates if we're currently reordering sections to prevent conflicts
+      if (isReorderingSectionRef.current) {
+        return;
+      }
+      
       if (eventType === 'create') {
         // Add new section to the appropriate lesson
         setStudioBaseClass(prevBaseClass => {
@@ -805,80 +813,123 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
 
   // NEW: Handler for reordering sections within a lesson
   const handleReorderSections = async (lessonId: string, activeSectionId: string, overSectionId: string) => {
-    if (!studioBaseClass || !studioBaseClass.paths) return;
-
-    let pathIndex = -1;
-    let lessonIndex = -1;
-    let oldSections: LessonSection[] = [];
-
-    // Find the path and lesson containing the sections
-    for (let i = 0; i < studioBaseClass.paths.length; i++) {
-      const lIdx = studioBaseClass.paths[i].lessons?.findIndex(l => l.id === lessonId) ?? -1;
-      if (lIdx !== -1) {
-        pathIndex = i;
-        lessonIndex = lIdx;
-        oldSections = studioBaseClass.paths[i].lessons?.[lIdx]?.sections || [];
-        break;
-      }
+    // Prevent multiple simultaneous calls
+    if (isReorderingSectionRef.current) {
+      return;
+    }
+    
+    if (!studioBaseClass || !studioBaseClass.paths) {
+      return;
     }
 
-    if (pathIndex === -1 || lessonIndex === -1 || !oldSections || oldSections.length === 0) return; // Added check for empty oldSections
-
-    const oldSectionIndex = oldSections.findIndex(s => s.id === activeSectionId);
-    const newSectionIndex = oldSections.findIndex(s => s.id === overSectionId);
-
-    if (oldSectionIndex === -1 || newSectionIndex === -1 || oldSectionIndex === newSectionIndex) return;
-
-    const newSections = arrayMove(oldSections, oldSectionIndex, newSectionIndex);
-
-    // Optimistic update
-    setStudioBaseClass(prev => {
-      if (!prev || !prev.paths) return null;
-      const newPaths = prev.paths.map(p => ({
-        ...p,
-        lessons: p.lessons?.map(l => {
-          if (l.id === lessonId) {
-            return { ...l, sections: newSections as LessonSection[] };
-          }
-          return l;
-        }) || [],
-      }));
-      return { ...prev, paths: newPaths };
-    });
+    isReorderingSectionRef.current = true;
 
     try {
-      const orderedSectionIds = newSections.map((s: LessonSection) => s.id);
-      const response = await fetch('/api/teach/reorder-items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          itemType: 'section',
-          orderedIds: orderedSectionIds,
-          parentId: lessonId, // Pass lessonId as parentId for sections
-        }),
+      let pathIndex = -1;
+      let lessonIndex = -1;
+      let oldSections: LessonSection[] = [];
+
+      // Find the path and lesson containing the sections
+      for (let i = 0; i < studioBaseClass.paths.length; i++) {
+        const lIdx = studioBaseClass.paths[i].lessons?.findIndex(l => l.id === lessonId) ?? -1;
+        if (lIdx !== -1) {
+          pathIndex = i;
+          lessonIndex = lIdx;
+          oldSections = [...(studioBaseClass.paths[i].lessons?.[lIdx]?.sections || [])]; // Create a shallow copy
+          break;
+        }
+      }
+
+      if (pathIndex === -1 || lessonIndex === -1 || !oldSections || oldSections.length === 0) {
+        return;
+      }
+
+      const oldSectionIndex = oldSections.findIndex(s => s.id === activeSectionId);
+      const newSectionIndex = oldSections.findIndex(s => s.id === overSectionId);
+
+      if (oldSectionIndex === -1 || newSectionIndex === -1 || oldSectionIndex === newSectionIndex) {
+        return;
+      }
+
+      const newSections = arrayMove([...oldSections], oldSectionIndex, newSectionIndex); // Create fresh copy
+
+      // Optimistic update with more careful state management
+      setStudioBaseClass(prev => {
+        if (!prev || !prev.paths) return prev;
+        
+        // Create a completely new state object to avoid mutations
+        const updatedPaths = prev.paths.map((path, pIdx) => {
+          if (pIdx !== pathIndex) return path;
+          
+          return {
+            ...path,
+            lessons: path.lessons?.map((lesson, lIdx) => {
+              if (lIdx !== lessonIndex || lesson.id !== lessonId) return lesson;
+              
+              return {
+                ...lesson,
+                sections: [...newSections] // Ensure we're using a fresh array
+              };
+            }) || []
+          };
+        });
+        
+        return {
+          ...prev,
+          paths: updatedPaths
+        };
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to reorder sections on server');
+      try {
+        const orderedSectionIds = newSections.map((s: LessonSection) => s.id);
+        const response = await fetch('/api/teach/reorder-items', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            itemType: 'section',
+            orderedIds: orderedSectionIds,
+            parentId: lessonId,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to reorder sections on server');
+        }
+      } catch (e: any) {
+        console.error('Failed to save section reorder:', e);
+        // Revert optimistic update on error with careful state management
+        setStudioBaseClass(prev => {
+          if (!prev || !prev.paths) return prev;
+          
+          const revertedPaths = prev.paths.map((path, pIdx) => {
+            if (pIdx !== pathIndex) return path;
+            
+            return {
+              ...path,
+              lessons: path.lessons?.map((lesson, lIdx) => {
+                if (lIdx !== lessonIndex || lesson.id !== lessonId) return lesson;
+                
+                return {
+                  ...lesson,
+                  sections: [...oldSections] // Revert to original sections
+                };
+              }) || []
+            };
+          });
+          
+          return {
+            ...prev,
+            paths: revertedPaths
+          };
+        });
+        setError(`Failed to save section order for lesson ${lessonId}: ${e.message}`);
       }
-    } catch (e: any) {
-      console.error('Failed to save section reorder:', e);
-      // Revert optimistic update on error
-      setStudioBaseClass(prev => {
-        if (!prev || !prev.paths) return null;
-         const revertedPaths = prev.paths.map(p => ({
-            ...p,
-            lessons: p.lessons?.map(l => {
-              if (l.id === lessonId) {
-                return { ...l, sections: oldSections as LessonSection[] }; // Revert to oldSections
-              }
-              return l;
-            }) || [],
-          }));
-        return { ...prev, paths: revertedPaths };
-      });
-      setError(`Failed to save section order for lesson ${lessonId}: ${e.message}`);
+    } catch (unexpectedError: any) {
+      console.error('Unexpected error in handleReorderSections:', unexpectedError);
+      setError(`Unexpected error during section reordering: ${unexpectedError.message}`);
+    } finally {
+      isReorderingSectionRef.current = false;
     }
   };
 
