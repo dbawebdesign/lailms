@@ -73,6 +73,21 @@ export default function NewSignupForm() {
           console.error('Profile creation error:', profileError)
         }
 
+        // Track referral signup with FirstPromoter
+        try {
+          await fetch('/api/firstpromoter/track-signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              email: email,
+              uid: data.user.id 
+            }),
+          });
+        } catch (fpError) {
+          // Don't fail signup if FirstPromoter tracking fails
+          console.warn('FirstPromoter tracking failed:', fpError);
+        }
+
         // Redirect to homeschool signup flow
         router.push('/homeschool-signup')
       }

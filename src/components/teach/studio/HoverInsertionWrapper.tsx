@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface HoverInsertionWrapperProps {
@@ -10,8 +10,10 @@ interface HoverInsertionWrapperProps {
   itemId: string;
   onInsertAbove: () => void;
   onInsertBelow: () => void;
+  onDelete?: () => void;
   className?: string;
   disabled?: boolean;
+  canDelete?: boolean;
 }
 
 export const HoverInsertionWrapper: React.FC<HoverInsertionWrapperProps> = ({
@@ -20,12 +22,15 @@ export const HoverInsertionWrapper: React.FC<HoverInsertionWrapperProps> = ({
   itemId,
   onInsertAbove,
   onInsertBelow,
+  onDelete,
   className,
-  disabled = false
+  disabled = false,
+  canDelete = true
 }) => {
   const [isDirectlyHovered, setIsDirectlyHovered] = useState(false);
   const [showAbove, setShowAbove] = useState(false);
   const [showBelow, setShowBelow] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -61,6 +66,7 @@ export const HoverInsertionWrapper: React.FC<HoverInsertionWrapperProps> = ({
         setIsDirectlyHovered(true);
         setShowAbove(true);
         setShowBelow(true);
+        setShowDelete(canDelete && !!onDelete);
       }, 150);
     } else if (!isDirectlyOver && isDirectlyHovered) {
       // Clear timeout if mouse moves away
@@ -71,6 +77,7 @@ export const HoverInsertionWrapper: React.FC<HoverInsertionWrapperProps> = ({
       setIsDirectlyHovered(false);
       setShowAbove(false);
       setShowBelow(false);
+      setShowDelete(false);
     }
   }, [disabled, isDirectlyHovered, checkDirectHover]);
 
@@ -85,6 +92,7 @@ export const HoverInsertionWrapper: React.FC<HoverInsertionWrapperProps> = ({
     setIsDirectlyHovered(false);
     setShowAbove(false);
     setShowBelow(false);
+    setShowDelete(false);
   }, [disabled]);
 
   const handleInsertAbove = (e: React.MouseEvent) => {
@@ -97,6 +105,14 @@ export const HoverInsertionWrapper: React.FC<HoverInsertionWrapperProps> = ({
     e.preventDefault();
     e.stopPropagation();
     onInsertBelow();
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onDelete) {
+      onDelete();
+    }
   };
 
   // Clean up timeout on unmount
@@ -170,6 +186,32 @@ export const HoverInsertionWrapper: React.FC<HoverInsertionWrapperProps> = ({
           <Plus size={14} className="stroke-2" />
         </button>
       </div>
+
+      {/* Delete Button */}
+      {canDelete && onDelete && (
+        <div
+          className={cn(
+            "absolute top-1/2 -right-2 transform -translate-y-1/2 z-50 transition-all duration-200 ease-in-out",
+            showDelete && isDirectlyHovered
+              ? "opacity-100 scale-100"
+              : "opacity-0 translate-x-2 scale-95 pointer-events-none"
+          )}
+        >
+          <button
+            onClick={handleDelete}
+            className={cn(
+              "flex items-center justify-center w-6 h-6 rounded-full shadow-lg transition-all duration-200 ease-in-out",
+              "bg-red-600 text-white hover:bg-red-700 hover:scale-110",
+              "border-2 border-background",
+              "focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:ring-offset-2"
+            )}
+            title={`Delete ${itemType}`}
+            aria-label={`Delete ${itemType}`}
+          >
+            <Trash2 size={12} className="stroke-2" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

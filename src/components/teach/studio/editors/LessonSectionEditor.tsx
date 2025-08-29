@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -859,7 +859,7 @@ const ContentEditor = ({
 
 const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSave }) => {
   const [title, setTitle] = useState(section.title);
-  const [sectionType, setSectionType] = useState(section.section_type || 'text');
+
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
@@ -920,7 +920,7 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
       
       setContentData(newContent);
       setTitle(section.title);
-      setSectionType(section.section_type || 'text');
+
     }
   }, [section.id, section.content]);
 
@@ -975,7 +975,7 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
         id: section.id,
         title: title,
         content: structuredContent,
-        section_type: sectionType,
+        section_type: 'core_concept',
       };
       
       await onSave(updatedData);
@@ -1012,8 +1012,8 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
         </Button>
       </div>
 
-      {/* Basic info - cleaner grid */}
-      <div className="grid grid-cols-2 gap-6 mb-8">
+      {/* Basic info - cleaner layout */}
+      <div className="mb-8">
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Section Title
@@ -1024,21 +1024,6 @@ const LessonSectionEditor: React.FC<LessonSectionEditorProps> = ({ section, onSa
             placeholder="Enter section title"
             className="border-gray-200 dark:border-gray-700 rounded-lg"
           />
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Section Type
-          </label>
-          <Select value={sectionType} onValueChange={setSectionType}>
-            <SelectTrigger className="border-gray-200 dark:border-gray-700 rounded-lg">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="text">Text Content</SelectItem>
-              <SelectItem value="introduction">Introduction</SelectItem>
-              <SelectItem value="core_concept">Core Concept</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
 

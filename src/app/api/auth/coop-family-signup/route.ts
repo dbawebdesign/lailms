@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Tables } from 'packages/types/db'
+import { trackFirstPromoterSignup, prepareTrackingData } from '@/lib/firstpromoter'
 
 interface CoopFamilySignupRequest {
   inviteCode: string
@@ -151,6 +152,22 @@ export async function POST(request: NextRequest) {
 
     if (profileError) {
       return NextResponse.json({ error: 'Failed to create parent profile' }, { status: 500 })
+    }
+
+    // Track referral signup with FirstPromoter
+    try {
+      const trackingData = prepareTrackingData(request, {
+        email: pseudoEmail,
+        uid: parentUserId,
+      });
+
+      if (trackingData.tid || trackingData.ref_id) {
+        await trackFirstPromoterSignup(trackingData);
+        console.log('FirstPromoter tracking completed for coop family user:', parentUserId);
+      }
+    } catch (fpError) {
+      // Don't fail signup if FirstPromoter tracking fails
+      console.warn('FirstPromoter tracking failed for coop family:', fpError);
     }
 
     // Create family info record

@@ -1199,6 +1199,161 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
     }
   };
 
+  // NEW: Delete handlers
+  const handleDeletePath = async (pathId: string) => {
+    if (!studioBaseClass) return;
+    
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('Attempting to delete path with ID:', pathId);
+      
+      // Delete the path (this will cascade delete lessons and sections due to foreign key constraints)
+      const { error } = await supabase
+        .from('paths')
+        .delete()
+        .eq('id', pathId)
+        .eq('creator_user_id', user.id); // Ensure user can only delete their own paths
+
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw new Error(`Database error: ${error.message || error.details || JSON.stringify(error)}`);
+      }
+
+      // Update local state
+      setStudioBaseClass(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          paths: prev.paths?.filter(p => p.id !== pathId) || []
+        };
+      });
+
+      // Clear selection if the deleted path was selected
+      if (selectedItem.id === pathId) {
+        setSelectedItem(prev => ({ ...prev, id: null, data: null }));
+      }
+
+      console.log('Successfully deleted path');
+    } catch (error: any) {
+      console.error('Full error object:', error);
+      console.error('Error message:', error?.message);
+      console.error('Error details:', error?.details);
+      console.error('Error hint:', error?.hint);
+      const errorMessage = error?.message || error?.details || error?.hint || 'Unknown database error';
+      setError(`Failed to delete path: ${errorMessage}`);
+    }
+  };
+
+  const handleDeleteLesson = async (lessonId: string) => {
+    if (!studioBaseClass) return;
+    
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('Attempting to delete lesson with ID:', lessonId);
+      
+      // Delete the lesson (this will cascade delete sections due to foreign key constraints)
+      const { error } = await supabase
+        .from('lessons')
+        .delete()
+        .eq('id', lessonId)
+        .eq('creator_user_id', user.id); // Ensure user can only delete their own lessons
+
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw new Error(`Database error: ${error.message || error.details || JSON.stringify(error)}`);
+      }
+
+      // Update local state
+      setStudioBaseClass(prev => {
+        if (!prev || !prev.paths) return prev;
+        return {
+          ...prev,
+          paths: prev.paths.map(p => ({
+            ...p,
+            lessons: p.lessons?.filter(l => l.id !== lessonId) || []
+          }))
+        };
+      });
+
+      // Clear selection if the deleted lesson was selected
+      if (selectedItem.id === lessonId) {
+        setSelectedItem(prev => ({ ...prev, id: null, data: null }));
+      }
+
+      console.log('Successfully deleted lesson');
+    } catch (error: any) {
+      console.error('Full error object:', error);
+      console.error('Error message:', error?.message);
+      console.error('Error details:', error?.details);
+      console.error('Error hint:', error?.hint);
+      const errorMessage = error?.message || error?.details || error?.hint || 'Unknown database error';
+      setError(`Failed to delete lesson: ${errorMessage}`);
+    }
+  };
+
+  const handleDeleteSection = async (sectionId: string) => {
+    if (!studioBaseClass) return;
+    
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('Attempting to delete section with ID:', sectionId);
+      console.log('Current user ID:', user.id);
+      
+      // Delete the section - RLS policy will handle permission checking
+      const { error } = await supabase
+        .from('lesson_sections')
+        .delete()
+        .eq('id', sectionId);
+
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw new Error(`Database error: ${error.message || error.details || JSON.stringify(error)}`);
+      }
+
+      // Update local state
+      setStudioBaseClass(prev => {
+        if (!prev || !prev.paths) return prev;
+        return {
+          ...prev,
+          paths: prev.paths.map(p => ({
+            ...p,
+            lessons: p.lessons?.map(l => ({
+              ...l,
+              sections: l.sections?.filter(s => s.id !== sectionId) || []
+            })) || []
+          }))
+        };
+      });
+
+      // Clear selection if the deleted section was selected
+      if (selectedItem.id === sectionId) {
+        setSelectedItem(prev => ({ ...prev, id: null, data: null }));
+      }
+
+      console.log('Successfully deleted section');
+    } catch (error: any) {
+      console.error('Full error object:', error);
+      console.error('Error message:', error?.message);
+      console.error('Error details:', error?.details);
+      console.error('Error hint:', error?.hint);
+      const errorMessage = error?.message || error?.details || error?.hint || 'Unknown database error';
+      setError(`Failed to delete section: ${errorMessage}`);
+      throw new Error(`Failed to delete section: ${errorMessage}`);
+    }
+  };
+
   const renderEditor = () => {
     if (!selectedItem || !selectedItem.data && selectedItem.type !== 'knowledgebase') { // Allow data to be null for knowledgebase if baseClass is passed
       if (isLoading) return <p className="p-6 text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin inline-block"/>Loading editor...</p>;
@@ -1344,6 +1499,9 @@ const BaseClassStudioPage: React.FC<BaseClassStudioPageProps> = (props) => {
                     onInsertPath={handleInsertPath}
                     onInsertLesson={handleInsertLesson}
                     onInsertSection={handleInsertSection}
+                    onDeletePath={handleDeletePath}
+                    onDeleteLesson={handleDeleteLesson}
+                    onDeleteSection={handleDeleteSection}
                   />
                 </div>
               )}

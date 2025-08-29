@@ -144,6 +144,9 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-title" content="Learnology AI" />
         <link rel="manifest" href="/site.webmanifest" />
+        {/* FirstPromoter tracking scripts */}
+        <script src="/fprmain.js" />
+        <script src="https://cdn.firstpromoter.com/fpr.js" />
         {/* Structured-data scripts */}
         <script
           type="application/ld+json"

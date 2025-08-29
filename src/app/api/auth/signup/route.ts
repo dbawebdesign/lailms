@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Tables } from 'packages/types/db'
+import { trackFirstPromoterSignup, prepareTrackingData } from '@/lib/firstpromoter'
 
 // Define expected type for invite code data with nested organisation
 type InviteCodeWithOrg = {
@@ -121,6 +122,22 @@ export async function POST(req: NextRequest) {
         { error: 'Error creating profile', details: profileError },
         { status: 500 }
       )
+    }
+
+    // Track referral signup with FirstPromoter
+    try {
+      const trackingData = prepareTrackingData(req, {
+        email: pseudoEmail,
+        uid: authUser.user.id,
+      });
+
+      if (trackingData.tid || trackingData.ref_id) {
+        await trackFirstPromoterSignup(trackingData);
+        console.log('FirstPromoter tracking completed for user:', authUser.user.id);
+      }
+    } catch (fpError) {
+      // Don't fail signup if FirstPromoter tracking fails
+      console.warn('FirstPromoter tracking failed:', fpError);
     }
 
     // Return success with user data - no payment required for regular signup flow

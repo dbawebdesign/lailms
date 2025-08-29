@@ -7,6 +7,7 @@ import { UpdatedContentWrapper } from '@/components/ui/content-update-indicator'
 import { Button } from '@/components/ui/button';
 import HoverInsertionWrapper from './HoverInsertionWrapper';
 import InsertionModal, { InsertionFormData } from './InsertionModal';
+import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 // NEW: DND Kit imports
 import {
@@ -46,6 +47,10 @@ interface StudioNavigationTreeProps {
   onInsertPath?: (data: InsertionFormData, position: 'above' | 'below', referenceId?: string) => Promise<void>;
   onInsertLesson?: (data: InsertionFormData, position: 'above' | 'below', pathId: string, referenceId?: string) => Promise<void>;
   onInsertSection?: (data: InsertionFormData, position: 'above' | 'below', lessonId: string, referenceId?: string) => Promise<void>;
+  // NEW: Props for deletion functionality
+  onDeletePath?: (pathId: string) => Promise<void>;
+  onDeleteLesson?: (lessonId: string) => Promise<void>;
+  onDeleteSection?: (sectionId: string) => Promise<void>;
 }
 
 // NEW: SortableItem component for Paths
@@ -66,6 +71,10 @@ const SortablePathItem: React.FC<{
   onInsertPath?: (data: InsertionFormData, position: 'above' | 'below', referenceId?: string) => Promise<void>;
   onInsertLesson?: (data: InsertionFormData, position: 'above' | 'below', pathId: string, referenceId?: string) => Promise<void>;
   onInsertSection?: (data: InsertionFormData, position: 'above' | 'below', lessonId: string, referenceId?: string) => Promise<void>;
+  // NEW: Props for deletion functionality
+  onDeletePath?: (pathId: string) => Promise<void>;
+  onDeleteLesson?: (lessonId: string) => Promise<void>;
+  onDeleteSection?: (sectionId: string) => Promise<void>;
 }> = ({ 
   path, 
   isExpanded, 
@@ -80,7 +89,10 @@ const SortablePathItem: React.FC<{
   recentlyUpdatedItems,
   onInsertPath,
   onInsertLesson,
-  onInsertSection
+  onInsertSection,
+  onDeletePath,
+  onDeleteLesson,
+  onDeleteSection
 }) => {
   const { 
     attributes,
@@ -134,6 +146,10 @@ const SortablePathItem: React.FC<{
     );
   };
 
+  const handleDeletePath = () => {
+    onDeletePath?.(path.id);
+  };
+
   return (
     <UpdatedContentWrapper isUpdated={isRecentlyUpdated}>
       <HoverInsertionWrapper
@@ -141,7 +157,9 @@ const SortablePathItem: React.FC<{
         itemId={path.id}
         onInsertAbove={handleInsertPathAbove}
         onInsertBelow={handleInsertPathBelow}
+        onDelete={handleDeletePath}
         disabled={!onInsertPath}
+        canDelete={!!onDeletePath}
       >
         <li ref={setNodeRef} style={style} className="py-0.5 bg-background rounded-md shadow-sm mb-1 list-none">
         <div className="flex items-center justify-between hover:bg-muted/50 rounded-t-md">
@@ -191,6 +209,8 @@ const SortablePathItem: React.FC<{
                     recentlyUpdatedItems={recentlyUpdatedItems}
                     onInsertLesson={onInsertLesson}
                     onInsertSection={onInsertSection}
+                    onDeleteLesson={onDeleteLesson}
+                    onDeleteSection={onDeleteSection}
                   />
                 ))}
                 {lessons.length === 0 && (
@@ -223,7 +243,10 @@ const SortableLessonItem: React.FC<{
   // NEW: Props for insertion functionality
   onInsertLesson?: (data: InsertionFormData, position: 'above' | 'below', pathId: string, referenceId?: string) => Promise<void>;
   onInsertSection?: (data: InsertionFormData, position: 'above' | 'below', lessonId: string, referenceId?: string) => Promise<void>;
-}> = ({ lesson, pathId, isExpanded, selectedItemId, onSelectItem, handleLessonHeaderClick, onReorderSections, expandedSections, onToggleExpandSection, recentlyUpdatedItems, onInsertLesson, onInsertSection }) => {
+  // NEW: Props for deletion functionality
+  onDeleteLesson?: (lessonId: string) => Promise<void>;
+  onDeleteSection?: (sectionId: string) => Promise<void>;
+}> = ({ lesson, pathId, isExpanded, selectedItemId, onSelectItem, handleLessonHeaderClick, onReorderSections, expandedSections, onToggleExpandSection, recentlyUpdatedItems, onInsertLesson, onInsertSection, onDeleteLesson, onDeleteSection }) => {
   const { 
     attributes,
     listeners,
@@ -280,6 +303,10 @@ const SortableLessonItem: React.FC<{
     );
   };
 
+  const handleDeleteLesson = () => {
+    onDeleteLesson?.(lesson.id);
+  };
+
   return (
     <UpdatedContentWrapper isUpdated={isRecentlyUpdated}>
       <HoverInsertionWrapper
@@ -287,7 +314,9 @@ const SortableLessonItem: React.FC<{
         itemId={lesson.id}
         onInsertAbove={handleInsertLessonAbove}
         onInsertBelow={handleInsertLessonBelow}
+        onDelete={handleDeleteLesson}
         disabled={!onInsertLesson}
+        canDelete={!!onDeleteLesson}
       >
         <li ref={setNodeRef} style={style} className="py-0.5 rounded-md mb-0.5 list-none bg-background">
         <div className="flex items-center justify-between hover:bg-muted/30 rounded-t-md">
@@ -331,6 +360,7 @@ const SortableLessonItem: React.FC<{
                     selectedItemId={selectedItemId}
                     onSelectItem={onSelectItem}
                     onInsertSection={onInsertSection}
+                    onDeleteSection={onDeleteSection}
                   />
                 ))}
               </ul>
@@ -354,7 +384,9 @@ const SortableSectionItem: React.FC<{
   onSelectItem: (type: string, itemData: LessonSection) => void;
   // NEW: Props for insertion functionality
   onInsertSection?: (data: InsertionFormData, position: 'above' | 'below', lessonId: string, referenceId?: string) => Promise<void>;
-}> = ({ section, lessonId, selectedItemId, onSelectItem, onInsertSection }) => {
+  // NEW: Props for deletion functionality
+  onDeleteSection?: (sectionId: string) => Promise<void>;
+}> = ({ section, lessonId, selectedItemId, onSelectItem, onInsertSection, onDeleteSection }) => {
   const {
     attributes,
     listeners,
@@ -390,13 +422,19 @@ const SortableSectionItem: React.FC<{
     );
   };
 
+  const handleDeleteSection = () => {
+    onDeleteSection?.(section.id);
+  };
+
   return (
     <HoverInsertionWrapper
       itemType="section"
       itemId={section.id}
       onInsertAbove={handleInsertSectionAbove}
       onInsertBelow={handleInsertSectionBelow}
+      onDelete={handleDeleteSection}
       disabled={!onInsertSection}
+      canDelete={!!onDeleteSection}
     >
       <li ref={setNodeRef} style={style} className="py-0.5 list-none rounded-md bg-background/80 hover:bg-muted/50 mb-0.5">
       <div className={`flex items-center text-xs cursor-pointer rounded ${selectedItemId === section.id ? 'bg-accent/70 text-accent-foreground font-medium' : ''}`}>
@@ -435,6 +473,9 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
   onInsertPath,
   onInsertLesson,
   onInsertSection,
+  onDeletePath,
+  onDeleteLesson,
+  onDeleteSection,
 }) => {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [expandedLessons, setExpandedLessons] = useState<Set<string>>(new Set());
@@ -452,6 +493,25 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
     itemType: 'path',
     position: 'above'
   });
+
+  // NEW: Modal state for deletion confirmation
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    itemType: 'path' | 'lesson' | 'section';
+    itemId: string;
+    itemTitle: string;
+    dependentItems?: {
+      lessons?: number;
+      sections?: number;
+    };
+  }>({
+    isOpen: false,
+    itemType: 'path',
+    itemId: '',
+    itemTitle: ''
+  });
+
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { 
@@ -628,6 +688,82 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
     }
   };
 
+  // NEW: Delete handlers that open the confirmation modal
+  const handleDeletePath = (pathId: string) => {
+    const path = baseClass?.paths?.find(p => p.id === pathId);
+    if (!path) return;
+
+    const totalLessons = path.lessons?.length || 0;
+    const totalSections = path.lessons?.reduce((acc, lesson) => acc + (lesson.sections?.length || 0), 0) || 0;
+
+    setDeleteModal({
+      isOpen: true,
+      itemType: 'path',
+      itemId: pathId,
+      itemTitle: path.title,
+      dependentItems: {
+        lessons: totalLessons,
+        sections: totalSections
+      }
+    });
+  };
+
+  const handleDeleteLesson = (lessonId: string) => {
+    const lesson = baseClass?.paths?.flatMap(p => p.lessons || []).find(l => l.id === lessonId);
+    if (!lesson) return;
+
+    const totalSections = lesson.sections?.length || 0;
+
+    setDeleteModal({
+      isOpen: true,
+      itemType: 'lesson',
+      itemId: lessonId,
+      itemTitle: lesson.title,
+      dependentItems: {
+        sections: totalSections
+      }
+    });
+  };
+
+  const handleDeleteSection = (sectionId: string) => {
+    const section = baseClass?.paths?.flatMap(p => p.lessons || []).flatMap(l => l.sections || []).find(s => s.id === sectionId);
+    if (!section) return;
+
+    setDeleteModal({
+      isOpen: true,
+      itemType: 'section',
+      itemId: sectionId,
+      itemTitle: section.title
+    });
+  };
+
+  // NEW: Handle delete confirmation
+  const handleDeleteConfirm = async () => {
+    const { itemType, itemId } = deleteModal;
+    
+    setIsDeleting(true);
+    try {
+      switch (itemType) {
+        case 'path':
+          await onDeletePath?.(itemId);
+          break;
+        case 'lesson':
+          await onDeleteLesson?.(itemId);
+          break;
+        case 'section':
+          await onDeleteSection?.(itemId);
+          break;
+      }
+      
+      setDeleteModal({ isOpen: false, itemType: 'path', itemId: '', itemTitle: '' });
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      // Error handling is done in the parent component
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-1 text-sm">
       {/* Base Class Item - Not sortable */}
@@ -701,6 +837,9 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
                   onInsertPath={handleInsertPath}
                   onInsertLesson={handleInsertLesson}
                   onInsertSection={handleInsertSection}
+                  onDeletePath={handleDeletePath}
+                  onDeleteLesson={handleDeleteLesson}
+                  onDeleteSection={handleDeleteSection}
                 />
               ))}
             </ul>
@@ -718,6 +857,16 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
         itemType={insertionModal.itemType}
         position={insertionModal.position}
         onSubmit={handleModalSubmit}
+      />
+
+      <DeleteConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={handleDeleteConfirm}
+        itemType={deleteModal.itemType}
+        itemTitle={deleteModal.itemTitle}
+        isDeleting={isDeleting}
+        dependentItems={deleteModal.dependentItems}
       />
     </div>
   );

@@ -1,6 +1,103 @@
 # Current Supabase Schema
 
-## Latest Updates (Sub-Account Support)
+## Latest Updates (Assessment Questions & Delete Functionality)
+
+### Assessment Questions Answer Key Validation (2025-01-31)
+The `assessment_questions` table has a check constraint `valid_answer_key` that validates the structure of the `answer_key` JSONB field based on the question type:
+
+**Multiple Choice Questions:**
+```json
+{
+  "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+  "correct_option": "Option 1"
+}
+```
+
+**True/False Questions:**
+```json
+{
+  "correct_answer": true
+}
+```
+
+**Short Answer Questions:**
+```json
+{
+  "acceptable_answers": ["answer1", "answer2", "answer3"]
+}
+```
+
+**Essay Questions:**
+```json
+{
+  "grading_criteria": "Detailed grading criteria text..."
+}
+```
+
+**Matching Questions:**
+```json
+{
+  "pairs": [
+    {"left": "Item 1", "right": "Match 1"},
+    {"left": "Item 2", "right": "Match 2"}
+  ]
+}
+```
+
+The validation is enforced by the `validate_question_answer_key(question_type, answer_key)` function.
+
+## Previous Updates (Delete Functionality & RLS Improvements)
+
+### Lesson Section Delete RLS Policy Update (2025-01-31)
+Updated the lesson_sections DELETE RLS policy to allow users to delete sections from lessons they created, even if the section's `created_by` field is NULL:
+
+```sql
+CREATE POLICY "Users can delete their own lesson sections" ON lesson_sections
+FOR DELETE TO authenticated
+USING (
+  created_by = auth.uid() OR 
+  EXISTS (
+    SELECT 1 FROM lessons l 
+    WHERE l.id = lesson_sections.lesson_id 
+    AND l.creator_user_id = auth.uid()
+  )
+);
+```
+
+This resolves issues where users couldn't delete sections that were created during course generation (which had NULL `created_by` values) but belonged to lessons they created.
+
+### Lesson Section Delete Trigger Fix (2025-01-31)
+Fixed the `reindex_sections_after_delete()` function to prevent stack depth limit exceeded errors:
+
+```sql
+CREATE OR REPLACE FUNCTION reindex_sections_after_delete()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Set flag to prevent recursive trigger calls
+    PERFORM set_config('app.bulk_reordering_in_progress', 'true', true);
+    
+    -- Reindex the remaining sections in the lesson to ensure no gaps
+    WITH ordered_sections AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY order_index) - 1 AS new_order
+        FROM public.lesson_sections
+        WHERE lesson_id = OLD.lesson_id
+    )
+    UPDATE public.lesson_sections AS s
+    SET order_index = os.new_order
+    FROM ordered_sections AS os
+    WHERE s.id = os.id;
+    
+    -- Clear the flag
+    PERFORM set_config('app.bulk_reordering_in_progress', 'false', true);
+    
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+This prevents recursive trigger calls that were causing stack depth errors when deleting lesson sections.
+
+## Previous Updates (Sub-Account Support)
 
 - **profiles table enhancements for sub-accounts:**
   - `is_sub_account` (BOOLEAN, default FALSE) - Indicates if this is a sub-account (student without auth)

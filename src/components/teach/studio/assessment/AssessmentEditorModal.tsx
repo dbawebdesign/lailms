@@ -126,7 +126,7 @@ export function AssessmentEditorModal({ isOpen, onClose, assessment, onSave }: A
       question_type: 'multiple_choice',
       points: 1,
       order_index: questions.length,
-      answer_key: { options: ['', '', '', ''], correct: 0 },
+      answer_key: { options: ['', '', '', ''], correct_option: '' },
       required: true,
     };
     setQuestions([...questions, newQuestion]);
@@ -191,7 +191,8 @@ export function AssessmentEditorModal({ isOpen, onClose, assessment, onSave }: A
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save question');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to save question (${response.status})`);
       }
 
       const savedQuestion = await response.json();
@@ -211,7 +212,7 @@ export function AssessmentEditorModal({ isOpen, onClose, assessment, onSave }: A
       console.error('Error saving question:', err);
       toast({
         title: "Error",
-        description: "Failed to save question",
+        description: err instanceof Error ? err.message : "Failed to save question",
         variant: "destructive",
       });
     }
@@ -284,7 +285,32 @@ export function AssessmentEditorModal({ isOpen, onClose, assessment, onSave }: A
               <Label htmlFor="question-type">Question Type</Label>
               <Select
                 value={question.question_type}
-                onValueChange={(value: any) => updateQuestion(question.id, { question_type: value })}
+                onValueChange={(value: any) => {
+                  let defaultAnswerKey = {};
+                  switch (value) {
+                    case 'multiple_choice':
+                      defaultAnswerKey = { options: ['', '', '', ''], correct_option: '' };
+                      break;
+                    case 'true_false':
+                      defaultAnswerKey = { correct_answer: true };
+                      break;
+                    case 'short_answer':
+                      defaultAnswerKey = { acceptable_answers: [''] };
+                      break;
+                    case 'essay':
+                      defaultAnswerKey = { grading_criteria: '' };
+                      break;
+                    case 'matching':
+                      defaultAnswerKey = { pairs: [] };
+                      break;
+                    default:
+                      defaultAnswerKey = {};
+                  }
+                  updateQuestion(question.id, { 
+                    question_type: value, 
+                    answer_key: defaultAnswerKey 
+                  });
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -338,12 +364,12 @@ export function AssessmentEditorModal({ isOpen, onClose, assessment, onSave }: A
                     />
                     <Button
                       size="sm"
-                      variant={question.answer_key?.correct === index ? "default" : "outline"}
+                      variant={question.answer_key?.correct_option === option ? "default" : "outline"}
                       onClick={() => updateQuestion(question.id, {
-                        answer_key: { ...question.answer_key, correct: index }
+                        answer_key: { ...question.answer_key, correct_option: option }
                       })}
                     >
-                      {question.answer_key?.correct === index ? "Correct" : "Mark Correct"}
+                      {question.answer_key?.correct_option === option ? "Correct" : "Mark Correct"}
                     </Button>
                   </div>
                 ))}
@@ -355,9 +381,9 @@ export function AssessmentEditorModal({ isOpen, onClose, assessment, onSave }: A
             <div>
               <Label>Correct Answer</Label>
               <Select
-                value={question.answer_key?.correct?.toString() || 'true'}
+                value={question.answer_key?.correct_answer?.toString() || 'true'}
                 onValueChange={(value) => updateQuestion(question.id, {
-                  answer_key: { correct: value === 'true' }
+                  answer_key: { correct_answer: value === 'true' }
                 })}
               >
                 <SelectTrigger>
@@ -368,6 +394,71 @@ export function AssessmentEditorModal({ isOpen, onClose, assessment, onSave }: A
                   <SelectItem value="false">False</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {question.question_type === 'short_answer' && (
+            <div>
+              <Label>Acceptable Answers</Label>
+              <div className="space-y-2 mt-2">
+                {(question.answer_key?.acceptable_answers || ['']).map((answer: string, index: number) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      value={answer}
+                      onChange={(e) => {
+                        const newAnswers = [...(question.answer_key?.acceptable_answers || [''])];
+                        newAnswers[index] = e.target.value;
+                        updateQuestion(question.id, {
+                          answer_key: { acceptable_answers: newAnswers }
+                        });
+                      }}
+                      placeholder={`Acceptable answer ${index + 1}`}
+                    />
+                    {index > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const newAnswers = (question.answer_key?.acceptable_answers || ['']).filter((_, i) => i !== index);
+                          updateQuestion(question.id, {
+                            answer_key: { acceptable_answers: newAnswers }
+                          });
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const newAnswers = [...(question.answer_key?.acceptable_answers || ['']), ''];
+                    updateQuestion(question.id, {
+                      answer_key: { acceptable_answers: newAnswers }
+                    });
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Answer
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {question.question_type === 'essay' && (
+            <div>
+              <Label htmlFor="grading-criteria">Grading Criteria</Label>
+              <Textarea
+                id="grading-criteria"
+                value={question.answer_key?.grading_criteria || ''}
+                onChange={(e) => updateQuestion(question.id, {
+                  answer_key: { grading_criteria: e.target.value }
+                })}
+                placeholder="Describe the criteria for grading this essay question..."
+                className="min-h-[100px]"
+              />
             </div>
           )}
 
