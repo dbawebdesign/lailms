@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Check if this is a sub-account (student without auth)
-    const isSubAccount = targetProfile.is_sub_account === true
+    const isSubAccount = ((targetProfile as any).is_sub_account as boolean | null) === true
     
     if (isSubAccount) {
       // For sub-accounts, we use session/cookie management
