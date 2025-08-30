@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Play, Clock, Sparkles, BookOpen, Users, GraduationCap, Wrench, AlertCircle, Home, Upload, MessageSquare, FileText } from 'lucide-react';
+import { X, Play, Sparkles, BookOpen, Users, GraduationCap, Wrench, AlertCircle, Home, Upload, MessageSquare, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -39,19 +39,17 @@ interface GuideCategory {
 }
 
 const categories: GuideCategory[] = [
+  { id: 'teacher-tools', name: 'Teachers', icon: Users },
+  { id: 'student-tools', name: 'Students', icon: BookOpen },
+  { id: 'general', name: 'General', icon: FileText },
+  // Keep existing categories for compatibility; they'll be hidden if empty
   { id: 'getting-started', name: 'Getting Started', icon: Sparkles },
-  { id: 'student-tools', name: 'Student Tools', icon: BookOpen },
-  { id: 'teacher-tools', name: 'Teacher Tools', icon: Users },
   { id: 'parent-tools', name: 'Parent Tools', icon: Home },
   { id: 'advanced', name: 'Advanced Features', icon: Wrench },
   { id: 'troubleshooting', name: 'Troubleshooting', icon: AlertCircle },
 ];
 
-const formatDuration = (seconds: number): string => {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
+// Duration formatting removed from UI; keeping function unnecessary, so removed to avoid unused lint
 
 const getYouTubeVideoId = (url: string): string | null => {
   const regex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/;
@@ -114,24 +112,139 @@ export default function QuickGuideModal({ isOpen, onClose }: QuickGuideModalProp
   const fetchVideos = async () => {
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from('video_guides')
-        .select('*')
-        .eq('is_published', true)
-        .order('category', { ascending: true })
-        .order('order_index', { ascending: true });
+
+      const deriveTitle = (fileName: string): string => {
+        const withoutExt = fileName.replace(/\.[^/.]+$/, '');
+        const withoutClipchamp = withoutExt.replace(/\s*-\s*Made with Clipchamp.*$/i, '');
+        const normalized = withoutClipchamp.replace(/[_]+/g, ' ');
+        return normalized.replace(/\s+/g, ' ').trim();
+      };
+
+      const deriveCategory = (title: string): string => {
+        const t = title.toLowerCase();
+        if (t.includes('study space') || t.startsWith('student ') || t.includes('student')) return 'student-tools';
+        if (t.includes('switching users') || t.includes('feedback') || t.includes('support')) return 'general';
+        if (t.includes('base class') || t.includes('class instance') || t.startsWith('create ') || t.startsWith('edit ')) return 'teacher-tools';
+        return 'general';
+      };
+
+      const { data, error } = await supabase.storage
+        .from('guide-videos')
+        .list('', { limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } });
 
       if (error) {
-        console.error('Error fetching videos:', error);
+        console.error('Error listing guide videos:', error);
         toast.error('Failed to load video guides');
         return;
       }
 
-      setVideos(data || []);
-      
-      // Select the first video if available
-      if (data && data.length > 0 && !selectedVideo) {
-        setSelectedVideo(data[0]);
+      // Ensure specific videos appear in desired order within their categories
+      const priority = (title: string, category: string) => {
+        const t = title.toLowerCase();
+        if (category === 'teacher-tools') {
+          if (t.startsWith('base class creation')) return 0;
+          if (t.startsWith('edit base class')) return 1;
+          return 2;
+        }
+        if (category === 'student-tools') {
+          if (t.startsWith('student my courses')) return 0;
+          if (t.startsWith('study space get started')) return 1;
+          return 2;
+        }
+        return 50; // general and others
+      };
+
+      const mappedFromStorage: VideoGuide[] = (data || [])
+        .filter((f) => f.name.toLowerCase().endsWith('.mp4'))
+        .sort((a, b) => {
+          const ta = deriveTitle(a.name);
+          const tb = deriveTitle(b.name);
+          const ca = deriveCategory(ta);
+          const cb = deriveCategory(tb);
+          const pa = priority(ta, ca);
+          const pb = priority(tb, cb);
+          return pa - pb || ta.localeCompare(tb);
+        })
+        .map((f, index) => {
+          const title = deriveTitle(f.name);
+          const category = deriveCategory(title);
+          return {
+            id: f.id || `${f.name}-${index}`,
+            title,
+            description: '',
+            video_url: f.name,
+            thumbnail_url: '',
+            duration_seconds: 0,
+            category,
+            target_roles: category === 'teacher-tools' ? ['teacher'] : category === 'student-tools' ? ['student'] : ['teacher', 'student'],
+            order_index: index,
+            is_featured: false,
+            is_published: true,
+            tags: [category.replace('-', ' ')],
+            created_at: '',
+            updated_at: ''
+          };
+        })
+        // Prefer a logical grouping order inside each category by title
+        .sort((a, b) => a.category.localeCompare(b.category) || a.title.localeCompare(b.title));
+
+      let finalVideos = mappedFromStorage;
+
+      // Fallback to curated list if storage listing returned nothing (or only non-mp4s)
+      if (!finalVideos || finalVideos.length === 0) {
+        const curatedNames: { name: string; category: string }[] = [
+          // General
+          { name: 'Switching Users Quick Guide - Made with Clipchamp_1756443802615.mp4', category: 'general' },
+          { name: 'Feedback_Support - Made with Clipchamp_1756444117444.mp4', category: 'general' },
+          // Teachers
+          { name: 'Base Class Creation Quick Guide - Made with Clipchamp_1756441294024.mp4', category: 'teacher-tools' },
+          { name: 'Edit Base Class Quick Guide - Made with Clipchamp_1756443201538.mp4', category: 'teacher-tools' },
+          { name: 'Create Class Instance Quick Guide - Made with Clipchamp_1756443504070.mp4', category: 'teacher-tools' },
+          // Students (Study Space)
+          { name: 'Study Space Get Started - Made with Clipchamp_1756523607137.mp4', category: 'student-tools' },
+          { name: 'Study Space Brain Bytes - Made with Clipchamp_1756524965968.mp4', category: 'student-tools' },
+          { name: 'Study Space Chat and Tools - Made with Clipchamp_1756523956335.mp4', category: 'student-tools' },
+          { name: 'Study Space Mind Map - Made with Clipchamp_1756524614830.mp4', category: 'student-tools' },
+          { name: 'Student My Courses Quick Guide - Made with Clipchamp_1756444588758.mp4', category: 'student-tools' },
+        ];
+
+        // Apply same priority ordering to curated list
+        curatedNames.sort((a, b) => {
+          const ta = deriveTitle(a.name);
+          const tb = deriveTitle(b.name);
+          const pa = priority(ta, a.category);
+          const pb = priority(tb, b.category);
+          return pa - pb || ta.localeCompare(tb);
+        });
+
+        finalVideos = curatedNames.map((f, index) => {
+          const title = deriveTitle(f.name);
+          return {
+            id: `${f.name}-${index}`,
+            title,
+            description: '',
+            video_url: f.name,
+            thumbnail_url: '',
+            duration_seconds: 0,
+            category: f.category,
+            target_roles: f.category === 'teacher-tools' ? ['teacher'] : f.category === 'student-tools' ? ['student'] : ['teacher', 'student'],
+            order_index: index,
+            is_featured: false,
+            is_published: true,
+            tags: [f.category.replace('-', ' ')],
+            created_at: '',
+            updated_at: ''
+          } as VideoGuide;
+        })
+        .sort((a, b) => a.category.localeCompare(b.category) || a.title.localeCompare(b.title));
+      }
+
+      setVideos(finalVideos);
+
+      if (finalVideos.length > 0) {
+        // Ensure selection starts on Base Class Creation when present
+        const preferredIndex = finalVideos.findIndex(v => v.title.toLowerCase().startsWith('base class creation'));
+        setSelectedVideo(finalVideos[preferredIndex >= 0 ? preferredIndex : 0]);
       }
     } catch (error) {
       console.error('Error fetching videos:', error);
@@ -190,15 +303,58 @@ export default function QuickGuideModal({ isOpen, onClose }: QuickGuideModalProp
     }
   };
 
-  // Group videos by category
+  // Sort helper for left list to enforce requested ordering per category
+  const sortWithinCategoryList = (a: VideoGuide, b: VideoGuide) => {
+    const ta = a.title.toLowerCase();
+    const tb = b.title.toLowerCase();
+    if (a.category === 'teacher-tools' && b.category === 'teacher-tools') {
+      const pa = ta.startsWith('base class creation') ? 0 : ta.startsWith('edit base class') ? 1 : 2;
+      const pb = tb.startsWith('base class creation') ? 0 : tb.startsWith('edit base class') ? 1 : 2;
+      if (pa !== pb) return pa - pb;
+      return ta.localeCompare(tb);
+    }
+    if (a.category === 'student-tools' && b.category === 'student-tools') {
+      const pa = ta.startsWith('student my courses') ? 0 : ta.startsWith('study space get started') ? 1 : 2;
+      const pb = tb.startsWith('student my courses') ? 0 : tb.startsWith('study space get started') ? 1 : 2;
+      if (pa !== pb) return pa - pb;
+      return ta.localeCompare(tb);
+    }
+    return ta.localeCompare(tb);
+  };
+
+  // Group and sort videos by category for the left list
   const videosByCategory = categories.reduce((acc, category) => {
-    acc[category.id] = videos.filter(video => video.category === category.id);
+    acc[category.id] = videos
+      .filter((video) => video.category === category.id)
+      .sort(sortWithinCategoryList);
     return acc;
   }, {} as Record<string, VideoGuide[]>);
 
-  // Get all videos in order for navigation
-  const allVideos = videos;
-  const currentVideoIndex = selectedVideo ? allVideos.findIndex(v => v.id === selectedVideo.id) : -1;
+  // Get all videos in the SAME order as the left list (by category order),
+  // ensuring Base Class Creation appears first in Teachers.
+  const sortWithinCategory = (a: VideoGuide, b: VideoGuide) => {
+    const ta = a.title.toLowerCase();
+    const tb = b.title.toLowerCase();
+    if (a.category === 'teacher-tools' && b.category === 'teacher-tools') {
+      const pa = ta.startsWith('base class creation') ? 0 : ta.startsWith('edit base class') ? 1 : 2;
+      const pb = tb.startsWith('base class creation') ? 0 : tb.startsWith('edit base class') ? 1 : 2;
+      if (pa !== pb) return pa - pb;
+      return ta.localeCompare(tb);
+    }
+    if (a.category === 'student-tools' && b.category === 'student-tools') {
+      const pa = ta.startsWith('student my courses') ? 0 : ta.startsWith('study space get started') ? 1 : 2;
+      const pb = tb.startsWith('student my courses') ? 0 : tb.startsWith('study space get started') ? 1 : 2;
+      if (pa !== pb) return pa - pb;
+      return ta.localeCompare(tb);
+    }
+    return ta.localeCompare(tb);
+  };
+
+  const allVideos = categories
+    .map((c) => videos.filter((v) => v.category === c.id).sort(sortWithinCategory))
+    .flat();
+
+  const currentVideoIndex = selectedVideo ? allVideos.findIndex((v) => v.id === selectedVideo.id) : -1;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -276,10 +432,6 @@ export default function QuickGuideModal({ isOpen, onClose }: QuickGuideModalProp
                                     </div>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
-                                  <Clock className="h-3 w-3" />
-                                  <span>{formatDuration(video.duration_seconds)}</span>
-                                </div>
                               </div>
                               {video.is_featured && (
                                 <Badge className="mt-1 text-xs" variant="secondary">
@@ -313,21 +465,10 @@ export default function QuickGuideModal({ isOpen, onClose }: QuickGuideModalProp
 
             {/* Video Player Area */}
             <div className="flex-1 p-8 flex flex-col min-h-0">
-              {/* Tags/Categories if video is selected */}
-              {selectedVideo && selectedVideo.tags && selectedVideo.tags.length > 0 && (
-                <div className="flex gap-2 mb-6 flex-wrap">
-                  {selectedVideo.tags.map((tag, index) => (
-                    <Badge key={index} variant="outline" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-
               {/* Video Player Container - Takes most of the space */}
-              <div className="flex-1 flex items-center justify-center min-h-0 mb-6">
+              <div className="flex-1 flex items-center justify-center min-h-0 mb-0">
                 <div className="w-full h-full max-w-none">
-                  <div className="aspect-video bg-black rounded-lg overflow-hidden w-full h-full max-h-[700px]">
+                  <div className="aspect-video bg-black rounded-lg overflow-hidden w-full h-full">
                     {loading && !selectedVideo ? (
                       <div className="w-full h-full flex items-center justify-center bg-muted">
                         <div className="text-center">
@@ -341,35 +482,7 @@ export default function QuickGuideModal({ isOpen, onClose }: QuickGuideModalProp
                   </div>
                 </div>
               </div>
-
-              {/* Video Info - Bottom area */}
-              {selectedVideo && (
-                <div className="flex-shrink-0 space-y-4">
-                  <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <span>{formatDuration(selectedVideo.duration_seconds)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="h-4 w-4" />
-                      <span className="capitalize">{selectedVideo.category.replace('-', ' ')}</span>
-                    </div>
-                    {selectedVideo.is_featured && (
-                      <Badge className="bg-gradient-to-r from-[#FF835D] to-[#E45DE5] text-white">
-                        Featured
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Pro Tip */}
-                  <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                    <h4 className="font-medium mb-2 text-sm">Pro Tip</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Use keyboard shortcuts for faster navigation. Press "?" to see all available shortcuts.
-                    </p>
-                  </div>
-                </div>
-              )}
+              {/* Removed extra info below the player to maximize available space */}
             </div>
 
             {/* Footer Navigation */}
