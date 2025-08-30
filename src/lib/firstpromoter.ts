@@ -185,3 +185,4 @@ export function prepareTrackingData(
     ip: ip || undefined,
   };
 }
+

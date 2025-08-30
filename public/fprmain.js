@@ -9,3 +9,4 @@
 // Initialize FirstPromoter with your client ID
 fpr("init", {cid: "z8op3lgw"}); 
 fpr("click");
+

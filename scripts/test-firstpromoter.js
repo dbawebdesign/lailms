@@ -73,3 +73,4 @@ console.log('   2. Set FIRSTPROMOTER_ACCOUNT_ID in your environment');
 console.log('   3. Update client ID in /public/fprmain.js if needed');
 console.log('   4. Test with a real referral link');
 console.log('\n📖 See docs/firstpromoter-setup.md for detailed setup instructions.');
+

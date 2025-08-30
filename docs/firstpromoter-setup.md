@@ -75,3 +75,4 @@ The integration is designed to be non-blocking:
 - If FirstPromoter tracking fails, the signup process continues normally
 - Errors are logged to the console for debugging
 - The API returns success even if tracking fails to prevent signup interruption
+
