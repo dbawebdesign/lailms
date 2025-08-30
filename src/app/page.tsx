@@ -1102,6 +1102,7 @@ export default function LandingPage() {
                 <h4 className="font-semibold text-white">Resources</h4>
                 <div className="space-y-2 text-sm text-gray-400">
                   <div><Link href="/help" className="hover:text-white transition-colors">Video Guides</Link></div>
+                  <div><Link href="/affiliate" className="hover:text-white transition-colors">Become an Affiliate</Link></div>
                 </div>
               </div>
               
