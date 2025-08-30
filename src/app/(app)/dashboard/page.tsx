@@ -14,16 +14,19 @@ export default async function DashboardPage() {
   
   const { profile, isSubAccount } = activeProfileData;
   
-  // Get organization info if needed
+  // Get organization info if available
   const supabase = createSupabaseServerClient()
-  const { data: orgData } = await supabase
-    .from('organisations')
-    .select('organisation_type')
-    .eq('id', profile.organisation_id)
-    .single()
+  let orgType: string | undefined
+  if (profile.organisation_id) {
+    const { data: orgData } = await supabase
+      .from('organisations')
+      .select('organisation_type')
+      .eq('id', profile.organisation_id)
+      .single()
+    orgType = orgData?.organisation_type ?? undefined
+  }
   
   const userRole = getEffectiveRole(profile)?.toLowerCase()
-  const orgType = orgData?.organisation_type
     
     // Redirect homeschool users to their dedicated dashboard
     if (orgType === 'individual_family' || orgType === 'homeschool_coop') {
@@ -46,7 +49,6 @@ export default async function DashboardPage() {
       case 'super_admin':
         redirect('/org')
     }
-  }
 
   // Fallback: Show coming soon page for unrecognized cases
   return (

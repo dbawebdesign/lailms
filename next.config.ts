@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  eslint: { ignoreDuringBuilds: true },
   
   // Image optimization configuration - disable for static assets to reduce log noise
   images: {

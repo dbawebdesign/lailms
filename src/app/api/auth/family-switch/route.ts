@@ -5,7 +5,7 @@ import { cookies } from 'next/headers'
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = cookies()
-    const supabase = createSupabaseServerClient(cookieStore)
+    const supabase = createSupabaseServerClient()
     
     const { targetUserId } = await request.json()
     
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     // Get current user's profile to check family relationship
     const { data: currentProfile } = await supabase
       .from('profiles')
-      .select('family_id, organisation_id, is_primary_parent')
+      .select('*')
       .eq('user_id', user.id)
       .single()
     
@@ -73,8 +73,13 @@ export async function POST(request: NextRequest) {
     }
     
     // Check if they're in the same family/organization
-    const sameFamily = (currentProfile.family_id && targetProfile.family_id === currentProfile.family_id) ||
-                      (currentProfile.organisation_id && targetProfile.organisation_id === currentProfile.organisation_id)
+    const currentFamilyId = (currentProfile as any).family_id as string | null
+    const targetFamilyId = (targetProfile as any).family_id as string | null
+    const currentOrgId = (currentProfile as any).organisation_id as string | null
+    const targetOrgId = (targetProfile as any).organisation_id as string | null
+
+    const sameFamily = (currentFamilyId && targetFamilyId === currentFamilyId) ||
+                      (currentOrgId && targetOrgId === currentOrgId)
     
     if (!sameFamily) {
       return NextResponse.json(

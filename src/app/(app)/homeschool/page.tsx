@@ -10,23 +10,10 @@ export default async function HomeschoolDashboardPage() {
     redirect("/login")
   }
 
-  // Get user profile and organization info
+  // Get user profile
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select(`
-      *,
-      organisations (
-        id,
-        name,
-        organisation_type,
-        max_students,
-        subscription_status
-      ),
-      homeschool_family_info!profiles_family_id_fkey (
-        id,
-        family_name
-      )
-    `)
+    .select('*')
     .eq('user_id', user.id)
     .single()
 
@@ -38,10 +25,25 @@ export default async function HomeschoolDashboardPage() {
     redirect("/homeschool-signup")
   }
 
-  // Check if this is actually a homeschool organization
-  if (profile.organisations?.organisation_type !== 'individual_family' && profile.organisations?.organisation_type !== 'homeschool_coop') {
-    console.log('Not a homeschool organization, redirecting to appropriate dashboard')
-    redirect("/teach") // Redirect non-homeschool teachers to regular teacher dashboard
+  // Local narrows for fields recently added in Supabase schema
+  const isPrimaryParent = (profile as any).is_primary_parent as boolean | null
+  const familyId = (profile as any).family_id as string | null
+
+  // Load organisation details to verify homeschool type
+  let organisationName = 'My Homeschool'
+  if (profile.organisation_id) {
+    const { data: org } = await supabase
+      .from('organisations')
+      .select('id, name, organisation_type')
+      .eq('id', profile.organisation_id)
+      .single()
+
+    if (org?.name) organisationName = org.name
+    // Check if this is actually a homeschool organization
+    if (org?.organisation_type !== 'individual_family' && org?.organisation_type !== 'homeschool_coop') {
+      console.log('Not a homeschool organization, redirecting to appropriate dashboard')
+      redirect("/teach") // Redirect non-homeschool teachers to regular teacher dashboard
+    }
   }
 
   // Check if payment is complete - if user hasn't paid, redirect to payment
@@ -51,9 +53,9 @@ export default async function HomeschoolDashboardPage() {
   }
 
   // Get family students if this is a parent account
-  let students = []
-  if (profile.is_primary_parent && profile.family_id) {
-    const { data: familyStudents } = await supabase
+  let students: { id: string; firstName: string; lastName: string; gradeLevel: string; username: string }[] = []
+  if (isPrimaryParent && familyId) {
+    const { data: familyStudents } = await (supabase as any)
       .from('family_students')
       .select(`
         student_id,
@@ -65,39 +67,61 @@ export default async function HomeschoolDashboardPage() {
           username
         )
       `)
-      .eq('family_id', profile.family_id)
+      .eq('family_id', familyId)
 
-    students = familyStudents?.map(fs => ({
+    type FamilyStudentRow = {
+      student_id: string
+      profiles?: {
+        user_id?: string
+        first_name?: string | null
+        last_name?: string | null
+        grade_level?: string | null
+        username?: string | null
+      } | null
+    }
+
+    const rows: FamilyStudentRow[] = (familyStudents as FamilyStudentRow[] | null) ?? []
+    students = rows.map((fs: FamilyStudentRow) => ({
       id: fs.student_id,
       firstName: fs.profiles?.first_name || '',
       lastName: fs.profiles?.last_name || '',
       gradeLevel: fs.profiles?.grade_level || '',
       username: fs.profiles?.username || ''
-    })) || []
+    }))
   }
 
-  // Get active courses
-  const { data: courses } = await supabase
-    .from('base_classes')
-    .select(`
-      id,
-      name,
-      description,
-      class_instances (
+  // Get active courses (normalize description to undefined for client prop)
+  let courses: { id: string; name: string; description?: string; class_instances?: any[] }[] = []
+  if (profile.organisation_id) {
+    const { data } = await (supabase as any)
+      .from('base_classes')
+      .select(`
         id,
         name,
-        status
-      )
-    `)
-    .eq('user_id', user.id)
-    .eq('organisation_id', profile.organisation_id)
-    .order('created_at', { ascending: false })
-    .limit(5)
+        description,
+        class_instances (
+          id,
+          name,
+          status
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('organisation_id', profile.organisation_id)
+      .order('created_at', { ascending: false })
+      .limit(5)
+    const rows: { id: string; name: string; description: string | null; class_instances?: any[] }[] = data || []
+    courses = rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      description: r.description ?? undefined,
+      class_instances: r.class_instances
+    }))
+  }
 
   return (
     <HomeschoolDashboardClient
       userName={profile.first_name || 'Teacher'}
-      organizationName={profile.organisations?.name || 'My Homeschool'}
+      organizationName={organisationName}
       students={students}
       courses={courses || []}
       isFirstTime={!courses || courses.length === 0}

@@ -629,7 +629,7 @@ export default async function TeacherDashboardPage() {
     .eq('user_id', user.id)
     .limit(1);
 
-  const hasBaseClasses = baseClasses && baseClasses.length > 0;
+  const hasBaseClasses = (baseClasses?.length ?? 0) > 0;
 
   // Check if this is a homeschool organization
   const isHomeschoolOrg = organization?.organisation_type === 'individual_family' || organization?.organisation_type === 'coop_network';

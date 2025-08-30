@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Analytics } from "@vercel/analytics/react";
 import { LogoPreloader } from "@/components/ui/logo-preloader";
 import { QuickGuideProvider } from "@/components/layout/QuickGuideProvider";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -144,9 +145,9 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-title" content="Learnology AI" />
         <link rel="manifest" href="/site.webmanifest" />
-        {/* FirstPromoter tracking scripts */}
-        <script src="/fprmain.js" />
-        <script src="https://cdn.firstpromoter.com/fpr.js" />
+        {/* FirstPromoter tracking scripts (loaded non-blocking) */}
+        <Script src="/fprmain.js" strategy="afterInteractive" />
+        <Script src="https://cdn.firstpromoter.com/fpr.js" strategy="afterInteractive" />
         {/* Structured-data scripts */}
         <script
           type="application/ld+json"
