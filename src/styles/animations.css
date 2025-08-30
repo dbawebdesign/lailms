@@ -130,14 +130,14 @@
 }
 
 .word:hover {
-  color: var(--accent);
+  color: #6B5DE5; /* Use a darker purple for better contrast in light theme */
   transform: translateY(-2px);
   text-shadow: 0 0 10px rgba(107, 93, 229, 0.3);
 }
 
 /* Dark mode word hover effect */
 .dark .word:hover {
-  color: var(--accent);
+  color: var(--accent); /* Keep the bright accent color for dark theme */
   text-shadow: 0 0 15px rgba(107, 93, 229, 0.5);
 }
 
@@ -564,10 +564,11 @@
 
 .hover-icon:hover {
   transform: scale(1.1);
-  color: var(--accent);
+  color: #6B5DE5; /* Use a darker purple for better contrast in light theme */
 }
 
 .dark .hover-icon:hover {
+  color: var(--accent); /* Keep the bright accent color for dark theme */
   filter: drop-shadow(0 0 4px rgba(107, 93, 229, 0.5));
 }
 
@@ -601,11 +602,11 @@
 }
 
 .hover-text-highlight:hover {
-  color: var(--accent);
+  color: #6B5DE5; /* Use a darker purple for better contrast in light theme */
 }
 
 .dark .hover-text-highlight:hover {
-  color: var(--accent);
+  color: var(--accent); /* Keep the bright accent color for dark theme */
   text-shadow: 0 0 8px rgba(107, 93, 229, 0.4);
 }
 
@@ -634,6 +635,86 @@
 .dark .focus-visible-enhanced:focus-visible {
   outline-color: rgba(107, 93, 229, 0.8);
   box-shadow: 0 0 0 4px rgba(107, 93, 229, 0.2);
+}
+
+/* Button hover fixes for light theme visibility - only for buttons using default accent colors */
+.light button[data-slot="button"]:hover:not([class*="hover:bg-"]):not([class*="hover:text-"]),
+:root:not(.dark) button[data-slot="button"]:hover:not([class*="hover:bg-"]):not([class*="hover:text-"]) {
+  --accent: #6B5DE5; /* Use darker purple for better contrast */
+  --accent-foreground: #1A1A1A; /* Use dark text for light theme */
+}
+
+/* Specific fix for buttons that use Tailwind's hover:bg-accent and hover:text-accent-foreground */
+.light button[data-slot="button"][class*="hover:bg-accent"]:hover,
+:root:not(.dark) button[data-slot="button"][class*="hover:bg-accent"]:hover,
+.light button[data-slot="button"][class*="hover:text-accent-foreground"]:hover,
+:root:not(.dark) button[data-slot="button"][class*="hover:text-accent-foreground"]:hover {
+  background-color: rgba(107, 93, 229, 0.1) !important;
+  color: #1A1A1A !important; /* Use dark text instead of white */
+}
+
+/* Comprehensive fix for outline and ghost variant buttons in light theme */
+.light button[data-slot="button"][class*="outline"]:hover,
+:root:not(.dark) button[data-slot="button"][class*="outline"]:hover,
+.light button[data-slot="button"][class*="ghost"]:hover,
+:root:not(.dark) button[data-slot="button"][class*="ghost"]:hover {
+  color: #1A1A1A !important; /* Force dark text in light theme */
+}
+
+/* Specific fix for homeschool dashboard quick action cards */
+.light button[data-slot="button"][class*="outline"][class*="min-h-[120px]"]:hover,
+:root:not(.dark) button[data-slot="button"][class*="outline"][class*="min-h-[120px]"]:hover {
+  color: #1A1A1A !important; /* Force dark text in light theme */
+}
+
+/* Ensure all child elements inherit the dark color */
+.light button[data-slot="button"][class*="outline"]:hover *,
+:root:not(.dark) button[data-slot="button"][class*="outline"]:hover *,
+.light button[data-slot="button"][class*="ghost"]:hover *,
+:root:not(.dark) button[data-slot="button"][class*="ghost"]:hover *,
+.light button[data-slot="button"][class*="outline"][class*="min-h-[120px]"]:hover *,
+:root:not(.dark) button[data-slot="button"][class*="outline"][class*="min-h-[120px]"]:hover * {
+  color: inherit !important; /* Inherit the dark color from parent */
+}
+
+/* Specific targeting for text elements in quick action cards and other buttons */
+.light button[data-slot="button"][class*="outline"]:hover span,
+:root:not(.dark) button[data-slot="button"][class*="outline"]:hover span,
+.light button[data-slot="button"][class*="ghost"]:hover span,
+:root:not(.dark) button[data-slot="button"][class*="ghost"]:hover span,
+.light button[data-slot="button"][class*="outline"]:hover .text-sm,
+:root:not(.dark) button[data-slot="button"][class*="outline"]:hover .text-sm,
+.light button[data-slot="button"][class*="ghost"]:hover .text-sm,
+:root:not(.dark) button[data-slot="button"][class*="ghost"]:hover .text-sm,
+.light button[data-slot="button"][class*="outline"]:hover .text-xs,
+:root:not(.dark) button[data-slot="button"][class*="outline"]:hover .text-xs,
+.light button[data-slot="button"][class*="ghost"]:hover .text-xs,
+:root:not(.dark) button[data-slot="button"][class*="ghost"]:hover .text-xs {
+  color: #1A1A1A !important; /* Force dark text for spans and text elements */
+}
+
+/* Ultra-specific fix for the exact span element with "Create Course" text */
+.light button[data-slot="button"][class*="outline"]:hover span.text-sm.font-medium.block,
+:root:not(.dark) button[data-slot="button"][class*="outline"]:hover span.text-sm.font-medium.block,
+.light button[data-slot="button"][class*="outline"]:hover span[class*="text-sm"][class*="font-medium"][class*="block"],
+:root:not(.dark) button[data-slot="button"][class*="outline"]:hover span[class*="text-sm"][class*="font-medium"][class*="block"] {
+  color: #1A1A1A !important; /* Force dark text specifically for this span */
+}
+
+/* Nuclear option - override all button text in light theme with maximum specificity */
+html:not(.dark) button[data-slot="button"]:hover,
+html:not(.dark) button[data-slot="button"]:hover *,
+html:not(.dark) button[data-slot="button"]:hover span,
+html:not(.dark) button[data-slot="button"]:hover div {
+  color: #1A1A1A !important;
+}
+
+/* Specific override for buttons with outline or ghost variants */
+html:not(.dark) button[data-slot="button"][class*="outline"]:hover,
+html:not(.dark) button[data-slot="button"][class*="outline"]:hover *,
+html:not(.dark) button[data-slot="button"][class*="ghost"]:hover,
+html:not(.dark) button[data-slot="button"][class*="ghost"]:hover * {
+  color: #1A1A1A !important;
 }
 
 /* Ripple effect for clicks */

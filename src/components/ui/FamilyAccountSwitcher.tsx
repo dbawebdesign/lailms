@@ -314,7 +314,7 @@ export default function FamilyAccountSwitcher() {
       <DropdownMenuTrigger asChild>
         <Button 
           variant="ghost" 
-          className="h-10 px-3 gap-2"
+          className="h-10 px-3 gap-2 hover:text-[#1A1A1A] dark:hover:text-white [&_*]:hover:text-[#1A1A1A] dark:[&_*]:hover:text-white"
           disabled={isSwitching}
         >
           <Avatar className="h-7 w-7">

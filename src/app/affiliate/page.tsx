@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import AnimatedGridBackground from '@/components/layout/AnimatedGridBackground';
 
 /**
  * Learnology AI — Affiliate Landing Page
@@ -53,6 +54,13 @@ export default function AffiliatePage() {
     <div className="min-h-screen bg-black text-white">
       {/* Navigation */}
       <nav className="relative px-6 py-4 flex items-center justify-between border-b border-gray-800 z-50">
+        <AnimatedGridBackground 
+          opacity={0.02}
+          patternId="nav-grid"
+          showFloatingElements={false}
+          showCornerElements={false}
+          showDetailDots={false}
+        />
         <div className="flex items-center space-x-8 relative z-10">
           <Link href="/" className="flex items-center">
             <Image
@@ -72,6 +80,13 @@ export default function AffiliatePage() {
 
       {/* Hero Section */}
       <section className="relative px-6 py-20">
+        <AnimatedGridBackground 
+          opacity={0.04}
+          patternId="hero-grid"
+          showFloatingElements={true}
+          showCornerElements={true}
+          showDetailDots={true}
+        />
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
             <div className="text-xs uppercase tracking-wider text-[#6B5DE5] font-semibold mb-4">
@@ -144,6 +159,13 @@ export default function AffiliatePage() {
 
       {/* Interactive Earnings Calculator */}
       <section className="relative px-6 py-20 bg-gray-900/50">
+        <AnimatedGridBackground 
+          opacity={0.06}
+          patternId="calculator-grid"
+          showFloatingElements={false}
+          showCornerElements={false}
+          showDetailDots={true}
+        />
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-8 text-center">Calculate Your Earnings</h2>
@@ -268,6 +290,13 @@ export default function AffiliatePage() {
 
       {/* Program Details */}
       <section className="relative px-6 py-20">
+        <AnimatedGridBackground 
+          opacity={0.03}
+          patternId="details-grid"
+          showFloatingElements={false}
+          showCornerElements={false}
+          showDetailDots={false}
+        />
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="grid md:grid-cols-2 gap-8">
             <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700">
@@ -341,6 +370,13 @@ export default function AffiliatePage() {
 
       {/* Call to Action */}
       <section className="relative px-6 py-20 bg-gray-900/50">
+        <AnimatedGridBackground 
+          opacity={0.05}
+          patternId="cta-grid"
+          showFloatingElements={true}
+          showCornerElements={false}
+          showDetailDots={false}
+        />
         <div className="max-w-4xl mx-auto relative z-10">
           <div className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] rounded-2xl p-8 shadow-2xl">
             <div className="flex flex-col md:flex-row items-center gap-6">
@@ -368,6 +404,13 @@ export default function AffiliatePage() {
 
       {/* Footer */}
       <footer className="relative border-t border-gray-800 px-6 py-16">
+        <AnimatedGridBackground 
+          opacity={0.03}
+          patternId="footer-grid"
+          showFloatingElements={false}
+          showCornerElements={false}
+          showDetailDots={false}
+        />
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-xl p-6 border border-gray-700">
             <p className="text-sm text-gray-400 text-center leading-relaxed">

@@ -177,7 +177,7 @@ export default function HomeschoolDashboard({
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
+                <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_.text-sm]:hover:text-[#1A1A1A] dark:[&_.text-sm]:hover:text-white [&_.text-xs]:hover:text-[#1A1A1A] dark:[&_.text-xs]:hover:text-white">
                   <Link href="/teach/knowledge-base/create">
                     <BookOpen className="h-8 w-8 hover-icon text-blue-600" />
                     <div className="text-center space-y-1">
@@ -186,7 +186,7 @@ export default function HomeschoolDashboard({
                     </div>
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
+                <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_.text-sm]:hover:text-[#1A1A1A] dark:[&_.text-sm]:hover:text-white [&_.text-xs]:hover:text-[#1A1A1A] dark:[&_.text-xs]:hover:text-white">
                   <Link href="/homeschool/add-students">
                     <Users className="h-8 w-8 hover-icon text-green-600" />
                     <div className="text-center space-y-1">
@@ -195,7 +195,7 @@ export default function HomeschoolDashboard({
                     </div>
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
+                <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_.text-sm]:hover:text-[#1A1A1A] dark:[&_.text-sm]:hover:text-white [&_.text-xs]:hover:text-[#1A1A1A] dark:[&_.text-xs]:hover:text-white">
                   <Link href="/teach/gradebook">
                     <GraduationCap className="h-8 w-8 hover-icon text-purple-600" />
                     <div className="text-center space-y-1">
@@ -204,7 +204,7 @@ export default function HomeschoolDashboard({
                     </div>
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
+                <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_.text-sm]:hover:text-[#1A1A1A] dark:[&_.text-sm]:hover:text-white [&_.text-xs]:hover:text-[#1A1A1A] dark:[&_.text-xs]:hover:text-white">
                   <Link href="/teach/tools">
                     <Settings className="h-8 w-8 hover-icon text-orange-600" />
                     <div className="text-center space-y-1">
