@@ -135,11 +135,14 @@ export default function FamilyAccountSwitcher() {
           ? member.user_id === activeFamilyMemberId 
           : member.user_id === user.id
           
+        // Determine if this member should be treated as a teacher
+        const isTeacherRole = ['teacher', 'admin', 'super_admin'].includes(member.role)
+        
         const formattedMember: FamilyMember = {
           id: member.user_id,
-          firstName: member.first_name || (member.role === 'teacher' ? 'Teacher' : 'Student'),
+          firstName: member.first_name || (isTeacherRole ? 'Teacher' : 'Student'),
           lastName: member.last_name || '',
-          role: member.role as 'teacher' | 'student',
+          role: isTeacherRole ? 'teacher' : 'student',
           gradeLevel: member.grade_level,
           email: member.user_id === user.id ? user.email : undefined, // Only show email for authenticated user
           isCurrent

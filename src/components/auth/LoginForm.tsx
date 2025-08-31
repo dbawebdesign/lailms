@@ -29,6 +29,29 @@ export default function LoginForm() {
     setIsLoading(true)
 
     try {
+      // First check if this is an old user needing migration
+      const migrationResponse = await fetch('/api/auth/migrate-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+
+      const migrationData = await migrationResponse.json()
+
+      if (migrationData.needsMigration) {
+        // User needs to migrate - redirect to migration page
+        router.push(`/account-migration?token=${migrationData.token}`)
+        return
+      }
+
+      if (migrationData.migrated) {
+        // User already migrated - show message
+        setError('Your account has been updated. Please use your email address and password to login, or continue with Google.')
+        setIsLoading(false)
+        return
+      }
+
+      // If migration check failed, try normal login
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

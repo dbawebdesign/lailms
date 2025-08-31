@@ -5,7 +5,7 @@ import { cookies } from 'next/headers'
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = cookies()
-    const supabase = createSupabaseServerClient(cookieStore)
+    const supabase = createSupabaseServerClient()
     const supabaseAdmin = createSupabaseServiceClient() // Use service client for admin operations
     
     const { students } = await request.json()
