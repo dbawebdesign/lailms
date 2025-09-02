@@ -363,7 +363,10 @@ After successful migration completion:
    - Deletes old auth user from auth.users table
    
 2. **For Email/Password migrations:**
-   - No cleanup needed (same user ID, just updated auth method)
+   - Creates new auth user with email/password
+   - Creates new profile with all original data
+   - Migrates all data to new user ID
+   - Deletes old profile and auth user (same as Google OAuth)
 
 3. **Legacy Data Handling:**
    - Claims any base_classes with NULL user_id in same organization

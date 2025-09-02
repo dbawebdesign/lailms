@@ -78,21 +78,21 @@ export async function POST(request: NextRequest) {
     let updatedUser = null
 
     if (!useGoogle) {
-      // For email/password: Update the existing user's email and password
-      const { data: authUser, error: updateError } = await supabase.auth.admin.updateUserById(
-        migration.user_id,
-        {
-          email: email,
-          password: password,
-          email_confirm: true
-        }
-      )
+      // For email/password: Create a NEW auth user with email/password
+      const { data: newAuthUser, error: createError } = await supabase.auth.admin.createUser({
+        email: email,
+        password: password,
+        email_confirm: true
+      })
 
-      if (updateError) {
-        console.error('Auth update error:', updateError)
-        return NextResponse.json({ error: 'Failed to update authentication' }, { status: 500 })
+      if (createError || !newAuthUser?.user) {
+        console.error('Auth creation error:', createError)
+        return NextResponse.json({ error: 'Failed to create new authentication' }, { status: 500 })
       }
-      updatedUser = authUser
+      
+      newUserId = newAuthUser.user.id
+      updatedUser = newAuthUser.user
+      console.log('Created new email/password user:', newUserId, 'for email:', email)
     } else {
       // For Google OAuth: Find the new user that was created by Google OAuth
       const { data: googleUsers, error: getUserError } = await supabase.auth.admin.listUsers()
@@ -113,33 +113,31 @@ export async function POST(request: NextRequest) {
       console.log('Found Google OAuth user:', googleUser.id, 'for email:', email)
     }
 
-    // Create or update the profile for the new user
-    if (useGoogle) {
-      // For Google OAuth: Create a new profile for the new user
-      await supabase
-        .from('profiles')
-        .insert({
-          user_id: newUserId,
-          first_name: oldProfile.first_name,
-          last_name: oldProfile.last_name,
-          role: oldProfile.role,
-          organisation_id: oldProfile.organisation_id,
-          organisation_unit_id: oldProfile.organisation_unit_id,
-          settings: oldProfile.settings,
-          additional_roles: oldProfile.additional_roles,
-          active_role: oldProfile.active_role,
-          survey_completed: oldProfile.survey_completed,
-          paid: oldProfile.paid,
-          paid_at: oldProfile.paid_at,
-          stripe_customer_id: oldProfile.stripe_customer_id,
-          stripe_payment_intent_id: oldProfile.stripe_payment_intent_id,
-          stripe_receipt_url: oldProfile.stripe_receipt_url,
-          payment_amount_cents: oldProfile.payment_amount_cents,
-          payment_currency: oldProfile.payment_currency,
-          onboarding_completed: oldProfile.onboarding_completed,
-          onboarding_step: oldProfile.onboarding_step
-        })
-    }
+    // ALWAYS create a new profile for the new user (both email/password and Google OAuth)
+    console.log('Creating new profile for user:', newUserId)
+    await supabase
+      .from('profiles')
+      .insert({
+        user_id: newUserId,
+        first_name: oldProfile.first_name,
+        last_name: oldProfile.last_name,
+        role: oldProfile.role,
+        organisation_id: oldProfile.organisation_id,
+        organisation_unit_id: oldProfile.organisation_unit_id,
+        settings: oldProfile.settings,
+        additional_roles: oldProfile.additional_roles,
+        active_role: oldProfile.active_role,
+        survey_completed: oldProfile.survey_completed,
+        paid: oldProfile.paid,
+        paid_at: oldProfile.paid_at,
+        stripe_customer_id: oldProfile.stripe_customer_id,
+        stripe_payment_intent_id: oldProfile.stripe_payment_intent_id,
+        stripe_receipt_url: oldProfile.stripe_receipt_url,
+        payment_amount_cents: oldProfile.payment_amount_cents,
+        payment_currency: oldProfile.payment_currency,
+        onboarding_completed: oldProfile.onboarding_completed,
+        onboarding_step: oldProfile.onboarding_step
+      })
 
     // If homeschool, set up or link to existing family structure
     if (isHomeschool && ['teacher', 'admin', 'super_admin'].includes(oldProfile.role)) {
@@ -188,13 +186,11 @@ export async function POST(request: NextRequest) {
           }
         }
       } else {
-        // Update existing family to point to new user if using Google OAuth
-        if (useGoogle) {
-          await supabase
-            .from('homeschool_family_info')
-            .update({ primary_parent_id: newUserId })
-            .eq('id', existingFamily.id)
-        }
+        // Update existing family to point to new user (both email/password and Google OAuth)
+        await supabase
+          .from('homeschool_family_info')
+          .update({ primary_parent_id: newUserId })
+          .eq('id', existingFamily.id)
       }
 
       if (familyInfo && orgUnit) {
@@ -239,16 +235,23 @@ export async function POST(request: NextRequest) {
               })
               .eq('user_id', student.user_id)
 
-            // Create family_students relationship (ignore if already exists)
-            await supabase
+            // Create family_students relationship (check if already exists first)
+            const { data: existingRelation } = await supabase
               .from('family_students')
-              .insert({
-                family_id: familyInfo.id,
-                student_id: student.user_id,
-                created_by: newUserId
-              })
-              .onConflict('family_id,student_id')
-              .ignoreDuplicates()
+              .select('id')
+              .eq('family_id', familyInfo.id)
+              .eq('student_id', student.user_id)
+              .single()
+
+            if (!existingRelation) {
+              await supabase
+                .from('family_students')
+                .insert({
+                  family_id: familyInfo.id,
+                  student_id: student.user_id,
+                  created_by: newUserId
+                })
+            }
           }
         }
 
@@ -313,9 +316,9 @@ export async function POST(request: NextRequest) {
       })
       .eq('migration_token', migrationToken)
 
-    // Clean up old profile ONLY if we migrated to a different user (Google OAuth)
+    // Clean up old profile ALWAYS (both email/password and Google OAuth create new users)
     // This is the FINAL step after all data has been successfully migrated
-    if (useGoogle && migration.user_id !== newUserId) {
+    if (migration.user_id !== newUserId) {
       console.log(`Cleaning up old profile for user ${migration.user_id} after successful migration to ${newUserId}`)
       
       // First, verify that no critical data remains linked to the old user
