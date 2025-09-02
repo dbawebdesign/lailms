@@ -9,11 +9,13 @@ import { ShinyButton } from '@/components/ui/shiny-button'
 import AnimatedGridBackground from '@/components/layout/AnimatedGridBackground'
 import { ContactModal } from '@/components/ui/ContactModal'
 import { VideoModal } from '@/components/ui/VideoModal'
+import QuickGuideModal from '@/components/layout/QuickGuideModal'
 
 export default function LandingPage() {
   const [isContactModalOpen, setIsContactModalOpen] = useState(false)
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isQuickGuideOpen, setIsQuickGuideOpen] = useState(false)
 
   useEffect(() => {
     // Word by word animation
@@ -963,12 +965,13 @@ export default function LandingPage() {
               No account required - these resources are available to everyone.
             </p>
             <div className="flex justify-center">
-              <Link href="/help">
-                <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-4 rounded-lg hover:opacity-90 transition-all duration-200 ease-in-out text-lg">
-                  <Play className="w-5 h-5 mr-2" />
-                  Watch Video Guides
-                </Button>
-              </Link>
+              <Button 
+                className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-4 rounded-lg hover:opacity-90 transition-all duration-200 ease-in-out text-lg"
+                onClick={() => setIsQuickGuideOpen(true)}
+              >
+                <Play className="w-5 h-5 mr-2" />
+                Watch Video Guides
+              </Button>
             </div>
           </div>
 
@@ -1021,12 +1024,14 @@ export default function LandingPage() {
               Need help with something specific? Our comprehensive video library covers everything from basic setup to advanced features.
             </p>
             <div className="flex justify-center">
-              <Link href="/help">
-                <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800 transition-all duration-200 ease-in-out px-6 py-3">
-                  <Play className="w-4 h-4 mr-2" />
-                  Browse All Videos
-                </Button>
-              </Link>
+              <Button 
+                variant="outline" 
+                className="border-gray-600 text-gray-300 hover:bg-gray-800 transition-all duration-200 ease-in-out px-6 py-3"
+                onClick={() => setIsQuickGuideOpen(true)}
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Browse All Videos
+              </Button>
             </div>
           </div>
         </div>
@@ -1101,7 +1106,7 @@ export default function LandingPage() {
               <div className="space-y-4">
                 <h4 className="font-semibold text-white">Resources</h4>
                 <div className="space-y-2 text-sm text-gray-400">
-                  <div><Link href="/help" className="hover:text-white transition-colors">Video Guides</Link></div>
+                  <div><button type="button" onClick={() => setIsQuickGuideOpen(true)} className="hover:text-white transition-colors text-left">Video Guides</button></div>
                   <div><Link href="/affiliate" className="hover:text-white transition-colors">Become an Affiliate</Link></div>
                 </div>
               </div>
@@ -1177,6 +1182,11 @@ export default function LandingPage() {
         title="Course Generation Demo"
         description="Watch how to create comprehensive courses in minutes using our AI-powered course generation system."
         autoplay={true}
+      />
+
+      <QuickGuideModal
+        isOpen={isQuickGuideOpen}
+        onClose={() => setIsQuickGuideOpen(false)}
       />
     </div>
   )
