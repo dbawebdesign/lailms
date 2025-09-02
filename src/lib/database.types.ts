@@ -651,6 +651,94 @@ export type Database = {
           },
         ]
       }
+      family_students: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          family_id: string
+          id: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          family_id: string
+          id?: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          family_id?: string
+          id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_students_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "family_students_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "homeschool_family_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_students_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      feedback_records: {
+        Row: {
+          content: Json
+          created_at: string | null
+          created_by: string | null
+          id: string
+          organisation_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          content: Json
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          organisation_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          content?: Json
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          organisation_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_records_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "feedback_records_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       study_content_index: {
         Row: {
           assessment_ids: string[] | null

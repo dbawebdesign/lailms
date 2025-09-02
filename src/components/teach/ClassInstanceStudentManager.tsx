@@ -65,9 +65,9 @@ export function ClassInstanceStudentManager({
       const students = data?.map(roster => ({
         id: roster.id,
         profile_id: roster.profile_id,
-        first_name: roster.profiles?.first_name || '',
-        last_name: roster.profiles?.last_name || '',
-        grade_level: roster.profiles?.grade_level,
+        first_name: (roster.profiles as any)?.first_name || '',
+        last_name: (roster.profiles as any)?.last_name || '',
+        grade_level: (roster.profiles as any)?.grade_level,
         joined_at: roster.joined_at
       })) || [];
 

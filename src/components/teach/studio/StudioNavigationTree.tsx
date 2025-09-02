@@ -146,7 +146,7 @@ const SortablePathItem: React.FC<{
     );
   };
 
-  const handleDeletePath = () => {
+  const handleDeletePath = async () => {
     onDeletePath?.(path.id);
   };
 
@@ -303,7 +303,7 @@ const SortableLessonItem: React.FC<{
     );
   };
 
-  const handleDeleteLesson = () => {
+  const handleDeleteLesson = async () => {
     onDeleteLesson?.(lesson.id);
   };
 
@@ -422,7 +422,7 @@ const SortableSectionItem: React.FC<{
     );
   };
 
-  const handleDeleteSection = () => {
+  const handleDeleteSection = async () => {
     onDeleteSection?.(section.id);
   };
 
@@ -633,7 +633,7 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
   };
 
   // NEW: Insertion handlers that open the modal
-  const handleInsertPath = (data: InsertionFormData, position: 'above' | 'below', referenceId?: string) => {
+  const handleInsertPath = async (data: InsertionFormData, position: 'above' | 'below', referenceId?: string) => {
     setInsertionModal({
       isOpen: true,
       itemType: 'path',
@@ -642,7 +642,7 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
     });
   };
 
-  const handleInsertLesson = (data: InsertionFormData, position: 'above' | 'below', pathId: string, referenceId?: string) => {
+  const handleInsertLesson = async (data: InsertionFormData, position: 'above' | 'below', pathId: string, referenceId?: string) => {
     setInsertionModal({
       isOpen: true,
       itemType: 'lesson',
@@ -652,7 +652,7 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
     });
   };
 
-  const handleInsertSection = (data: InsertionFormData, position: 'above' | 'below', lessonId: string, referenceId?: string) => {
+  const handleInsertSection = async (data: InsertionFormData, position: 'above' | 'below', lessonId: string, referenceId?: string) => {
     setInsertionModal({
       isOpen: true,
       itemType: 'section',
@@ -689,7 +689,7 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
   };
 
   // NEW: Delete handlers that open the confirmation modal
-  const handleDeletePath = (pathId: string) => {
+  const handleDeletePath = async (pathId: string) => {
     const path = baseClass?.paths?.find(p => p.id === pathId);
     if (!path) return;
 
@@ -708,7 +708,7 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
     });
   };
 
-  const handleDeleteLesson = (lessonId: string) => {
+  const handleDeleteLesson = async (lessonId: string) => {
     const lesson = baseClass?.paths?.flatMap(p => p.lessons || []).find(l => l.id === lessonId);
     if (!lesson) return;
 
@@ -725,7 +725,7 @@ const StudioNavigationTree: React.FC<StudioNavigationTreeProps> = ({
     });
   };
 
-  const handleDeleteSection = (sectionId: string) => {
+  const handleDeleteSection = async (sectionId: string) => {
     const section = baseClass?.paths?.flatMap(p => p.lessons || []).flatMap(l => l.sections || []).find(s => s.id === sectionId);
     if (!section) return;
 

@@ -67,8 +67,8 @@ export async function POST(request: NextRequest) {
         firstName: profile.first_name,
         lastName: profile.last_name,
         role: profile.role,
-        organisationType: profile.organisations?.organisation_type,
-        organisationName: profile.organisations?.name
+        organisationType: (profile.organisations as any)?.organisation_type,
+        organisationName: (profile.organisations as any)?.name
       }
     })
   } catch (error) {

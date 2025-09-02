@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
-import { cookies } from 'next/headers'
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies()
     const supabase = createSupabaseServerClient()
     const supabaseAdmin = createSupabaseServiceClient() // Use service client for admin operations
     
@@ -43,7 +41,7 @@ export async function POST(request: NextRequest) {
     
     const organizationId = profile.organisation_id
     const organizationUnitId = profile.organisation_unit_id // Get the actual unit ID
-    const familyId = profile.family_id
+    const familyId = (profile as any).family_id
     
     if (!organizationId || !familyId) {
       return NextResponse.json(
@@ -137,8 +135,8 @@ export async function POST(request: NextRequest) {
         first_name: student.firstName,
         last_name: '',
         grade_level: student.gradeLevel,
-        role: 'student',
-        active_role: 'student',
+        role: 'student' as const,
+        active_role: 'student' as const,
         organisation_id: organizationId,
         organisation_unit_id: unitId, // Use the correct unit ID
         family_id: familyId,
@@ -146,8 +144,8 @@ export async function POST(request: NextRequest) {
         onboarding_completed: true,
         is_sub_account: true, // Flag to indicate this is a sub-account
         parent_account_id: user.id, // Link to parent account
-        additional_roles: JSON.stringify(['student'])
-      }
+        additional_roles: ['student'] // Use array for JSON field
+      } as any
       
       console.log('Profile payload:', profilePayload)
       
@@ -170,7 +168,7 @@ export async function POST(request: NextRequest) {
       console.log('Created profile:', profileData)
       
       // Link student to family
-      const { error: linkError } = await supabase
+      const { error: linkError } = await (supabase as any)
         .from('family_students')
         .insert({
           family_id: familyId,

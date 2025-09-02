@@ -304,15 +304,15 @@ async function calculateOrderIndex(
 
     if (!referenceItemId) {
       // No reference item, append to end
-      const maxOrder = Math.max(...sections.map(s => s.order_index || 0));
+      const maxOrder = Math.max(...sections.map((s: any) => s.order_index || 0));
       return maxOrder + 1;
     }
 
     // Find the reference section
-    const referenceSection = sections.find(s => s.id === referenceItemId);
+    const referenceSection = sections.find((s: any) => s.id === referenceItemId);
     if (!referenceSection) {
       // Reference not found, append to end
-      const maxOrder = Math.max(...sections.map(s => s.order_index || 0));
+      const maxOrder = Math.max(...sections.map((s: any) => s.order_index || 0));
       return maxOrder + 1;
     }
 
@@ -396,8 +396,8 @@ export async function POST(request: NextRequest) {
       base_class_id: lessonContextData.paths.base_classes.id,
       base_class_name: lessonContextData.paths.base_classes.name,
       base_class_description: lessonContextData.paths.base_classes.description,
-      base_class_subject: lessonContextData.paths.base_classes.settings?.subject,
-      base_class_gradeLevel: lessonContextData.paths.base_classes.settings?.gradeLevel,
+      base_class_subject: (lessonContextData.paths.base_classes.settings as any)?.subject,
+      base_class_gradeLevel: (lessonContextData.paths.base_classes.settings as any)?.gradeLevel,
       organisation_id: lessonContextData.paths.base_classes.organisation_id
     };
 
@@ -432,7 +432,7 @@ export async function POST(request: NextRequest) {
     const sectionContent = generatedSection;
 
     // Insert the new section
-    const { data: insertedSection, error: insertError } = await supabase
+    const { data: insertedSection, error: insertError } = await (supabase as any)
       .from('lesson_sections')
       .insert({
         lesson_id: lessonId,
@@ -453,7 +453,7 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    console.log(`Successfully generated and saved lesson section: ${generatedSection.title} for lesson ${lessonId}`);
+    console.log(`Successfully generated and saved lesson section: ${generatedSection.sectionTitle} for lesson ${lessonId}`);
 
     return NextResponse.json({
       message: 'Lesson section generated successfully',

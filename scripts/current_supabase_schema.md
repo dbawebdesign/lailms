@@ -1,6 +1,24 @@
 # Current Supabase Schema
 
-## Latest Updates (Assessment Questions & Delete Functionality)
+## Latest Updates (User Deletion CASCADE Fixes & Assessment Questions)
+
+### User Deletion CASCADE Fixes (2025-02-09)
+Fixed foreign key constraints to prevent user deletion errors by updating the following constraints:
+
+**CASCADE DELETE (data will be deleted with user):**
+- `documents.uploaded_by` → `auth.users.id` - Documents uploaded by user will be deleted
+- All other user-owned content (study spaces, notes, etc.) already had CASCADE delete
+
+**SET NULL (data preserved, user reference nullified):**
+- `lesson_media_assets.created_by` → `auth.users.id` - Media assets preserved, creator set to NULL
+- `course_outlines.user_id` → `auth.users.id` - Course outlines preserved, creator set to NULL  
+- `knowledge_base_analyses.user_id` → `auth.users.id` - Analyses preserved, creator set to NULL
+- `generated_lesson_content.user_id` → `auth.users.id` - Generated content preserved, creator set to NULL
+- `course_generation_jobs.user_id` → `auth.users.id` - Generation jobs preserved, creator set to NULL
+
+This resolves the error: `ERROR: null value in column "uploaded_by" of relation "documents" violates not-null constraint` that was preventing user deletion from the Supabase admin panel.
+
+## Previous Updates (Assessment Questions & Delete Functionality)
 
 ### Assessment Questions Answer Key Validation (2025-01-31)
 The `assessment_questions` table has a check constraint `valid_answer_key` that validates the structure of the `answer_key` JSONB field based on the question type:

@@ -77,8 +77,8 @@ export function FamilyStudentSelector({
       if (!profile) return;
 
       // Check if this is a homeschool organization
-      const isHomeschool = profile.organisations?.organisation_type === 'individual_family' || 
-                          profile.organisations?.organisation_type === 'homeschool_coop';
+      const isHomeschool = (profile.organisations as any)?.organisation_type === 'individual_family' || 
+                          (profile.organisations as any)?.organisation_type === 'homeschool_coop';
 
       if (!isHomeschool) {
         // Not a homeschool account, no family students to show

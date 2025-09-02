@@ -107,8 +107,6 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
         name: '',
         startDate: undefined,
         endDate: undefined,
-        period: '',
-        capacity: undefined,
       });
       setSelectedStudents([]);
 

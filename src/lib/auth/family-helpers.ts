@@ -39,15 +39,15 @@ export async function getActiveProfile() {
         .single()
       
       if (currentProfile) {
-        const sameFamily = (currentProfile.family_id && subProfile.family_id === currentProfile.family_id) ||
-                          (currentProfile.organisation_id && subProfile.organisation_id === currentProfile.organisation_id)
+        const sameFamily = ((currentProfile as any).family_id && (subProfile as any).family_id === (currentProfile as any).family_id) ||
+                          ((currentProfile as any).organisation_id && (subProfile as any).organisation_id === (currentProfile as any).organisation_id)
         
         if (sameFamily) {
           console.log('Found valid sub-account profile:', subProfile)
           return {
             profile: subProfile,
             isSubAccount: true,
-            parentId: subProfile.parent_account_id
+            parentId: (subProfile as any).parent_account_id
           }
         } else {
           console.warn('Sub-account does not belong to current user family, clearing cookie')

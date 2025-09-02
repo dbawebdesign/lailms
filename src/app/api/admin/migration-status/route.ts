@@ -2,6 +2,17 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
+interface Migration {
+  status: 'completed' | 'pending' | 'failed'
+  created_at: string
+  completed_at?: string
+}
+
+interface AuthUser {
+  id: string
+  email: string
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Check if user is admin
@@ -41,7 +52,7 @@ export async function GET(request: NextRequest) {
 
 async function getMigrationStats(supabase: any) {
   // Get total users needing migration
-  const { data: authUsers } = await supabase
+  const { data: authUsers }: { data: AuthUser[] | null } = await supabase
     .from('auth.users')
     .select('id, email')
     .like('email', '%@%.internal')
@@ -49,7 +60,7 @@ async function getMigrationStats(supabase: any) {
   const needsMigration = authUsers?.length || 0
 
   // Get migration progress
-  const { data: migrations } = await supabase
+  const { data: migrations }: { data: Migration[] | null } = await supabase
     .from('account_migrations')
     .select('status, created_at, completed_at')
 
@@ -58,12 +69,12 @@ async function getMigrationStats(supabase: any) {
   const failed = migrations?.filter(m => m.status === 'failed').length || 0
 
   // Calculate average migration time
-  const completedMigrations = migrations?.filter(m => m.status === 'completed' && m.completed_at)
+  const completedMigrations = migrations?.filter((m: Migration) => m.status === 'completed' && m.completed_at)
   let avgMigrationTime = 0
   if (completedMigrations && completedMigrations.length > 0) {
-    const totalTime = completedMigrations.reduce((acc, m) => {
+    const totalTime = completedMigrations.reduce((acc: number, m: Migration) => {
       const start = new Date(m.created_at).getTime()
-      const end = new Date(m.completed_at).getTime()
+      const end = new Date(m.completed_at!).getTime()
       return acc + (end - start)
     }, 0)
     avgMigrationTime = Math.round(totalTime / completedMigrations.length / 1000 / 60) // in minutes
@@ -79,7 +90,7 @@ async function getMigrationStats(supabase: any) {
         organisation_type
       )
     `)
-    .in('user_id', authUsers?.map(u => u.id) || [])
+    .in('user_id', authUsers?.map((u: AuthUser) => u.id) || [])
 
   const byOrganization = orgBreakdown?.reduce((acc: any, p: any) => {
     const orgName = p.organisations?.name || 'Unknown'
@@ -98,7 +109,7 @@ async function getMigrationStats(supabase: any) {
   const { data: roleBreakdown } = await supabase
     .from('profiles')
     .select('role')
-    .in('user_id', authUsers?.map(u => u.id) || [])
+    .in('user_id', authUsers?.map((u: AuthUser) => u.id) || [])
 
   const byRole = roleBreakdown?.reduce((acc: any, p: any) => {
     const role = p.role || 'unknown'
@@ -119,7 +130,7 @@ async function getMigrationStats(supabase: any) {
       byOrganization: Object.values(byOrganization || {}),
       byRole
     },
-    recentMigrations: migrations?.slice(0, 10).map((m: any) => ({
+    recentMigrations: migrations?.slice(0, 10).map((m: Migration) => ({
       status: m.status,
       createdAt: m.created_at,
       completedAt: m.completed_at

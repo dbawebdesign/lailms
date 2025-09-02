@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
           console.log('Created shadow auth with ID:', studentId)
           
           // Create student profile linked to the shadow auth account
-          const { data: profileData, error: profileError } = await supabase
+          const { data: profileData, error: profileError } = await (supabase as any)
             .from('profiles')
             .insert({
               user_id: studentId, // Using the auth user ID
@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
           console.log('Created student profile:', profileData)
 
           // Link student to family
-          const { error: linkError } = await supabase
+          const { error: linkError } = await (supabase as any)
             .from('family_students')
             .insert({
               family_id: familyId,
@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Update onboarding step
-        await supabase
+        await (supabase as any)
           .from('profiles')
           .update({ 
             onboarding_step: 'payment',
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
 
       case 'complete_onboarding': {
         // Mark onboarding as complete
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('profiles')
           .update({ 
             onboarding_completed: true,

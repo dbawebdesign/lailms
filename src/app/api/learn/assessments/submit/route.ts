@@ -201,7 +201,7 @@ export async function PUT(request: NextRequest) {
         
         // Use ProgressService to update assessment progress, which will also update class instance progress
         const hierarchicalService = new HierarchicalProgressService(true);
-        const progressService = new ProgressService(user.id, supabase, hierarchicalService);
+        const progressService = new ProgressService(profile.user_id, supabase, hierarchicalService);
         await progressService.updateAssessmentProgress(attempt.assessment_id, {
           status: progressStatus,
           progressPercentage: progressPercentage,

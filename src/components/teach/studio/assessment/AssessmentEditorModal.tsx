@@ -419,7 +419,7 @@ export function AssessmentEditorModal({ isOpen, onClose, assessment, onSave }: A
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          const newAnswers = (question.answer_key?.acceptable_answers || ['']).filter((_, i) => i !== index);
+                          const newAnswers = (question.answer_key?.acceptable_answers || ['']).filter((_: any, i: number) => i !== index);
                           updateQuestion(question.id, {
                             answer_key: { acceptable_answers: newAnswers }
                           });

@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify password with pseudo-email
-    const pseudoEmail = `${username}@${profile.organisations.abbr}.internal`
+    const pseudoEmail = `${username}@${(profile.organisations as any).abbr}.internal`
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email: pseudoEmail,
       password
@@ -122,8 +122,8 @@ export async function POST(request: NextRequest) {
         firstName: profile.first_name,
         lastName: profile.last_name,
         role: profile.role,
-        organisationType: profile.organisations.organisation_type,
-        organisationName: profile.organisations.name
+        organisationType: (profile.organisations as any).organisation_type,
+        organisationName: (profile.organisations as any).name
       }
     })
   } catch (error) {

@@ -180,10 +180,10 @@ export default function FamilyAccountSwitcher() {
                 
               const formattedMember: FamilyMember = {
                 id: fs.student_id,
-                firstName: fs.profiles.first_name || 'Student',
-                lastName: fs.profiles.last_name || '',
+                firstName: (fs.profiles as any).first_name || 'Student',
+                lastName: (fs.profiles as any).last_name || '',
                 role: 'student',
-                gradeLevel: fs.profiles.grade_level,
+                gradeLevel: (fs.profiles as any).grade_level,
                 isCurrent
               }
               
