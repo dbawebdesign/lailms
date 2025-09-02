@@ -1128,6 +1128,109 @@ async function extractTranscriptFromYouTube(url: string): Promise<{ transcript?:
 
 // Note: Alternative transcript methods removed - using LangChain YoutubeLoader instead
 
+// Helper: Extract text from image using GPT-4.1-mini vision
+async function extractTextFromImage(filePath: string, supabase: SupabaseClient, bucketName: string, openaiApiKey: string): Promise<string> {
+  console.log(`Attempting to extract text from image: ${filePath} in bucket ${bucketName}`);
+  try {
+    const { data: imageFileData, error: downloadError } = await supabase.storage
+      .from(bucketName)
+      .download(filePath);
+
+    if (downloadError || !imageFileData) {
+      throw new Error(`Failed to download image file ${filePath} from storage: ${downloadError?.message}`);
+    }
+
+    // Convert image to base64
+    const arrayBuffer = await imageFileData.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    const base64String = btoa(String.fromCharCode(...uint8Array));
+    
+    // Determine image type from file extension or content type
+    const fileExtension = filePath.split('.').pop()?.toLowerCase();
+    let mimeType = 'image/jpeg'; // default
+    
+    switch (fileExtension) {
+      case 'png':
+        mimeType = 'image/png';
+        break;
+      case 'gif':
+        mimeType = 'image/gif';
+        break;
+      case 'webp':
+        mimeType = 'image/webp';
+        break;
+      case 'jpg':
+      case 'jpeg':
+      default:
+        mimeType = 'image/jpeg';
+        break;
+    }
+
+    console.log(`Processing image with GPT-4.1-mini vision API, type: ${mimeType}, size: ${uint8Array.length} bytes`);
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiApiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini', // Use gpt-4o-mini which supports vision
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Please extract all visible text from this image. Include any text from documents, signs, handwriting, captions, or any other readable content. Preserve the structure and formatting as much as possible. If there are multiple columns or sections, maintain their organization. If no text is visible, respond with "No readable text found in this image."'
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:${mimeType};base64,${base64String}`,
+                  detail: 'high' // Use high detail for better text extraction
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 4000,
+        temperature: 0.1 // Low temperature for consistent text extraction
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error('GPT-4.1-mini vision API error response:', errorBody);
+      throw new Error(`GPT-4.1-mini vision API request failed with status ${response.status}: ${errorBody}`);
+    }
+
+    const result = await response.json();
+    
+    if (!result.choices || !result.choices[0] || !result.choices[0].message || !result.choices[0].message.content) {
+      console.error('GPT-4.1-mini vision API returned invalid response:', result);
+      throw new Error('GPT-4.1-mini vision API did not return valid text content.');
+    }
+
+    const extractedText = result.choices[0].message.content.trim();
+    
+    // Check if no text was found
+    if (extractedText.toLowerCase().includes('no readable text found') || 
+        extractedText.toLowerCase().includes('no text visible') ||
+        extractedText.length < 10) {
+      console.warn(`No readable text found in image ${filePath}`);
+      throw new Error('No readable text content found in this image. The image may contain only graphics, be too blurry, or have text that is not clearly visible.');
+    }
+
+    console.log(`Successfully extracted text from image ${filePath}. Text length: ${extractedText.length}`);
+    return extractedText;
+    
+  } catch (error) {
+    console.error(`Error extracting text from image ${filePath}:`, error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to extract text from image ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 async function transcribeAudio(filePath: string, supabase: SupabaseClient, bucketName: string, openaiApiKey: string): Promise<string> {
   console.log(`Attempting to transcribe audio: ${filePath} in bucket ${bucketName}`);
   try {
@@ -1693,6 +1796,13 @@ serve(async (req: Request) => {
       extractedText = await transcribeAudio(storagePath, supabaseClient, bucketName, openaiApiKey);
       extractedText = sanitizeTextForDatabase(extractedText);
       docMetadata.source_type = 'audio_transcript';
+    } else if (fileType.startsWith('image/')) {
+      // Handle image processing with GPT-4.1-mini vision
+      console.log(`PROCESS-DOCUMENT: Processing image: ${document.file_name}`);
+      extractedText = await extractTextFromImage(storagePath, supabaseClient, bucketName, openaiApiKey);
+      extractedText = sanitizeTextForDatabase(extractedText);
+      docMetadata.source_type = 'image_text_extraction';
+      console.log(`PROCESS-DOCUMENT: Successfully extracted ${extractedText.length} characters from image ${documentId}`);
     } else if (fileType === 'application/pdf') {
       try {
         console.log(`Starting PDF extraction for document: ${documentId}, file: ${storagePath}`);
@@ -1830,6 +1940,8 @@ serve(async (req: Request) => {
       documentType = 'txt';
     } else if (fileType?.startsWith('audio/')) {
       documentType = 'audio';
+    } else if (fileType?.startsWith('image/')) {
+      documentType = 'txt'; // Treat images as text for chunking purposes since we extracted text
     } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileType === 'application/msword') {
       documentType = 'txt'; // Treat Word documents as text for chunking purposes
     } else {

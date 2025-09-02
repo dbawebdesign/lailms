@@ -110,8 +110,22 @@ export async function POST(request: Request) {
           bucketName,
           { 
             public: false,
-            allowedMimeTypes: ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
-            fileSizeLimit: 10485760 // 10MB limit
+            allowedMimeTypes: [
+              'application/pdf', 
+              'text/plain', 
+              'application/msword', 
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+              'application/vnd.ms-powerpoint',
+              'text/csv',
+              // Image types for AI text extraction
+              'image/jpeg',
+              'image/jpg', 
+              'image/png',
+              'image/gif',
+              'image/webp'
+            ],
+            fileSizeLimit: 52428800 // 50MB limit (increased from 10MB)
           }
         );
         

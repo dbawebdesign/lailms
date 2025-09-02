@@ -57,6 +57,12 @@ const ACCEPTED_FILE_TYPES = [
   'application/vnd.ms-powerpoint',
   'text/csv',
   'text/plain',
+  // Image types for AI text extraction
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/gif',
+  'image/webp',
 ];
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -187,7 +193,7 @@ export default function StreamlinedCourseCreator({
       if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
         toast({
           title: 'Unsupported file type',
-          description: `"${file.name}" is not supported. Please use PDF, Word, PowerPoint, or text files.`,
+          description: `"${file.name}" is not supported. Please use PDF, Word, PowerPoint, text files, or images.`,
           variant: 'destructive',
         });
         return false;
@@ -483,13 +489,13 @@ export default function StreamlinedCourseCreator({
               Drop files here or click to browse
             </h3>
             <p className="text-muted-foreground">
-              PDF, Word, or text files up to 50MB each
+              PDF, Word, text files, or images up to 50MB each
             </p>
             <input
               ref={fileInputRef}
               type="file"
               multiple
-              accept=".pdf,.docx,.doc,.txt,.csv"
+              accept=".pdf,.docx,.doc,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp"
               className="hidden"
               onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
             />
