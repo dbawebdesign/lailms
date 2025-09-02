@@ -16,8 +16,7 @@ import AnimatedGridBackground from '@/components/layout/AnimatedGridBackground';
  */
 
 // FirstPromoter affiliate signup portal URL
-// Based on client ID "z8op3lgw" from fprmain.js
-const FIRST_PROMOTER_URL = "https://firstpromoter.com/signup/z8op3lgw"; 
+const FIRST_PROMOTER_URL = "https://learnologyai.firstpromoter.com/signup"; 
 
 // Program constants
 const PRICE_PER_MONTH = 40; // Learnology AI monthly price
