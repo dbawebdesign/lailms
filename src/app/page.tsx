@@ -3,17 +3,15 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, CheckCircle, Zap, Users, BookOpen, Brain, TrendingUp, Shield, Star, Play, ChevronRight, GraduationCap, Home, School, Sparkles, Target, Award, Lightbulb, MessageCircle, Menu, X, Facebook, Instagram, Linkedin, Video } from 'lucide-react'
+import { ArrowRight, CheckCircle, Zap, Users, BookOpen, Brain, TrendingUp, Shield, Star, Play, ChevronRight, Home, Sparkles, Target, Award, Lightbulb, MessageCircle, Menu, X, Facebook, Instagram, Linkedin, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ShinyButton } from '@/components/ui/shiny-button'
 import AnimatedGridBackground from '@/components/layout/AnimatedGridBackground'
 import { ContactModal } from '@/components/ui/ContactModal'
-import { VideoModal } from '@/components/ui/VideoModal'
 import QuickGuideModal from '@/components/layout/QuickGuideModal'
 
 export default function LandingPage() {
   const [isContactModalOpen, setIsContactModalOpen] = useState(false)
-  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isQuickGuideOpen, setIsQuickGuideOpen] = useState(false)
 
@@ -123,7 +121,6 @@ export default function LandingPage() {
             className="h-8 w-auto"
           />
           <div className="hidden md:flex items-center space-x-6 text-sm">
-            <Link href="#k12-college" className="text-gray-300 hover:text-white transition-colors">K-12 & College</Link>
             <Link href="#homeschool" className="text-gray-300 hover:text-white transition-colors">Homeschool</Link>
             <Link href="#features" className="text-gray-300 hover:text-white transition-colors">Features</Link>
             <Link href="#pricing" className="text-gray-300 hover:text-white transition-colors">Pricing</Link>
@@ -157,13 +154,6 @@ export default function LandingPage() {
       {isMobileMenuOpen && (
         <div className="md:hidden fixed top-[73px] left-0 right-0 bg-black border-b border-gray-800 z-40">
           <div className="flex flex-col py-4 px-6 space-y-4">
-            <Link 
-              href="#k12-college" 
-              className="text-gray-300 hover:text-white transition-colors py-2"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              K-12 & College
-            </Link>
             <Link 
               href="#homeschool" 
               className="text-gray-300 hover:text-white transition-colors py-2"
@@ -272,7 +262,7 @@ export default function LandingPage() {
           <ShinyButton 
             className="px-8 py-3 flex items-center opacity-0" 
             style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.4s'}}
-            onClick={() => setIsVideoModalOpen(true)}
+            onClick={() => setIsQuickGuideOpen(true)}
           >
             <Play className="mr-2 h-4 w-4" />
             Watch Demo
@@ -302,79 +292,7 @@ export default function LandingPage() {
         <div id="mouse-gradient" className="fixed pointer-events-none w-96 h-96 bg-gradient-radial from-[#6B5DE5]/10 to-transparent rounded-full blur-3xl transition-all duration-500 ease-out opacity-0"></div>
       </section>
 
-      {/* K-12 & College Section */}
-      <section id="k12-college" className="relative px-6 py-20 bg-gray-900/50">
-        <AnimatedGridBackground 
-          opacity={0.04}
-          patternId="k12-grid"
-          showFloatingElements={false}
-          showCornerElements={false}
-          showDetailDots={false}
-        />
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center mb-16">
-            <div className="flex items-center justify-center mb-4">
-              <GraduationCap className="w-8 h-8 text-[#6B5DE5] mr-3" />
-              <h2 className="text-4xl font-bold">K-12 & College Education</h2>
-            </div>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Revolutionize institutional learning with AI-powered personalization, intelligent content generation, and adaptive assessments that scale with your educational needs.
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-            <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#6B5DE5]/50 transition-colors">
-              <Brain className="w-12 h-12 text-[#6B5DE5] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Intelligent Course Generation</h3>
-              <p className="text-gray-300">Transform any curriculum document into complete courses with lessons, assessments, and multimedia content in minutes, not months.</p>
-            </div>
-            
-            <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#E45DE5]/50 transition-colors">
-              <TrendingUp className="w-12 h-12 text-[#E45DE5] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Adaptive Learning Paths</h3>
-              <p className="text-gray-300">AI analyzes student performance in real-time, adjusting difficulty and pacing to ensure every learner succeeds at their optimal level.</p>
-            </div>
-            
-            <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#FF835D]/50 transition-colors">
-              <Users className="w-12 h-12 text-[#FF835D] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Collaborative Learning</h3>
-              <p className="text-gray-300">AI-powered group formation and project management that matches students for optimal peer learning and academic success.</p>
-            </div>
-            
-            <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#6B5DE5]/50 transition-colors">
-              <Target className="w-12 h-12 text-[#6B5DE5] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Predictive Analytics</h3>
-              <p className="text-gray-300">Identify at-risk students early and provide targeted interventions to improve retention and academic outcomes.</p>
-            </div>
-            
-            <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#E45DE5]/50 transition-colors">
-              <CheckCircle className="w-12 h-12 text-[#E45DE5] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Automated Grading</h3>
-              <p className="text-gray-300">AI-powered assessment that provides instant feedback on assignments, essays, and complex projects with detailed rubrics.</p>
-            </div>
-            
-            <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#FF835D]/50 transition-colors">
-              <Shield className="w-12 h-12 text-[#FF835D] mb-4" />
-              <h3 className="text-xl font-bold mb-3">FERPA Compliance</h3>
-              <p className="text-gray-300">Built-in privacy protection and data security that meets all educational regulations and institutional requirements.</p>
-            </div>
-          </div>
 
-          <div className="bg-gradient-to-r from-[#6B5DE5]/10 to-[#E45DE5]/10 rounded-2xl p-8 text-center">
-            <h3 className="text-2xl font-bold mb-4">Ready to Transform Your Institution?</h3>
-            <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
-              Join leading educational institutions that have reduced course development time by 75% while improving student outcomes.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="https://calendly.com/zjones-learnologyai/learnology-ai-demo?month=2025-07" target="_blank" rel="noopener noreferrer">
-                <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity">
-                  Schedule Demo
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* Homeschool Section */}
       <section id="homeschool" className="relative px-6 py-20">
@@ -440,7 +358,7 @@ export default function LandingPage() {
               Join thousands of homeschool families who have discovered the power of AI-personalized education that grows with their children.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="https://buy.stripe.com/eVa9Ce5AmaJm4py288" target="_blank" rel="noopener noreferrer">
+              <Link href="/signup">
                 <Button className="bg-gradient-to-r from-[#E45DE5] via-[#FF835D] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity">
                   Get started today
                 </Button>
@@ -461,8 +379,8 @@ export default function LandingPage() {
         />
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">AI-Native Features That Transform Learning</h2>
-            <p className="text-xl text-gray-300">Powered by advanced AI that understands education at every level</p>
+            <h2 className="text-4xl font-bold mb-4">AI-Native Features That Transform Homeschool Learning</h2>
+            <p className="text-xl text-gray-300">Powered by advanced AI designed specifically for homeschool families</p>
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -487,19 +405,19 @@ export default function LandingPage() {
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#6B5DE5]/50 transition-colors">
               <BookOpen className="w-12 h-12 text-[#6B5DE5] mb-4" />
               <h3 className="text-xl font-bold mb-3">Smart Knowledge Base</h3>
-              <p className="text-gray-300">Secure document ingestion with automatic chunking, embeddings, and AI-powered content discovery across your institution.</p>
+              <p className="text-gray-300">Secure document ingestion with automatic chunking, embeddings, and AI-powered content discovery for your homeschool curriculum.</p>
             </div>
             
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#E45DE5]/50 transition-colors">
               <Users className="w-12 h-12 text-[#E45DE5] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Intelligent Collaboration</h3>
-              <p className="text-gray-300">AI-moderated group projects, peer matching, and intelligent discussion facilitation for enhanced social learning.</p>
+              <h3 className="text-xl font-bold mb-3">Family Learning Support</h3>
+              <p className="text-gray-300">AI-powered tools to help parents track multiple children's progress, coordinate learning activities, and connect with other homeschool families.</p>
             </div>
             
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#FF835D]/50 transition-colors">
               <Shield className="w-12 h-12 text-[#FF835D] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Enterprise Security</h3>
-              <p className="text-gray-300">Tenant-isolated AI environments, FERPA/GDPR compliance, and comprehensive audit logging for institutional trust.</p>
+              <h3 className="text-xl font-bold mb-3">Privacy & Security</h3>
+              <p className="text-gray-300">Secure, family-focused AI environments with privacy protection and data security designed specifically for homeschool families.</p>
             </div>
           </div>
         </div>
@@ -745,7 +663,7 @@ export default function LandingPage() {
               Simple, Transparent Pricing
             </h2>
             <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              Choose the plan that best fits your family's or organization's needs. All plans come with 
+              Choose the plan that best fits your family's needs. All plans come with 
               our full suite of AI-powered learning tools.
             </p>
           </div>
@@ -786,7 +704,7 @@ export default function LandingPage() {
                     <span className="text-sm">Full access to all features</span>
                   </li>
                 </ul>
-                <Link href="/homeschool-signup">
+                <Link href="/signup">
                   <Button className="w-full bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white py-3 rounded-lg hover:opacity-90 transition-opacity">
                     Get started today
                   </Button>
@@ -820,7 +738,7 @@ export default function LandingPage() {
                     <span className="text-sm">Full access to all features</span>
                   </li>
                 </ul>
-                <Link href="/homeschool-signup">
+                <Link href="/signup">
                   <Button className="w-full bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white py-3 rounded-lg hover:opacity-90 transition-opacity">
                     Get started today
                   </Button>
@@ -829,77 +747,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* K-12 & College Pricing */}
-          <div className="border-t border-gray-800 pt-20">
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] p-0.5 rounded-full mb-4">
-                <div className="bg-black rounded-full px-6 py-2 flex items-center space-x-2">
-                  <School className="w-5 h-5 text-white" />
-                  <span className="text-white font-semibold">Organizations</span>
-                </div>
-              </div>
-              <p className="text-gray-400 max-w-2xl mx-auto">
-                For school districts, schools, colleges, businesses, government, and other organizations
-              </p>
-            </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-              <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-6 border border-gray-700 text-center">
-                <div className="mb-4">
-                  <Users className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-                  <h3 className="text-lg font-semibold">Less than 500 users</h3>
-                </div>
-                <div className="mb-4">
-                  <span className="text-3xl font-bold">$6</span>
-                  <span className="text-gray-400">/user/month</span>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-6 border border-gray-700 text-center">
-                <div className="mb-4">
-                  <Users className="w-8 h-8 text-green-500 mx-auto mb-2" />
-                  <h3 className="text-lg font-semibold">500-999 users</h3>
-                </div>
-                <div className="mb-4">
-                  <span className="text-3xl font-bold">$5</span>
-                  <span className="text-gray-400">/user/month</span>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-6 border border-gray-700 text-center">
-                <div className="mb-4">
-                  <Users className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-                  <h3 className="text-lg font-semibold">1000-2499 users</h3>
-                </div>
-                <div className="mb-4">
-                  <span className="text-3xl font-bold">$4</span>
-                  <span className="text-gray-400">/user/month</span>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-6 border border-gray-700 text-center">
-                <div className="mb-4">
-                  <Users className="w-8 h-8 text-orange-500 mx-auto mb-2" />
-                  <h3 className="text-lg font-semibold">2500+ users</h3>
-                </div>
-                <div className="mb-4">
-                  <span className="text-3xl font-bold">$3</span>
-                  <span className="text-gray-400">/user/month</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="text-center mt-12">
-              <p className="text-gray-400 mb-6">
-                Ready to transform your organization's learning experience?
-              </p>
-              <Link href="mailto:zjones@learnologyai.com?subject=Sales%20Inquiry&body=Hi%20there,%0D%0A%0D%0AI'm%20interested%20in%20learning%20more%20about%20Learnology%20AI%20for%20my%20organization.%20Please%20contact%20me%20to%20discuss%20pricing%20and%20features.%0D%0A%0D%0AThank%20you!">
-                <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity">
-                  Contact Sales
-                </Button>
-              </Link>
-            </div>
-          </div>
 
           {/* FAQ Section */}
           <div className="border-t border-gray-800 pt-20 mt-20">
@@ -1008,7 +856,7 @@ export default function LandingPage() {
             <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700 hover:border-gray-600 transition-all duration-200 ease-in-out">
               <div className="flex items-center mb-6">
                 <div className="bg-gradient-to-r from-[#6B5DE5] to-[#FF835D] p-4 rounded-xl mr-4">
-                  <GraduationCap className="w-6 h-6 text-white" />
+                  <Home className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-xl font-semibold">For Parents</h3>
               </div>
@@ -1096,7 +944,6 @@ export default function LandingPage() {
               <div className="space-y-4">
                 <h4 className="font-semibold text-white">Solutions</h4>
                 <div className="space-y-2 text-sm text-gray-400">
-                  <div><Link href="#k12-college" className="hover:text-white transition-colors">K-12 & College</Link></div>
                   <div><Link href="#homeschool" className="hover:text-white transition-colors">Homeschool</Link></div>
                   <div><Link href="#features" className="hover:text-white transition-colors">Features</Link></div>
                   <div><Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link></div>
@@ -1173,15 +1020,6 @@ export default function LandingPage() {
       <ContactModal 
         isOpen={isContactModalOpen} 
         onClose={() => setIsContactModalOpen(false)} 
-      />
-
-      <VideoModal
-        isOpen={isVideoModalOpen}
-        onClose={() => setIsVideoModalOpen(false)}
-        videoUrl="Course generation - Made with Clipchamp_1752574974128.mp4"
-        title="Course Generation Demo"
-        description="Watch how to create comprehensive courses in minutes using our AI-powered course generation system."
-        autoplay={true}
       />
 
       <QuickGuideModal
