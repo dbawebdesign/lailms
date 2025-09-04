@@ -39,7 +39,7 @@ export const assignmentService = {
       .select('*')
       .eq('class_instance_id', classInstanceId)
       .order('order_index', { ascending: true })
-      .order('due_date', { ascending: true, nullsLast: true })
+      .order('due_date', { ascending: true })
       .order('created_at', { ascending: true })
 
     if (error) throw error
@@ -106,7 +106,7 @@ export const assignmentService = {
       `)
       .eq('class_instance_id', classInstanceId)
       .order('order_index', { ascending: true })
-      .order('due_date', { ascending: true, nullsLast: true })
+      .order('due_date', { ascending: true })
       .order('created_at', { ascending: true })
 
     if (error) throw error

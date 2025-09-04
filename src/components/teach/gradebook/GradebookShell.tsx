@@ -87,6 +87,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
       published: assignment.published,
       description: assignment.description,
       category: assignment.category,
+      order_index: assignment.order_index,
       created_at: assignment.created_at,
       updated_at: assignment.updated_at,
       class_instance_id: assignment.class_instance_id,
