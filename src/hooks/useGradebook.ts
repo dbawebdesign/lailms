@@ -203,7 +203,7 @@ export function useGradebook(classInstanceId: string): UseGradebookReturn {
       }, {} as Record<string, Grade>);
 
       console.log('📥 Loading fresh data from database:', {
-        assignmentsFromDB: (result.assignments || []).map((a: Assignment, i) => ({ 
+        assignmentsFromDB: (result.assignments || []).map((a: Assignment, i: number) => ({ 
           pos: i, 
           name: a.name, 
           order_index: a.order_index,
