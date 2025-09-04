@@ -74,7 +74,7 @@ export async function GET(
       .select('*')
       .eq('class_instance_id', instanceId)
       .order('order_index', { ascending: true })
-      .order('due_date', { ascending: true, nullsLast: true })
+      .order('due_date', { ascending: true })
       .order('created_at', { ascending: true });
 
     if (assignmentsError) {
