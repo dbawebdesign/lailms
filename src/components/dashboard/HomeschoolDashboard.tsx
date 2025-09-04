@@ -298,6 +298,41 @@ export default function HomeschoolDashboard({
       ) : (
         /* Existing User Layout - Has Base Classes */
         <div className="space-y-6">
+          {/* Quick Actions - Positioned at top for easy access */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white">
+                  <Link href="/teach/knowledge-base/create">
+                    <BookOpen className="h-8 w-8 hover-icon text-blue-600" />
+                    <span className="text-sm font-medium">Create Course</span>
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white">
+                  <Link href="/homeschool/add-students">
+                    <Users className="h-8 w-8 hover-icon text-green-600" />
+                    <span className="text-sm font-medium">Add Students</span>
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white">
+                  <Link href="/teach/gradebook">
+                    <GraduationCap className="h-8 w-8 hover-icon text-purple-600" />
+                    <span className="text-sm font-medium">View Gradebook</span>
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white">
+                  <Link href="/teach/tools">
+                    <Settings className="h-8 w-8 hover-icon text-orange-600" />
+                    <span className="text-sm font-medium">Teacher Tools</span>
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card className="hover-card cursor-pointer hover-bg-light">
@@ -325,8 +360,6 @@ export default function HomeschoolDashboard({
             </Card>
           </div>
 
-
-
           {/* Students Section */}
           <Card>
             <CardHeader>
@@ -343,8 +376,14 @@ export default function HomeschoolDashboard({
                     No students yet
                   </h3>
                   <p className="text-neutral-500 dark:text-neutral-400 mb-4">
-                    Students will appear here once they join using invite codes
+                    Add students to get started with your homeschool
                   </p>
+                  <Button asChild variant="outline">
+                    <Link href="/homeschool/add-students">
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Add Your First Student
+                    </Link>
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -375,35 +414,6 @@ export default function HomeschoolDashboard({
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
-                  <Link href="/teach/knowledge-base/create">
-                    <BookOpen className="h-8 w-8 hover-icon" />
-                    <span className="text-sm font-medium">Create Course</span>
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
-                  <Link href="/teach/gradebook">
-                    <GraduationCap className="h-8 w-8 hover-icon" />
-                    <span className="text-sm font-medium">View Gradebook</span>
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md">
-                  <Link href="/teach/tools">
-                    <Settings className="h-8 w-8 hover-icon" />
-                    <span className="text-sm font-medium">Teacher Tools</span>
-                  </Link>
-                </Button>
-              </div>
             </CardContent>
           </Card>
         </div>

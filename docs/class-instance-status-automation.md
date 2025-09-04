@@ -33,6 +33,27 @@ The system automatically updates class instance statuses based on the current da
 - Ensures status is immediately corrected when dates change
 - Also updates the `updated_at` timestamp
 
+## Automated Daily Updates
+
+### Cron Job
+A PostgreSQL cron job runs daily at 1:00 AM UTC to automatically update all class instance statuses:
+
+```sql
+-- View the scheduled job
+SELECT jobname, schedule, command FROM cron.job WHERE jobname = 'daily-class-status-update';
+```
+
+### Direct Database Function
+```sql
+SELECT daily_class_status_update_direct();
+```
+
+This function:
+- Calls `update_class_instance_status()` to update all statuses
+- Returns a JSON summary of the operation
+- Logs results for monitoring
+- Handles errors gracefully
+
 ## API Endpoints
 
 ### Manual Status Update
@@ -70,6 +91,63 @@ Shows current status analysis without making changes.
 {
   "success": true,
   "data": [
+    {
+      "id": "uuid",
+      "name": "Class Name",
+      "start_date": "2025-08-29",
+      "end_date": "2025-10-03",
+      "status": "active",
+      "shouldBe": "active",
+      "needsUpdate": false
+    }
+  ],
+  "summary": {
+    "total": 25,
+    "needingUpdate": 0,
+    "byStatus": {
+      "active": 15,
+      "upcoming": 0,
+      "completed": 10
+    }
+  }
+}
+```
+
+## Monitoring & Troubleshooting
+
+### Check Cron Job Status
+```sql
+-- View all cron jobs
+SELECT * FROM cron.job;
+
+-- View cron job execution history
+SELECT * FROM cron.job_run_details 
+WHERE jobname = 'daily-class-status-update' 
+ORDER BY start_time DESC 
+LIMIT 10;
+```
+
+### Manual Execution
+If you need to manually trigger the status update:
+
+```sql
+-- Direct database function (recommended)
+SELECT daily_class_status_update_direct();
+
+-- Or use the original function
+SELECT update_class_instance_status();
+```
+
+### Edge Function Alternative
+A Supabase Edge Function `daily-class-status-update` is also available as a backup method, though the direct database approach is more reliable.
+
+## Implementation Notes
+
+- **Automatic**: Runs daily at 1:00 AM UTC via PostgreSQL cron
+- **Reliable**: Uses direct database functions instead of HTTP calls
+- **Monitored**: Returns detailed JSON logs for tracking
+- **Fallback**: Multiple methods available (cron, manual, API, Edge Function)
+- **Safe**: Only updates statuses that actually need changing
     {
       "id": "uuid",
       "name": "Class Name",
