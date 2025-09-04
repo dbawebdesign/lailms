@@ -513,7 +513,7 @@ export default function StreamlinedCourseCreator({
                   className="bg-background border-border focus:border-primary focus:ring-primary"
                 />
                 <p className="text-sm text-muted-foreground mt-2">
-                  Supports PDFs, websites, and YouTube videos
+                  Supports website URL's (Youtube video URL coming soon)
                 </p>
               </div>
               <Button
