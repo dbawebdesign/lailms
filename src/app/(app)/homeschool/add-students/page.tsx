@@ -1,24 +1,107 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Trash2, GraduationCap, Users } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 interface Student {
   firstName: string
   gradeLevel: string
 }
 
+interface ExistingStudent {
+  user_id: string
+  first_name: string | null
+  last_name: string | null
+  grade_level: string | null
+  username: string | null
+}
+
 export default function AddStudentsPage() {
   const [students, setStudents] = useState<Student[]>([{ firstName: '', gradeLevel: '' }])
   const [isLoading, setIsLoading] = useState(false)
   const [createdCredentials, setCreatedCredentials] = useState<any[]>([])
+  const [existingStudents, setExistingStudents] = useState<ExistingStudent[]>([])
+  const [loadingExisting, setLoadingExisting] = useState(true)
   const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    loadExistingStudents()
+  }, [])
+
+  const loadExistingStudents = async () => {
+    try {
+      setLoadingExisting(true)
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Get current user's profile to find family members
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select(`
+          family_id,
+          organisation_id,
+          organisations (
+            organisation_type
+          )
+        `)
+        .eq('user_id', user.id)
+        .single()
+
+      if (!profile) return
+
+      // Check if this is a homeschool organization
+      const isHomeschool = (profile.organisations as any)?.organisation_type === 'individual_family' || 
+                          (profile.organisations as any)?.organisation_type === 'homeschool_coop'
+
+      if (!isHomeschool) {
+        setExistingStudents([])
+        return
+      }
+
+      let students: ExistingStudent[] = []
+
+      // Get family members - try family_id first, then organisation_id
+      if (profile.family_id) {
+        const { data: familyMembers } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name, grade_level, username, role')
+          .eq('family_id', profile.family_id)
+          .eq('role', 'student')
+          .order('first_name')
+        
+        if (familyMembers) {
+          students = familyMembers
+        }
+      } else if (profile.organisation_id) {
+        const { data: orgMembers } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name, grade_level, username, role')
+          .eq('organisation_id', profile.organisation_id)
+          .eq('role', 'student')
+          .order('first_name')
+        
+        if (orgMembers) {
+          students = orgMembers
+        }
+      }
+
+      setExistingStudents(students)
+    } catch (error) {
+      console.error('Error loading existing students:', error)
+    } finally {
+      setLoadingExisting(false)
+    }
+  }
 
   const addStudentField = () => {
     if (students.length < 4) {
@@ -63,6 +146,8 @@ export default function AddStudentsPage() {
       if (result.students && result.students.length > 0) {
         setCreatedCredentials(result.students)
         toast.success('Students created successfully! Save these credentials!')
+        // Refresh the existing students list
+        await loadExistingStudents()
       }
     } catch (error: any) {
       console.error('Error:', error)
@@ -177,6 +262,59 @@ export default function AddStudentsPage() {
                 )}
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Current Students List */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Current Students
+            </CardTitle>
+            <CardDescription>
+              Students currently in your family account
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingExisting ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center space-x-3 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg animate-pulse">
+                    <div className="h-5 w-5 bg-neutral-200 dark:bg-neutral-700 rounded" />
+                    <div className="flex-1">
+                      <div className="h-4 bg-neutral-200 dark:bg-neutral-700 rounded w-32 mb-1" />
+                      <div className="h-3 bg-neutral-200 dark:bg-neutral-700 rounded w-20" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : existingStudents.length > 0 ? (
+              <div className="space-y-3">
+                {existingStudents.map((student) => (
+                  <div key={student.user_id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <GraduationCap className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <p className="font-medium">
+                          {student.first_name} {student.last_name}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {student.grade_level ? `Grade ${student.grade_level}` : 'No grade set'}
+                          {student.username && ` • @${student.username}`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <GraduationCap className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium mb-2">No students yet</p>
+                <p className="text-sm">Add your first student using the form above</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
