@@ -1,0 +1,57 @@
+# LLMs.txt - Learnology AI
+
+## Site Information
+- Site Name: Learnology AI
+- Domain: https://www.learnologyai.com
+- Description: The first fully AI‑powered learning management system that generates complete courses in minutes and adapts to every student, subject, and curriculum.
+- Contact: Available through the contact form on our website
+
+## About Learnology AI
+Learnology AI is an innovative educational technology platform that leverages artificial intelligence to transform how students learn and teachers teach. Our platform offers:
+
+- AI-generated course content that adapts to individual learning styles
+- Personalized learning paths for K-12 education
+- Comprehensive homeschool and traditional school solutions
+- Advanced analytics and progress tracking
+- Interactive AI tutoring with Luna, our educational assistant
+
+## Key Features
+- **Course Generation**: Create complete courses in minutes using AI
+- **Adaptive Learning**: Content that adjusts to each student's pace and understanding
+- **Multi-Role Support**: Designed for students, teachers, administrators, and families
+- **Assessment Tools**: AI-powered grading and feedback systems
+- **Progress Analytics**: Detailed insights into learning outcomes
+- **Collaboration Tools**: Built-in communication and sharing features
+
+## Target Audience
+- K-12 students and educators
+- Homeschooling families and cooperatives
+- Traditional schools and educational institutions
+- Educational administrators and curriculum designers
+
+## Privacy and Data Protection
+We are committed to protecting user privacy and educational data. Our platform complies with relevant educational privacy regulations and maintains strict data security standards.
+
+## Terms and Policies
+- Privacy Policy: https://www.learnologyai.com/privacy-policy
+- Terms of Service: https://www.learnologyai.com/terms-of-service
+- Cookie Policy: https://www.learnologyai.com/cookie-policy
+
+## Content Guidelines
+Our AI-generated educational content is designed to be:
+- Age-appropriate and curriculum-aligned
+- Factually accurate and educationally sound
+- Inclusive and accessible to diverse learners
+- Regularly updated and improved through machine learning
+
+## AI Training Data Usage
+This site contains educational content and user-generated materials that may be used to improve AI educational models, subject to our privacy policy and user consent where required.
+
+## Affiliate Program
+We offer an affiliate program for educators and organizations interested in promoting quality AI-powered education solutions. Details available at: https://www.learnologyai.com/affiliate
+
+## Last Updated
+December 19, 2024
+
+---
+For questions about this file or our AI policies, please contact us through our website.
