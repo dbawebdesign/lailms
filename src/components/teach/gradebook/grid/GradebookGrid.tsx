@@ -388,15 +388,24 @@ export function GradebookGrid({
                   {assignments.filter(a => a.published).map((assignment) => (
                     <th key={assignment.id} className="text-center p-2 w-16 min-w-16 max-w-16 bg-surface/50 relative group border-r border-b border-divider">
                       <div className="space-y-1">
-                        <div className="text-xs font-medium text-foreground truncate max-w-[60px] mx-auto" title={assignment.name}>
+                        <div className="text-xs font-medium text-foreground truncate max-w-[60px] mx-auto cursor-help" title={assignment.name}>
                           {assignment.name}
                         </div>
                         <div className="text-xs text-muted-foreground">{assignment.points_possible}pts</div>
                       </div>
-                      {/* Hover tooltip for full assignment name */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-popover border border-divider rounded-lg shadow-lg text-sm text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-30 max-w-xs">
-                        <div className="break-words">{assignment.name}</div>
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-popover"></div>
+                      {/* Enhanced hover tooltip for full assignment name */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-3 py-2 bg-popover border border-divider rounded-lg shadow-xl text-sm text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out pointer-events-none z-40 max-w-xs scale-95 group-hover:scale-100">
+                        <div className="break-words font-medium">{assignment.name}</div>
+                        {assignment.due_date && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Due: {new Date(assignment.due_date).toLocaleDateString()}
+                          </div>
+                        )}
+                        <div className="text-xs text-muted-foreground">
+                          {assignment.points_possible} points possible
+                        </div>
+                        {/* Tooltip arrow */}
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-popover drop-shadow-sm"></div>
                       </div>
                     </th>
                   ))}

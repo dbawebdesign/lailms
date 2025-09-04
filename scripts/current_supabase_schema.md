@@ -1,6 +1,42 @@
 # Current Supabase Schema
 
-## Latest Updates (User Deletion CASCADE Fixes & Assessment Questions)
+## Latest Updates (Assignment Drag & Drop Reordering)
+
+### Assignment Reordering API (2025-02-09)
+Added drag and drop reordering functionality for assignments in the gradebook:
+
+**New API Endpoint:**
+- `POST /api/teach/assignments/reorder` - Updates assignment order in Supabase
+- Accepts: `{ assignmentId: string, newOrderIndex: number, classInstanceId: string }`
+- Validates user permissions and updates `order_index` for all assignments in the class
+
+**Updated Components:**
+- `AssignmentsManager.tsx` - Now supports drag and drop using `@hello-pangea/dnd`
+- Added visual drag handles with `GripVertical` icon
+- Drag is disabled when filters are active (search, type, status)
+- Visual feedback during drag operations (shadow, rotation, drop zones)
+
+**Database Changes:**
+- Assignments table already had `order_index` field (default: 0)
+- Updated gradebook API to fetch from `assignments` table instead of `lessons`
+- Assignments are now sorted by: `order_index` ASC, `due_date` ASC, `created_at` ASC
+- Fixed RLS policies for assignments table to support UPDATE operations:
+  - Consolidated duplicate teacher policies into single policy with proper WITH CHECK clause
+  - Changed from UPSERT to individual UPDATE operations to avoid RLS conflicts
+- Implemented optimistic updates for seamless drag and drop UX:
+  - Added `reorderAssignments` function to `useGradebook` hook for proper state management
+  - Immediate visual feedback without page refresh using hook's optimistic updates
+  - Proper index calculation using full assignments array (not filtered)
+  - Updates order_index values in optimistic state to match new positions
+  - Error handling with automatic revert capability via hook
+  - Integrated with real-time broadcast system for multi-user sync
+  - Removed custom optimistic state from AssignmentsManager component
+
+**Service Layer:**
+- Added `assignmentService.reorderAssignments()` method in `gradebook.ts`
+- Handles batch updates of assignment order indices
+
+## Previous Updates (User Deletion CASCADE Fixes & Assessment Questions)
 
 ### User Deletion CASCADE Fixes (2025-02-09)
 Fixed foreign key constraints to prevent user deletion errors by updating the following constraints:
@@ -212,6 +248,23 @@ Added comprehensive payment tracking and Stripe integration for homeschool signu
   - Webhook updates user profiles upon successful payment
   - Payment success page provides user feedback and login redirect
   - Support for both one-time and subscription payments
+
+### Gradebook Assignment Ordering (2025-01-31)
+Added logical ordering support for gradebook assignments:
+
+- **Schema Changes:**
+  - Added `order_index INTEGER DEFAULT 0` column to `assignments` table
+  - Added index `idx_assignments_order_index` on `(class_instance_id, order_index)` for performance
+  - Updated existing assignments to have order based on due_date (if present) then created_at
+
+- **Features:**
+  - **Logical Assignment Ordering**: Assignments now display in a logical order from left to right
+  - **Enhanced Tooltips**: Assignment titles show enhanced tooltips with full name, due date, and points
+  - **Flexible Ordering**: Supports custom ordering via order_index, with fallback to due_date then created_at
+
+- **API Changes:**
+  - Updated gradebook API to sort assignments by order_index, due_date, then created_at
+  - Updated assignment service methods to use proper ordering
 
 ### Enhanced Course Generation Tracking System (2025-01-29)
 Added comprehensive task-level tracking, error management, and recovery capabilities for course generation:

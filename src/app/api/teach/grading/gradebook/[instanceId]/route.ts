@@ -68,58 +68,31 @@ export async function GET(
       };
     });
 
-    // Get assignments (lessons with questions for this class)
-    const { data: lessons, error: lessonsError } = await supabase
-      .from('lessons')
-      .select(`
-        id,
-        title,
-        created_at,
-        paths!inner(
-          id,
-          base_class_id
-        ),
-        lesson_questions(
-          id,
-          question_id
-        )
-      `)
-      .eq('paths.base_class_id', (classInstance as any).base_classes.id)
-      .not('lesson_questions', 'is', null);
+    // Get assignments for this class instance
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from('assignments')
+      .select('*')
+      .eq('class_instance_id', instanceId)
+      .order('order_index', { ascending: true })
+      .order('due_date', { ascending: true, nullsLast: true })
+      .order('created_at', { ascending: true });
 
-    if (lessonsError) {
+    if (assignmentsError) {
       return NextResponse.json({ error: 'Failed to fetch assignments' }, { status: 500 });
     }
 
-    // Transform assignment data
-    const assignments = (lessons || []).map((lesson: any) => ({
-      id: lesson.id,
-      name: lesson.title,
-      type: 'quiz' as const,
-      points_possible: lesson.lesson_questions?.length * 10 || 100, // Simplified scoring
-      due_date: null,
-      published: true,
-      created_at: lesson.created_at
-    }));
-
-    // Get quiz attempts (grades) for all students and assignments
+    // Get grades for all students and assignments
     const studentIds = students.map((s: any) => s.id);
-    const { data: quizAttempts, error: attemptsError } = await supabase
-      .from('quiz_attempts')
-      .select(`
-        id,
-        user_id,
-        score,
-        max_score,
-        created_at,
-        lesson_questions!inner(
-          lesson_id
-        )
-      `)
-      .in('user_id', studentIds)
-      .in('lesson_questions.lesson_id', assignments.map(a => a.id));
+    const assignmentIds = (assignments || []).map(a => a.id);
+    
+    const { data: gradesData, error: gradesError } = await supabase
+      .from('grades')
+      .select('*')
+      .eq('class_instance_id', instanceId)
+      .in('student_id', studentIds)
+      .in('assignment_id', assignmentIds);
 
-    if (attemptsError) {
+    if (gradesError) {
       return NextResponse.json({ error: 'Failed to fetch grades' }, { status: 500 });
     }
 
@@ -127,28 +100,34 @@ export async function GET(
     const grades: Record<string, any> = {};
     const studentGrades: Record<string, { totalScore: number; totalMaxScore: number; attempts: number }> = {};
 
-    for (const attempt of quizAttempts || []) {
-      const attemptData = attempt as any;
-      const key = `${attemptData.user_id}-${attemptData.lesson_questions.lesson_id}`;
-      const percentage = attemptData.max_score > 0 ? Math.round((attemptData.score / attemptData.max_score) * 100) : 0;
+    for (const grade of gradesData || []) {
+      const key = `${grade.student_id}-${grade.assignment_id}`;
+      const percentage = grade.percentage || 0;
       
       grades[key] = {
-        student_id: attemptData.user_id,
-        assignment_id: attemptData.lesson_questions.lesson_id,
-        points_earned: attemptData.score,
-        points_possible: attemptData.max_score,
+        student_id: grade.student_id,
+        assignment_id: grade.assignment_id,
+        points_earned: grade.points_earned,
+        points_possible: assignments?.find(a => a.id === grade.assignment_id)?.points_possible || 0,
         percentage,
-        status: 'graded' as const,
-        submitted_at: attemptData.created_at
+        status: grade.status || 'pending',
+        submitted_at: grade.submitted_at,
+        graded_at: grade.graded_at,
+        feedback: grade.feedback
       };
 
       // Track student totals for overall grade calculation
-      if (!studentGrades[attemptData.user_id]) {
-        studentGrades[attemptData.user_id] = { totalScore: 0, totalMaxScore: 0, attempts: 0 };
+      if (grade.points_earned !== null && grade.points_earned !== undefined) {
+        if (!studentGrades[grade.student_id!]) {
+          studentGrades[grade.student_id!] = { totalScore: 0, totalMaxScore: 0, attempts: 0 };
+        }
+        const assignment = assignments?.find(a => a.id === grade.assignment_id);
+        const pointsPossible = assignment?.points_possible || 0;
+        
+        studentGrades[grade.student_id!].totalScore += Number(grade.points_earned);
+        studentGrades[grade.student_id!].totalMaxScore += pointsPossible;
+        studentGrades[grade.student_id!].attempts += 1;
       }
-      studentGrades[attemptData.user_id].totalScore += attemptData.score;
-      studentGrades[attemptData.user_id].totalMaxScore += attemptData.max_score;
-      studentGrades[attemptData.user_id].attempts += 1;
     }
 
     // Update student overall grades
@@ -175,7 +154,7 @@ export async function GET(
 
     return NextResponse.json({
       students,
-      assignments,
+      assignments: assignments || [],
       grades,
       standards: [], // TODO: Implement standards tracking
       settings: {} // TODO: Implement gradebook settings

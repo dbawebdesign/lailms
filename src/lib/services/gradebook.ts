@@ -38,7 +38,9 @@ export const assignmentService = {
       .from('assignments')
       .select('*')
       .eq('class_instance_id', classInstanceId)
-      .order('created_at', { ascending: false })
+      .order('order_index', { ascending: true })
+      .order('due_date', { ascending: true, nullsLast: true })
+      .order('created_at', { ascending: true })
 
     if (error) throw error
     return data || []
@@ -103,10 +105,57 @@ export const assignmentService = {
         )
       `)
       .eq('class_instance_id', classInstanceId)
-      .order('created_at', { ascending: false })
+      .order('order_index', { ascending: true })
+      .order('due_date', { ascending: true, nullsLast: true })
+      .order('created_at', { ascending: true })
 
     if (error) throw error
     return data || []
+  },
+
+  // Reorder assignments by updating their order_index
+  async reorderAssignments(assignmentId: string, newOrderIndex: number, classInstanceId: string): Promise<void> {
+    // Get all assignments for this class instance
+    const { data: assignments, error: fetchError } = await supabase
+      .from('assignments')
+      .select('id, order_index')
+      .eq('class_instance_id', classInstanceId)
+      .order('order_index', { ascending: true })
+
+    if (fetchError) throw fetchError
+    if (!assignments || assignments.length === 0) throw new Error('No assignments found')
+
+    // Find the assignment being moved
+    const movingAssignment = assignments.find(a => a.id === assignmentId)
+    if (!movingAssignment) throw new Error('Assignment not found')
+
+    // Get the current index of the moving assignment
+    const currentIndex = assignments.findIndex(a => a.id === assignmentId)
+    
+    // Create a copy of the assignments array for reordering
+    const reorderedAssignments = [...assignments]
+    
+    // Remove the assignment from its current position
+    reorderedAssignments.splice(currentIndex, 1)
+    
+    // Insert it at the new position
+    reorderedAssignments.splice(newOrderIndex, 0, movingAssignment)
+
+    // Update order_index for each assignment based on its new position
+    const updatePromises = reorderedAssignments.map(async (assignment, index) => {
+      // Only update if the order_index has actually changed
+      if (assignment.order_index !== index) {
+        const { error } = await supabase
+          .from('assignments')
+          .update({ order_index: index })
+          .eq('id', assignment.id)
+        
+        if (error) throw error
+      }
+    })
+
+    // Execute all updates
+    await Promise.all(updatePromises)
   }
 }
 

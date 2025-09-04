@@ -68,6 +68,7 @@ export interface UseGradebookReturn {
   createAssignment: (assignmentData: Partial<Assignment>) => Promise<void>
   updateAssignment: (assignmentId: string, updates: Partial<Assignment>) => Promise<void>
   deleteAssignment: (assignmentId: string) => Promise<void>
+  reorderAssignments: (assignmentId: string, newOrderIndex: number) => Promise<void>
   updateSettings: (settings: any) => Promise<void>
 }
 
@@ -200,6 +201,15 @@ export function useGradebook(classInstanceId: string): UseGradebookReturn {
         acc[key] = grade;
         return acc;
       }, {} as Record<string, Grade>);
+
+      console.log('📥 Loading fresh data from database:', {
+        assignmentsFromDB: (result.assignments || []).map((a, i) => ({ 
+          pos: i, 
+          name: a.name, 
+          order_index: a.order_index,
+          id: a.id 
+        }))
+      });
 
       setData(prevData => ({
         ...prevData,
@@ -527,6 +537,81 @@ export function useGradebook(classInstanceId: string): UseGradebookReturn {
     }
   }, [data.assignments, loadGradebookData, broadcastUpdate, classInstanceId])
 
+  // Reorder assignments with optimistic updates
+  const reorderAssignments = useCallback(async (assignmentId: string, newOrderIndex: number) => {
+    try {
+      setSyncStatus('syncing')
+      
+      // Find the assignment being moved
+      const movingAssignment = data.assignments.find(a => a.id === assignmentId)
+      if (!movingAssignment) {
+        throw new Error('Assignment not found')
+      }
+
+      // Get current index
+      const currentIndex = data.assignments.findIndex(a => a.id === assignmentId)
+      
+      // Create optimistic update immediately for smooth UX
+      const currentAssignments = [...data.assignments]
+      const [movedAssignment] = currentAssignments.splice(currentIndex, 1)
+      currentAssignments.splice(newOrderIndex, 0, movedAssignment)
+      
+      // Update order_index for all assignments to match their new positions
+      const updatedAssignments = currentAssignments.map((assignment, index) => ({
+        ...assignment,
+        order_index: index
+      }))
+      
+      // Apply optimistic update
+      console.log('🔄 Hook Optimistic Update:', {
+        assignmentId,
+        newOrderIndex,
+        beforeUpdate: data.assignments.map((a, i) => ({ pos: i, name: a.name, order_index: a.order_index })),
+        afterUpdate: updatedAssignments.map((a, i) => ({ pos: i, name: a.name, order_index: a.order_index }))
+      });
+      
+      setData(prevData => ({
+        ...prevData,
+        assignments: updatedAssignments
+      }))
+
+      // Call the API to update the assignment order
+      const response = await fetch('/api/teach/assignments/reorder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assignmentId,
+          newOrderIndex,
+          classInstanceId,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to reorder assignments')
+      }
+
+      // Broadcast the update to other clients
+      await broadcastUpdate('assignment_update', {
+        type: 'assignment_updated',
+        assignment: movedAssignment,
+        class_instance_id: classInstanceId
+      })
+      
+      setSyncStatus('synced')
+      
+    } catch (err) {
+      console.error('Error reordering assignments:', err)
+      setError(err instanceof Error ? err.message : 'Failed to reorder assignments')
+      setSyncStatus('error')
+      
+      // Revert optimistic update on error
+      await loadGradebookData()
+    }
+  }, [data.assignments, classInstanceId, loadGradebookData, broadcastUpdate])
+
   // Update gradebook settings
   const updateSettings = useCallback(async (settings: any) => {
     try {
@@ -557,6 +642,7 @@ export function useGradebook(classInstanceId: string): UseGradebookReturn {
     createAssignment,
     updateAssignment,
     deleteAssignment,
+    reorderAssignments,
     updateSettings
   }
 } 

@@ -59,6 +59,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
     createAssignment,
     updateAssignment,
     deleteAssignment,
+    reorderAssignments,
     updateSettings
   } = useGradebook(classInstance.id);
 
@@ -378,6 +379,7 @@ export function GradebookShell({ classInstance }: GradebookShellProps) {
                 onCreateAssignment={createAssignment}
                 onUpdateAssignment={updateAssignment}
                 onDeleteAssignment={deleteAssignment}
+                onReorderAssignments={reorderAssignments}
               />
             </TabsContent>
             

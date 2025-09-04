@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AssignmentModal } from '../shared/AssignmentModal';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { 
   Plus, 
   Edit, 
@@ -29,7 +30,8 @@ import {
   AlertCircle,
   TrendingUp,
   BookOpen,
-  Star
+  Star,
+  GripVertical
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tables } from '../../../../../packages/types/db';
@@ -56,6 +58,7 @@ interface AssignmentsManagerProps {
   onCreateAssignment?: (assignmentData: Partial<Assignment>) => Promise<void>;
   onUpdateAssignment?: (assignmentId: string, updates: Partial<Assignment>) => Promise<void>;
   onDeleteAssignment?: (assignmentId: string) => Promise<void>;
+  onReorderAssignments?: (assignmentId: string, newOrderIndex: number) => Promise<void>;
 }
 
 export function AssignmentsManager({
@@ -65,7 +68,8 @@ export function AssignmentsManager({
   isLoading,
   onCreateAssignment,
   onUpdateAssignment,
-  onDeleteAssignment
+  onDeleteAssignment,
+  onReorderAssignments
 }: AssignmentsManagerProps) {
   const [activeTab, setActiveTab] = useState('assignments');
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,6 +79,7 @@ export function AssignmentsManager({
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
 
   // Use live data from props
   const assignments = data.assignments;
@@ -153,6 +158,64 @@ export function AssignmentsManager({
 
   const handleBulkAction = (action: string) => {
     console.log('Bulk action:', action, selectedAssignments);
+  };
+
+  const handleDragEnd = async (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+
+    // If dropped outside the list or in the same position, do nothing
+    if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) {
+      return;
+    }
+
+    // Only handle reordering within the same list
+    if (destination.droppableId !== 'assignments-list') {
+      return;
+    }
+
+    // Don't allow reordering when filters are active
+    if (searchTerm !== '' || filterType !== 'all' || filterStatus !== 'all') {
+      return;
+    }
+
+    // Don't allow reordering if the function is not provided
+    if (!onReorderAssignments) {
+      console.warn('onReorderAssignments function not provided');
+      return;
+    }
+
+    setIsReordering(true);
+
+    try {
+      const assignmentBeingMoved = assignments.find(a => a.id === draggableId);
+      console.log('🎯 Frontend Reorder:', {
+        assignmentId: draggableId,
+        assignmentName: assignmentBeingMoved?.name,
+        fromIndex: source.index,
+        toIndex: destination.index,
+        totalAssignments: assignments.length,
+        currentOrder: assignments.map((a, i) => `${i}: ${a.name}`)
+      });
+      
+      // Also log to browser console for debugging
+      if (typeof window !== 'undefined') {
+        console.log('🎯 Browser Console - Frontend Reorder:', {
+          assignmentId: draggableId,
+          assignmentName: assignmentBeingMoved?.name,
+          fromIndex: source.index,
+          toIndex: destination.index,
+          currentOrder: assignments.map((a, i) => `${i}: ${a.name}`)
+        });
+      }
+
+      // Use the hook's reorder function which handles optimistic updates
+      await onReorderAssignments(draggableId, destination.index);
+    } catch (error) {
+      console.error('Failed to reorder assignments:', error);
+      alert('Failed to reorder assignments. Please try again.');
+    } finally {
+      setIsReordering(false);
+    }
   };
 
   const renderRubrics = () => (
@@ -330,100 +393,158 @@ export function AssignmentsManager({
         </Card>
       )}
 
-      {/* Assignments List */}
-      <div className="space-y-6">
-        {filteredAssignments.map((assignment) => (
-          <Card key={assignment.id} className="p-6 bg-surface/50 border-divider hover:shadow-lg transition-airy">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4 flex-1">
-                <Checkbox
-                  checked={selectedAssignments.includes(assignment.id)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setSelectedAssignments([...selectedAssignments, assignment.id]);
-                    } else {
-                      setSelectedAssignments(selectedAssignments.filter(id => id !== assignment.id));
-                    }
-                  }}
-                  className="mt-1"
-                />
-                
-                <div className="flex-1 space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-h3 font-semibold text-foreground">{assignment.name}</h3>
-                        <Badge 
-                          variant={assignment.published ? "default" : "secondary"}
-                          className={cn(
-                            "text-xs",
-                            assignment.published 
-                              ? "bg-success/10 text-success border-success/20" 
-                              : "bg-muted/50 text-muted-foreground border-muted/20"
-                          )}
-                        >
-                          {assignment.published ? 'Published' : 'Draft'}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {assignment.type}
-                        </Badge>
-                      </div>
-                      {assignment.description && (
-                        <p className="text-body text-muted-foreground leading-relaxed">
-                          {assignment.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-6 text-caption text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Target className="w-4 h-4" />
-                      <span>{assignment.points_possible} points</span>
-                    </div>
-                    {assignment.due_date && (
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>Due {new Date(assignment.due_date).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      <span>Created {new Date(assignment.created_at).toLocaleDateString()}</span>
-                    </div>
-                    {assignment.category && (
-                      <div className="flex items-center gap-1">
-                        <FileText className="w-4 h-4" />
-                        <span>{assignment.category}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex flex-col gap-2 flex-shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleEditAssignment(assignment)}
-                  className="hover:bg-surface/80 border-divider transition-airy min-w-[70px] justify-center"
-                >
-                  <Edit className="w-4 h-4 mr-1" />
-                  Edit
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="hover:bg-surface/80 border-divider transition-airy min-w-[70px] justify-center"
-                >
-                  <Eye className="w-4 h-4 mr-1" />
-                  View
-                </Button>
-              </div>
+      {/* Drag and Drop Info */}
+      {(searchTerm !== '' || filterType !== 'all' || filterStatus !== 'all') && (
+        <Card className="p-4 bg-info/5 border-info/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-info/10 rounded-full">
+              <GripVertical className="w-4 h-4 text-info" />
             </div>
-          </Card>
-        ))}
-      </div>
+            <div>
+              <p className="text-body font-medium text-foreground">Drag and Drop Disabled</p>
+              <p className="text-caption text-muted-foreground">Clear all filters to reorder assignments by dragging</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Assignments List */}
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Droppable droppableId="assignments-list">
+          {(provided, snapshot) => (
+            <div
+              {...provided.droppableProps}
+              ref={provided.innerRef}
+              className={cn(
+                "space-y-6 transition-colors",
+                snapshot.isDraggingOver && "bg-accent/5 rounded-lg p-4"
+              )}
+            >
+              {(searchTerm !== '' || filterType !== 'all' || filterStatus !== 'all' ? filteredAssignments : assignments).map((assignment, index) => (
+                <Draggable 
+                  key={assignment.id} 
+                  draggableId={assignment.id} 
+                  index={index}
+                  isDragDisabled={isReordering || searchTerm !== '' || filterType !== 'all' || filterStatus !== 'all'}
+                >
+                  {(provided, snapshot) => (
+                    <Card 
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      className={cn(
+                        "p-6 bg-surface/50 border-divider hover:shadow-lg transition-airy",
+                        snapshot.isDragging && "shadow-xl rotate-2 bg-surface border-primary/20",
+                        (searchTerm !== '' || filterType !== 'all' || filterStatus !== 'all') && "cursor-default"
+                      )}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-4 flex-1">
+                          {/* Drag Handle */}
+                          <div 
+                            {...provided.dragHandleProps}
+                            className={cn(
+                              "flex items-center justify-center w-6 h-6 rounded cursor-grab active:cursor-grabbing mt-1",
+                              "hover:bg-accent/10 transition-colors",
+                              (searchTerm !== '' || filterType !== 'all' || filterStatus !== 'all') && "opacity-30 cursor-not-allowed"
+                            )}
+                          >
+                            <GripVertical className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                          
+                          <Checkbox
+                            checked={selectedAssignments.includes(assignment.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedAssignments([...selectedAssignments, assignment.id]);
+                              } else {
+                                setSelectedAssignments(selectedAssignments.filter(id => id !== assignment.id));
+                              }
+                            }}
+                            className="mt-1"
+                          />
+                          
+                          <div className="flex-1 space-y-4">
+                            <div className="flex items-start justify-between">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-3">
+                                  <h3 className="text-h3 font-semibold text-foreground">{assignment.name}</h3>
+                                  <Badge 
+                                    variant={assignment.published ? "default" : "secondary"}
+                                    className={cn(
+                                      "text-xs",
+                                      assignment.published 
+                                        ? "bg-success/10 text-success border-success/20" 
+                                        : "bg-muted/50 text-muted-foreground border-muted/20"
+                                    )}
+                                  >
+                                    {assignment.published ? 'Published' : 'Draft'}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-xs capitalize">
+                                    {assignment.type}
+                                  </Badge>
+                                </div>
+                                {assignment.description && (
+                                  <p className="text-body text-muted-foreground leading-relaxed">
+                                    {assignment.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-6 text-caption text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Target className="w-4 h-4" />
+                                <span>{assignment.points_possible} points</span>
+                              </div>
+                              {assignment.due_date && (
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="w-4 h-4" />
+                                  <span>Due {new Date(assignment.due_date).toLocaleDateString()}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <Clock className="w-4 h-4" />
+                                <span>Created {new Date(assignment.created_at).toLocaleDateString()}</span>
+                              </div>
+                              {assignment.category && (
+                                <div className="flex items-center gap-1">
+                                  <FileText className="w-4 h-4" />
+                                  <span>{assignment.category}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-col gap-2 flex-shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditAssignment(assignment)}
+                            className="hover:bg-surface/80 border-divider transition-airy min-w-[70px] justify-center"
+                          >
+                            <Edit className="w-4 h-4 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="hover:bg-surface/80 border-divider transition-airy min-w-[70px] justify-center"
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </DragDropContext>
     </div>
   );
 
