@@ -288,11 +288,11 @@ export default function LandingPage() {
         <div className="text-center">
           <div className="mb-4 w-16 h-px bg-gradient-to-r from-transparent via-[#FF835D] to-transparent opacity-30"></div>
           <h2 className="text-xs md:text-sm font-mono font-light text-gray-400 uppercase tracking-[0.2em] opacity-0">
-            <span className="word" data-delay="4600">No</span>
-            <span className="word" data-delay="4750">more</span>
-            <span className="word" data-delay="4900">Sunday</span>
-            <span className="word" data-delay="5050">night</span>
-            <span className="word" data-delay="5200">panic.</span>
+            <span className="word" data-delay="4600">AI</span>
+            <span className="word" data-delay="4750">Powered</span>
+            <span className="word" data-delay="4900">Homeschool</span>
+            <span className="word" data-delay="5050">Learning</span>
+            <span className="word" data-delay="5200">Management</span>
           </h2>
           
           {/* Additional details */}
@@ -524,43 +524,14 @@ export default function LandingPage() {
             </div>
             
             <div className="relative">
-              <div className="bg-gradient-to-br from-gray-900 to-black rounded-2xl border border-gray-800 p-6 shadow-2xl">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">AI Teacher Dashboard</h3>
-                    <div className="text-xs text-gray-400">Live Demo</div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gradient-to-r from-[#6B5DE5]/20 to-[#E45DE5]/20 rounded-lg p-3 text-center">
-                      <div className="text-lg font-bold">24</div>
-                      <div className="text-xs text-gray-300">Lessons Generated</div>
-                    </div>
-                    <div className="bg-gradient-to-r from-[#E45DE5]/20 to-[#FF835D]/20 rounded-lg p-3 text-center">
-                      <div className="text-lg font-bold">16</div>
-                      <div className="text-xs text-gray-300">Assessments Created</div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="bg-gray-800 rounded-lg p-3 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span>📝 Rubric Generator</span>
-                        <span className="text-green-400">Ready</span>
-                      </div>
-                    </div>
-                    <div className="bg-gray-800 rounded-lg p-3 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span>🎯 Lesson Planner</span>
-                        <span className="text-yellow-400">Processing</span>
-                      </div>
-                    </div>
-                    <div className="bg-gray-800 rounded-lg p-3 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span>🧠 Luna AI Tutor</span>
-                        <span className="text-blue-400">Active</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <div className="rounded-2xl shadow-2xl overflow-hidden">
+                <Image
+                  src="/teacher-dash.png"
+                  alt="Teacher Dashboard - AI-powered homeschool management interface"
+                  width={600}
+                  height={400}
+                  className="w-full h-auto object-cover"
+                />
               </div>
             </div>
           </div>
@@ -577,47 +548,20 @@ export default function LandingPage() {
           showDetailDots={true}
         />
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="relative order-2 lg:order-1">
-              <div className="bg-gradient-to-br from-gray-900 to-black rounded-2xl border border-gray-800 p-6 shadow-2xl">
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-8 h-8 bg-gradient-to-r from-[#6B5DE5] to-[#E45DE5] rounded-full flex items-center justify-center">
-                      <span className="text-sm font-bold">JS</span>
-                    </div>
-                    <div>
-                      <div className="font-semibold text-sm">Jane's Learning Space</div>
-                      <div className="text-xs text-gray-400">Biology - Cell Structure</div>
-                    </div>
-                  </div>
-                  <div className="bg-gray-800 rounded-lg p-4">
-                    <div className="text-sm font-medium mb-2">Learning Progress</div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs">
-                        <span>Mastery Level</span>
-                        <span className="text-[#6B5DE5]">87%</span>
-                      </div>
-                      <div className="w-full bg-gray-700 rounded-full h-2">
-                        <div className="bg-gradient-to-r from-[#6B5DE5] to-[#E45DE5] h-2 rounded-full w-[87%]"></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="bg-gradient-to-r from-[#6B5DE5]/20 to-[#E45DE5]/20 rounded-lg p-3 text-sm">
-                      🎯 Personalized pathway adapted
-                    </div>
-                    <div className="bg-gradient-to-r from-[#E45DE5]/20 to-[#FF835D]/20 rounded-lg p-3 text-sm">
-                      🧠 AI tutor session completed
-                    </div>
-                    <div className="bg-gradient-to-r from-[#FF835D]/20 to-[#6B5DE5]/20 rounded-lg p-3 text-sm">
-                      📊 Assessment feedback ready
-                    </div>
-                  </div>
-                </div>
+          <div className="grid lg:grid-cols-5 gap-12 items-center">
+            <div className="relative order-2 lg:order-1 lg:col-span-3">
+              <div className="rounded-2xl shadow-2xl overflow-hidden max-w-none">
+                <Image
+                  src="/study space render.png"
+                  alt="Student Study Space - AI-powered personalized learning interface"
+                  width={2400}
+                  height={1500}
+                  className="w-full h-auto object-cover scale-105"
+                />
               </div>
             </div>
             
-            <div className="space-y-8 order-1 lg:order-2">
+            <div className="space-y-8 order-1 lg:order-2 lg:col-span-2">
               <div className="space-y-4">
                 <h2 className="text-4xl font-bold">Your Kids Will Actually Love Learning</h2>
                 <p className="text-xl text-gray-300">
@@ -892,7 +836,7 @@ export default function LandingPage() {
         />
         <div className="max-w-7xl mx-auto relative z-10">
           {/* Main Footer Content */}
-          <div className="grid lg:grid-cols-3 gap-12 mb-12">
+          <div className="grid lg:grid-cols-3 gap-12 mb-12 text-center lg:text-left">
             {/* Logo and Description - Takes up more space */}
             <div className="lg:col-span-2 space-y-6">
               <div className="space-y-4">
@@ -901,7 +845,7 @@ export default function LandingPage() {
                   alt="Learnology AI"
                   width={280}
                   height={56}
-                  className="h-12 w-auto"
+                  className="h-12 w-auto mx-auto lg:mx-0"
                 />
                 <p className="text-gray-400 text-base max-w-2xl leading-relaxed">
                   AI-first learning management system transforming education through intelligent automation and personalization. 
@@ -936,7 +880,7 @@ export default function LandingPage() {
             </div>
             
             {/* Navigation Links */}
-            <div className="space-y-8">
+            <div className="space-y-8 flex flex-col items-center lg:items-start">
               <div className="space-y-4">
                 <h4 className="font-semibold text-white">Solutions</h4>
                 <div className="space-y-2 text-sm text-gray-400">
@@ -956,7 +900,7 @@ export default function LandingPage() {
               
               <div className="space-y-4">
                 <h4 className="font-semibold text-white">Follow Us</h4>
-                <div className="flex space-x-4">
+                <div className="flex space-x-4 justify-center lg:justify-start">
                   <a 
                     href="https://www.facebook.com/p/Learnology-AI-61573064702124/"
                     target="_blank"
@@ -999,11 +943,11 @@ export default function LandingPage() {
           </div>
           
           {/* Bottom Footer */}
-          <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
+          <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-center md:justify-between items-center text-center md:text-left">
             <div className="text-sm text-gray-400">
               © 2025 Learnology AI. All rights reserved.
             </div>
-            <div className="flex space-x-6 text-sm text-gray-400 mt-4 md:mt-0">
+            <div className="flex flex-wrap justify-center space-x-6 text-sm text-gray-400 mt-4 md:mt-0">
               <Link href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
               <Link href="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link>
               <Link href="/cookie-policy" className="hover:text-white transition-colors">Cookie Policy</Link>

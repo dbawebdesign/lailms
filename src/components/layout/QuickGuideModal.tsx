@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Play, Sparkles, BookOpen, Users, GraduationCap, Wrench, AlertCircle, Home, Upload, MessageSquare, FileText } from 'lucide-react';
+import { X, Play, Sparkles, BookOpen, Users, GraduationCap, Wrench, AlertCircle, Home, Upload, MessageSquare, FileText, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +67,8 @@ export default function QuickGuideModal({ isOpen, onClose }: QuickGuideModalProp
   const [videos, setVideos] = useState<VideoGuide[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<VideoGuide | null>(null);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
   // Add custom scrollbar styles
   useEffect(() => {
@@ -108,6 +110,7 @@ export default function QuickGuideModal({ isOpen, onClose }: QuickGuideModalProp
       fetchVideos();
     }
   }, [isOpen]);
+
 
   const fetchVideos = async () => {
     try {
@@ -258,6 +261,35 @@ export default function QuickGuideModal({ isOpen, onClose }: QuickGuideModalProp
     setSelectedVideo(video);
   };
 
+  // Touch gesture handlers for mobile swiping
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && currentVideoIndex < allVideos.length - 1) {
+      // Swipe left - next video
+      setSelectedVideo(allVideos[currentVideoIndex + 1]);
+    }
+    if (isRightSwipe && currentVideoIndex > 0) {
+      // Swipe right - previous video
+      setSelectedVideo(allVideos[currentVideoIndex - 1]);
+    }
+  };
+
   const renderVideoEmbed = () => {
     if (!selectedVideo) {
       return (
@@ -356,168 +388,259 @@ export default function QuickGuideModal({ isOpen, onClose }: QuickGuideModalProp
 
   const currentVideoIndex = selectedVideo ? allVideos.findIndex((v) => v.id === selectedVideo.id) : -1;
 
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (currentVideoIndex > 0) {
+            setSelectedVideo(allVideos[currentVideoIndex - 1]);
+          }
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          if (currentVideoIndex < allVideos.length - 1) {
+            setSelectedVideo(allVideos[currentVideoIndex + 1]);
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          onClose();
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, currentVideoIndex, allVideos, onClose, selectedVideo]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogPortal>
         <DialogOverlay className="backdrop-blur-sm bg-black/50" />
-        <DialogContent className="!max-w-[95vw] !w-[1600px] !h-[90vh] p-0 gap-0 overflow-hidden sm:!max-w-[95vw]">
-        <VisuallyHidden>
-          <DialogTitle>Quick Guide</DialogTitle>
-        </VisuallyHidden>
-        
-        <div className="flex h-full min-h-0">
-          {/* Left Sidebar - All videos visible in categorized list */}
-          <div className="w-[400px] bg-background border-r border-border flex flex-col flex-shrink-0 h-full max-h-full min-h-0">
-            {/* Header */}
-            <div className="p-6 border-b border-border flex-shrink-0">
-              <h2 className="text-xl font-semibold">Quick Guide</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Explore {videos.length}+ features
-              </p>
-            </div>
-
-            {/* All Videos Listed by Category - Scrollable */}
-            <div 
-              className="flex-1 overflow-y-auto quick-guide-scroll min-h-0"
-              style={{
-                scrollbarWidth: 'thin',
-                scrollbarColor: '#9CA3AF #F3F4F6'
-              }}
-            >
-              <div className="p-4 space-y-6">
-                {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="text-center">
-                      <Sparkles className="h-8 w-8 text-muted-foreground mx-auto mb-2 animate-pulse" />
-                      <p className="text-sm text-muted-foreground">Loading guides...</p>
+        <DialogContent className="!max-w-[95vw] !w-full !h-[95vh] md:!w-[1600px] md:!h-[90vh] p-0 gap-0 overflow-hidden [&>button]:hidden">
+          <VisuallyHidden>
+            <DialogTitle>Quick Guide</DialogTitle>
+          </VisuallyHidden>
+          
+          {/* Mobile Layout */}
+          <div className="flex flex-col md:flex-row h-full min-h-0">
+            {/* Mobile Header */}
+            <div className="md:hidden flex flex-col gap-2 p-4 border-b border-border bg-background flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Quick Guide</h2>
+                <Button variant="ghost" size="sm" onClick={onClose}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              {selectedVideo && (
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-sm font-medium truncate">
+                    {selectedVideo.title}
+                  </h3>
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-muted-foreground">
+                      {currentVideoIndex + 1} of {allVideos.length}
                     </div>
-                  </div>
-                ) : videos.length === 0 ? (
-                  <div className="text-center py-8">
-                    <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">No video guides available</p>
-                  </div>
-                ) : (
-                  categories.map((category) => {
-                    const categoryVideos = videosByCategory[category.id] || [];
-                    
-                    if (categoryVideos.length === 0) return null;
-                    
-                    return (
-                      <div key={category.id} className="space-y-2">
-                        {/* Category Header */}
-                        <div className="flex items-center gap-2 px-2 py-1 text-sm font-medium text-muted-foreground sticky top-0 bg-background">
-                          <category.icon className="h-4 w-4" />
-                          <span>{category.name}</span>
-                        </div>
-                        
-                        {/* Videos in this category */}
-                        <div className="space-y-1">
-                          {categoryVideos.map((video) => (
-                            <button
-                              key={video.id}
-                              onClick={() => handleVideoClick(video)}
-                              className={cn(
-                                "w-full text-left px-4 py-2.5 rounded-md text-sm transition-colors group",
-                                "hover:bg-accent/50",
-                                selectedVideo?.id === video.id && "bg-accent text-accent-foreground"
-                              )}
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium truncate">{video.title}</div>
-                                  {video.description && (
-                                    <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                                      {video.description}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              {video.is_featured && (
-                                <Badge className="mt-1 text-xs" variant="secondary">
-                                  Featured
-                                </Badge>
-                              )}
-                            </button>
-                          ))}
-                        </div>
+                    {selectedVideo.description && (
+                      <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                        {selectedVideo.description}
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Content Area - Video Player */}
-          <div className="flex-1 flex flex-col bg-muted/30 min-w-0">
-            {/* Content Header */}
-            <div className="flex items-center p-6 border-b border-border bg-background flex-shrink-0">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-lg font-semibold truncate">
-                  {selectedVideo?.title || 'Select a guide to get started'}
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                  {selectedVideo?.description || 'Choose a video guide from the list to view the walkthrough demo.'}
-                </p>
-              </div>
-            </div>
-
-            {/* Video Player Area */}
-            <div className="flex-1 p-8 flex flex-col min-h-0">
-              {/* Video Player Container - Takes most of the space */}
-              <div className="flex-1 flex items-center justify-center min-h-0 mb-0">
-                <div className="w-full h-full max-w-none">
-                  <div className="aspect-video bg-black rounded-lg overflow-hidden w-full h-full">
-                    {loading && !selectedVideo ? (
-                      <div className="w-full h-full flex items-center justify-center bg-muted">
-                        <div className="text-center">
-                          <Sparkles className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-pulse" />
-                          <p className="text-muted-foreground">Loading video guide...</p>
-                        </div>
-                      </div>
-                    ) : (
-                      renderVideoEmbed()
                     )}
                   </div>
                 </div>
-              </div>
-              {/* Removed extra info below the player to maximize available space */}
+              )}
             </div>
 
-            {/* Footer Navigation */}
-            <div className="flex items-center justify-between p-6 border-t border-border bg-background flex-shrink-0">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (currentVideoIndex > 0) {
-                    setSelectedVideo(allVideos[currentVideoIndex - 1]);
-                  }
+            {/* Video List Sidebar - Desktop only */}
+            <div className="hidden md:flex md:w-[400px] bg-background border-r border-border flex-col flex-shrink-0 h-full max-h-full min-h-0">
+              {/* Header */}
+              <div className="p-6 border-b border-border flex-shrink-0">
+                <h2 className="text-xl font-semibold">Quick Guide</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Explore {videos.length}+ features
+                </p>
+              </div>
+
+              {/* All Videos Listed by Category - Scrollable */}
+              <div 
+                className="flex-1 overflow-y-auto quick-guide-scroll min-h-0"
+                style={{
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: '#9CA3AF #F3F4F6'
                 }}
-                disabled={currentVideoIndex <= 0}
               >
-                Back
-              </Button>
-              
-              <span className="text-sm text-muted-foreground">
-                {currentVideoIndex >= 0 && `${currentVideoIndex + 1} of ${allVideos.length}`}
-              </span>
-              
-              <Button
-                onClick={() => {
-                  if (currentVideoIndex < allVideos.length - 1) {
-                    setSelectedVideo(allVideos[currentVideoIndex + 1]);
-                  } else {
-                    onClose();
-                  }
-                }}
-                disabled={!selectedVideo}
-              >
-                {currentVideoIndex === allVideos.length - 1 ? 'Finish' : 'Next'}
-              </Button>
+                <div className="p-4 space-y-6">
+                  {loading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-center">
+                        <Sparkles className="h-8 w-8 text-muted-foreground mx-auto mb-2 animate-pulse" />
+                        <p className="text-sm text-muted-foreground">Loading guides...</p>
+                      </div>
+                    </div>
+                  ) : videos.length === 0 ? (
+                    <div className="text-center py-8">
+                      <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">No video guides available</p>
+                    </div>
+                  ) : (
+                    categories.map((category) => {
+                      const categoryVideos = videosByCategory[category.id] || [];
+                      
+                      if (categoryVideos.length === 0) return null;
+                      
+                      return (
+                        <div key={category.id} className="space-y-2">
+                          {/* Category Header */}
+                          <div className="flex items-center gap-2 px-2 py-1 text-sm font-medium text-muted-foreground sticky top-0 bg-background">
+                            <category.icon className="h-4 w-4" />
+                            <span>{category.name}</span>
+                          </div>
+                          
+                          {/* Videos in this category */}
+                          <div className="space-y-1">
+                            {categoryVideos.map((video) => (
+                              <button
+                                key={video.id}
+                                onClick={() => handleVideoClick(video)}
+                                className={cn(
+                                  "w-full text-left px-4 py-2.5 rounded-md text-sm transition-colors group",
+                                  "hover:bg-accent/50",
+                                  selectedVideo?.id === video.id && "bg-accent text-accent-foreground"
+                                )}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium truncate">{video.title}</div>
+                                    {video.description && (
+                                      <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                                        {video.description}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                {video.is_featured && (
+                                  <Badge className="mt-1 text-xs" variant="secondary">
+                                    Featured
+                                  </Badge>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Main Content Area - Video Player */}
+            <div className="flex-1 flex flex-col bg-muted/30 min-w-0">
+              {/* Content Header */}
+              <div className="hidden md:flex items-center p-6 border-b border-border bg-background flex-shrink-0">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold truncate">
+                    {selectedVideo?.title || 'Select a guide to get started'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                    {selectedVideo?.description || 'Choose a video guide from the list to view the walkthrough demo.'}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={onClose} className="ml-4">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Video Player Area */}
+              <div className="flex-1 p-2 md:p-8 flex flex-col min-h-0">
+                {/* Video Player Container */}
+                <div className="flex-1 flex items-center justify-center min-h-0 mb-0">
+                  <div className="w-full h-full max-w-none">
+                    {/* Mobile: Use more flexible aspect ratio, Desktop: Fixed aspect-video */}
+                    <div 
+                      className="w-full h-full md:aspect-video bg-black rounded-lg overflow-hidden"
+                      onTouchStart={onTouchStart}
+                      onTouchMove={onTouchMove}
+                      onTouchEnd={onTouchEnd}
+                    >
+                      {loading && !selectedVideo ? (
+                        <div className="w-full h-full flex items-center justify-center bg-muted">
+                          <div className="text-center px-4">
+                            <Sparkles className="h-8 md:h-12 w-8 md:w-12 text-muted-foreground mx-auto mb-4 animate-pulse" />
+                            <p className="text-sm md:text-base text-muted-foreground">Loading video guide...</p>
+                          </div>
+                        </div>
+                      ) : !selectedVideo ? (
+                        <div className="w-full h-full flex items-center justify-center bg-muted/50 rounded-lg">
+                          <div className="text-center px-4">
+                            <Play className="h-12 md:h-16 w-12 md:w-16 text-muted-foreground mx-auto mb-4" />
+                            <p className="text-sm md:text-base text-muted-foreground">Select a guide to view the demo</p>
+                          </div>
+                        </div>
+                      ) : (
+                        renderVideoEmbed()
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Navigation */}
+              <div className="flex flex-col gap-2 p-4 md:p-6 border-t border-border bg-background flex-shrink-0">
+                {/* Mobile swipe hint */}
+                {selectedVideo && (
+                  <div className="text-center md:hidden">
+                    <p className="text-xs text-muted-foreground">
+                      Swipe left/right on video to navigate
+                    </p>
+                  </div>
+                )}
+                
+                {/* Navigation buttons */}
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (currentVideoIndex > 0) {
+                        setSelectedVideo(allVideos[currentVideoIndex - 1]);
+                      }
+                    }}
+                    disabled={currentVideoIndex <= 0}
+                    className="flex items-center gap-2"
+                  >
+                    <ArrowLeft className="h-3 w-3 md:hidden" />
+                    <span className="hidden md:inline">Back</span>
+                    <span className="md:hidden">Previous</span>
+                  </Button>
+                  
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-xs md:text-sm text-muted-foreground">
+                      {currentVideoIndex >= 0 && `${currentVideoIndex + 1} of ${allVideos.length}`}
+                    </span>
+                  </div>
+                  
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (currentVideoIndex < allVideos.length - 1) {
+                        setSelectedVideo(allVideos[currentVideoIndex + 1]);
+                      } else {
+                        onClose();
+                      }
+                    }}
+                    disabled={!selectedVideo}
+                  >
+                    {currentVideoIndex === allVideos.length - 1 ? 'Finish' : 'Next'}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
         </DialogContent>
       </DialogPortal>
     </Dialog>
