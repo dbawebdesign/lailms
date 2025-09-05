@@ -223,41 +223,36 @@ export default function LandingPage() {
         <div className="text-center max-w-6xl mx-auto mb-16 relative">
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-extralight leading-tight tracking-tight text-white text-decoration opacity-0">
             <div className="mb-4 md:mb-6">
-              <span className="word" data-delay="800">Get</span>
-              <span className="word" data-delay="950">15</span>
-              <span className="word" data-delay="1100">hours</span>
-              <span className="word" data-delay="1250">back</span>
-              <span className="word bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent" data-delay="1400"> every week.</span>
+              <span className="word" data-delay="800">Spend</span>
+              <span className="word" data-delay="950">less</span>
+              <span className="word" data-delay="1100">time</span>
+              <span className="word" data-delay="1250">planning,</span>
+              <span className="word" data-delay="1400">and</span>
+              <span className="word bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent" data-delay="1550">more</span>
+              <span className="word bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent" data-delay="1700">time</span>
+              <span className="word" data-delay="1850">engaging</span>
+              <span className="word bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent" data-delay="2000">with</span>
+              <span className="word bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent" data-delay="2150">your</span>
+              <span className="word bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent" data-delay="2300">kids.</span>
             </div>
-            <div className="text-xl md:text-2xl lg:text-3xl font-thin text-gray-300 leading-relaxed">
-              <span className="word" data-delay="1700">AI</span>
-              <span className="word" data-delay="1850">creates</span>
-              <span className="word" data-delay="2000">personalized</span>
-              <span className="word" data-delay="2150">lesson</span>
-              <span className="word" data-delay="2300">plans</span>
-              <span className="word" data-delay="2450">instantly,</span>
-              <span className="word" data-delay="2600">adapts</span>
-              <span className="word" data-delay="2750">to</span>
-              <span className="word" data-delay="2900">each</span>
-              <span className="word" data-delay="3050">child's</span>
-              <span className="word" data-delay="3200">learning</span>
-              <span className="word" data-delay="3350">style,</span>
-              <span className="word" data-delay="3500">and</span>
-              <span className="word" data-delay="3650">handles</span>
-              <span className="word" data-delay="3800">multiple</span>
-              <span className="word" data-delay="3950">grades</span>
-              <span className="word" data-delay="4100">effortlessly.</span>
-              <span className="word" data-delay="4250">Spend</span>
-              <span className="word" data-delay="4400">less</span>
-              <span className="word" data-delay="4550">time</span>
-              <span className="word" data-delay="4700">planning,</span>
-              <span className="word" data-delay="4850">and</span>
-              <span className="word" data-delay="5000">more</span>
-              <span className="word" data-delay="5150">time</span>
-              <span className="word" data-delay="5300">engaging</span>
-              <span className="word" data-delay="5450">with</span>
-              <span className="word" data-delay="5600">your</span>
-              <span className="word" data-delay="5750">kids.</span>
+            <div className="text-xl md:text-2xl lg:text-3xl font-thin text-gray-300 leading-relaxed max-w-4xl mx-auto">
+              <span className="word" data-delay="2500">Create</span>
+              <span className="word" data-delay="2650">personalized</span>
+              <span className="word" data-delay="2800">lesson</span>
+              <span className="word" data-delay="2950">plans</span>
+              <span className="word" data-delay="3100">instantly</span>
+              <span className="word" data-delay="3250">that</span>
+              <span className="word" data-delay="3400">adapt</span>
+              <span className="word" data-delay="3550">to</span>
+              <span className="word" data-delay="3700">each</span>
+              <span className="word" data-delay="3850">child's</span>
+              <span className="word" data-delay="4000">learning</span>
+              <span className="word" data-delay="4150">style</span>
+              <span className="word" data-delay="4300">and</span>
+              <span className="word" data-delay="4450">handle</span>
+              <span className="word" data-delay="4600">multiple</span>
+              <span className="word" data-delay="4750">grades</span>
+              <span className="word" data-delay="4900">effortlessly.</span>
             </div>
           </h1>
           
@@ -288,15 +283,14 @@ export default function LandingPage() {
         <div className="text-center">
           <div className="mb-4 w-16 h-px bg-gradient-to-r from-transparent via-[#FF835D] to-transparent opacity-30"></div>
           <h2 className="text-xs md:text-sm font-mono font-light text-gray-400 uppercase tracking-[0.2em] opacity-0">
-            <span className="word" data-delay="4600">AI</span>
-            <span className="word" data-delay="4750">Powered</span>
-            <span className="word" data-delay="4900">Homeschool</span>
-            <span className="word" data-delay="5050">Learning</span>
-            <span className="word" data-delay="5200">Management</span>
+            <span className="word" data-delay="5200">AI-Powered</span>
+            <span className="word" data-delay="5350">Homeschool</span>
+            <span className="word" data-delay="5500">Learning</span>
+            <span className="word" data-delay="5650">Management</span>
           </h2>
           
           {/* Additional details */}
-          <div className="mt-6 flex justify-center space-x-4 opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '5.5s'}}>
+          <div className="mt-6 flex justify-center space-x-4 opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '5.8s'}}>
             <div className="w-1 h-1 bg-[#6B5DE5] rounded-full opacity-40"></div>
             <div className="w-1 h-1 bg-[#E45DE5] rounded-full opacity-60"></div>
             <div className="w-1 h-1 bg-[#FF835D] rounded-full opacity-40"></div>
