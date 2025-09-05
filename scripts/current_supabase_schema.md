@@ -1,6 +1,35 @@
 # Current Supabase Schema
 
-## Latest Updates (Assignment Drag & Drop Reordering)
+## Latest Updates (Role Assignment Standardization)
+
+### Active Role Standardization (2025-02-09)
+Standardized role assignment across all signup flows to ensure consistent user experience:
+
+**Changes Made:**
+- **NewSignupForm**: Homeschool email signups now set `active_role: 'teacher'` by default
+- **Invite Code Signup**: Non-student users get `active_role: 'teacher'`, students get `active_role: 'student'`
+- **Homeschool Organization Creation**: Primary contacts always get `active_role: 'teacher'` regardless of their base role
+- **Student Creation**: All student accounts (homeschool onboarding, migration) get both `role: 'student'` and `active_role: 'student'`
+- **Database Migration**: Updated existing profiles where `active_role` was NULL to set appropriate values
+
+**Role Assignment Logic:**
+- **Non-students**: Always get `active_role: 'teacher'` (regardless of base role like 'super_admin', 'admin', etc.)
+- **Students**: Always get `active_role: 'student'`
+- **Role switching functionality**: Removed from the application as users no longer need to switch between roles
+
+**Database Migration Applied:**
+```sql
+UPDATE public.profiles 
+SET active_role = CASE 
+  WHEN role = 'student' THEN 'student'::role
+  ELSE 'teacher'::role
+END
+WHERE active_role IS NULL;
+```
+
+This ensures all users have a consistent active role experience and eliminates confusion from role switching.
+
+## Previous Updates (Assignment Drag & Drop Reordering)
 
 ### Assignment Reordering API (2025-02-09)
 Added drag and drop reordering functionality for assignments in the gradebook:

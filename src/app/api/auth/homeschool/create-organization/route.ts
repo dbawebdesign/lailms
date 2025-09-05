@@ -279,7 +279,7 @@ export async function POST(request: NextRequest) {
         first_name: primaryContact.firstName,
         last_name: primaryContact.lastName,
         role: primaryRole,
-        active_role: primaryRole, // Set active_role to match primary role
+        active_role: 'teacher', // Set active_role to teacher for all non-student users
         additional_roles: additionalRoles,
         organisation_id: organizationId,
         organisation_unit_id: organizationUnitId

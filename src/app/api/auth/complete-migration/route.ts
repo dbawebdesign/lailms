@@ -276,6 +276,7 @@ export async function POST(request: NextRequest) {
                 first_name: newStudent.firstName,
                 grade_level: newStudent.gradeLevel,
                 role: 'student',
+                active_role: 'student', // Set active_role to student for student accounts
                 organisation_id: oldProfile.organisation_id,
                 organisation_unit_id: orgUnit.id,
                 family_id: familyInfo.id,

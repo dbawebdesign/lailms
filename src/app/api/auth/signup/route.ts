@@ -111,6 +111,7 @@ export async function POST(req: NextRequest) {
         last_name: lastName,
         grade_level: gradeLevel,
         role: inviteData.role,
+        active_role: inviteData.role === 'student' ? 'student' : 'teacher', // Set active_role to teacher for non-students
         organisation_id: inviteData.organisation_id,
       })
 
