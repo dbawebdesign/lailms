@@ -101,12 +101,16 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
       >
         <div className="flex items-center">
           {!isNavCollapsed ? (
-            <ThemeAwareLogo
-              width={160}
-              height={32}
-              className="py-2 animate-gentle-fade-in"
+            <div 
+              className="animate-gentle-fade-in"
               style={{"--animation-delay": "200ms"} as React.CSSProperties}
-            />
+            >
+              <ThemeAwareLogo
+                width={160}
+                height={32}
+                className="py-2"
+              />
+            </div>
           ) : (
             <Button
               variant="ghost"
