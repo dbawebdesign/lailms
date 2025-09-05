@@ -169,7 +169,7 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
                 type="date"
                 value={formData.startDate ? format(formData.startDate, "yyyy-MM-dd") : ""}
                 onChange={(e) => {
-                  const date = e.target.value ? new Date(e.target.value) : undefined;
+                  const date = e.target.value ? new Date(e.target.value + 'T00:00:00') : undefined;
                   setFormData(prev => ({ ...prev, startDate: date }));
                 }}
                 disabled={isLoading}
@@ -185,7 +185,7 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({
                 type="date"
                 value={formData.endDate ? format(formData.endDate, "yyyy-MM-dd") : ""}
                 onChange={(e) => {
-                  const date = e.target.value ? new Date(e.target.value) : undefined;
+                  const date = e.target.value ? new Date(e.target.value + 'T00:00:00') : undefined;
                   setFormData(prev => ({ ...prev, endDate: date }));
                 }}
                 disabled={isLoading}
