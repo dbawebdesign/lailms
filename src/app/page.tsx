@@ -210,10 +210,11 @@ export default function LandingPage() {
         {/* Top Text */}
         <div className="text-center mb-16">
           <h2 className="text-xs md:text-sm font-mono font-light text-gray-400 uppercase tracking-[0.2em] opacity-0">
-            <span className="word" data-delay="0">Transform</span>
-            <span className="word" data-delay="200">education</span>
-            <span className="word" data-delay="400">with</span>
-            <span className="word" data-delay="600">intelligence.</span>
+            <span className="word" data-delay="0">Stop</span>
+            <span className="word" data-delay="200">drowning</span>
+            <span className="word" data-delay="400">in</span>
+            <span className="word" data-delay="600">curriculum</span>
+            <span className="word" data-delay="800">chaos.</span>
           </h2>
           <div className="mt-4 w-16 h-px bg-gradient-to-r from-transparent via-[#6B5DE5] to-transparent opacity-30"></div>
         </div>
@@ -222,27 +223,41 @@ export default function LandingPage() {
         <div className="text-center max-w-6xl mx-auto mb-16 relative">
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-extralight leading-tight tracking-tight text-white text-decoration opacity-0">
             <div className="mb-4 md:mb-6">
-              <span className="word" data-delay="800">The</span>
-              <span className="word" data-delay="950">world's</span>
-              <span className="word" data-delay="1100">first</span>
-              <span className="word bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent" data-delay="1250"> AI-native </span>
-              <span className="word" data-delay="1400">LMS.</span>
+              <span className="word" data-delay="800">Get</span>
+              <span className="word" data-delay="950">15</span>
+              <span className="word" data-delay="1100">hours</span>
+              <span className="word" data-delay="1250">back</span>
+              <span className="word bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent" data-delay="1400"> every week.</span>
             </div>
             <div className="text-xl md:text-2xl lg:text-3xl font-thin text-gray-300 leading-relaxed">
-              <span className="word" data-delay="1700">Where</span>
-              <span className="word" data-delay="1850">artificial</span>
-              <span className="word" data-delay="2000">intelligence</span>
-              <span className="word" data-delay="2150">meets</span>
-              <span className="word" data-delay="2300">personalized</span>
-              <span className="word" data-delay="2450">learning,</span>
-              <span className="word" data-delay="2600">creating</span>
-              <span className="word" data-delay="2750">adaptive</span>
-              <span className="word" data-delay="2900">experiences</span>
-              <span className="word" data-delay="3050">that</span>
-              <span className="word" data-delay="3200">evolve</span>
-              <span className="word" data-delay="3350">with</span>
-              <span className="word" data-delay="3500">every</span>
-              <span className="word" data-delay="3650">student.</span>
+              <span className="word" data-delay="1700">AI</span>
+              <span className="word" data-delay="1850">creates</span>
+              <span className="word" data-delay="2000">personalized</span>
+              <span className="word" data-delay="2150">lesson</span>
+              <span className="word" data-delay="2300">plans</span>
+              <span className="word" data-delay="2450">instantly,</span>
+              <span className="word" data-delay="2600">adapts</span>
+              <span className="word" data-delay="2750">to</span>
+              <span className="word" data-delay="2900">each</span>
+              <span className="word" data-delay="3050">child's</span>
+              <span className="word" data-delay="3200">learning</span>
+              <span className="word" data-delay="3350">style,</span>
+              <span className="word" data-delay="3500">and</span>
+              <span className="word" data-delay="3650">handles</span>
+              <span className="word" data-delay="3800">multiple</span>
+              <span className="word" data-delay="3950">grades</span>
+              <span className="word" data-delay="4100">effortlessly.</span>
+              <span className="word" data-delay="4250">Spend</span>
+              <span className="word" data-delay="4400">less</span>
+              <span className="word" data-delay="4550">time</span>
+              <span className="word" data-delay="4700">planning,</span>
+              <span className="word" data-delay="4850">and</span>
+              <span className="word" data-delay="5000">more</span>
+              <span className="word" data-delay="5150">time</span>
+              <span className="word" data-delay="5300">engaging</span>
+              <span className="word" data-delay="5450">with</span>
+              <span className="word" data-delay="5600">your</span>
+              <span className="word" data-delay="5750">kids.</span>
             </div>
           </h1>
           
@@ -253,9 +268,9 @@ export default function LandingPage() {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 mb-16">
-          <Link href="https://calendly.com/zjones-learnologyai/learnology-ai-demo?month=2025-07" target="_blank" rel="noopener noreferrer">
+          <Link href="/signup">
             <Button className="bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center opacity-0" style={{animation: 'word-appear 1s ease-out forwards', animationDelay: '4.2s'}}>
-              Book a Consultation
+              Start Free - See How It Works
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
@@ -273,11 +288,11 @@ export default function LandingPage() {
         <div className="text-center">
           <div className="mb-4 w-16 h-px bg-gradient-to-r from-transparent via-[#FF835D] to-transparent opacity-30"></div>
           <h2 className="text-xs md:text-sm font-mono font-light text-gray-400 uppercase tracking-[0.2em] opacity-0">
-            <span className="word" data-delay="4600">Generate</span>
-            <span className="word" data-delay="4750">complete</span>
-            <span className="word" data-delay="4900">courses</span>
-            <span className="word" data-delay="5050">in</span>
-            <span className="word" data-delay="5200">minutes.</span>
+            <span className="word" data-delay="4600">No</span>
+            <span className="word" data-delay="4750">more</span>
+            <span className="word" data-delay="4900">Sunday</span>
+            <span className="word" data-delay="5050">night</span>
+            <span className="word" data-delay="5200">panic.</span>
           </h2>
           
           {/* Additional details */}
@@ -307,60 +322,60 @@ export default function LandingPage() {
           <div className="text-center mb-16">
             <div className="flex items-center justify-center mb-4">
               <Home className="w-8 h-8 text-[#E45DE5] mr-3" />
-              <h2 className="text-4xl font-bold">Homeschool Education</h2>
+              <h2 className="text-4xl font-bold">Finally, Homeschool Without the Overwhelm</h2>
             </div>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Empower your homeschool journey with AI that adapts to your child's unique learning style, creates personalized curricula, and provides comprehensive progress tracking.
+              Stop spending 15+ hours a week planning lessons. Our AI instantly creates personalized curricula that adapt to each child's learning style, handles multiple grade levels, and gives you confidence you're providing excellent education.
             </p>
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#E45DE5]/50 transition-colors">
               <Sparkles className="w-12 h-12 text-[#E45DE5] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Personalized Curriculum</h3>
-              <p className="text-gray-300">AI creates custom learning paths tailored to your child's interests, learning style, and pace, ensuring engaging and effective education.</p>
+              <h3 className="text-xl font-bold mb-3">End Curriculum Shopping Forever</h3>
+              <p className="text-gray-300">Stop wasting $500+ annually on curricula that don't work. AI creates custom learning paths that actually fit each child's learning style and interests - no more guessing.</p>
             </div>
             
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#FF835D]/50 transition-colors">
               <BookOpen className="w-12 h-12 text-[#FF835D] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Multi-Grade Support</h3>
-              <p className="text-gray-300">Effortlessly manage multiple children across different grade levels with AI-powered lesson planning and progress tracking.</p>
+              <h3 className="text-xl font-bold mb-3">Teach Multiple Kids Without Losing Your Mind</h3>
+              <p className="text-gray-300">AI automatically creates age-appropriate lessons for each child simultaneously. No more juggling different curricula or feeling like you're shortchanging someone.</p>
             </div>
             
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#6B5DE5]/50 transition-colors">
               <Award className="w-12 h-12 text-[#6B5DE5] mb-4" />
-              <h3 className="text-xl font-bold mb-3">State Standards Alignment</h3>
-              <p className="text-gray-300">Automatically align your curriculum with state standards and generate compliance reports for easy record-keeping.</p>
+              <h3 className="text-xl font-bold mb-3">Never Worry About "Am I Doing Enough?"</h3>
+              <p className="text-gray-300">Automatically aligns with state standards and generates compliance reports. You'll have confidence you're meeting requirements without the constant second-guessing.</p>
             </div>
             
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#E45DE5]/50 transition-colors">
               <Lightbulb className="w-12 h-12 text-[#E45DE5] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Interactive Learning</h3>
-              <p className="text-gray-300">Engage children with AI-generated interactive activities, virtual field trips, and hands-on projects that make learning fun.</p>
+              <h3 className="text-xl font-bold mb-3">Kids Actually Want to Learn</h3>
+              <p className="text-gray-300">AI creates engaging activities that match each child's interests. No more battles over "boring" lessons - they'll be excited to start school each day.</p>
             </div>
             
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#FF835D]/50 transition-colors">
               <Users className="w-12 h-12 text-[#FF835D] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Parent Support</h3>
-              <p className="text-gray-300">Get AI-powered teaching suggestions, lesson plans, and guidance to help you become the best educator for your child.</p>
+              <h3 className="text-xl font-bold mb-3">Feel Like a Professional Teacher</h3>
+              <p className="text-gray-300">AI gives you expert teaching strategies and explanations for every lesson. You'll have the confidence to tackle any subject, even high school chemistry.</p>
             </div>
             
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#6B5DE5]/50 transition-colors">
               <TrendingUp className="w-12 h-12 text-[#6B5DE5] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Progress Insights</h3>
-              <p className="text-gray-300">Comprehensive analytics and reporting to track your child's progress, identify strengths, and address learning gaps.</p>
+              <h3 className="text-xl font-bold mb-3">See Real Progress (Not Just Busy Work)</h3>
+              <p className="text-gray-300">Clear analytics show exactly what each child has mastered and where they need support. No more wondering if they're actually learning or just completing assignments.</p>
             </div>
           </div>
 
           <div className="bg-gradient-to-r from-[#E45DE5]/10 to-[#FF835D]/10 rounded-2xl p-8 text-center">
-            <h3 className="text-2xl font-bold mb-4">Start Your AI-Powered Homeschool Journey</h3>
+            <h3 className="text-2xl font-bold mb-4">Transform Your Homeschool Experience in 30 Days</h3>
             <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
-              Join thousands of homeschool families who have discovered the power of AI-personalized education that grows with their children.
+              Join homeschool families who went from overwhelmed and stressed to confident and organized. Get your evenings back, reduce planning time by 90%, and watch your kids thrive with personalized learning.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/signup">
                 <Button className="bg-gradient-to-r from-[#E45DE5] via-[#FF835D] to-[#6B5DE5] text-white px-8 py-3 rounded-lg hover:opacity-90 transition-opacity">
-                  Get started today
+                  Start Free Trial
                 </Button>
               </Link>
             </div>
@@ -379,45 +394,45 @@ export default function LandingPage() {
         />
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">AI-Native Features That Transform Homeschool Learning</h2>
-            <p className="text-xl text-gray-300">Powered by advanced AI designed specifically for homeschool families</p>
+            <h2 className="text-4xl font-bold mb-4">The Tools That End Homeschool Burnout</h2>
+            <p className="text-xl text-gray-300">Everything you need to teach with confidence, save time, and see real results</p>
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#6B5DE5]/50 transition-colors">
               <Brain className="w-12 h-12 text-[#6B5DE5] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Luna AI Assistant</h3>
-              <p className="text-gray-300">24/7 intelligent tutoring with context-aware responses, Socratic dialogue, and multi-persona support for diverse learning needs.</p>
+              <h3 className="text-xl font-bold mb-3">Your Personal Teaching Assistant</h3>
+              <p className="text-gray-300">Luna AI answers every "How do I explain this?" moment. Get instant teaching strategies, explanations, and support - like having a master teacher on call 24/7.</p>
             </div>
             
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#E45DE5]/50 transition-colors">
               <TrendingUp className="w-12 h-12 text-[#E45DE5] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Adaptive Assessments</h3>
-              <p className="text-gray-300">AI-powered assessments that adjust difficulty in real-time, providing accurate skill measurement and personalized feedback.</p>
+              <h3 className="text-xl font-bold mb-3">Know Exactly Where Each Child Stands</h3>
+              <p className="text-gray-300">Assessments that adapt to each child's level and give you clear insights into what they've mastered. No more guessing if they're ready to move on.</p>
             </div>
             
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#FF835D]/50 transition-colors">
               <Zap className="w-12 h-12 text-[#FF835D] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Instant Content Generation</h3>
-              <p className="text-gray-300">Transform any document into complete courses with lessons, quizzes, and multimedia content in minutes, not weeks.</p>
+              <h3 className="text-xl font-bold mb-3">Turn Any Idea Into a Full Curriculum</h3>
+              <p className="text-gray-300">Upload a document or describe what you want to teach. AI creates complete lessons, activities, and assessments in minutes. No more spending weekends planning.</p>
             </div>
             
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#6B5DE5]/50 transition-colors">
               <BookOpen className="w-12 h-12 text-[#6B5DE5] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Smart Knowledge Base</h3>
-              <p className="text-gray-300">Secure document ingestion with automatic chunking, embeddings, and AI-powered content discovery for your homeschool curriculum.</p>
+              <h3 className="text-xl font-bold mb-3">All Your Resources in One Place</h3>
+              <p className="text-gray-300">Upload textbooks, articles, videos - anything. AI organizes everything and creates lessons from your materials. No more hunting through scattered resources.</p>
             </div>
             
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#E45DE5]/50 transition-colors">
               <Users className="w-12 h-12 text-[#E45DE5] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Family Learning Support</h3>
-              <p className="text-gray-300">AI-powered tools to help parents track multiple children's progress, coordinate learning activities, and connect with other homeschool families.</p>
+              <h3 className="text-xl font-bold mb-3">Finally Feel Supported, Not Alone</h3>
+              <p className="text-gray-300">Track all your children's progress in one dashboard. Get guidance when you're stuck. Connect with other homeschool families. You're not doing this alone anymore.</p>
             </div>
             
             <div className="bg-black/50 rounded-2xl p-8 border border-gray-800 hover:border-[#FF835D]/50 transition-colors">
               <Shield className="w-12 h-12 text-[#FF835D] mb-4" />
-              <h3 className="text-xl font-bold mb-3">Privacy & Security</h3>
-              <p className="text-gray-300">Secure, family-focused AI environments with privacy protection and data security designed specifically for homeschool families.</p>
+              <h3 className="text-xl font-bold mb-3">Your Family's Data Stays Safe</h3>
+              <p className="text-gray-300">Built with homeschool families in mind. Your children's information and learning data are protected with enterprise-level security. No selling data to advertisers.</p>
             </div>
           </div>
         </div>
@@ -433,25 +448,25 @@ export default function LandingPage() {
           showDetailDots={true}
         />
         <div className="max-w-7xl mx-auto text-center relative z-10">
-          <h2 className="text-4xl font-bold mb-4">Transforming Education at Scale</h2>
-          <p className="text-xl text-gray-300 mb-16">Join forward-thinking institutions already revolutionizing learning</p>
+          <h2 className="text-4xl font-bold mb-4">Real Results from Real Homeschool Families</h2>
+          <p className="text-xl text-gray-300 mb-16">See the transformation that happens when you stop struggling and start thriving</p>
           
           <div className="grid md:grid-cols-4 gap-8">
             <div className="space-y-2">
-              <div className="text-4xl font-bold bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent">98%</div>
-              <div className="text-gray-300">Content Generation Accuracy</div>
+              <div className="text-4xl font-bold bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent">90%</div>
+              <div className="text-gray-300">Less Time Planning</div>
             </div>
             <div className="space-y-2">
-              <div className="text-4xl font-bold bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent">15min</div>
-              <div className="text-gray-300">Course Creation Time</div>
+              <div className="text-4xl font-bold bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent">15hrs</div>
+              <div className="text-gray-300">Saved Per Week</div>
             </div>
             <div className="space-y-2">
-              <div className="text-4xl font-bold bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent">75%</div>
-              <div className="text-gray-300">Reduction in Admin Tasks</div>
+              <div className="text-4xl font-bold bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent">100%</div>
+              <div className="text-gray-300">More Confident Parents</div>
             </div>
             <div className="space-y-2">
-              <div className="text-4xl font-bold bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent">99.9%</div>
-              <div className="text-gray-300">Platform Uptime</div>
+              <div className="text-4xl font-bold bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] bg-clip-text text-transparent">$500+</div>
+              <div className="text-gray-300">Saved on Curricula</div>
             </div>
           </div>
         </div>
@@ -470,9 +485,9 @@ export default function LandingPage() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8">
               <div className="space-y-4">
-                <h2 className="text-4xl font-bold">Powerful AI Tools for Every Educator</h2>
+                <h2 className="text-4xl font-bold">Stop Reinventing the Wheel Every Week</h2>
                 <p className="text-xl text-gray-300">
-                  A comprehensive suite of AI-powered generators that streamline instructional tasks and enhance teaching effectiveness.
+                  AI tools that handle the tedious work so you can focus on what matters - actually teaching your children.
                 </p>
               </div>
               
@@ -480,29 +495,29 @@ export default function LandingPage() {
                 <div className="flex items-start space-x-3">
                   <CheckCircle className="w-6 h-6 text-[#6B5DE5] flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="font-semibold">Smart Rubric Generator</div>
-                    <div className="text-gray-300 text-sm">Create custom assessment rubrics aligned with learning objectives</div>
+                    <div className="font-semibold">Instant Assessment Creation</div>
+                    <div className="text-gray-300 text-sm">Generate rubrics and assessments in seconds - no more spending hours creating tests</div>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <CheckCircle className="w-6 h-6 text-[#E45DE5] flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="font-semibold">Lesson Plan Generator</div>
-                    <div className="text-gray-300 text-sm">Generate comprehensive lesson plans from prompts or documents</div>
+                    <div className="font-semibold">Professional Lesson Plans Instantly</div>
+                    <div className="text-gray-300 text-sm">Turn any topic into detailed lesson plans with activities and objectives - done in minutes</div>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <CheckCircle className="w-6 h-6 text-[#FF835D] flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="font-semibold">Adaptive Quiz Builder</div>
-                    <div className="text-gray-300 text-sm">AI-generated assessments with multiple difficulty levels</div>
+                    <div className="font-semibold">Perfect-Level Quizzes Every Time</div>
+                    <div className="text-gray-300 text-sm">Quizzes that automatically match each child's ability level - no more too-easy or too-hard tests</div>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <CheckCircle className="w-6 h-6 text-[#6B5DE5] flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="font-semibold">Content Leveler</div>
-                    <div className="text-gray-300 text-sm">Automatically adjust reading levels for diverse learners</div>
+                    <div className="font-semibold">One Lesson, Multiple Reading Levels</div>
+                    <div className="text-gray-300 text-sm">Same content automatically adjusted for each child's reading level - teach multiple grades simultaneously</div>
                   </div>
                 </div>
               </div>
@@ -604,9 +619,9 @@ export default function LandingPage() {
             
             <div className="space-y-8 order-1 lg:order-2">
               <div className="space-y-4">
-                <h2 className="text-4xl font-bold">AI-Powered Student Experience</h2>
+                <h2 className="text-4xl font-bold">Your Kids Will Actually Love Learning</h2>
                 <p className="text-xl text-gray-300">
-                  Personalized learning companions that adapt to each student's needs, providing support and guidance every step of the way.
+                  No more battles over schoolwork. AI creates engaging experiences that adapt to how each child learns best, making education feel like discovery, not drudgery.
                 </p>
               </div>
               
@@ -614,29 +629,29 @@ export default function LandingPage() {
                 <div className="flex items-start space-x-3">
                   <CheckCircle className="w-6 h-6 text-[#6B5DE5] flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="font-semibold">Adaptive Learning Paths</div>
-                    <div className="text-gray-300 text-sm">AI adjusts content difficulty and pacing based on individual progress</div>
+                    <div className="font-semibold">No More "This is Too Hard" Meltdowns</div>
+                    <div className="text-gray-300 text-sm">AI automatically adjusts difficulty so each child is challenged but never overwhelmed</div>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <CheckCircle className="w-6 h-6 text-[#E45DE5] flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="font-semibold">Intelligent Tutoring</div>
-                    <div className="text-gray-300 text-sm">24/7 AI support with personalized explanations and guidance</div>
+                    <div className="font-semibold">Patient Tutor That Never Gets Frustrated</div>
+                    <div className="text-gray-300 text-sm">AI explains concepts in different ways until each child understands - no judgment, just support</div>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <CheckCircle className="w-6 h-6 text-[#FF835D] flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="font-semibold">Real-time Feedback</div>
-                    <div className="text-gray-300 text-sm">Instant assessment and suggestions for improvement</div>
+                    <div className="font-semibold">Celebrate Every Win</div>
+                    <div className="text-gray-300 text-sm">Immediate feedback and encouragement keeps kids motivated and shows exactly what they've mastered</div>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <CheckCircle className="w-6 h-6 text-[#6B5DE5] flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="font-semibold">Progress Analytics</div>
-                    <div className="text-gray-300 text-sm">Detailed insights into learning patterns and achievements</div>
+                    <div className="font-semibold">See Growth Happening Daily</div>
+                    <div className="text-gray-300 text-sm">Clear progress tracking shows you and your child exactly how much they're learning and growing</div>
                   </div>
                 </div>
               </div>
@@ -660,11 +675,10 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-              Simple, Transparent Pricing
+              Less Than Your Monthly Curriculum Budget
             </h2>
             <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              Choose the plan that best fits your family's needs. All plans come with 
-              our full suite of AI-powered learning tools.
+              Stop buying curricula that don't work. For less than you spend on textbooks, get personalized learning that adapts to every child in your family.
             </p>
           </div>
 
@@ -684,7 +698,7 @@ export default function LandingPage() {
               <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700 flex flex-col">
                 <div className="text-center">
                   <h3 className="text-2xl font-bold mb-2">Single Family</h3>
-                  <p className="text-gray-400 mb-6">For families joining after initial launch offer</p>
+                  <p className="text-gray-400 mb-6">Perfect for homeschool families ready to transform their experience</p>
                   <div className="mb-6">
                     <span className="text-4xl font-bold">$40</span>
                     <span className="text-gray-400">/month</span>
@@ -693,7 +707,7 @@ export default function LandingPage() {
                 <ul className="space-y-3 mb-8 flex-grow">
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm">Up to 6 users included</span>
+                    <span className="text-sm">Covers your whole family (1 teacher account and up to 4 students)</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="w-5 h-5 text-green-500" />
@@ -701,12 +715,12 @@ export default function LandingPage() {
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm">Full access to all features</span>
+                    <span className="text-sm">Everything you need - no hidden features or upgrades</span>
                   </li>
                 </ul>
                 <Link href="/signup">
                   <Button className="w-full bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white py-3 rounded-lg hover:opacity-90 transition-opacity">
-                    Get started today
+                    Start Free Trial
                   </Button>
                 </Link>
               </div>
@@ -714,33 +728,30 @@ export default function LandingPage() {
               {/* Micro-Academies & Networks */}
               <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700 flex flex-col">
                 <div className="text-center">
-                  <h3 className="text-2xl font-bold mb-2">Micro-Academies & Networks</h3>
-                  <p className="text-gray-400 mb-6">Ideal for co-ops and small learning groups</p>
+                  <h3 className="text-2xl font-bold mb-2">Homeschool Co-ops & Groups</h3>
+                  <p className="text-gray-400 mb-6">Perfect for co-ops and learning communities</p>
                   <div className="mb-6">
                     <span className="text-4xl font-bold">$5</span>
                     <span className="text-gray-400">/mo/user</span>
-                  </div>
-                  <div className="bg-gradient-to-r from-green-500 to-blue-500 text-white px-4 py-2 rounded-lg mb-6 text-sm font-semibold">
-                    30 days FREE for the network!
                   </div>
                 </div>
                 <ul className="space-y-3 mb-8 flex-grow">
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm">Billed per active user</span>
+                    <span className="text-sm">Only pay for families who actually use it</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm">Admin dashboard for user management</span>
+                    <span className="text-sm">Easy admin dashboard to manage your group</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm">Full access to all features</span>
+                    <span className="text-sm">Everything you need - no hidden features or upgrades</span>
                   </li>
                 </ul>
                 <Link href="/signup">
                   <Button className="w-full bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white py-3 rounded-lg hover:opacity-90 transition-opacity">
-                    Get started today
+                    Start Free Trial
                   </Button>
                 </Link>
               </div>
@@ -752,37 +763,37 @@ export default function LandingPage() {
           {/* FAQ Section */}
           <div className="border-t border-gray-800 pt-20 mt-20">
             <div className="text-center mb-12">
-              <h3 className="text-3xl font-bold mb-4">Frequently Asked Questions</h3>
-              <p className="text-gray-400">Everything you need to know about our pricing</p>
+              <h3 className="text-3xl font-bold mb-4">Questions from Homeschool Parents Like You</h3>
+              <p className="text-gray-400">Real concerns from real families considering the switch</p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
               <div className="space-y-6">
                 <div>
-                  <h4 className="text-lg font-semibold mb-2">What's included in all plans?</h4>
-                  <p className="text-gray-400 text-sm">All plans include AI-powered course generation, personalized learning paths, assessment tools, progress tracking, and 24/7 support.</p>
+                  <h4 className="text-lg font-semibold mb-2">Will this really save me time, or is it just another thing to learn?</h4>
+                  <p className="text-gray-400 text-sm">Most parents see immediate time savings within the first week. The AI does the heavy lifting - you just guide and teach. No complex setup required.</p>
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold mb-2">Can I change plans anytime?</h4>
-                  <p className="text-gray-400 text-sm">Yes, you can upgrade or downgrade your plan at any time. Changes take effect at the next billing cycle.</p>
+                  <h4 className="text-lg font-semibold mb-2">What if my kids don't like it or it doesn't work for our family?</h4>
+                  <p className="text-gray-400 text-sm">You can cancel anytime, no contracts. Most families see engagement improve within days because the AI adapts to each child's interests and learning style.</p>
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold mb-2">Is there a free trial?</h4>
-                  <p className="text-gray-400 text-sm">Yes! 30 days free for homeschool co-op and networks.</p>
+                  <h4 className="text-lg font-semibold mb-2">I'm not tech-savvy. Will I be able to figure this out?</h4>
+                  <p className="text-gray-400 text-sm">Absolutely! It's designed for busy parents, not tech experts. If you can use a smartphone, you can use this. Plus we provide step-by-step video guides.</p>
                 </div>
               </div>
               <div className="space-y-6">
                 <div>
-                  <h4 className="text-lg font-semibold mb-2">What counts as a user?</h4>
-                  <p className="text-gray-400 text-sm">A user is anyone who has an active account and can access the platform - this includes students, teachers, parents, and administrators.</p>
+                  <h4 className="text-lg font-semibold mb-2">Can this really handle high school subjects I'm not confident teaching?</h4>
+                  <p className="text-gray-400 text-sm">Yes! The AI provides detailed explanations and teaching strategies for every subject, including advanced math and science. You'll feel confident teaching anything.</p>
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold mb-2">Do you offer discounts for nonprofits?</h4>
-                  <p className="text-gray-400 text-sm">Yes, we offer special pricing for qualifying nonprofit organizations and educational institutions. Contact us for details.</p>
+                  <h4 className="text-lg font-semibold mb-2">Will this replace the personal connection I have with my kids?</h4>
+                  <p className="text-gray-400 text-sm">Never! AI handles the planning and prep so you can spend MORE quality time actually teaching and connecting with your children. You'll have deeper conversations about learning.</p>
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold mb-2">How does billing work?</h4>
-                  <p className="text-gray-400 text-sm">All plans are billed monthly. For organizations, billing is based on active users at the time of billing.</p>
+                  <h4 className="text-lg font-semibold mb-2">What if I've already spent money on curricula this year?</h4>
+                  <p className="text-gray-400 text-sm">You can upload your existing materials and AI will create lessons from them! Plus, you'll never need to buy another curriculum again. Most families save $500+ annually.</p>
                 </div>
               </div>
             </div>
@@ -858,30 +869,15 @@ export default function LandingPage() {
                 <div className="bg-gradient-to-r from-[#6B5DE5] to-[#FF835D] p-4 rounded-xl mr-4">
                   <Home className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold">For Parents</h3>
+                <h3 className="text-xl font-semibold">For Students</h3>
               </div>
               <p className="text-gray-400 mb-6 leading-relaxed">
-                Learn how to monitor your child's progress, set learning goals, and collaborate with teachers effectively.
+                Discover how to navigate your personalized learning space, track your progress, and get the most out of AI-powered tutoring.
               </p>
 
             </div>
           </div>
 
-          <div className="text-center mt-16">
-            <p className="text-gray-400 mb-8 text-lg max-w-2xl mx-auto">
-              Need help with something specific? Our comprehensive video library covers everything from basic setup to advanced features.
-            </p>
-            <div className="flex justify-center">
-              <Button 
-                variant="outline" 
-                className="border-gray-600 text-gray-300 hover:bg-gray-800 transition-all duration-200 ease-in-out px-6 py-3"
-                onClick={() => setIsQuickGuideOpen(true)}
-              >
-                <Play className="w-4 h-4 mr-2" />
-                Browse All Videos
-              </Button>
-            </div>
-          </div>
         </div>
       </section>
 
