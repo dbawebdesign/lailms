@@ -4,6 +4,7 @@
 @import "tw-animate-css";
 @import "../styles/animations.css";
 @import "../styles/_variables.scss";
+@import "../styles/glassmorphism.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -233,6 +234,10 @@
 
 /* Brand Gradient Utilities */
 @layer utilities {
+  /* Group hover animations */
+  .group:hover .group-hover\:animate-pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
   .bg-brand-gradient {
     background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-mid) 50%, var(--gradient-end) 100%);
   }

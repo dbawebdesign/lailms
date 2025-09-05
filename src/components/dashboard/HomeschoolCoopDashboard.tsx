@@ -386,26 +386,28 @@ export default function HomeschoolCoopDashboard({
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
-        <Card className="transition-all hover:shadow-lg">
+        <Card className="glass-card glass-card-hover animate-scale-in delay-100 card-hover-gradient transition-all hover:shadow-lg"
+              style={{"--hover-gradient": "linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(6, 182, 212, 0.05) 100%)"} as React.CSSProperties}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Families</CardTitle>
-            <Home className="h-4 w-4 text-muted-foreground" />
+            <Home className="h-4 w-4 text-muted-foreground icon-hover" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{coopStats.totalFamilies}</div>
+            <div className="text-2xl font-bold animate-counter number-digit">{coopStats.totalFamilies}</div>
             <p className="text-xs text-muted-foreground">
               Active families
             </p>
           </CardContent>
         </Card>
 
-        <Card className="transition-all hover:shadow-lg">
+        <Card className="glass-card glass-card-hover animate-scale-in delay-200 card-hover-gradient transition-all hover:shadow-lg"
+              style={{"--hover-gradient": "linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%)"} as React.CSSProperties}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Students</CardTitle>
-            <GraduationCap className="h-4 w-4 text-muted-foreground" />
+            <GraduationCap className="h-4 w-4 text-muted-foreground icon-hover" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{coopStats.totalStudents}</div>
+            <div className="text-2xl font-bold animate-counter number-digit">{coopStats.totalStudents}</div>
             <p className="text-xs text-muted-foreground">
               Learning together
             </p>

@@ -42,9 +42,10 @@ const iconMap = {
 interface ToolCardProps {
   tool: TeachingTool;
   onSelect: (tool: TeachingTool) => void;
+  animationDelay?: number;
 }
 
-export function ToolCard({ tool, onSelect }: ToolCardProps) {
+export function ToolCard({ tool, onSelect, animationDelay = 0 }: ToolCardProps) {
   const router = useRouter();
   const IconComponent = iconMap[tool.icon as keyof typeof iconMap];
 
@@ -74,30 +75,45 @@ export function ToolCard({ tool, onSelect }: ToolCardProps) {
 
   return (
     <Card 
-      className="group relative overflow-hidden cursor-pointer border-0 shadow-sm bg-card transition-all duration-300 ease-out hover:shadow-xl hover:shadow-primary/10 hover:-translate-y-1 hover:scale-[1.02]"
+      className="group relative cursor-pointer border-0 shadow-sm glass-card glass-card-hover card-hover-gradient animate-premium-entrance transition-all duration-300 ease-out hover:shadow-xl hover:shadow-primary/10 overflow-visible"
       onClick={() => onSelect(tool)}
+      style={{
+        "--hover-gradient": "linear-gradient(135deg, rgba(107, 93, 229, 0.1) 0%, rgba(228, 93, 229, 0.05) 100%)",
+        "--animation-delay": `${animationDelay}ms`
+      } as React.CSSProperties}
     >
       {/* Status badges */}
-      <div className="absolute top-3 right-3 flex gap-1 z-10">
+      <div className="absolute top-3 right-3 flex flex-col gap-1 z-20">
         {tool.isNew && (
-          <Badge variant="secondary" className="text-xs bg-gradient-to-r from-emerald-500 to-teal-500 text-white">
+          <Badge 
+            variant="secondary" 
+            className="text-xs px-2 py-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md font-medium rounded-md border-0 animate-fade-in"
+            style={{"--animation-delay": `${animationDelay + 300}ms`} as React.CSSProperties}
+          >
             New
           </Badge>
         )}
         {tool.isPopular && (
-          <Badge variant="secondary" className="text-xs bg-gradient-to-r from-orange-500 to-red-500 text-white">
+          <Badge 
+            variant="secondary" 
+            className="text-xs px-2 py-1 bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md font-medium rounded-md border-0 animate-fade-in"
+            style={{"--animation-delay": `${animationDelay + 400}ms`} as React.CSSProperties}
+          >
             Popular
           </Badge>
         )}
       </div>
 
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 pt-6 pr-16">
         <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center transition-all duration-300 group-hover:from-primary/20 group-hover:to-primary/30 group-hover:scale-110">
-            {IconComponent && <IconComponent className="w-6 h-6 text-primary transition-all duration-300 group-hover:text-primary" />}
+          <div 
+            className="flex-shrink-0 w-12 h-12 rounded-lg bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center transition-all duration-300 group-hover:from-primary/20 group-hover:to-primary/30 group-hover:scale-110 animate-scale-in"
+            style={{"--animation-delay": `${animationDelay + 200}ms`} as React.CSSProperties}
+          >
+            {IconComponent && <IconComponent className="w-6 h-6 text-primary transition-colors duration-300 icon-pulse-on-hover" />}
           </div>
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-lg font-semibold text-slate-800 dark:text-slate-100 leading-tight transition-colors duration-300 group-hover:text-primary">
+            <CardTitle className="text-lg font-semibold text-slate-800 dark:text-slate-100 leading-tight transition-colors duration-300 group-hover:text-primary text-hover">
               {tool.name}
             </CardTitle>
             <div className="flex items-center gap-2 mt-2">
@@ -110,7 +126,10 @@ export function ToolCard({ tool, onSelect }: ToolCardProps) {
       </CardHeader>
 
       <CardContent className="pt-0 pb-4">
-        <CardDescription className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2 transition-colors duration-300 group-hover:text-slate-700 dark:group-hover:text-slate-300">
+        <CardDescription 
+          className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2 transition-colors duration-300 group-hover:text-slate-700 dark:group-hover:text-slate-300 animate-fade-in"
+          style={{"--animation-delay": `${animationDelay + 100}ms`} as React.CSSProperties}
+        >
           {tool.description}
         </CardDescription>
         

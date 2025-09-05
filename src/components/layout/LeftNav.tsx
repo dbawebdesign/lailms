@@ -86,23 +86,26 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
     <aside
       id="navigation"
       className={cn(
-        "h-full flex flex-col bg-background border-r border-[#E0E0E0] dark:border-[#333333]",
+        "h-full flex flex-col bg-background border-r border-[#E0E0E0] dark:border-[#333333] animate-gentle-fade-in",
         isNavCollapsed ? "items-center" : "items-start"
       )}
       aria-label="Main Navigation"
+      style={{"--animation-delay": "50ms"} as React.CSSProperties}
     >
       <div
         className={cn(
-          "h-14 sm:h-16 shrink-0 flex items-center border-b border-[#E0E0E0] dark:border-[#333333] w-full",
+          "h-14 sm:h-16 shrink-0 flex items-center border-b border-[#E0E0E0] dark:border-[#333333] w-full animate-subtle-slide-up",
           isNavCollapsed ? "justify-center px-0" : "justify-between px-4"
         )}
+        style={{"--animation-delay": "150ms"} as React.CSSProperties}
       >
         <div className="flex items-center">
           {!isNavCollapsed ? (
             <ThemeAwareLogo
               width={160}
               height={32}
-              className="py-2"
+              className="py-2 animate-gentle-fade-in"
+              style={{"--animation-delay": "200ms"} as React.CSSProperties}
             />
           ) : (
             <Button
@@ -146,7 +149,7 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
       </div>
 
       <nav className="flex-1 w-full overflow-y-auto py-4 space-y-1 px-2">
-        {mainNavItems.map((item) => (
+        {mainNavItems.map((item, index) => (
           <TooltipProvider key={item.href} delayDuration={0}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -154,12 +157,13 @@ const LeftNav: React.FC<LeftNavProps> = ({ userRole }) => {
                   href={item.href}
                   onClick={(e) => handleNavItemClick(item, e)}
                   className={cn(
-                    "flex items-center py-2 px-3 rounded-md text-sm font-medium transition-colors",
+                    "flex items-center py-2 px-3 rounded-md text-sm font-medium transition-colors animate-subtle-slide-up",
                     pathname === item.href
                       ? "bg-gradient-to-r from-[#FF835D] via-[#E45DE5] to-[#6B5DE5] text-white"
                       : "text-muted-foreground hover:bg-gradient-to-r hover:from-[#6B5DE5]/5 hover:to-[#6B5DE5]/10 hover:text-foreground",
                     isNavCollapsed ? "justify-center" : "w-full"
                   )}
+                  style={{"--animation-delay": `${300 + (index * 50)}ms`} as React.CSSProperties}
                 >
                   <item.icon
                     className={cn(

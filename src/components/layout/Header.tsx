@@ -145,12 +145,12 @@ const Header = () => {
   const hasMultipleRoles = availableRoles.length > 1;
 
   return (
-    <header className="flex items-center justify-between h-14 sm:h-16 px-4 sm:px-6 border-b border-[#E0E0E0] dark:border-[#333333] bg-background sticky top-0 z-10">
+    <header className="flex items-center justify-between h-14 sm:h-16 px-4 sm:px-6 border-b border-[#E0E0E0] dark:border-[#333333] bg-background sticky top-0 z-10 animate-gentle-fade-in" style={{"--animation-delay": "100ms"} as React.CSSProperties}>
       {/* Left Side */}
       <div></div>
 
       {/* Right Side: Actions */}
-      <div className="flex items-center space-x-1 sm:space-x-2">
+      <div className="flex items-center space-x-1 sm:space-x-2 animate-subtle-slide-up" style={{"--animation-delay": "200ms"} as React.CSSProperties}>
         {/* Theme Toggle */}
         <Button
           variant="ghost"

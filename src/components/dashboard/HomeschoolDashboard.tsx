@@ -299,31 +299,31 @@ export default function HomeschoolDashboard({
         /* Existing User Layout - Has Base Classes */
         <div className="space-y-6">
           {/* Quick Actions - Positioned at top for easy access */}
-          <Card>
+          <Card style={{"--animation-delay": "100ms"} as React.CSSProperties}>
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white">
+                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 dark-mode-safe-hover bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white animate-gentle-fade-in" style={{"--animation-delay": "300ms"} as React.CSSProperties}>
                   <Link href="/teach/knowledge-base/create">
                     <BookOpen className="h-8 w-8 hover-icon text-blue-600" />
                     <span className="text-sm font-medium">Create Course</span>
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white">
+                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 dark-mode-safe-hover bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white animate-gentle-fade-in" style={{"--animation-delay": "400ms"} as React.CSSProperties}>
                   <Link href="/homeschool/add-students">
                     <Users className="h-8 w-8 hover-icon text-green-600" />
                     <span className="text-sm font-medium">Add Students</span>
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white">
+                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 dark-mode-safe-hover bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white animate-gentle-fade-in" style={{"--animation-delay": "500ms"} as React.CSSProperties}>
                   <Link href="/teach/gradebook">
                     <GraduationCap className="h-8 w-8 hover-icon text-purple-600" />
                     <span className="text-sm font-medium">View Gradebook</span>
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white">
+                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 dark-mode-safe-hover bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white animate-gentle-fade-in" style={{"--animation-delay": "600ms"} as React.CSSProperties}>
                   <Link href="/teach/tools">
                     <Settings className="h-8 w-8 hover-icon text-orange-600" />
                     <span className="text-sm font-medium">Teacher Tools</span>
@@ -335,7 +335,7 @@ export default function HomeschoolDashboard({
 
           {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="hover-card cursor-pointer hover-bg-light">
+            <Card className="hover-card cursor-pointer hover-bg-light" style={{"--animation-delay": "700ms"} as React.CSSProperties}>
               <CardContent className="pt-6">
                 <div className="flex items-center space-x-2">
                   <GraduationCap className="h-5 w-5 text-blue-600 hover-icon" />
@@ -347,7 +347,7 @@ export default function HomeschoolDashboard({
               </CardContent>
             </Card>
             
-            <Card className="hover-card cursor-pointer hover-bg-light">
+            <Card className="hover-card cursor-pointer hover-bg-light" style={{"--animation-delay": "800ms"} as React.CSSProperties}>
               <CardContent className="pt-6">
                 <div className="flex items-center space-x-2">
                   <BookOpen className="h-5 w-5 text-purple-600 hover-icon" />
@@ -361,7 +361,7 @@ export default function HomeschoolDashboard({
           </div>
 
           {/* Students Section */}
-          <Card>
+          <Card style={{"--animation-delay": "900ms"} as React.CSSProperties}>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <GraduationCap className="h-5 w-5" />

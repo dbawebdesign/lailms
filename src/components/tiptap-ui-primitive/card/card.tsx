@@ -6,7 +6,7 @@ import "@/components/tiptap-ui-primitive/card/card.scss"
 
 const Card = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
   ({ className, ...props }, ref) => {
-    return <div ref={ref} className={cn("tiptap-card", className)} {...props} />
+    return <div ref={ref} className={cn("tiptap-card glass-card glass-card-hover animate-fade-in", className)} {...props} />
   }
 )
 Card.displayName = "Card"

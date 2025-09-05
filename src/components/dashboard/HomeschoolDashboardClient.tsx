@@ -252,7 +252,8 @@ export default function HomeschoolDashboardClient({
                 {courses.map((course) => (
                   <Card
                     key={course.id}
-                    className="p-4 border-neutral-200/50 dark:border-neutral-800/50 bg-white/50 dark:bg-neutral-900/50 backdrop-blur hover:shadow-lg transition-shadow cursor-pointer"
+                    className="p-4 glass-card glass-card-hover animate-slide-up card-hover-gradient hover:shadow-lg transition-shadow cursor-pointer"
+                    style={{"--hover-gradient": "linear-gradient(135deg, rgba(107, 93, 229, 0.08) 0%, rgba(228, 93, 229, 0.04) 100%)"} as React.CSSProperties}
                   >
                     <Link href={`/teach/base-classes/${course.id}`}>
                       <div className="flex items-center justify-between">

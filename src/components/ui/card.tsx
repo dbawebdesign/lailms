@@ -7,11 +7,15 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
+        // Base card styling with glassmorphism
+        "glass-card glass-card-hover",
+        "text-card-foreground flex flex-col gap-6 py-6 shadow-sm",
         // Enhanced hover effects for better interactivity
         "hover-card transition-all duration-300 ease-out",
         "hover:shadow-lg hover:shadow-primary/5",
         "dark:hover:shadow-primary/10 dark:hover:border-primary/20",
+        // Premium entrance animation
+        "animate-premium-entrance",
         className
       )}
       {...props}

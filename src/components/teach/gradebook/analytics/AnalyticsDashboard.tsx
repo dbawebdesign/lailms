@@ -175,17 +175,18 @@ export function AnalyticsDashboard({
     className?: string;
     color?: 'primary' | 'success' | 'warning' | 'info';
   }) => (
-    <Card className={cn("p-4 lg:p-6 bg-surface/50 border-divider hover:shadow-lg transition-airy", className)}>
+    <Card className={cn("p-4 lg:p-6 glass-card glass-card-hover animate-scale-in card-hover-gradient hover:shadow-lg transition-airy", className)}
+          style={{"--hover-gradient": "linear-gradient(135deg, rgba(107, 93, 229, 0.05) 0%, rgba(228, 93, 229, 0.02) 100%)"} as React.CSSProperties}>
       <div className="flex items-center gap-3 lg:gap-4">
         <div className={cn(
-          "p-2 lg:p-3 rounded-xl transition-airy",
+          "p-2 lg:p-3 rounded-xl transition-airy icon-hover group-hover:animate-pulse-glow",
           color === 'primary' && "bg-primary/10",
           color === 'success' && "bg-success/10",
           color === 'warning' && "bg-warning/10",
           color === 'info' && "bg-info/10"
         )}>
           <Icon className={cn(
-            "w-5 h-5 lg:w-6 lg:h-6",
+            "w-5 h-5 lg:w-6 lg:h-6 hover-scale",
             color === 'primary' && "text-primary",
             color === 'success' && "text-success",
             color === 'warning' && "text-warning",
@@ -194,7 +195,7 @@ export function AnalyticsDashboard({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs lg:text-caption text-muted-foreground font-medium">{title}</p>
-          <p className="text-lg lg:text-h2 font-bold text-foreground mt-1">{value}</p>
+          <p className="text-lg lg:text-h2 font-bold text-foreground mt-1 animate-counter number-digit">{value}</p>
           {subtitle && (
             <div className="flex items-center gap-2 mt-1 lg:mt-2">
               {trend && (

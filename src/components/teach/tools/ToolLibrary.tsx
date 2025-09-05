@@ -69,11 +69,12 @@ export function ToolLibrary() {
 
       {/* Tools Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-        {filteredTools.map((tool: TeachingTool) => (
+        {filteredTools.map((tool: TeachingTool, index: number) => (
           <ToolCard
             key={tool.id}
             tool={tool}
             onSelect={handleToolSelect}
+            animationDelay={index * 150} // Stagger by 150ms for premium feel
           />
         ))}
       </div>
