@@ -25,6 +25,9 @@ export default async function AppPagesLayout({
   }
   
   const { profile, isSubAccount, parentId } = activeProfileData;
+  if ((profile as any).is_canceled === true) {
+    redirect('/canceled');
+  }
   
   console.log('Layout: Active profile:', {
     userId: profile.user_id,

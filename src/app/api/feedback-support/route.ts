@@ -79,6 +79,63 @@ export async function POST(request: NextRequest) {
     // Log successful submission for monitoring
     console.log(`Feedback submitted: ${feedback.id} - ${validatedData.category} - ${validatedData.priority} - User: ${user.id}`);
 
+    // Send email notification via Resend
+    try {
+      const RESEND_API_KEY = process.env.RESEND_API_KEY;
+      const TO = 'areyes@learnologyai.com';
+      const FROM = process.env.RESEND_FROM_EMAIL || 'no-reply@learnologyai.com';
+
+      if (!RESEND_API_KEY) {
+        console.warn('RESEND_API_KEY not set; skipping feedback email send');
+      } else {
+        const fullName = `${(profile as any)?.first_name || ''} ${(profile as any)?.last_name || ''}`.trim();
+        const userEmail = user.email || insertData.contact_email || '';
+        const subject = `[${validatedData.category.toUpperCase()}][${validatedData.priority.toUpperCase()}] ${validatedData.subject} — ${fullName || userEmail || user.id}`;
+
+        const browserInfoHtml = validatedData.browserInfo
+          ? `<pre style="white-space:pre-wrap;margin-top:8px;background:#f7f7f7;padding:8px;border-radius:6px;">${JSON.stringify(validatedData.browserInfo, null, 2)}</pre>`
+          : '<em>No browser info provided</em>';
+
+        const html = `
+          <h2 style="margin:0 0 12px 0">New ${validatedData.category.replace('_', ' ')} submission</h2>
+          <p style="margin:4px 0"><strong>Record ID:</strong> ${feedback.id}</p>
+          <p style="margin:4px 0"><strong>Status:</strong> open</p>
+          <hr style="margin:12px 0;border:none;border-top:1px solid #e5e5e5" />
+          <p style="margin:4px 0"><strong>Priority:</strong> ${validatedData.priority}</p>
+          <p style="margin:4px 0"><strong>Subject:</strong> ${validatedData.subject}</p>
+          <p style="margin:8px 0"><strong>Message:</strong></p>
+          <div style="white-space:pre-wrap;background:#fafafa;padding:10px;border-radius:6px;border:1px solid #eee">${validatedData.message}</div>
+          <hr style="margin:12px 0;border:none;border-top:1px solid #e5e5e5" />
+          <h3 style="margin:0 0 8px 0">User</h3>
+          <p style="margin:4px 0"><strong>User ID:</strong> ${user.id}</p>
+          <p style="margin:4px 0"><strong>Name:</strong> ${fullName || 'N/A'}</p>
+          <p style="margin:4px 0"><strong>Email:</strong> ${userEmail || 'N/A'}</p>
+          <p style="margin:4px 0"><strong>Organisation ID:</strong> ${(profile as any)?.organisation_id || 'N/A'}</p>
+          <p style="margin:4px 0"><strong>Wants follow-up:</strong> ${validatedData.wantsFollowup ? 'Yes' : 'No'}</p>
+          <p style="margin:4px 0"><strong>Contact email provided:</strong> ${validatedData.contactEmail || userEmail || 'N/A'}</p>
+          <p style="margin:4px 0"><strong>Current page:</strong> ${validatedData.currentPage || 'N/A'}</p>
+          <h3 style="margin:12px 0 4px 0">Browser info</h3>
+          ${browserInfoHtml}
+        `;
+
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: FROM,
+            to: [TO],
+            subject,
+            html,
+          }),
+        });
+      }
+    } catch (emailError) {
+      console.error('Failed to send feedback notification email', emailError);
+    }
+
     return NextResponse.json({
       success: true,
       id: feedback.id,

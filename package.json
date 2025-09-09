@@ -140,6 +140,7 @@
     "tailwindcss-animate": "^1.0.7",
     "tiktoken": "^1.0.21",
     "uuid": "^11.1.0",
+    "resend": "^4.0.0",
     "yjs": "^13.6.27",
     "youtube-transcript-api": "^3.0.2",
     "youtubei.js": "^1.4.5",

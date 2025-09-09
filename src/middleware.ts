@@ -76,6 +76,38 @@ export async function middleware(request: NextRequest) {
   // Refresh session if expired - important!
   await supabase.auth.getSession()
 
+  // Enforce canceled accounts: redirect all authenticated requests to /canceled
+  // Allowlist certain paths so the canceled page and its API can function
+  const pathname = request.nextUrl.pathname
+  const isAllowedPath =
+    pathname.startsWith('/canceled') ||
+    pathname.startsWith('/api/account/reactivate') ||
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/favicon') ||
+    pathname.startsWith('/site.webmanifest') ||
+    pathname.startsWith('/api/auth')
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_canceled')
+        .eq('user_id', user.id)
+        .single()
+
+      if (profile?.is_canceled === true) {
+        if (!pathname.startsWith('/canceled') && !isAllowedPath) {
+          const url = request.nextUrl.clone()
+          url.pathname = '/canceled'
+          return NextResponse.redirect(url)
+        }
+      }
+    }
+  } catch (err) {
+    // Fail-open to avoid blocking non-auth traffic; authenticated users will still be handled elsewhere
+  }
+
   return response
 }
 
