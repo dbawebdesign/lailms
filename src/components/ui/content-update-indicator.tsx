@@ -149,6 +149,4 @@ export const UpdatedContentWrapper: React.FC<{
       {children}
     </motion.div>
   );
-};
-
-export default ContentUpdateIndicator; 
+}; 

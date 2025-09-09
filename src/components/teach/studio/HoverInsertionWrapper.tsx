@@ -216,4 +216,3 @@ export const HoverInsertionWrapper: React.FC<HoverInsertionWrapperProps> = ({
   );
 };
 
-export default HoverInsertionWrapper;

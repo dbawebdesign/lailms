@@ -473,4 +473,3 @@ export const ColorTextPopover = React.forwardRef<
 
 ColorTextPopover.displayName = "ColorTextPopover"
 
-export default ColorTextPopover

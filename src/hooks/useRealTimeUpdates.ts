@@ -182,5 +182,3 @@ export const useSectionUpdates = () => {
     enableAnimations: true,
   });
 };
-
-export default useRealTimeUpdates; 

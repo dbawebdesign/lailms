@@ -61,4 +61,3 @@ export function useUiEditorState(editor: Editor | null): UiEditorState {
   return aiState ?? defaultUiEditorState
 }
 
-export default useUiEditorState

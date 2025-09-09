@@ -11,6 +11,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "knip": "npx -y knip --reporter markdown",
+    "knip:json": "npx -y knip --reporter json",
     "check:types": "tsc --noEmit",
     "check:eslint": "eslint ./src ./packages/*/src ./supabase/functions ./workers ./tests --ext .ts,.tsx --quiet",
     "check": "npm-run-all -c -s check:*",

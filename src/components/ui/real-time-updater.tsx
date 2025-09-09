@@ -309,5 +309,3 @@ export const useRealTimeContentUpdates = (
 
   return { lastUpdate };
 };
-
-export default RealTimeUpdater; 

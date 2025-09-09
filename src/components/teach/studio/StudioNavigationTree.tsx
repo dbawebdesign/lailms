@@ -5,8 +5,8 @@ import type { StudioBaseClass, Path, Lesson, LessonSection } from '@/types/lesso
 import { ChevronRight, ChevronDown, FileText, GripVertical, Info as InfoIcon, FoldVertical, UnfoldVertical, BookOpen } from 'lucide-react';
 import { UpdatedContentWrapper } from '@/components/ui/content-update-indicator';
 import { Button } from '@/components/ui/button';
-import HoverInsertionWrapper from './HoverInsertionWrapper';
-import InsertionModal, { InsertionFormData } from './InsertionModal';
+import { HoverInsertionWrapper } from './HoverInsertionWrapper';
+import { InsertionModal, InsertionFormData } from './InsertionModal';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 // NEW: DND Kit imports

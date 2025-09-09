@@ -258,6 +258,4 @@ export const AILoadingAnimation: React.FC<{
     </div>
     <span className="text-blue-700 font-medium">{message}</span>
   </motion.div>
-);
-
-export default PremiumAnimation; 
+); 

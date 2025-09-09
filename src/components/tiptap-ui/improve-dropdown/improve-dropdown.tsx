@@ -481,4 +481,3 @@ export function ImproveDropdown({
   )
 }
 
-export default ImproveDropdown

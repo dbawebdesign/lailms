@@ -163,5 +163,3 @@ export const VideoNodeView: React.FC<ReactNodeViewProps> = ({
     </NodeViewWrapper>
   )
 }
-
-export default VideoNodeView 

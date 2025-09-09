@@ -44,4 +44,3 @@ export const useComposedRef = <T extends HTMLElement>(
   )
 }
 
-export default useComposedRef

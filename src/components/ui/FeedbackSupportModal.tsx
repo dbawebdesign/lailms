@@ -444,5 +444,3 @@ export const FeedbackSupportModal: React.FC<FeedbackSupportModalProps> = ({
     </AccessibleModal>
   );
 };
-
-export default FeedbackSupportModal; 

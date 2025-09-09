@@ -112,5 +112,3 @@ export const VideoNode = Node.create<VideoOptions>({
     ]
   },
 })
-
-export default VideoNode 

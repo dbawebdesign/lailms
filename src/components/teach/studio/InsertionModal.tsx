@@ -221,4 +221,3 @@ export const InsertionModal: React.FC<InsertionModalProps> = ({
   );
 };
 
-export default InsertionModal;
