@@ -21,17 +21,16 @@ export async function DELETE(
     const supabase = createSupabaseServiceClient();
     const { id } = await context.params;
 
-    // Verify this is a course catalog item
+    // Get the base class to verify it exists and get the name for the response
     const { data: baseClass, error: fetchError } = await supabase
       .from('base_classes')
-      .select('id, name, course_catalog')
+      .select('id, name')
       .eq('id', id)
-      .eq('course_catalog', true)
       .single();
 
     if (fetchError || !baseClass) {
       return NextResponse.json(
-        { error: 'Course catalog item not found' },
+        { error: 'Course not found' },
         { status: 404 }
       );
     }
@@ -45,7 +44,7 @@ export async function DELETE(
     if (deleteError) {
       console.error('Error deleting course catalog item:', deleteError);
       return NextResponse.json(
-        { error: 'Failed to delete course catalog item' },
+        { error: 'Failed to delete course' },
         { status: 500 }
       );
     }
