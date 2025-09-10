@@ -779,7 +779,9 @@ export default async function TeacherDashboardPage() {
           <div className="lg:col-span-4 space-y-6">
             
             {/* Quick Actions */}
-            <TeacherQuickActions organizationId={profile.organisation_id} />
+            {profile.organisation_id && (
+              <TeacherQuickActions organizationId={profile.organisation_id} />
+            )}
 
             {/* Classes Needing Attention */}
             <div className="bg-card/50 backdrop-blur-sm border border-border/40 rounded-2xl p-6">

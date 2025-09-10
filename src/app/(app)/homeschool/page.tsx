@@ -29,6 +29,12 @@ export default async function HomeschoolDashboardPage() {
   const isPrimaryParent = (profile as any).is_primary_parent as boolean | null
   const familyId = (profile as any).family_id as string | null
 
+  // Check if user has an organization - required for homeschool dashboard
+  if (!profile.organisation_id) {
+    console.error('User has no organization ID, redirecting to signup')
+    redirect("/homeschool-signup")
+  }
+
   // Load organisation details to verify homeschool type
   let organisationName = 'My Homeschool'
   if (profile.organisation_id) {
@@ -122,7 +128,7 @@ export default async function HomeschoolDashboardPage() {
     <HomeschoolDashboardClient
       userName={profile.first_name || 'Teacher'}
       organizationName={organisationName}
-      organizationId={profile.organisation_id}
+      organizationId={profile.organisation_id!}
       students={students}
       courses={courses || []}
       isFirstTime={!courses || courses.length === 0}
