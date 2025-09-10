@@ -10,7 +10,7 @@ function validateDevAdminPassword(request: NextRequest): boolean {
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   // Check dev admin password
   if (!validateDevAdminPassword(request)) {
@@ -19,7 +19,7 @@ export async function DELETE(
 
   try {
     const supabase = createSupabaseServiceClient();
-    const { id } = params;
+    const { id } = await context.params;
 
     // Verify this is a course catalog item
     const { data: baseClass, error: fetchError } = await supabase
