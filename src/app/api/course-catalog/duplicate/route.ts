@@ -22,6 +22,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
 
+    if (!profile.organisation_id) {
+      return NextResponse.json({ error: 'User must be associated with an organization to duplicate courses' }, { status: 400 });
+    }
+
     const body = await request.json();
     const { sourceBaseClassId, newCourseName } = body;
 
@@ -53,7 +57,7 @@ export async function POST(request: NextRequest) {
       .insert({
         name: newCourseName,
         description: sourceBaseClass.description,
-        organisation_id: profile.organisation_id,
+        organisation_id: profile.organisation_id!,
         user_id: user.id,
         settings: {
           ...sourceBaseClass.settings,
@@ -100,7 +104,7 @@ export async function POST(request: NextRequest) {
           banner_image: sourcePath.banner_image,
           level: sourcePath.level,
           published: sourcePath.published,
-          organisation_id: profile.organisation_id,
+          organisation_id: profile.organisation_id!,
           base_class_id: newBaseClass.id,
           order_index: sourcePath.order_index,
           created_by: user.id,
