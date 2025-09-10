@@ -52,6 +52,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Start a transaction to duplicate everything
+    // Safely extract settings as an object, defaulting to empty object if not a plain object
+    const sourceSettings = sourceBaseClass.settings && 
+                          typeof sourceBaseClass.settings === 'object' && 
+                          !Array.isArray(sourceBaseClass.settings) 
+                          ? sourceBaseClass.settings as Record<string, any>
+                          : {};
+
     const { data: newBaseClass, error: baseClassError } = await supabase
       .from('base_classes')
       .insert({
@@ -60,7 +67,7 @@ export async function POST(request: NextRequest) {
         organisation_id: profile.organisation_id!,
         user_id: user.id,
         settings: {
-          ...(sourceBaseClass.settings || {}),
+          ...sourceSettings,
           duplicated_from: sourceBaseClassId,
           duplicated_at: new Date().toISOString()
         },
