@@ -142,11 +142,10 @@ export function CourseCreationOptionsModal({
           </Card>
 
           {/* Choose from Catalog */}
-          <Card className="relative hover:shadow-lg transition-shadow cursor-pointer group border-green-200 dark:border-green-800 flex flex-col h-full" onClick={handleChooseFromCatalog}>
+          <Card className="relative hover:shadow-lg transition-shadow cursor-pointer group border-green-200 dark:border-green-800 flex flex-col h-full opacity-75">
             <div className="absolute top-3 right-3 z-10">
-              <Badge className="bg-green-500 hover:bg-green-600 text-white shadow-lg">
-                <Zap className="h-3 w-3 mr-1" />
-                Fastest
+              <Badge variant="secondary" className="shadow-lg">
+                Coming Soon
               </Badge>
             </div>
             <CardHeader className="text-center pb-4">
@@ -174,9 +173,9 @@ export function CourseCreationOptionsModal({
                   <div>• Ready to use immediately</div>
                 </div>
               </div>
-              <Button className="w-full bg-green-600 hover:bg-green-700 mt-auto" onClick={handleChooseFromCatalog}>
-                Browse Catalog
-                <ArrowRight className="ml-2 h-4 w-4" />
+              <Button variant="outline" className="w-full mt-auto" disabled>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Coming Soon
               </Button>
             </CardContent>
           </Card>
