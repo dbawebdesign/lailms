@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { useCourseCreationModal } from '@/hooks/useCourseCreationModal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { 
   Plus, 
@@ -38,6 +39,7 @@ interface Course {
 interface HomeschoolDashboardClientProps {
   userName: string
   organizationName: string
+  organizationId: string
   students: Student[]
   courses: Course[]
   isFirstTime: boolean
@@ -46,11 +48,16 @@ interface HomeschoolDashboardClientProps {
 export default function HomeschoolDashboardClient({
   userName,
   organizationName,
+  organizationId,
   students,
   courses,
   isFirstTime
 }: HomeschoolDashboardClientProps) {
   const [showDemoVideo, setShowDemoVideo] = useState(isFirstTime)
+  
+  const { openModal, CourseCreationModal } = useCourseCreationModal({ 
+    organisationId: organizationId 
+  })
   useEffect(() => {
     if (isFirstTime && !showDemoVideo) {
       // Trigger help link animation in sidebar after closing demo
@@ -276,12 +283,10 @@ export default function HomeschoolDashboardClient({
                 <Button
                   variant="outline"
                   className="w-full border-dashed border-neutral-300 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600"
-                  asChild
+                  onClick={openModal}
                 >
-                  <Link href="/teach/knowledge-base/create">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create New Course
-                  </Link>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create New Course
                 </Button>
               </div>
             </div>
@@ -367,6 +372,8 @@ export default function HomeschoolDashboardClient({
           </div>
         </DialogContent>
       </Dialog>
+      
+      <CourseCreationModal />
     </div>
   )
 }

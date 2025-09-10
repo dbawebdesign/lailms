@@ -122,6 +122,7 @@ export default async function HomeschoolDashboardPage() {
     <HomeschoolDashboardClient
       userName={profile.first_name || 'Teacher'}
       organizationName={organisationName}
+      organizationId={profile.organisation_id}
       students={students}
       courses={courses || []}
       isFirstTime={!courses || courses.length === 0}

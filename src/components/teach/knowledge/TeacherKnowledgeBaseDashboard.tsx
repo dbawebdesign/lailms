@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, BookOpen, FileText, Sparkles, Upload, Building2 } from 'lucide-react';
+import { useCourseCreationModal } from '@/hooks/useCourseCreationModal';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,6 +57,10 @@ export default function TeacherKnowledgeBaseDashboard({
     pendingProcessing: 0,
     recentUploads: 0,
     activeClassesWithKB: 0
+  });
+
+  const { openModal, CourseCreationModal } = useCourseCreationModal({ 
+    organisationId 
   });
 
   // Load knowledge base statistics
@@ -139,11 +144,9 @@ export default function TeacherKnowledgeBaseDashboard({
                   </p>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <Button asChild variant="outline">
-                    <Link href="/teach/knowledge-base/create">
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Create Course
-                    </Link>
+                  <Button variant="outline" onClick={openModal}>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Create Course
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -246,6 +249,8 @@ export default function TeacherKnowledgeBaseDashboard({
           </div>
         </div>
       </div>
+      
+      <CourseCreationModal />
     </LunaContextElement>
   );
 } 

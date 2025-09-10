@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { BaseClass, BaseClassCreationData, GeneratedOutline } from "@/types/teach";
 import { BaseClassCardGrid } from "@/components/teach/BaseClassCardGrid";
 import { CreateBaseClassModal } from "@/components/teach/CreateBaseClassModal";
+import { CourseCreationOptionsModal } from "@/components/teach/CourseCreationOptionsModal";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, BookOpenText, Plus, Loader2 } from "lucide-react";
 import { createBrowserClient } from '@supabase/ssr'; // Import Supabase client
@@ -79,6 +80,7 @@ export default function TeachBaseClassesPage() {
   const [baseClasses, setBaseClasses] = useState<BaseClass[]>([]);
   const [isLoadingPage, setIsLoadingPage] = useState(true); // For initial page load
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null); 
   
   const [isProcessingRequest, setIsProcessingRequest] = useState(false); // Overall request processing state
@@ -301,7 +303,16 @@ export default function TeachBaseClassesPage() {
   };
 
   const handleCreateNewBaseClass = () => {
-    router.push('/teach/knowledge-base/create');
+    if (!userOrgId) {
+      console.error('Cannot create base class: Organisation ID is missing.');
+      setPageError('Organisation ID is missing. Cannot create base class.');
+      return;
+    }
+    
+    console.log('Opening course creation options modal with organisation ID:', userOrgId);
+    setIsOptionsModalOpen(true);
+    setPageError(null); // Clear any previous errors
+    setCurrentProcessStatus(null); // Clear any previous status
   };
 
   const handleModalOpen = () => {
@@ -322,6 +333,11 @@ export default function TeachBaseClassesPage() {
         // setPageError(null);
     }
     // If processing, modal close is prevented by its internal onOpenChange logic
+  };
+
+  const handleOptionsModalClose = () => {
+    setIsOptionsModalOpen(false);
+    setCurrentProcessStatus(null); // Clear status when modal closes
   };
 
   // Placeholder action handlers - these can be implemented later
@@ -458,6 +474,14 @@ export default function TeachBaseClassesPage() {
           organisationId={userOrgId} 
           isProcessing={isProcessingRequest} // Pass processing state
           currentStatusMessage={currentProcessStatus} // Pass status message
+        />
+      )}
+
+      {isOptionsModalOpen && userOrgId && (
+        <CourseCreationOptionsModal
+          isOpen={isOptionsModalOpen}
+          onClose={handleOptionsModalClose}
+          organisationId={userOrgId}
         />
       )}
     </div>

@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import WelcomeCard from "@/components/dashboard/WelcomeCard";
 import { ActiveClassItem } from "@/components/dashboard/teacher/ActiveClassItem";
+import TeacherQuickActions from "@/components/dashboard/teacher/TeacherQuickActions";
 import ServerPremiumProgressWidget from '@/components/dashboard/ServerPremiumProgressWidget';
 import HomeschoolDashboard from "@/components/dashboard/HomeschoolDashboard";
 import AutoRefreshHandler from "@/components/dashboard/AutoRefreshHandler";
@@ -778,29 +779,7 @@ export default async function TeacherDashboardPage() {
           <div className="lg:col-span-4 space-y-6">
             
             {/* Quick Actions */}
-            <div className="bg-card/50 backdrop-blur-sm border border-border/40 rounded-2xl p-6">
-              <h3 className="text-base font-medium mb-4 text-foreground">Quick Actions</h3>
-              <div className="space-y-3">
-                <Button asChild className="w-full justify-start h-10" variant="outline">
-                  <Link href="/teach/knowledge-base/create">
-                    <BookOpen className="mr-2 h-4 w-4" />
-                    Create New Course
-                  </Link>
-                </Button>
-                <Button asChild className="w-full justify-start h-10" variant="outline">
-                  <Link href="/teach/gradebook">
-                    <ClipboardCheck className="mr-2 h-4 w-4" />
-                    Grade Assignments
-                  </Link>
-                </Button>
-                <Button asChild className="w-full justify-start h-10" variant="outline">
-                  <Link href="/teach/knowledge">
-                    <Search className="mr-2 h-4 w-4" />
-                    Search Knowledge
-                  </Link>
-                </Button>
-              </div>
-            </div>
+            <TeacherQuickActions organizationId={profile.organisation_id} />
 
             {/* Classes Needing Attention */}
             <div className="bg-card/50 backdrop-blur-sm border border-border/40 rounded-2xl p-6">
