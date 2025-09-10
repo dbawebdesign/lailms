@@ -30,12 +30,10 @@ export async function GET(request: NextRequest) {
         organisation_id,
         settings,
         assessment_config,
-        course_catalog,
         paths!inner(id),
         lessons!inner(id),
         assessments!inner(id)
       `)
-      .eq('course_catalog', true)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -47,21 +45,26 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform the data to include counts
-    const coursesWithCounts = courses.map(course => ({
-      ...course,
+    const coursesWithCounts = courses?.map(course => ({
+      id: course.id,
+      name: course.name,
+      description: course.description,
+      created_at: course.created_at,
+      updated_at: course.updated_at,
+      user_id: course.user_id,
+      organisation_id: course.organisation_id,
+      settings: course.settings,
+      assessment_config: course.assessment_config,
       _count: {
         paths: course.paths?.length || 0,
         lessons: course.lessons?.length || 0,
         assessments: course.assessments?.length || 0
       }
-    }));
-
-    // Remove the nested arrays from the response
-    const cleanCourses = coursesWithCounts.map(({ paths, lessons, assessments, ...course }) => course);
+    })) || [];
 
     return NextResponse.json({
       success: true,
-      courses: cleanCourses
+      courses: coursesWithCounts
     });
 
   } catch (error) {

@@ -415,9 +415,6 @@ export function DevAdminCourseGenerator() {
             {generationJob && (
               <RealTimeProgress 
                 jobId={generationJob.id}
-                onComplete={() => {
-                  // Handle completion
-                }}
               />
             )}
           </CardContent>

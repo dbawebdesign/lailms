@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DevAdminCourseGenerator } from '@/components/dev-admin/DevAdminCourseGenerator'
 import { DevAdminCourseList } from '@/components/dev-admin/DevAdminCourseList'
-import { RealTimeProgress } from '@/components/ui/real-time-progress'
+import RealtimeCourseGenerationWidget from '@/components/dashboard/RealtimeCourseGenerationWidget'
 import { 
   BookOpen, 
   Plus, 
@@ -164,13 +164,10 @@ export default function DevAdminCourseCatalogPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <RealTimeProgress 
-                jobId={null} // Will show all active jobs
-                onComplete={() => {
-                  // Refresh the manage tab when generation completes
-                  setActiveTab('manage')
-                }}
-                showAllJobs={true}
+              <RealtimeCourseGenerationWidget 
+                userId="dev-admin" // Dev admin user
+                className="w-full"
+                initialJobs={[]} // Start with empty array, will fetch jobs dynamically
               />
               
               <div className="mt-6">

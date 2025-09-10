@@ -46,17 +46,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify the base class exists and is marked as course_catalog
+    // Verify the base class exists
     const { data: baseClass, error: baseClassError } = await supabase
       .from('base_classes')
       .select('*')
       .eq('id', baseClassId)
-      .eq('course_catalog', true)
       .single();
 
     if (baseClassError || !baseClass) {
       return NextResponse.json(
-        { error: 'Course catalog base class not found' }, 
+        { error: 'Base class not found' }, 
         { status: 404 }
       );
     }
@@ -65,7 +64,7 @@ export async function POST(request: NextRequest) {
     const generationRequest: CourseGenerationRequest = {
       baseClassId,
       organisationId: baseClass.organisation_id,
-      userId: null, // Dev admin doesn't have a specific user ID
+      userId: 'dev-admin', // Dev admin system user
       title,
       description,
       generationMode: generationMode as any,
@@ -88,12 +87,12 @@ export async function POST(request: NextRequest) {
         organisation_id: baseClass.organisation_id,
         job_type: 'generate_course_v2_teach',
         status: 'queued',
-        job_data: generationRequest,
-        user_id: null, // Dev admin
+        job_data: generationRequest as any,
+        user_id: null, // Dev admin - no specific user
         generation_config: {
           isDevAdmin: true,
           courseCatalog: true
-        }
+        } as any
       })
       .select()
       .single();
@@ -120,9 +119,8 @@ export async function POST(request: NextRequest) {
       prerequisites,
       lessonsPerWeek,
       learningObjectives,
-      assessmentSettings,
-      paths: [] // Will be generated
-    }, generationRequest).catch(error => {
+      assessmentSettings
+    } as any, generationRequest).catch(error => {
       console.error('Error in course generation orchestration:', error);
     });
 
