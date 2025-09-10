@@ -235,8 +235,7 @@ export async function POST(request: NextRequest) {
             allow_review: sourceAssessment.allow_review,
             ai_grading_enabled: sourceAssessment.ai_grading_enabled,
             ai_model: sourceAssessment.ai_model,
-            created_by: user.id,
-            is_published: sourceAssessment.is_published
+            created_by: user.id
           })
           .select()
           .single();
