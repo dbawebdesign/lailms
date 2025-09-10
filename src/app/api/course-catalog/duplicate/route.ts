@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         organisation_id: profile.organisation_id!,
         user_id: user.id,
         settings: {
-          ...sourceBaseClass.settings,
+          ...(sourceBaseClass.settings || {}),
           duplicated_from: sourceBaseClassId,
           duplicated_at: new Date().toISOString()
         },
