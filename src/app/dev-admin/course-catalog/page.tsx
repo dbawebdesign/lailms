@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 
-export default function DevAdminCourseCatalogPage() {
+function DevAdminCourseCatalogContent() {
   const searchParams = useSearchParams()
   const [password, setPassword] = useState('')
   const [authenticated, setAuthenticated] = useState(false)
@@ -192,5 +192,13 @@ export default function DevAdminCourseCatalogPage() {
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+export default function DevAdminCourseCatalogPage() {
+  return (
+    <Suspense fallback={<div className="p-8">Loading...</div>}>
+      <DevAdminCourseCatalogContent />
+    </Suspense>
   )
 }
