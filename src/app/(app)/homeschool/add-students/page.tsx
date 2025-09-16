@@ -129,8 +129,7 @@ export default function AddStudentsPage() {
                 first_name: studentProfile.first_name,
                 last_name: studentProfile.last_name,
                 grade_level: studentProfile.grade_level,
-                username: studentProfile.username,
-                role: studentProfile.role
+                username: studentProfile.username
               })
             }
           })
