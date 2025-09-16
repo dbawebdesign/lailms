@@ -4,11 +4,35 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  const token_hash = searchParams.get('token_hash')
+  const type = searchParams.get('type')
   const next = searchParams.get('next') ?? '/'
 
-  if (code) {
-    const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseServerClient()
+
+  // Handle PKCE flow with token_hash (for password reset)
+  if (token_hash && type) {
+    const { data, error } = await supabase.auth.verifyOtp({
+      type: type as any,
+      token_hash,
+    })
+
+    if (!error && data.user) {
+      // For password reset, redirect to change password page
+      if (type === 'recovery') {
+        return NextResponse.redirect(`${origin}/change-password`)
+      }
+      
+      // For email confirmation, continue with normal flow
+      return NextResponse.redirect(`${origin}${next}`)
+    }
     
+    // If there's an error, redirect to error page
+    return NextResponse.redirect(`${origin}/login?error=invalid_token`)
+  }
+
+  // Handle standard OAuth code exchange
+  if (code) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error && data.user) {
