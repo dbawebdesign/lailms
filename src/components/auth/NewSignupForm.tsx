@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { Loader2, Mail } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
+import EmailConfirmationSuccess from './EmailConfirmationSuccess'
 
 export default function NewSignupForm() {
   const router = useRouter()
@@ -22,6 +23,7 @@ export default function NewSignupForm() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false)
 
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,7 +51,7 @@ export default function NewSignupForm() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/homeschool-signup`
+          emailRedirectTo: `${window.location.origin}/auth/callback`
         }
       })
 
@@ -58,39 +60,46 @@ export default function NewSignupForm() {
       }
 
       if (data?.user) {
-        // Create initial profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: data.user.id,
-            username: email.split('@')[0], // Default username from email
-            role: 'teacher', // Default to teacher for homeschool users
-            active_role: 'teacher', // Set active_role to teacher for homeschool users
-            onboarding_completed: false,
-            onboarding_step: 'organization_type'
-          })
+        // Check if email confirmation is required
+        if (!data.user.email_confirmed_at) {
+          // Email confirmation required - show success message
+          setShowEmailConfirmation(true)
+        } else {
+          // Email already confirmed (shouldn't happen with confirmations enabled, but handle it)
+          // Create initial profile
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              user_id: data.user.id,
+              username: email.split('@')[0], // Default username from email
+              role: 'teacher', // Default to teacher for homeschool users
+              active_role: 'teacher', // Set active_role to teacher for homeschool users
+              onboarding_completed: false,
+              onboarding_step: 'organization_type'
+            })
 
-        if (profileError && profileError.code !== '23505') { // Ignore duplicate key errors
-          console.error('Profile creation error:', profileError)
+          if (profileError && profileError.code !== '23505') { // Ignore duplicate key errors
+            console.error('Profile creation error:', profileError)
+          }
+
+          // Track referral signup with FirstPromoter
+          try {
+            await fetch('/api/firstpromoter/track-signup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                email: email,
+                uid: data.user.id 
+              }),
+            });
+          } catch (fpError) {
+            // Don't fail signup if FirstPromoter tracking fails
+            console.warn('FirstPromoter tracking failed:', fpError);
+          }
+
+          // Redirect to homeschool signup flow
+          router.push('/homeschool-signup')
         }
-
-        // Track referral signup with FirstPromoter
-        try {
-          await fetch('/api/firstpromoter/track-signup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              email: email,
-              uid: data.user.id 
-            }),
-          });
-        } catch (fpError) {
-          // Don't fail signup if FirstPromoter tracking fails
-          console.warn('FirstPromoter tracking failed:', fpError);
-        }
-
-        // Redirect to homeschool signup flow
-        router.push('/homeschool-signup')
       }
     } catch (error: any) {
       console.error('Signup error:', error)
@@ -112,7 +121,7 @@ export default function NewSignupForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/homeschool-signup`,
+          redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent'
@@ -128,6 +137,11 @@ export default function NewSignupForm() {
       toast.error(error.message || 'Failed to sign up with Google')
       setIsLoading(false)
     }
+  }
+
+  // Show email confirmation success message if needed
+  if (showEmailConfirmation) {
+    return <EmailConfirmationSuccess email={email} />
   }
 
   return (

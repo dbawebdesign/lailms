@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
         .select(`
           role,
           active_role,
+          onboarding_completed,
+          onboarding_step,
           organisations (
             organisation_type
           )
@@ -26,6 +28,13 @@ export async function GET(request: NextRequest) {
         .single()
 
       if (profile) {
+        // Check if this is a new user who just confirmed their email
+        if (!profile.onboarding_completed) {
+          // New user - redirect to onboarding flow
+          return NextResponse.redirect(`${origin}/homeschool-signup`)
+        }
+
+        // Existing user - redirect to their appropriate dashboard
         const userRole = (profile.active_role || profile.role)?.toUpperCase()
         const orgType = profile.organisations?.organisation_type
         
@@ -48,10 +57,42 @@ export async function GET(request: NextRequest) {
         }
         
         return NextResponse.redirect(`${origin}${redirectPath}`)
+      } else {
+        // No profile found - this is a new user who just confirmed their email
+        // Create initial profile for homeschool users
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: data.user.id,
+            username: data.user.email?.split('@')[0] || 'user', // Default username from email
+            role: 'teacher', // Default to teacher for homeschool users
+            active_role: 'teacher', // Set active_role to teacher for homeschool users
+            onboarding_completed: false,
+            onboarding_step: 'organization_type'
+          })
+
+        if (profileError && profileError.code !== '23505') { // Ignore duplicate key errors
+          console.error('Profile creation error:', profileError)
+        }
+
+        // Track referral signup with FirstPromoter
+        try {
+          await fetch(`${origin}/api/firstpromoter/track-signup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              email: data.user.email,
+              uid: data.user.id 
+            }),
+          });
+        } catch (fpError) {
+          // Don't fail signup if FirstPromoter tracking fails
+          console.warn('FirstPromoter tracking failed:', fpError);
+        }
+
+        // Redirect to homeschool signup flow
+        return NextResponse.redirect(`${origin}/homeschool-signup`)
       }
-      
-      // If no profile found, redirect to signup
-      return NextResponse.redirect(`${origin}/homeschool-signup`)
     }
   }
 
