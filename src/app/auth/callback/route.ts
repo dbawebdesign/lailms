@@ -18,8 +18,6 @@ export async function GET(request: NextRequest) {
         .select(`
           role,
           active_role,
-          onboarding_completed,
-          onboarding_step,
           organisations (
             organisation_type
           )
@@ -28,9 +26,14 @@ export async function GET(request: NextRequest) {
         .single()
 
       if (profile) {
-        // Check if this is a new user who just confirmed their email
-        if (!profile.onboarding_completed) {
-          // New user - redirect to onboarding flow
+        // Check if this is a homeschool user (no organization or individual_family type)
+        const isHomeschoolUser = !profile.organisations || 
+          profile.organisations.organisation_type === 'individual_family' ||
+          profile.organisations.organisation_type === 'homeschool_coop'
+        
+        // If it's a homeschool user, redirect to onboarding to complete setup
+        if (isHomeschoolUser && !profile.organisations) {
+          // New homeschool user - redirect to onboarding flow
           return NextResponse.redirect(`${origin}/homeschool-signup`)
         }
 
@@ -66,9 +69,7 @@ export async function GET(request: NextRequest) {
             user_id: data.user.id,
             username: data.user.email?.split('@')[0] || 'user', // Default username from email
             role: 'teacher', // Default to teacher for homeschool users
-            active_role: 'teacher', // Set active_role to teacher for homeschool users
-            onboarding_completed: false,
-            onboarding_step: 'organization_type'
+            active_role: 'teacher' // Set active_role to teacher for homeschool users
           })
 
         if (profileError && profileError.code !== '23505') { // Ignore duplicate key errors

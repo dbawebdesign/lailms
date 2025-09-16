@@ -73,9 +73,7 @@ export default function NewSignupForm() {
               user_id: data.user.id,
               username: email.split('@')[0], // Default username from email
               role: 'teacher', // Default to teacher for homeschool users
-              active_role: 'teacher', // Set active_role to teacher for homeschool users
-              onboarding_completed: false,
-              onboarding_step: 'organization_type'
+              active_role: 'teacher' // Set active_role to teacher for homeschool users
             })
 
           if (profileError && profileError.code !== '23505') { // Ignore duplicate key errors
