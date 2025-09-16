@@ -61,6 +61,25 @@ export default async function HomeschoolDashboardPage() {
   // Get family students if this is a parent account
   let students: { id: string; firstName: string; lastName: string; gradeLevel: string; username: string }[] = []
   if (isPrimaryParent && familyId) {
+    // First get students from profiles table by family_id
+    const { data: profileStudents } = await (supabase as any)
+      .from('profiles')
+      .select('user_id, first_name, last_name, grade_level, username')
+      .eq('family_id', familyId)
+      .eq('role', 'student')
+      .order('first_name')
+
+    if (profileStudents) {
+      students = profileStudents.map((student: any) => ({
+        id: student.user_id,
+        firstName: student.first_name || '',
+        lastName: student.last_name || '',
+        gradeLevel: student.grade_level || '',
+        username: student.username || ''
+      }))
+    }
+
+    // Also get students from family_students table
     const { data: familyStudents } = await (supabase as any)
       .from('family_students')
       .select(`
@@ -86,14 +105,20 @@ export default async function HomeschoolDashboardPage() {
       } | null
     }
 
-    const rows: FamilyStudentRow[] = (familyStudents as FamilyStudentRow[] | null) ?? []
-    students = rows.map((fs: FamilyStudentRow) => ({
-      id: fs.student_id,
-      firstName: fs.profiles?.first_name || '',
-      lastName: fs.profiles?.last_name || '',
-      gradeLevel: fs.profiles?.grade_level || '',
-      username: fs.profiles?.username || ''
-    }))
+    const familyStudentRows: FamilyStudentRow[] = (familyStudents as FamilyStudentRow[] | null) ?? []
+    
+    // Merge family_students data, avoiding duplicates
+    familyStudentRows.forEach((fs: FamilyStudentRow) => {
+      if (fs.profiles && !students.find(s => s.id === fs.student_id)) {
+        students.push({
+          id: fs.student_id,
+          firstName: fs.profiles.first_name || '',
+          lastName: fs.profiles.last_name || '',
+          gradeLevel: fs.profiles.grade_level || '',
+          username: fs.profiles.username || ''
+        })
+      }
+    })
   }
 
   // Get active courses (normalize description to undefined for client prop)
