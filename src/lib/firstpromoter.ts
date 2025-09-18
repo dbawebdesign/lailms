@@ -174,7 +174,8 @@ export function prepareTrackingData(
   userInfo: { email?: string; uid?: string }
 ): FirstPromoterTrackingData {
   const tid = getTrackingIdFromRequest(request);
-  const ref_id = getReferralIdFromRequest(request);
+  // Prefer _fprom_tid to avoid multiple tracking; only fall back to ref_id if no tid
+  const ref_id = tid ? null : getReferralIdFromRequest(request);
   const ip = getClientIP(request);
 
   return {

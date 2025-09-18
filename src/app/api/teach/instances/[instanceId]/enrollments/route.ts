@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { type User } from '@supabase/supabase-js';
 import { Tables } from 'packages/types/db';
 
-import { PROFILE_ROLE_FIELDS } from '@/lib/utils/roleUtils';
+import { PROFILE_ROLE_FIELDS, hasTeacherPermissions } from '@/lib/utils/roleUtils';
 // Define expected types for request/response payloads
 interface EnrollmentRequest {
   profile_id: string; // Changed from student_som_id to profile_id
@@ -36,9 +36,9 @@ async function authorizeTeacher(supabase: ReturnType<typeof createSupabaseServer
     return { organisationId: '', errorResponse: NextResponse.json({ error: 'User not associated with an organisation.' }, { status: 403 }) };
   }
 
-  if (!['admin', 'teacher'].includes(profile.role)) {
-    console.warn('Auth warning: User is not an admin or teacher.', { userId: currentUser.id, role: profile.role });
-    return { organisationId: '', errorResponse: NextResponse.json({ error: 'User does not have sufficient privileges (admin/teacher required).' }, { status: 403 }) };
+  if (!hasTeacherPermissions(profile)) {
+    console.warn('Auth warning: User does not have teacher-level permissions.', { userId: currentUser.id, role: profile.role, active_role: profile.active_role });
+    return { organisationId: '', errorResponse: NextResponse.json({ error: 'User does not have sufficient privileges (teacher-level required).' }, { status: 403 }) };
   }
 
   // Check if the class instance belongs to the teacher's organisation
