@@ -20,7 +20,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, BookOpen } from "lucide-react";
+import { CourseCatalogSelector } from "@/components/course-catalog/CourseCatalogSelector";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const PRESET_WEEKS = {
   QUARTER: 10,
@@ -59,6 +61,7 @@ export const CreateBaseClassModal: React.FC<CreateBaseClassModalProps> = ({
 }) => {
   const { toast } = useToast();
   const [currentLengthWeeks, setCurrentLengthWeeks] = useState(initialDefaultWeeks); // Use initial default
+  const [activeTab, setActiveTab] = useState("create");
 
   const form = useForm<BaseClassFormValues>({
     resolver: zodResolver(baseClassFormSchema),
@@ -121,18 +124,28 @@ export const CreateBaseClassModal: React.FC<CreateBaseClassModalProps> = ({
     }
   };
 
+  const handleCourseSelected = (courseId: string, courseName: string) => {
+    toast({
+      title: "Course Duplicated",
+      description: `"${courseName}" has been added to your base classes.`,
+    });
+    onClose();
+    // Optionally refresh the base classes list
+    window.location.reload();
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open && !isProcessing) {
         onClose();
       }
     }}>
-      <DialogContent className="sm:max-w-[525px]">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg font-medium">Create New Base Class</DialogTitle>
           {!isProcessing && (
             <DialogDescription className="text-sm text-muted-foreground">
-              Fill in the details below to create a new base class.
+              Create a new base class from scratch or choose from our course catalog.
             </DialogDescription>
           )}
           {isProcessing && currentStatusMessage && (
@@ -142,7 +155,18 @@ export const CreateBaseClassModal: React.FC<CreateBaseClassModalProps> = ({
             </div>
           )}
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6 py-2 pb-4">
+        
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="create">Create New</TabsTrigger>
+            <TabsTrigger value="catalog">
+              <BookOpen className="w-4 h-4 mr-2" />
+              Course Catalog
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="create" className="mt-6">
+            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6 py-2 pb-4">
           <div className="space-y-1.5">
             <Label htmlFor="name">Name</Label>
             <Input id="name" {...form.register("name")} placeholder="e.g., Introduction to Algebra" disabled={isProcessing} />
@@ -204,24 +228,30 @@ export const CreateBaseClassModal: React.FC<CreateBaseClassModalProps> = ({
             </div>
           </div>
 
-          <DialogFooter className="pt-6">
-            <Button type="button" variant="outline" onClick={onClose} className="px-6 py-3" disabled={isProcessing}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isProcessing || form.formState.isSubmitting} className="px-6 py-3 w-[180px]">
-              {isProcessing && currentStatusMessage ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
-                  {currentStatusMessage.length > 15 ? `${currentStatusMessage.substring(0,15)}...` : currentStatusMessage}
-                </>
-              ) : form.formState.isSubmitting ? (
-                "Submitting..."
-              ) : (
-                "Create Base Class"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
+              <DialogFooter className="pt-6">
+                <Button type="button" variant="outline" onClick={onClose} className="px-6 py-3" disabled={isProcessing}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isProcessing || form.formState.isSubmitting} className="px-6 py-3 w-[180px]">
+                  {isProcessing && currentStatusMessage ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                      {currentStatusMessage.length > 15 ? `${currentStatusMessage.substring(0,15)}...` : currentStatusMessage}
+                    </>
+                  ) : form.formState.isSubmitting ? (
+                    "Submitting..."
+                  ) : (
+                    "Create Base Class"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </TabsContent>
+          
+          <TabsContent value="catalog" className="mt-6">
+            <CourseCatalogSelector onCourseSelected={handleCourseSelected} />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

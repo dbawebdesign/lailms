@@ -112,8 +112,8 @@ export default function FamilyAccountSwitcher() {
         }
       }
       
-      // If no family members found, try organisation_id
-      if (allProfiles.length === 0 && profile.organisation_id) {
+      // Also try organisation_id to get additional members (not just fallback)
+      if (profile.organisation_id) {
         const { data: orgMembers } = await supabase
           .from('profiles')
           .select('*')
@@ -121,7 +121,12 @@ export default function FamilyAccountSwitcher() {
           .order('role', { ascending: true })
         
         if (orgMembers) {
-          allProfiles = orgMembers
+          // Merge org members with family members, avoiding duplicates
+          orgMembers.forEach(orgMember => {
+            if (!allProfiles.find(p => p.user_id === orgMember.user_id)) {
+              allProfiles.push(orgMember)
+            }
+          })
         }
       }
 
@@ -170,6 +175,8 @@ export default function FamilyAccountSwitcher() {
             )
           `)
           .eq('family_id', profile.family_id)
+
+        console.log('Found family_students entries:', familyStudents)
 
         if (familyStudents) {
           familyStudents.forEach(fs => {

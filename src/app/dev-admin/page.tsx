@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Users, GraduationCap, BarChart3, MessageSquare } from 'lucide-react'
+import { Users, GraduationCap, BarChart3, MessageSquare, BookOpen } from 'lucide-react'
 
 export default function DevAdminPage() {
   const [password, setPassword] = useState('')
@@ -107,6 +107,25 @@ export default function DevAdminPage() {
             <Link href="/dev-admin/ai-grading">
               <Button className="w-full">
                 Access AI Grading
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="w-5 h-5" />
+              Course Catalog
+            </CardTitle>
+            <CardDescription>
+              Create and manage pre-built courses for users to duplicate
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/dev-admin/course-catalog">
+              <Button className="w-full">
+                Manage Course Catalog
               </Button>
             </Link>
           </CardContent>

@@ -9,6 +9,7 @@ import { AllInstancesTable } from "@/components/teach/AllInstancesTable";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import CreateInstanceModalWithBaseClassSelection from "@/components/teach/CreateInstanceModalWithBaseClassSelection";
 
 // Real API function to fetch enriched instances
 const fetchAllEnrichedInstances = async (): Promise<EnrichedClassInstance[]> => {
@@ -32,6 +33,7 @@ export default function AllInstancesPage() {
   const { toast } = useToast();
   const [instances, setInstances] = useState<EnrichedClassInstance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const loadInstances = useCallback(async () => {
     setIsLoading(true);
@@ -88,6 +90,19 @@ export default function AllInstancesPage() {
     router.push(`/teach/base-classes/${instance.base_class_id}`);
   };
 
+  const handleCreateInstance = () => {
+    setIsCreateModalOpen(true);
+  };
+
+  const handleInstanceCreated = (instanceId: string) => {
+    // Reload instances to show the new one
+    loadInstances();
+    toast({
+      title: "Instance Created!",
+      description: "Your new class instance has been created successfully.",
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="h-full flex flex-col overflow-hidden">
@@ -128,7 +143,7 @@ export default function AllInstancesPage() {
             <p className="text-muted-foreground text-sm md:text-base">Manage all your active and past class instances</p>
           </div>
           <Button 
-            onClick={() => router.push('/teach/base-classes')}
+            onClick={handleCreateInstance}
             className="bg-brand-gradient hover:opacity-90 transition-all duration-200 flex-shrink-0"
           >
             <PlusCircle className="w-4 h-4 mr-2" />
@@ -150,6 +165,13 @@ export default function AllInstancesPage() {
           </div>
         </div>
       </div>
+
+      {/* Create Instance Modal */}
+      <CreateInstanceModalWithBaseClassSelection
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onInstanceCreated={handleInstanceCreated}
+      />
     </div>
   );
 } 

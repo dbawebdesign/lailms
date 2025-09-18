@@ -16,6 +16,8 @@ export default function LoginForm() {
   const searchParams = useSearchParams()
   const supabase = createClient()
   const justRegistered = searchParams.get('registered') === 'true'
+  const passwordUpdated = searchParams.get('message') === 'password-updated'
+  const resetSuccess = searchParams.get('reset') === 'success'
   
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -134,6 +136,12 @@ export default function LoginForm() {
       {justRegistered && (
         <div className="mb-4 p-3 bg-green-100 text-green-700 dark:bg-green-800/30 dark:text-green-300 rounded-md">
           Account created successfully! Please log in with your new credentials.
+        </div>
+      )}
+
+      {(passwordUpdated || resetSuccess) && (
+        <div className="mb-4 p-3 bg-green-100 text-green-700 dark:bg-green-800/30 dark:text-green-300 rounded-md">
+          Password updated successfully! Please log in with your new password.
         </div>
       )}
       

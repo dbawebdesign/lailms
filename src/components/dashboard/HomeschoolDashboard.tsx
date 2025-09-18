@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import { createClient } from '@/lib/supabase/client'
+import { useCourseCreationModal } from '@/hooks/useCourseCreationModal'
 
 
 interface Student {
@@ -44,6 +45,10 @@ export default function HomeschoolDashboard({
   const [activeCourses, setActiveCourses] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
   const supabase = createClient()
+  
+  const { openModal, CourseCreationModal } = useCourseCreationModal({ 
+    organisationId: organizationId 
+  })
 
   useEffect(() => {
     fetchDashboardData()
@@ -177,14 +182,12 @@ export default function HomeschoolDashboard({
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_.text-sm]:hover:text-[#1A1A1A] dark:[&_.text-sm]:hover:text-white [&_.text-xs]:hover:text-[#1A1A1A] dark:[&_.text-xs]:hover:text-white">
-                  <Link href="/teach/knowledge-base/create">
-                    <BookOpen className="h-8 w-8 hover-icon text-blue-600" />
-                    <div className="text-center space-y-1">
-                      <span className="text-sm font-medium block">Create Course</span>
-                      <span className="text-xs text-neutral-500 dark:text-neutral-400 block">Start with AI</span>
-                    </div>
-                  </Link>
+                <Button variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_.text-sm]:hover:text-[#1A1A1A] dark:[&_.text-sm]:hover:text-white [&_.text-xs]:hover:text-[#1A1A1A] dark:[&_.text-xs]:hover:text-white" onClick={openModal}>
+                  <BookOpen className="h-8 w-8 hover-icon text-blue-600" />
+                  <div className="text-center space-y-1">
+                    <span className="text-sm font-medium block">Create Course</span>
+                    <span className="text-xs text-neutral-500 dark:text-neutral-400 block">Start with AI</span>
+                  </div>
                 </Button>
                 <Button asChild variant="outline" className="min-h-[120px] flex flex-col items-center justify-center space-y-3 p-6 hover-button-glow bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_.text-sm]:hover:text-[#1A1A1A] dark:[&_.text-sm]:hover:text-white [&_.text-xs]:hover:text-[#1A1A1A] dark:[&_.text-xs]:hover:text-white">
                   <Link href="/homeschool/add-students">
@@ -305,11 +308,9 @@ export default function HomeschoolDashboard({
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 dark-mode-safe-hover bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white animate-gentle-fade-in" style={{"--animation-delay": "300ms"} as React.CSSProperties}>
-                  <Link href="/teach/knowledge-base/create">
-                    <BookOpen className="h-8 w-8 hover-icon text-blue-600" />
-                    <span className="text-sm font-medium">Create Course</span>
-                  </Link>
+                <Button variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 dark-mode-safe-hover bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white animate-gentle-fade-in" style={{"--animation-delay": "300ms"} as React.CSSProperties} onClick={openModal}>
+                  <BookOpen className="h-8 w-8 hover-icon text-blue-600" />
+                  <span className="text-sm font-medium">Create Course</span>
                 </Button>
                 <Button asChild variant="outline" className="min-h-[100px] flex flex-col items-center justify-center space-y-3 p-6 dark-mode-safe-hover bg-card/70 dark:bg-card/60 border-border/60 dark:border-border/40 hover:bg-card/90 dark:hover:bg-card/80 transition-colors shadow-sm dark:shadow-md hover:text-[#1A1A1A] dark:hover:text-white [&_span]:hover:text-[#1A1A1A] dark:[&_span]:hover:text-white animate-gentle-fade-in" style={{"--animation-delay": "400ms"} as React.CSSProperties}>
                   <Link href="/homeschool/add-students">
@@ -418,6 +419,8 @@ export default function HomeschoolDashboard({
           </Card>
         </div>
       )}
+      
+      <CourseCreationModal />
     </div>
   )
 } 

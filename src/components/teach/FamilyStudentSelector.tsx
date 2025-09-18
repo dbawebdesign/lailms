@@ -88,7 +88,7 @@ export function FamilyStudentSelector({
 
       let students: FamilyStudent[] = [];
 
-      // Get family members - try family_id first, then organisation_id
+      // Get family members - try both family_id and organisation_id
       if (profile.family_id) {
         const { data: familyMembers } = await supabase
           .from('profiles')
@@ -100,7 +100,10 @@ export function FamilyStudentSelector({
         if (familyMembers) {
           students = familyMembers;
         }
-      } else if (profile.organisation_id) {
+      }
+      
+      // Also try organisation_id to get additional students (not just fallback)
+      if (profile.organisation_id) {
         const { data: orgMembers } = await supabase
           .from('profiles')
           .select('user_id, first_name, last_name, grade_level, role')
@@ -109,7 +112,44 @@ export function FamilyStudentSelector({
           .order('first_name');
         
         if (orgMembers) {
-          students = orgMembers;
+          // Merge org members with family members, avoiding duplicates
+          orgMembers.forEach(orgMember => {
+            if (!students.find(s => s.user_id === orgMember.user_id)) {
+              students.push(orgMember);
+            }
+          });
+        }
+      }
+
+      // Also check family_students table for additional students
+      if (profile.family_id) {
+        const { data: familyStudents } = await supabase
+          .from('family_students')
+          .select(`
+            student_id,
+            profiles!family_students_student_id_fkey (
+              user_id,
+              first_name,
+              last_name,
+              grade_level,
+              role
+            )
+          `)
+          .eq('family_id', profile.family_id);
+
+        if (familyStudents) {
+          familyStudents.forEach(fs => {
+            if (fs.profiles && !students.find(s => s.user_id === fs.student_id)) {
+              const studentProfile = fs.profiles as any;
+              students.push({
+                user_id: fs.student_id,
+                first_name: studentProfile.first_name,
+                last_name: studentProfile.last_name,
+                grade_level: studentProfile.grade_level,
+                role: studentProfile.role
+              });
+            }
+          });
         }
       }
 
