@@ -128,10 +128,17 @@ export default function StreamlinedCourseCreator({
           const errorMessages = errorDocuments.map((doc: any) => {
             const metadata = doc.metadata as any;
             const error = metadata?.processing_error;
-            return `${doc.file_name}: ${error?.userFriendlyMessage || 'Processing failed'}`;
-          }).join('; ');
+            const errorMsg = error?.userFriendlyMessage || error?.message || 'Processing failed';
+            
+            // Check for OpenAI API key errors
+            if (errorMsg.includes('Incorrect API key') || errorMsg.includes('invalid_api_key')) {
+              return `${doc.file_name}: OpenAI API configuration error. Please contact support.`;
+            }
+            
+            return `${doc.file_name}: ${errorMsg}`;
+          }).join('\n\n');
           
-          throw new Error(`Document processing failed: ${errorMessages}`);
+          throw new Error(`Document processing failed:\n\n${errorMessages}`);
         }
 
 				// If all documents are completed, we're done
