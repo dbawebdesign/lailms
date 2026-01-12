@@ -3,6 +3,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import KnowledgeBaseCourseGenerator from '@/components/knowledge-base/KnowledgeBaseCourseGenerator';
 
+// Force dynamic rendering for auth-protected pages
+export const dynamic = 'force-dynamic';
+
 interface PageProps {
   params: Promise<{
     baseClassId: string;

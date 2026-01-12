@@ -4,6 +4,10 @@ import { TeacherToolLibrary } from "@/components/teach/tools/TeacherToolLibrary"
 import { Tables } from "packages/types/db";
 
 import { PROFILE_ROLE_FIELDS, hasTeacherPermissions } from '@/lib/utils/roleUtils';
+
+// Force dynamic rendering for auth-protected pages
+export const dynamic = 'force-dynamic';
+
 export default async function TeacherToolLibraryPage() {
   const supabase = createSupabaseServerClient();
 

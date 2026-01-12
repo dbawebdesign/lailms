@@ -11,6 +11,9 @@ import { PROFILE_ROLE_FIELDS, getEffectiveRole } from "@/lib/utils/roleUtils";
 import AdminMessageModal from "@/components/messaging/AdminMessageModal";
 import { getActiveProfile } from '@/lib/auth/family-helpers';
 
+// Force dynamic rendering for auth-protected layouts
+export const dynamic = 'force-dynamic';
+
 export default async function AppPagesLayout({
   children,
 }: {

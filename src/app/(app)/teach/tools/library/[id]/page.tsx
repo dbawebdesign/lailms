@@ -4,6 +4,10 @@ import { CreationViewer } from '@/components/teach/tools/CreationViewer';
 import { Tables } from 'packages/types/db';
 
 import { PROFILE_ROLE_FIELDS, hasTeacherPermissions } from '@/lib/utils/roleUtils';
+
+// Force dynamic rendering for auth-protected pages
+export const dynamic = 'force-dynamic';
+
 interface CreationViewPageProps {
   params: Promise<{
     id: string;

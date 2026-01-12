@@ -2,6 +2,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import HomeschoolDashboardClient from "@/components/dashboard/HomeschoolDashboardClient"
 
+// Force dynamic rendering for auth-protected pages
+export const dynamic = 'force-dynamic';
+
 export default async function HomeschoolDashboardPage() {
   const supabase = createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()

@@ -4,6 +4,9 @@ import { redirect } from 'next/navigation';
 import TeacherKnowledgeBaseDashboard from '@/components/teach/knowledge/TeacherKnowledgeBaseDashboard';
 import { Tables } from 'packages/types/db';
 
+// Force dynamic rendering for auth-protected pages
+export const dynamic = 'force-dynamic';
+
 export default async function TeacherKnowledgePage() {
   const supabase = createSupabaseServerClient();
   

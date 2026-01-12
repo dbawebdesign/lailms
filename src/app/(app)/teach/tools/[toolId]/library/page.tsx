@@ -5,6 +5,10 @@ import { teachingTools } from "@/config/teachingTools";
 import { Tables } from "packages/types/db";
 
 import { PROFILE_ROLE_FIELDS, hasTeacherPermissions } from '@/lib/utils/roleUtils';
+
+// Force dynamic rendering for auth-protected pages
+export const dynamic = 'force-dynamic';
+
 interface ToolLibraryPageProps {
   params: Promise<{
     toolId: string;

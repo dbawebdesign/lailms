@@ -6,6 +6,9 @@ import StudentCourseNavigationTree from '@/components/student/StudentCourseNavig
 import { Tables } from 'packages/types/db';
 import CoursePlayerClient from '@/components/student/CoursePlayerClient';
 
+// Force dynamic rendering for auth-protected pages
+export const dynamic = 'force-dynamic';
+
 interface CoursePageProps {
   params: Promise<{
     courseId: string;

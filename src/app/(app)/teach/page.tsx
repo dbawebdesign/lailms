@@ -13,6 +13,9 @@ import Link from "next/link";
 import { Tables } from "packages/types/db";
 import { getEffectiveRole, hasTeacherPermissions, PROFILE_ROLE_FIELDS } from "@/lib/utils/roleUtils";
 
+// Force dynamic rendering for auth-protected pages
+export const dynamic = 'force-dynamic';
+
 interface ActiveClassData {
   id: string;
   name: string;

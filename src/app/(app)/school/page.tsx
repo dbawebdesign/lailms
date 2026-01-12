@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation'
 import HomeschoolCoopDashboard from '@/components/dashboard/HomeschoolCoopDashboard'
 import HomeschoolFamilyAdminDashboard from '@/components/dashboard/HomeschoolFamilyAdminDashboard'
 
+// Force dynamic rendering for auth-protected pages
+export const dynamic = 'force-dynamic';
+
 export default async function SchoolPage() {
   const supabase = createSupabaseServerClient()
 

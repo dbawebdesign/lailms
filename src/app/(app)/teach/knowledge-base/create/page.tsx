@@ -4,6 +4,9 @@ import { redirect } from 'next/navigation';
 import StreamlinedCourseCreator from '@/components/knowledge-base/StreamlinedCourseCreator';
 import { Tables } from 'packages/types/db';
 
+// Force dynamic rendering for auth-protected pages
+export const dynamic = 'force-dynamic';
+
 interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
