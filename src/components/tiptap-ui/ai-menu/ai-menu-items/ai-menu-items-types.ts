@@ -1,5 +1,7 @@
 import type { Action } from "@/components/tiptap-ui-primitive/menu"
-import { type TextOptions } from "@tiptap-pro/extension-ai"
+// TipTap Pro AI extension disabled - using local type definitions
+// import { type TextOptions } from "@tiptap-pro/extension-ai"
+type TextOptions = any
 import type { Editor } from "@tiptap/react"
 
 export interface MenuActionBase {

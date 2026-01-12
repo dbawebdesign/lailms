@@ -1,4 +1,6 @@
-import type { Language } from "@tiptap-pro/extension-ai"
+// TipTap Pro AI extension disabled - using local type definitions
+// import type { Language } from "@tiptap-pro/extension-ai"
+type Language = string
 
 export const SUPPORTED_LANGUAGES: Array<{
   label: string

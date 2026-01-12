@@ -6,7 +6,9 @@ import { Button, ButtonGroup } from "@/components/tiptap-ui-primitive/button"
 import { RefreshAiIcon } from "@/components/tiptap-icons/refresh-ai-icon"
 import { XIcon } from "@/components/tiptap-icons/x-icon"
 import { CheckIcon } from "@/components/tiptap-icons/check-icon"
-import type { TextOptions } from "@tiptap-pro/extension-ai"
+// TipTap Pro AI extension disabled - using local type definitions
+// import type { TextOptions } from "@tiptap-pro/extension-ai"
+type TextOptions = any
 import { useUiEditorState } from "@/hooks/use-ui-editor-state"
 
 import "@/components/tiptap-ui/ai-menu/ai-menu-actions/ai-menu-actions.scss"
@@ -30,19 +32,25 @@ export function AiMenuActions({
 
   const handleRegenerate = React.useCallback(() => {
     if (!editor) return
-    editor.chain().focus().aiRegenerate(options).run()
+    // TipTap Pro AI extension disabled
+    // editor.chain().focus().aiRegenerate(options).run()
+    console.warn('AI regenerate requires TipTap Pro subscription')
     onRegenerate?.()
   }, [editor, onRegenerate, options])
 
   const handleDiscard = React.useCallback(() => {
     if (!editor) return
-    editor.chain().focus().aiReject().run()
+    // TipTap Pro AI extension disabled
+    // editor.chain().focus().aiReject().run()
+    console.warn('AI reject requires TipTap Pro subscription')
     onReject?.()
   }, [editor, onReject])
 
   const handleApply = React.useCallback(() => {
     if (!editor) return
-    editor.chain().focus().aiAccept().run()
+    // TipTap Pro AI extension disabled
+    // editor.chain().focus().aiAccept().run()
+    console.warn('AI accept requires TipTap Pro subscription')
     onAccept?.()
   }, [editor, onAccept])
 

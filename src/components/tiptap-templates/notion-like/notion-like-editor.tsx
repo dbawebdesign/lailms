@@ -3,7 +3,8 @@
 import * as React from "react"
 import { EditorContent, EditorContext, useEditor, Editor } from "@tiptap/react"
 import type { Doc as YDoc } from "yjs"
-import type { TiptapCollabProvider } from "@tiptap-cloud/provider"
+// TipTap Cloud collaboration disabled - requires TipTap Pro subscription
+// import type { TiptapCollabProvider } from "@tiptap-cloud/provider"
 
 // --- Tiptap Core Extensions ---
 import { StarterKit } from "@tiptap/starter-kit"
@@ -71,7 +72,7 @@ export interface NotionEditorProps {
 }
 
 export interface EditorProviderProps {
-  provider: TiptapCollabProvider
+  provider: any // TipTap Cloud disabled
   ydoc: YDoc
   placeholder?: string
   editor: Editor | null

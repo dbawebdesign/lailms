@@ -2,7 +2,19 @@
 
 import * as React from "react"
 import { type Editor } from "@tiptap/react"
-import { type Language } from "@tiptap-pro/extension-ai"
+// TipTap Pro AI extension disabled - using local type definitions
+// import { type Language } from "@tiptap-pro/extension-ai"
+type Language = string
+
+// Helper to safely call AI commands (disabled without TipTap Pro)
+const callAiCommand = (editor: Editor, commandName: string, ...args: any[]) => {
+  const chain = editor.chain() as any
+  if (typeof chain[commandName] === 'function') {
+    chain[commandName](...args).run()
+  } else {
+    console.warn(`AI command "${commandName}" requires TipTap Pro subscription`)
+  }
+}
 
 // -- Hooks --
 import { useTiptapEditor } from "@/hooks/use-tiptap-editor"
@@ -76,14 +88,11 @@ function initializeEditorMenuActions(): Record<
 
         const { insertAt } = getContextAndInsertAt(editor)
 
-        editor
-          .chain()
-          .aiFixSpellingAndGrammar({
-            ...options,
-            insertAt,
-            regenerate: true,
-          })
-          .run()
+        callAiCommand(editor, 'aiFixSpellingAndGrammar', {
+          ...options,
+          insertAt,
+          regenerate: true,
+        })
       },
     },
     aiExtend: {
@@ -96,14 +105,11 @@ function initializeEditorMenuActions(): Record<
 
         const { insertAt } = getContextAndInsertAt(editor)
 
-        editor
-          .chain()
-          .aiExtend({
-            ...options,
-            insertAt,
-            regenerate: true,
-          })
-          .run()
+        callAiCommand(editor, 'aiExtend', {
+          ...options,
+          insertAt,
+          regenerate: true,
+        })
       },
     },
     aiShorten: {
@@ -116,14 +122,11 @@ function initializeEditorMenuActions(): Record<
 
         const { insertAt } = getContextAndInsertAt(editor)
 
-        editor
-          .chain()
-          .aiShorten({
+        callAiCommand(editor, 'aiShorten', {
             ...options,
             insertAt,
             regenerate: true,
           })
-          .run()
       },
     },
     simplifyLanguage: {
@@ -136,14 +139,11 @@ function initializeEditorMenuActions(): Record<
 
         const { insertAt } = getContextAndInsertAt(editor)
 
-        editor
-          .chain()
-          .aiSimplify({
+        callAiCommand(editor, 'aiSimplify', {
             ...options,
             insertAt,
             regenerate: true,
           })
-          .run()
       },
     },
     improveWriting: {
@@ -156,14 +156,11 @@ function initializeEditorMenuActions(): Record<
 
         const { insertAt } = getContextAndInsertAt(editor)
 
-        editor
-          .chain()
-          .aiRephrase({
+        callAiCommand(editor, 'aiRephrase', {
             ...options,
             insertAt,
             regenerate: true,
           })
-          .run()
       },
     },
     emojify: {
@@ -176,14 +173,11 @@ function initializeEditorMenuActions(): Record<
 
         const { insertAt } = getContextAndInsertAt(editor)
 
-        editor
-          .chain()
-          .aiEmojify({
+        callAiCommand(editor, 'aiEmojify', {
             ...options,
             insertAt,
             regenerate: true,
           })
-          .run()
       },
     },
     continueWriting: {
@@ -196,14 +190,11 @@ function initializeEditorMenuActions(): Record<
 
         const { insertAt } = getContextAndInsertAt(editor)
 
-        editor
-          .chain()
-          .aiComplete({
+        callAiCommand(editor, 'aiComplete', {
             ...options,
             insertAt,
             regenerate: true,
           })
-          .run()
       },
     },
     summarize: {
@@ -216,14 +207,11 @@ function initializeEditorMenuActions(): Record<
 
         const { insertAt } = getContextAndInsertAt(editor)
 
-        editor
-          .chain()
-          .aiSummarize({
+        callAiCommand(editor, 'aiSummarize', {
             ...options,
             insertAt,
             regenerate: true,
           })
-          .run()
       },
     },
     translateTo: {
@@ -307,9 +295,7 @@ export function LanguageSelectionSubmenu({
 
       updateState({ language: selectedLanguageCode })
 
-      editor
-        .chain()
-        .aiTranslate(selectedLanguageCode, {
+      callAiCommand(editor, 'aiTranslate', selectedLanguageCode, {
           stream: true,
           tone: state.tone,
           language: selectedLanguageCode,
@@ -317,7 +303,6 @@ export function LanguageSelectionSubmenu({
           insertAt,
           regenerate: true,
         })
-        .run()
     },
     [editor, state.tone, updateState]
   )
@@ -396,16 +381,13 @@ export function ToneSelectionSubmenu({ editor }: { editor: Editor | null }) {
 
       updateState({ tone: selectedTone })
 
-      editor
-        .chain()
-        .aiAdjustTone(selectedTone, {
+      callAiCommand(editor, 'aiAdjustTone', selectedTone, {
           stream: true,
           language: state.language,
           format: "rich-text",
           insertAt,
           regenerate: true,
         })
-        .run()
     },
     [editor, state.language, updateState]
   )

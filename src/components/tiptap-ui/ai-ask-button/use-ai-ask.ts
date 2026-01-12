@@ -15,6 +15,19 @@ import { useTiptapEditor } from "@/hooks/use-tiptap-editor"
 
 // --- Icons ---
 import { AiSparklesIcon } from "@/components/tiptap-icons/ai-sparkles-icon"
+
+// Helper to safely call AI commands (disabled without TipTap Pro)
+const callAiCommand = (editor: any, commandName: string, ...args: any[]): boolean => {
+  const chain = editor.chain() as any
+  if (typeof chain[commandName] === 'function') {
+    chain[commandName](...args).run()
+    return true
+  } else {
+    console.warn(`AI command "${commandName}" requires TipTap Pro subscription`)
+    return false
+  }
+}
+
 export interface UseAiAskConfig {
   /**
    * The Tiptap editor instance.
@@ -115,7 +128,7 @@ export function useAiAsk(config: UseAiAskConfig = {}) {
   const handleAiAsk = React.useCallback((): boolean => {
     if (!editor || !canAiAsk) return false
 
-    const success = editor.chain().focus().aiGenerationShow().run()
+    const success = callAiCommand(editor, 'aiGenerationShow', )
     if (success) {
       onAiAsked?.()
     }

@@ -3,6 +3,16 @@
 import * as React from "react"
 import { type Editor } from "@tiptap/react"
 
+// Helper to safely call AI commands (disabled without TipTap Pro)
+const callAiCommand = (editor: Editor, commandName: string, ...args: any[]) => {
+  const chain = editor.chain() as any
+  if (typeof chain[commandName] === 'function') {
+    chain[commandName](...args).run()
+  } else {
+    console.warn(`AI command "${commandName}" requires TipTap Pro subscription`)
+  }
+}
+
 import { AiMenuItems } from "@/components/tiptap-ui/ai-menu/ai-menu-items/ai-menu-items"
 
 // -- Hooks --
@@ -97,16 +107,13 @@ export function AiMenuContent({
         }
       }
 
-      editor
-        .chain()
-        .aiTextPrompt({
-          text: promptWithContext,
-          insert: true,
-          stream: true,
-          tone: state.tone,
-          format: "rich-text",
-        })
-        .run()
+      callAiCommand(editor, 'aiTextPrompt', {
+        text: promptWithContext,
+        insert: true,
+        stream: true,
+        tone: state.tone,
+        format: "rich-text",
+      })
     },
     [editor, state.tone, state.fallbackAnchor, setFallbackAnchor]
   )
@@ -127,22 +134,36 @@ export function AiMenuContent({
 
   const handleOnReject = React.useCallback(() => {
     if (!editor) return
-    editor.commands.aiReject()
+    // TipTap Pro AI extension disabled
+    const commands = editor.commands as any
+    if (typeof commands.aiReject === 'function') {
+      commands.aiReject()
+    }
     closeAiMenu()
   }, [closeAiMenu, editor])
 
   const handleOnAccept = React.useCallback(() => {
     if (!editor) return
-    editor.commands.aiAccept()
+    // TipTap Pro AI extension disabled
+    const commands = editor.commands as any
+    if (typeof commands.aiAccept === 'function') {
+      commands.aiAccept()
+    }
     closeAiMenu()
   }, [closeAiMenu, editor])
 
   const handleInputOnClose = React.useCallback(() => {
     if (!editor) return
+    // TipTap Pro AI extension disabled
+    const commands = editor.commands as any
     if (aiGenerationIsLoading) {
-      editor.commands.aiReject({ type: "reset" })
+      if (typeof commands.aiReject === 'function') {
+        commands.aiReject({ type: "reset" })
+      }
     } else {
-      editor.commands.aiAccept()
+      if (typeof commands.aiAccept === 'function') {
+        commands.aiAccept()
+      }
     }
     closeAiMenu()
   }, [aiGenerationIsLoading, closeAiMenu, editor])
@@ -152,7 +173,11 @@ export function AiMenuContent({
       closeAiMenu()
 
       if (!editor) return
-      editor.commands.aiAccept()
+      // TipTap Pro AI extension disabled
+      const commands = editor.commands as any
+      if (typeof commands.aiAccept === 'function') {
+        commands.aiAccept()
+      }
     }
   }, [aiGenerationIsLoading, closeAiMenu, editor])
 
@@ -270,7 +295,8 @@ export function AiMenuProgress({ editor }: { editor: Editor }) {
   const handleStop = React.useCallback(() => {
     if (!editor) return
 
-    editor.chain().aiReject({ type: "reset" }).run()
+    // TipTap Pro AI extension disabled
+    callAiCommand(editor, 'aiReject', { type: "reset" })
     reset()
     editor.commands.resetUiState()
   }, [editor, reset])

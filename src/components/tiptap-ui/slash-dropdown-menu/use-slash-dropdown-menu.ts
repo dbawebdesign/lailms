@@ -33,6 +33,17 @@ import type { SuggestionItem } from "@/components/tiptap-ui-utils/suggestion-men
 import { addEmojiTrigger } from "@/components/tiptap-ui/emoji-trigger-button"
 import { addMentionTrigger } from "@/components/tiptap-ui/mention-trigger-button"
 
+
+// Helper to safely call AI commands (disabled without TipTap Pro)
+const callAiCommand = (editor: any, commandName: string, ...args: any[]) => {
+  const chain = editor.chain() as any
+  if (typeof chain[commandName] === 'function') {
+    chain[commandName](...args)
+  } else {
+    console.warn(`AI command "${commandName}" requires TipTap Pro subscription`)
+  }
+}
+
 export interface SlashMenuConfig {
   enabledItems?: SlashMenuItemType[]
   customItems?: SuggestionItem[]
@@ -229,7 +240,7 @@ const getItemImplementations = () => {
 
         editorChain.run()
 
-        editor.chain().focus().aiGenerationShow().run()
+        callAiCommand(editor, 'aiGenerationShow', )
 
         requestAnimationFrame(() => {
           const { from } = editor.state.selection
@@ -244,15 +255,11 @@ const getItemImplementations = () => {
               }\n\nContinue writing from where the text above ends. Write ONLY ONE SENTENCE. DONT REPEAT THE TEXT.`
             : "Start writing a new paragraph. Write ONLY ONE SENTENCE."
 
-          editor
-            .chain()
-            .focus()
-            .aiTextPrompt({
+          callAiCommand(editor, 'aiTextPrompt', {
               stream: true,
               format: "rich-text",
               text: prompt,
             })
-            .run()
         })
       },
     },
@@ -270,7 +277,7 @@ const getItemImplementations = () => {
 
         editorChain.run()
 
-        editor.chain().focus().aiGenerationShow().run()
+        callAiCommand(editor, 'aiGenerationShow', )
       },
     },
 
@@ -278,55 +285,55 @@ const getItemImplementations = () => {
     text: {
       check: (editor: Editor) => isNodeInSchema("paragraph", editor),
       action: ({ editor }: { editor: Editor }) => {
-        editor.chain().focus().setParagraph().run()
+        editor.chain().focus().setParagraph()
       },
     },
     heading_1: {
       check: (editor: Editor) => isNodeInSchema("heading", editor),
       action: ({ editor }: { editor: Editor }) => {
-        editor.chain().focus().toggleHeading({ level: 1 }).run()
+        editor.chain().focus().toggleHeading({ level: 1 })
       },
     },
     heading_2: {
       check: (editor: Editor) => isNodeInSchema("heading", editor),
       action: ({ editor }: { editor: Editor }) => {
-        editor.chain().focus().toggleHeading({ level: 2 }).run()
+        editor.chain().focus().toggleHeading({ level: 2 })
       },
     },
     heading_3: {
       check: (editor: Editor) => isNodeInSchema("heading", editor),
       action: ({ editor }: { editor: Editor }) => {
-        editor.chain().focus().toggleHeading({ level: 3 }).run()
+        editor.chain().focus().toggleHeading({ level: 3 })
       },
     },
     bullet_list: {
       check: (editor: Editor) => isNodeInSchema("bulletList", editor),
       action: ({ editor }: { editor: Editor }) => {
-        editor.chain().focus().toggleBulletList().run()
+        editor.chain().focus().toggleBulletList()
       },
     },
     ordered_list: {
       check: (editor: Editor) => isNodeInSchema("orderedList", editor),
       action: ({ editor }: { editor: Editor }) => {
-        editor.chain().focus().toggleOrderedList().run()
+        editor.chain().focus().toggleOrderedList()
       },
     },
     task_list: {
       check: (editor: Editor) => isNodeInSchema("taskList", editor),
       action: ({ editor }: { editor: Editor }) => {
-        editor.chain().focus().toggleTaskList().run()
+        editor.chain().focus().toggleTaskList()
       },
     },
     quote: {
       check: (editor: Editor) => isNodeInSchema("blockquote", editor),
       action: ({ editor }: { editor: Editor }) => {
-        editor.chain().focus().toggleBlockquote().run()
+        editor.chain().focus().toggleBlockquote()
       },
     },
     code_block: {
       check: (editor: Editor) => isNodeInSchema("codeBlock", editor),
       action: ({ editor }: { editor: Editor }) => {
-        editor.chain().focus().toggleNode("codeBlock", "paragraph").run()
+        editor.chain().focus().toggleNode("codeBlock", "paragraph")
       },
     },
 
@@ -344,7 +351,7 @@ const getItemImplementations = () => {
     divider: {
       check: (editor: Editor) => isNodeInSchema("horizontalRule", editor),
       action: ({ editor }: { editor: Editor }) => {
-        editor.chain().focus().setHorizontalRule().run()
+        editor.chain().focus().setHorizontalRule()
       },
     },
 
@@ -358,7 +365,6 @@ const getItemImplementations = () => {
           .insertContent({
             type: "imageUpload",
           })
-          .run()
       },
     },
     video: {
@@ -384,7 +390,6 @@ const getItemImplementations = () => {
                     controls: true,
                   },
                 })
-                .run()
             } catch (error) {
               console.error('Video upload failed:', error)
             }
@@ -410,7 +415,6 @@ const getItemImplementations = () => {
                 .chain()
                 .focus()
                 .insertContent(`<audio controls src="${result.url}"></audio>`)
-                .run()
             } catch (error) {
               console.error('Audio upload failed:', error)
             }
@@ -436,7 +440,6 @@ const getItemImplementations = () => {
                 .chain()
                 .focus()
                 .insertContent(`<a href="${result.url}" download="${file.name}">${file.name}</a>`)
-                .run()
             } catch (error) {
               console.error('File upload failed:', error)
             }

@@ -4,10 +4,11 @@ import { getSelectedDOMElement } from "@/lib/tiptap-advanced-utils"
 export function getContextAndInsertAt(editor: Editor) {
   let context: string | undefined = ""
   let insertAt = { from: 0, to: 0 }
-  const generatedWith = editor.storage.ai.generatedWith
+  // TipTap Pro AI extension disabled
+  const generatedWith = (editor.storage as any).ai?.generatedWith
 
   if (generatedWith && generatedWith.range) {
-    context = editor.storage.ai.response
+    context = (editor.storage as any).ai?.response
     insertAt = generatedWith.range
   }
 

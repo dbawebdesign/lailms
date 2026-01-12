@@ -3,7 +3,9 @@
 import * as React from "react"
 
 // Tiptap Core Extensions
-import type { Tone } from "@tiptap-pro/extension-ai"
+// TipTap Pro AI extension disabled - using local type definitions
+// import type { Tone } from "@tiptap-pro/extension-ai"
+type Tone = string
 
 // Icons
 import { MicAiIcon } from "@/components/tiptap-icons/mic-ai-icon"

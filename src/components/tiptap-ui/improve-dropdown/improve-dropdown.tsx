@@ -2,7 +2,11 @@
 
 import * as React from "react"
 import { type Editor } from "@tiptap/react"
-import type { Language, TextOptions, Tone } from "@tiptap-pro/extension-ai"
+// TipTap Pro AI extension disabled - using local type definitions
+// import type { Language, TextOptions, Tone } from "@tiptap-pro/extension-ai"
+type Language = string
+type Tone = string
+type TextOptions = any
 import { NodeSelection } from "@tiptap/pm/state"
 
 // --- Hooks ---
@@ -42,6 +46,17 @@ import {
 } from "@/components/tiptap-ui-primitive/dropdown-menu"
 import { Card, CardBody } from "@/components/tiptap-ui-primitive/card"
 import { Separator } from "@/components/tiptap-ui-primitive/separator"
+
+
+// Helper to safely call AI commands (disabled without TipTap Pro)
+const callAiCommand = (editor: any, commandName: string, ...args: any[]) => {
+  const commands = editor.commands as any
+  if (typeof commands[commandName] === 'function') {
+    commands[commandName](...args)
+  } else {
+    console.warn(`AI command "${commandName}" requires TipTap Pro subscription`)
+  }
+}
 
 export interface ToneOption {
   label: string
@@ -218,25 +233,25 @@ function useAICommands(editor: Editor | null, textOptions?: TextOptions) {
       setTimeout(() => {
         switch (command) {
           case "fixSpellingAndGrammar":
-            editor.commands.aiFixSpellingAndGrammar(defaultOptions)
+            callAiCommand(editor, 'aiFixSpellingAndGrammar', defaultOptions)
             break
           case "extend":
-            editor.commands.aiExtend(defaultOptions)
+            callAiCommand(editor, 'aiExtend', defaultOptions)
             break
           case "shorten":
-            editor.commands.aiShorten(defaultOptions)
+            callAiCommand(editor, 'aiShorten', defaultOptions)
             break
           case "simplify":
-            editor.commands.aiSimplify(defaultOptions)
+            callAiCommand(editor, 'aiSimplify', defaultOptions)
             break
           case "emojify":
-            editor.commands.aiEmojify(defaultOptions)
+            callAiCommand(editor, 'aiEmojify', defaultOptions)
             break
           case "complete":
-            editor.commands.aiComplete(defaultOptions)
+            callAiCommand(editor, 'aiComplete', defaultOptions)
             break
           case "summarize":
-            editor.commands.aiSummarize(defaultOptions)
+            callAiCommand(editor, 'aiSummarize', defaultOptions)
             break
         }
       }, 0)
@@ -250,7 +265,7 @@ function useAICommands(editor: Editor | null, textOptions?: TextOptions) {
       editor.chain().focus().aiGenerationShow().run()
 
       setTimeout(() => {
-        editor.commands.aiAdjustTone(tone, defaultOptions)
+        callAiCommand(editor, 'aiAdjustTone', tone, defaultOptions)
       }, 0)
     },
     [editor, defaultOptions]
@@ -262,7 +277,7 @@ function useAICommands(editor: Editor | null, textOptions?: TextOptions) {
       editor.chain().focus().aiGenerationShow().run()
 
       setTimeout(() => {
-        editor.commands.aiTranslate(language, defaultOptions)
+        callAiCommand(editor, 'aiTranslate', language, defaultOptions)
       }, 0)
     },
     [editor, defaultOptions]

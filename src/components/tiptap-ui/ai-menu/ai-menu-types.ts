@@ -1,4 +1,7 @@
-import type { Language, Tone } from "@tiptap-pro/extension-ai"
+// TipTap Pro AI extension disabled - using local type definitions
+// import type { Language, Tone } from "@tiptap-pro/extension-ai"
+type Language = string
+type Tone = string
 
 export interface AiMenuPosition {
   element: HTMLElement | null

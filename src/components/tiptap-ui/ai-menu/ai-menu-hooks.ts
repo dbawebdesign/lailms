@@ -86,7 +86,8 @@ export function useAiContentTracker({
     if (!editor || !aiGenerationActive) return
 
     const handleTransaction = ({ editor }: { editor: Editor }) => {
-      const aiStorage = editor.storage.ai || editor.storage.aiAdvanced
+      // TipTap Pro AI extension disabled
+      const aiStorage = (editor.storage as any).ai || (editor.storage as any).aiAdvanced
 
       if (aiStorage?.state === "loading") {
         const aiMarkedElement = findPrioritizedAIElement(editor)
