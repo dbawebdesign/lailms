@@ -61,3 +61,6 @@ node_modules/
 
 # Authentication tokens
 .npmrc
+
+# Cursor MCP config (may contain credentials)
+.cursor/mcp.json

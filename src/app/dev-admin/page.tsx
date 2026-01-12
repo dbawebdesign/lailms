@@ -15,7 +15,11 @@ export default function DevAdminPage() {
   const [error, setError] = useState<string | null>(null)
 
   const checkPassword = () => {
-    const devPassword = 'TerroirLAI'
+    const devPassword = process.env.NEXT_PUBLIC_DEV_ADMIN_PASSWORD
+    if (!devPassword) {
+      setError('Dev admin password not configured')
+      return
+    }
     if (password === devPassword) {
       setAuthenticated(true)
       setError(null)

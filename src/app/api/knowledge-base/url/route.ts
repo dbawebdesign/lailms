@@ -92,7 +92,64 @@ export async function POST(request: Request) {
 
     if (uploadError) {
       console.error('Storage Upload Error:', uploadError);
-      throw new Error(`Failed to upload URL to storage: ${uploadError.message}`);
+      // Attempt to create bucket if it doesn't exist
+      if (uploadError.message.includes('Bucket not found')) {
+        console.log(`Attempting to create bucket: ${bucketName}`);
+        
+        // Use service role client for bucket creation
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        
+        if (!supabaseUrl || !serviceRoleKey) {
+          throw new Error('Service role key not configured for bucket creation');
+        }
+        
+        const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
+        
+        const { error: createBucketError } = await adminSupabase.storage.createBucket(
+          bucketName,
+          { 
+            public: false,
+            allowedMimeTypes: [
+              'application/pdf', 
+              'text/plain', 
+              'application/msword', 
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+              'application/vnd.ms-powerpoint',
+              'text/csv',
+              // Image types for AI text extraction
+              'image/jpeg',
+              'image/jpg', 
+              'image/png',
+              'image/gif',
+              'image/webp'
+            ],
+            fileSizeLimit: 52428800 // 50MB limit
+          }
+        );
+        
+        if (createBucketError && !createBucketError.message.includes('already exists')) {
+          throw new Error(`Failed to create bucket: ${createBucketError.message}`);
+        }
+        
+        console.log(`Bucket ${bucketName} created successfully`);
+        
+        // Retry upload with the regular client now that bucket exists
+        const { error: retryUploadError } = await supabase.storage
+          .from(bucketName)
+          .upload(storagePath, url, {
+            contentType: 'text/plain',
+            cacheControl: '3600',
+            upsert: false
+          });
+        
+        if (retryUploadError) {
+          throw new Error(`Failed to upload URL after bucket creation: ${retryUploadError.message}`);
+        }
+      } else {
+        throw new Error(`Failed to upload URL to storage: ${uploadError.message}`);
+      }
     }
 
     // Insert document record

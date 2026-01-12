@@ -38,7 +38,11 @@ export default function OrganisationsPage() {
   
   // Check if the auth is correct
   const checkPassword = () => {
-    const devPassword = 'TerroirLAI'
+    const devPassword = process.env.NEXT_PUBLIC_DEV_ADMIN_PASSWORD
+    if (!devPassword) {
+      setError('Dev admin password not configured')
+      return
+    }
     if (password === devPassword) {
       setAuthenticated(true)
       fetchOrganisations()
@@ -61,7 +65,7 @@ export default function OrganisationsPage() {
       const response = await fetch('/api/dev-admin/organisations', {
         method: 'GET',
         headers: {
-          'x-dev-admin-password': 'TerroirLAI'
+          'x-dev-admin-password': process.env.NEXT_PUBLIC_DEV_ADMIN_PASSWORD || ''
         }
       })
       
@@ -104,7 +108,7 @@ export default function OrganisationsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-dev-admin-password': 'TerroirLAI'
+          'x-dev-admin-password': process.env.NEXT_PUBLIC_DEV_ADMIN_PASSWORD || ''
         },
         body: JSON.stringify({
           name,
