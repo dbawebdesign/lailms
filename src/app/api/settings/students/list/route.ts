@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
 
     // Also check family_students table
     if ((profile as any).family_id) {
-      const { data: linkedStudents } = await supabase
+      const { data: linkedStudents } = await (supabase as any)
         .from('family_students')
         .select(`
           student_id,
