@@ -63,7 +63,7 @@ export default function LoginForm() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Invalid username or password')
+        throw new Error(data.error || 'Invalid credentials')
       }
 
       // Redirect based on effective role and organization type
@@ -189,14 +189,14 @@ export default function LoginForm() {
           <Separator className="w-full" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-white dark:bg-neutral-900 px-2 text-neutral-500 dark:text-neutral-400">Or continue with username</span>
+          <span className="bg-white dark:bg-neutral-900 px-2 text-neutral-500 dark:text-neutral-400">Or continue with email / username</span>
         </div>
       </div>
       
       <form onSubmit={handleLogin} className="space-y-5">
         <div>
           <label htmlFor="username" className="block text-sm font-normal text-neutral-700 dark:text-neutral-400 mb-1.5">
-            Username
+            Username or Email
           </label>
           <input
             id="username"
@@ -206,7 +206,7 @@ export default function LoginForm() {
             className="w-full p-3 bg-transparent border border-neutral-300 dark:border-neutral-700 rounded-lg focus:ring-1 focus:ring-neutral-500 dark:focus:ring-neutral-500 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-500 dark:bg-neutral-800"
             required
             disabled={isLoading}
-            placeholder="Enter your username"
+            placeholder="Enter your username or email"
           />
         </div>
         

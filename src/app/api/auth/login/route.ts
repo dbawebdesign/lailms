@@ -1,27 +1,34 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
-// import { cookies, type ReadonlyRequestCookies } from 'next/headers' // Remove ReadonlyRequestCookies import
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers' 
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function POST(req: NextRequest) {
-  // Remove predefined handlers
-  // const cookieStore = cookies() 
-  // const cookieHandlers = { ... }
+// Define the expected type for the profile data including the related organisation
+type ProfileWithOrgAndRole = {
+  user_id: string;
+  organisation_id: string | null;
+  role: string;
+  active_role: string | null;
+  organisations: { abbr: string; organisation_type: string } | null;
+}
 
+export async function POST(req: NextRequest) {
   try {
     const { username, password } = await req.json()
+    
+    // Accept either 'username' or 'identifier' for backwards compatibility
+    const identifier = username
 
-    if (!username || !password) {
-      return NextResponse.json({ error: 'Username and password are required' }, { status: 400 })
+    if (!identifier || !password) {
+      return NextResponse.json({ error: 'Username/email and password are required' }, { status: 400 })
     }
 
-    // Create Supabase server client passing functions that call cookies()
+    // Create Supabase server client for session management
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          // Use async handlers and await cookies()
           async get(name: string) {
             const cookieStore = await cookies()
             return cookieStore.get(name)?.value
@@ -38,18 +45,57 @@ export async function POST(req: NextRequest) {
       }
     )
 
-        // Define the expected type for the profile data including the related organisation
-type ProfileWithOrgAndRole = {
-      user_id: string;
-      organisation_id: string | null;
-      role: string;
-      active_role: string | null;
-      organisations: { abbr: string; organisation_type: string } | null;
+    // Check if identifier is an email (contains @)
+    const isEmail = identifier.includes('@')
+    
+    console.log('Login API: Identifier:', identifier, 'isEmail:', isEmail);
+
+    // If it's an email, try direct email login first (for homeschool/email signups)
+    if (isEmail) {
+      console.log('Login API: Attempting direct email login');
+      
+      // Try to sign in directly with email
+      const { data: emailAuthData, error: emailAuthError } = await supabase.auth.signInWithPassword({
+        email: identifier,
+        password,
+      })
+
+      if (!emailAuthError && emailAuthData?.user) {
+        console.log('Login API: Email login successful for user:', emailAuthData.user.id);
+        
+        // Get profile data for the authenticated user
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select(`
+            user_id,
+            organisation_id,
+            role,
+            active_role,
+            organisations (abbr, organisation_type)
+          `)
+          .eq('user_id', emailAuthData.user.id)
+          .single<ProfileWithOrgAndRole>()
+
+        // Calculate effective role
+        const effectiveRole = profileData?.active_role || profileData?.role || 'teacher';
+
+        return NextResponse.json({
+          user: emailAuthData.user,
+          session: emailAuthData.session,
+          role: effectiveRole,
+          organisation_type: profileData?.organisations?.organisation_type,
+        })
+      }
+      
+      console.log('Login API: Direct email login failed:', emailAuthError?.message);
+      // If direct email login fails, return error (don't fall through to username logic)
+      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
-    console.log('Login API: Looking up profile for username:', username);
+    // Username login flow (existing logic for invite code users)
+    console.log('Login API: Looking up profile for username:', identifier);
     
-    // First, get the organization and role from the profile (including active_role for role switching)
+    // Get the organization and role from the profile
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select(`
@@ -59,7 +105,7 @@ type ProfileWithOrgAndRole = {
         active_role,
         organisations (abbr, organisation_type)
       `)
-      .eq('username', username)
+      .eq('username', identifier)
       .single<ProfileWithOrgAndRole>()
       
     console.log('Login API: Profile lookup result:', profileData);
@@ -70,21 +116,45 @@ type ProfileWithOrgAndRole = {
       return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 })
     }
 
-    // Get organization abbreviation (Type checker should now understand organisations is an object or null)
+    // Get organization abbreviation
     const orgAbbr = profileData.organisations?.abbr
 
+    // For homeschool users who may not have an org abbreviation yet,
+    // try to get the auth email directly from auth.users
+    let authEmail: string | null = null
+
     if (!orgAbbr) {
-      console.error('Organisation abbreviation not found for profile:', profileData.user_id);
-      return NextResponse.json({ error: 'Organization data missing or invalid' }, { status: 500 })
+      // Try to get the user's email from auth.users using admin client
+      const adminSupabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
+      )
+
+      const { data: authUserData } = await adminSupabase.auth.admin.getUserById(profileData.user_id)
+      authEmail = authUserData?.user?.email || null
+      
+      console.log('Login API: Got auth email from admin:', authEmail);
     }
 
-    // Construct pseudo-email
-    const pseudoEmail = `${username}@${orgAbbr}.internal`
-    console.log('Login API: Constructed pseudo-email:', pseudoEmail);
+    // Determine the email to use for authentication
+    const loginEmail = authEmail || (orgAbbr ? `${identifier}@${orgAbbr}.internal` : null)
+    
+    if (!loginEmail) {
+      console.error('Could not determine login email for user:', profileData.user_id);
+      return NextResponse.json({ error: 'Account configuration error. Please contact support.' }, { status: 500 })
+    }
 
-    // Sign in with pseudo-email and password
+    console.log('Login API: Using login email:', loginEmail);
+
+    // Sign in with the determined email
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: pseudoEmail,
+      email: loginEmail,
       password,
     })
     
@@ -95,10 +165,10 @@ type ProfileWithOrgAndRole = {
       return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 })
     }
 
-    // Calculate effective role (active_role if set, otherwise base role)
+    // Calculate effective role
     const effectiveRole = profileData.active_role || profileData.role;
 
-    // Return success with user data, effective role, and organization type
+    // Return success with user data
     return NextResponse.json({
       user: data.user,
       session: data.session,

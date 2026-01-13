@@ -20,16 +20,51 @@ export default function NewSignupForm() {
   const supabase = createClient()
   const [isLoading, setIsLoading] = useState(false)
   const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
+  const [usernameError, setUsernameError] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false)
+
+  // Validate username format
+  const validateUsername = (value: string): string => {
+    if (value.length < 3) {
+      return 'Username must be at least 3 characters'
+    }
+    if (value.length > 20) {
+      return 'Username must be 20 characters or less'
+    }
+    if (!/^[a-zA-Z0-9_.-]+$/.test(value)) {
+      return 'Username can only contain letters, numbers, underscores, dots, and hyphens'
+    }
+    if (/^[._-]/.test(value) || /[._-]$/.test(value)) {
+      return 'Username cannot start or end with special characters'
+    }
+    return ''
+  }
+
+  const handleUsernameChange = (value: string) => {
+    setUsername(value)
+    if (value) {
+      setUsernameError(validateUsername(value))
+    } else {
+      setUsernameError('')
+    }
+  }
 
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!agreedToTerms) {
       toast.error('Please agree to the Terms of Service to continue')
+      return
+    }
+
+    // Validate username
+    const usernameValidationError = validateUsername(username)
+    if (usernameValidationError) {
+      toast.error(usernameValidationError)
       return
     }
     
@@ -46,12 +81,28 @@ export default function NewSignupForm() {
     setIsLoading(true)
 
     try {
-      // Sign up with email and password
+      // Check if username is already taken
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('username', username.toLowerCase())
+        .single()
+
+      if (existingUser) {
+        toast.error('This username is already taken. Please choose another.')
+        setIsLoading(false)
+        return
+      }
+
+      // Sign up with email and password, storing username in metadata
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            username: username.toLowerCase() // Store username in user metadata
+          }
         }
       })
 
@@ -71,7 +122,7 @@ export default function NewSignupForm() {
             .from('profiles')
             .insert({
               user_id: data.user.id,
-              username: email.split('@')[0], // Default username from email
+              username: username.toLowerCase(), // Use the chosen username
               role: 'teacher', // Default to teacher for homeschool users
               active_role: 'teacher' // Set active_role to teacher for homeschool users
             })
@@ -247,6 +298,27 @@ export default function NewSignupForm() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="Choose a username"
+                value={username}
+                onChange={(e) => handleUsernameChange(e.target.value)}
+                required
+                disabled={isLoading}
+                minLength={3}
+                maxLength={20}
+                className={usernameError ? 'border-red-500' : ''}
+              />
+              {usernameError ? (
+                <p className="text-xs text-red-500">{usernameError}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">3-20 characters, letters, numbers, underscores, dots, or hyphens</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
@@ -274,7 +346,7 @@ export default function NewSignupForm() {
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading || !agreedToTerms}>
+            <Button type="submit" className="w-full" disabled={isLoading || !agreedToTerms || !username || !!usernameError}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

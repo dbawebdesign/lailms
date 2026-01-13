@@ -481,16 +481,21 @@ export default function HomeschoolOnboarding() {
       if (!existingProfile) {
         console.log('Creating initial profile...')
         
+        // Get username from user metadata (set during signup) or fallback to email prefix
+        const usernameFromMetadata = user.user_metadata?.username
+        const fallbackUsername = user.email?.split('@')[0] || 'user'
+        const profileUsername = usernameFromMetadata || fallbackUsername
+        
         const { error: initialProfileError } = await supabase
           .from('profiles')
           .insert({
             user_id: user.id,
+            username: profileUsername, // Use username from signup or email prefix
             first_name: firstName,
             last_name: lastName,
             role: 'teacher',
             active_role: 'teacher',
             onboarding_completed: false
-            // username is now optional - not needed for homeschool accounts
           })
         
         if (initialProfileError) {

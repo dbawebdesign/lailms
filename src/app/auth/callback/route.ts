@@ -87,11 +87,16 @@ export async function GET(request: NextRequest) {
       } else {
         // No profile found - this is a new user who just confirmed their email
         // Create initial profile for homeschool users
+        // Get username from user metadata (set during signup) or fallback to email prefix
+        const usernameFromMetadata = data.user.user_metadata?.username
+        const fallbackUsername = data.user.email?.split('@')[0] || 'user'
+        const username = usernameFromMetadata || fallbackUsername
+
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
             user_id: data.user.id,
-            username: data.user.email?.split('@')[0] || 'user', // Default username from email
+            username: username,
             role: 'teacher', // Default to teacher for homeschool users
             active_role: 'teacher' // Set active_role to teacher for homeschool users
           })
