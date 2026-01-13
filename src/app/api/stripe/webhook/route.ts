@@ -100,17 +100,50 @@ export async function POST(req: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
 
-        // Update subscription status if needed
+        // Get the current period end date
+        const currentPeriodEnd = subscription.current_period_end 
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : null;
+
+        // Update subscription fields in profiles
         const { error: updateError } = await supabase
           .from('profiles')
           .update({
-            // Add subscription-related fields if needed in the future
+            stripe_subscription_id: subscription.id,
+            subscription_status: subscription.status,
+            subscription_cancel_at_period_end: subscription.cancel_at_period_end,
+            subscription_current_period_end: currentPeriodEnd,
             updated_at: new Date().toISOString(),
           })
           .eq('stripe_customer_id', customerId);
 
         if (updateError) {
           console.error('Error updating subscription status:', updateError);
+        } else {
+          console.log('Updated subscription status for customer:', customerId, 'Status:', subscription.status);
+        }
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = subscription.customer as string;
+
+        // Mark subscription as canceled and set is_canceled flag
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            subscription_status: 'canceled',
+            subscription_cancel_at_period_end: false,
+            is_canceled: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('stripe_customer_id', customerId);
+
+        if (updateError) {
+          console.error('Error updating canceled subscription:', updateError);
+        } else {
+          console.log('Subscription canceled for customer:', customerId);
         }
         break;
       }

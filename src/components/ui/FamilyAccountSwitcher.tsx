@@ -25,6 +25,7 @@ interface FamilyMember {
   gradeLevel?: string
   email?: string
   isCurrent: boolean
+  isSubAccount?: boolean
 }
 
 export default function FamilyAccountSwitcher() {
@@ -150,7 +151,8 @@ export default function FamilyAccountSwitcher() {
           role: isTeacherRole ? 'teacher' : 'student',
           gradeLevel: member.grade_level,
           email: member.user_id === user.id ? user.email : undefined, // Only show email for authenticated user
-          isCurrent
+          isCurrent,
+          isSubAccount: member.is_sub_account || false
         }
         
         members.push(formattedMember)
@@ -191,7 +193,8 @@ export default function FamilyAccountSwitcher() {
                 lastName: (fs.profiles as any).last_name || '',
                 role: 'student',
                 gradeLevel: (fs.profiles as any).grade_level,
-                isCurrent
+                isCurrent,
+                isSubAccount: true // Students from family_students are always sub-accounts
               }
               
               members.push(formattedMember)
@@ -406,10 +409,13 @@ export default function FamilyAccountSwitcher() {
         )}
         
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push('/settings')}>
-          <Settings className="mr-2 h-4 w-4" />
-          Settings
-        </DropdownMenuItem>
+        {/* Only show settings for non-sub-accounts (parent/teacher accounts) */}
+        {currentUser && !currentUser.isSubAccount && (
+          <DropdownMenuItem onClick={() => router.push('/settings')}>
+            <Settings className="mr-2 h-4 w-4" />
+            Settings
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           Sign Out

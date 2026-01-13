@@ -1,0 +1,77 @@
+import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2023-10-16',
+});
+
+export async function POST(req: NextRequest) {
+  try {
+    const supabase = createSupabaseServerClient();
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get user profile with subscription info
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('stripe_subscription_id, stripe_customer_id, subscription_status, is_sub_account')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    }
+
+    // Check if user is a sub-account (they can't manage subscriptions)
+    if (profile.is_sub_account) {
+      return NextResponse.json({ error: 'Sub-accounts cannot manage subscriptions' }, { status: 403 });
+    }
+
+    // Check if user has a subscription
+    if (!profile.stripe_subscription_id) {
+      return NextResponse.json({ error: 'No active subscription found' }, { status: 400 });
+    }
+
+    // Check if subscription is already canceled
+    if (profile.subscription_status === 'canceled') {
+      return NextResponse.json({ error: 'Subscription is already canceled' }, { status: 400 });
+    }
+
+    // Cancel subscription at end of billing period
+    const subscription = await stripe.subscriptions.update(profile.stripe_subscription_id, {
+      cancel_at_period_end: true,
+    });
+
+    // Update profile with cancellation info
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        subscription_cancel_at_period_end: true,
+        subscription_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      console.error('Error updating profile:', updateError);
+      // Don't fail the request since Stripe was updated successfully
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Subscription will be canceled at the end of the billing period',
+      cancelAt: new Date(subscription.current_period_end * 1000).toISOString(),
+    });
+  } catch (error: any) {
+    console.error('Error canceling subscription:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to cancel subscription' },
+      { status: 500 }
+    );
+  }
+}

@@ -1,6 +1,45 @@
 # Current Supabase Schema
 
-## Latest Updates (Role Assignment Standardization)
+## Latest Updates (Settings Page & Subscription Management)
+
+### User Settings Page & Stripe Subscription Fields (2025-01-13)
+Added comprehensive user settings page with subscription management capabilities:
+
+**New Database Fields on profiles table:**
+- `stripe_subscription_id` (text) - Stripe subscription ID for recurring billing
+- `subscription_status` (text, default 'active') - Current subscription status (active, canceled, past_due, trialing, etc.)
+- `subscription_cancel_at_period_end` (boolean, default false) - Whether subscription is set to cancel at period end
+- `subscription_current_period_end` (timestamptz) - When the current billing period ends
+
+**New Indexes:**
+- `idx_profiles_stripe_subscription_id` - Index on stripe_subscription_id for faster lookups
+- `idx_profiles_subscription_status` - Index on subscription_status for filtering
+
+**New API Routes:**
+- `POST /api/settings/subscription/cancel` - Cancel subscription at period end
+- `POST /api/settings/subscription/reactivate` - Reactivate a canceled subscription
+- `GET /api/settings/subscription/status` - Get current subscription status
+- `POST /api/settings/profile/update` - Update profile (username, firstName, lastName)
+- `POST /api/settings/students/update` - Update student sub-account info
+- `GET /api/settings/students/list` - List all students for a parent
+
+**Updated Stripe Webhook:**
+- Enhanced `customer.subscription.created` and `customer.subscription.updated` handlers to store subscription data
+- Added `customer.subscription.deleted` handler to mark subscriptions as canceled
+
+**New Settings Page Features:**
+- Profile settings (username, display name)
+- Student management for homeschool accounts
+- Subscription management with cancel/reactivate functionality
+- Security settings with password reset
+- Feedback & support integration
+
+**Access Control:**
+- Settings page is only accessible to parent/teacher accounts (non-sub-accounts)
+- Settings menu item hidden for student sub-accounts in FamilyAccountSwitcher
+- Sub-accounts redirected to dashboard if they try to access /settings directly
+
+## Previous Updates (Role Assignment Standardization)
 
 ### Active Role Standardization (2025-02-09)
 Standardized role assignment across all signup flows to ensure consistent user experience:
