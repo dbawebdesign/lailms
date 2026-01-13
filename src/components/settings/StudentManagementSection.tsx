@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Save, Edit2, X, User, GraduationCap } from 'lucide-react';
+import { Loader2, Save, Edit2, X, User, GraduationCap, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Separator } from '@/components/ui/separator';
 
 interface Student {
   userId: string;
@@ -22,6 +23,11 @@ interface StudentManagementSectionProps {
   familyId: string | null;
 }
 
+interface NewStudent {
+  firstName: string;
+  gradeLevel: string;
+}
+
 export default function StudentManagementSection({ familyId }: StudentManagementSectionProps) {
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,6 +38,9 @@ export default function StudentManagementSection({ familyId }: StudentManagement
     gradeLevel: '',
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newStudents, setNewStudents] = useState<NewStudent[]>([{ firstName: '', gradeLevel: '' }]);
 
   useEffect(() => {
     loadStudents();
@@ -119,6 +128,62 @@ export default function StudentManagementSection({ familyId }: StudentManagement
     }
   };
 
+  const addStudentField = () => {
+    if (newStudents.length < 4) {
+      setNewStudents([...newStudents, { firstName: '', gradeLevel: '' }]);
+    } else {
+      toast.error('Maximum 4 students can be added at once');
+    }
+  };
+
+  const removeStudentField = (index: number) => {
+    if (newStudents.length > 1) {
+      setNewStudents(newStudents.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateNewStudent = (index: number, field: keyof NewStudent, value: string) => {
+    const updated = [...newStudents];
+    updated[index] = { ...updated[index], [field]: value };
+    setNewStudents(updated);
+  };
+
+  const handleCreateStudents = async () => {
+    // Validate
+    const validStudents = newStudents.filter(s => s.firstName && s.gradeLevel);
+    if (validStudents.length === 0) {
+      toast.error('Please add at least one student with name and grade');
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const response = await fetch('/api/auth/homeschool/fix-students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ students: validStudents }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create students');
+      }
+
+      toast.success('Students created successfully!');
+      
+      // Reset form and reload students
+      setNewStudents([{ firstName: '', gradeLevel: '' }]);
+      setShowAddForm(false);
+      await loadStudents();
+    } catch (error: any) {
+      console.error('Error creating students:', error);
+      toast.error(error.message || 'Failed to create students');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -136,12 +201,109 @@ export default function StudentManagementSection({ familyId }: StudentManagement
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Student Management</CardTitle>
-        <CardDescription>
-          Manage your students&apos; names and grade levels
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Student Management</CardTitle>
+            <CardDescription>
+              Manage your students&apos; names and grade levels
+            </CardDescription>
+          </div>
+          {!showAddForm && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddForm(true)}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Student
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Add New Students Form */}
+        {showAddForm && (
+          <>
+            <div className="rounded-lg border p-4 space-y-4 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium">Add New Students</h4>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowAddForm(false);
+                    setNewStudents([{ firstName: '', gradeLevel: '' }]);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {newStudents.map((student, index) => (
+                <div key={index} className="flex gap-4 items-end">
+                  <div className="flex-1">
+                    <Label htmlFor={`new-name-${index}`}>First Name</Label>
+                    <Input
+                      id={`new-name-${index}`}
+                      value={student.firstName}
+                      onChange={(e) => updateNewStudent(index, 'firstName', e.target.value)}
+                      placeholder="Enter first name"
+                    />
+                  </div>
+                  <div className="w-32">
+                    <Label htmlFor={`new-grade-${index}`}>Grade</Label>
+                    <Input
+                      id={`new-grade-${index}`}
+                      value={student.gradeLevel}
+                      onChange={(e) => updateNewStudent(index, 'gradeLevel', e.target.value)}
+                      placeholder="K-12"
+                    />
+                  </div>
+                  {newStudents.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeStudentField(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+
+              <div className="flex gap-2">
+                {newStudents.length < 4 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addStudentField}
+                    className="flex-1"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Another
+                  </Button>
+                )}
+                <Button
+                  onClick={handleCreateStudents}
+                  disabled={isCreating}
+                  className="flex-1"
+                >
+                  {isCreating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Students'
+                  )}
+                </Button>
+              </div>
+            </div>
+            <Separator />
+          </>
+        )}
         {students.length === 0 ? (
           <div className="rounded-lg border border-dashed p-6 text-center">
             <User className="mx-auto h-10 w-10 text-muted-foreground/50" />

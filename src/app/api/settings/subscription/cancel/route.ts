@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     // Get user profile with subscription info
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('stripe_subscription_id, stripe_customer_id, subscription_status, is_sub_account')
+      .select('stripe_subscription_id, stripe_customer_id, subscription_status, is_sub_account, paid')
       .eq('user_id', user.id)
       .single();
 
@@ -32,25 +32,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Sub-accounts cannot manage subscriptions' }, { status: 403 });
     }
 
-    // Check if user has a subscription
-    if (!profile.stripe_subscription_id) {
-      return NextResponse.json({ error: 'No active subscription found' }, { status: 400 });
-    }
-
     // Check if subscription is already canceled
     if (profile.subscription_status === 'canceled') {
       return NextResponse.json({ error: 'Subscription is already canceled' }, { status: 400 });
     }
 
+    let subscriptionId = profile.stripe_subscription_id;
+
+    // If we don't have subscription ID but have customer ID, look it up from Stripe
+    if (!subscriptionId && profile.stripe_customer_id) {
+      const subscriptions = await stripe.subscriptions.list({
+        customer: profile.stripe_customer_id,
+        status: 'active',
+        limit: 1,
+      });
+
+      if (subscriptions.data.length > 0) {
+        subscriptionId = subscriptions.data[0].id;
+      }
+    }
+
+    // Check if user has a subscription
+    if (!subscriptionId) {
+      return NextResponse.json({ error: 'No active subscription found' }, { status: 400 });
+    }
+
     // Cancel subscription at end of billing period
-    const subscription = await stripe.subscriptions.update(profile.stripe_subscription_id, {
+    const subscription = await stripe.subscriptions.update(subscriptionId, {
       cancel_at_period_end: true,
     });
 
-    // Update profile with cancellation info
+    // Update profile with cancellation info and subscription ID if we looked it up
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
+        stripe_subscription_id: subscription.id,
+        subscription_status: subscription.status,
         subscription_cancel_at_period_end: true,
         subscription_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
         updated_at: new Date().toISOString(),

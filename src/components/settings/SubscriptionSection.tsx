@@ -48,8 +48,13 @@ export default function SubscriptionSection({ profile }: SubscriptionSectionProp
   const [isLoading, setIsLoading] = useState(false);
   const [isCanceling, setIsCanceling] = useState(false);
   const [isReactivating, setIsReactivating] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(profile.subscriptionCancelAtPeriodEnd);
   const [subscriptionStatus, setSubscriptionStatus] = useState(profile.subscriptionStatus);
+  const [subscriptionId, setSubscriptionId] = useState(profile.stripeSubscriptionId);
+  const [currentPeriodEnd, setCurrentPeriodEnd] = useState(profile.subscriptionCurrentPeriodEnd);
+  const [paymentAmount, setPaymentAmount] = useState(profile.paymentAmountCents);
+  const [paymentCurrency, setPaymentCurrency] = useState(profile.paymentCurrency);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
@@ -111,6 +116,10 @@ export default function SubscriptionSection({ profile }: SubscriptionSectionProp
       }
 
       setCancelAtPeriodEnd(true);
+      // Update the period end date from the API response
+      if (data.cancelAt) {
+        setCurrentPeriodEnd(data.cancelAt);
+      }
       toast.success('Subscription will be canceled at the end of the billing period');
     } catch (error) {
       console.error('Error canceling subscription:', error);
@@ -146,13 +155,45 @@ export default function SubscriptionSection({ profile }: SubscriptionSectionProp
     }
   };
 
+  const handleSyncSubscription = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch('/api/settings/subscription/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to sync subscription');
+        return;
+      }
+
+      // Update local state with synced data
+      setSubscriptionId(data.subscription.id);
+      setSubscriptionStatus(data.subscription.status);
+      setCancelAtPeriodEnd(data.subscription.cancelAtPeriodEnd);
+      setCurrentPeriodEnd(data.subscription.currentPeriodEnd);
+      if (data.subscription.amount) {
+        setPaymentAmount(data.subscription.amount);
+        setPaymentCurrency(data.subscription.currency);
+      }
+      
+      toast.success('Subscription data synced successfully');
+    } catch (error) {
+      console.error('Error syncing subscription:', error);
+      toast.error('Failed to sync subscription');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const canCancelSubscription = profile.paid && 
-    profile.stripeSubscriptionId && 
     subscriptionStatus !== 'canceled' && 
     !cancelAtPeriodEnd;
 
   const canReactivateSubscription = profile.paid && 
-    profile.stripeSubscriptionId && 
     cancelAtPeriodEnd && 
     subscriptionStatus !== 'canceled';
 
@@ -188,7 +229,7 @@ export default function SubscriptionSection({ profile }: SubscriptionSectionProp
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Amount</p>
                 <p className="font-medium">
-                  {formatAmount(profile.paymentAmountCents, profile.paymentCurrency)}
+                  {formatAmount(paymentAmount, paymentCurrency)}
                 </p>
               </div>
               
@@ -202,7 +243,7 @@ export default function SubscriptionSection({ profile }: SubscriptionSectionProp
                   {cancelAtPeriodEnd ? 'Access Until' : 'Next Billing Date'}
                 </p>
                 <p className="font-medium">
-                  {formatDate(profile.subscriptionCurrentPeriodEnd)}
+                  {formatDate(currentPeriodEnd)}
                 </p>
               </div>
             </>
@@ -217,7 +258,7 @@ export default function SubscriptionSection({ profile }: SubscriptionSectionProp
               <div>
                 <p className="font-medium text-yellow-600">Subscription Canceling</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Your subscription is set to cancel on {formatDate(profile.subscriptionCurrentPeriodEnd)}. 
+                  Your subscription is set to cancel on {formatDate(currentPeriodEnd)}. 
                   You will continue to have access until then. You can reactivate anytime before that date.
                 </p>
               </div>
@@ -231,6 +272,41 @@ export default function SubscriptionSection({ profile }: SubscriptionSectionProp
             <p className="text-muted-foreground">
               You don&apos;t have an active subscription.
             </p>
+          </div>
+        )}
+
+        {/* Warning for missing subscription data */}
+        {profile.paid && !subscriptionId && !cancelAtPeriodEnd && (
+          <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4">
+            <div className="flex gap-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-yellow-600">Subscription Data Not Synced</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your payment has been processed, but subscription details need to be synced from Stripe. 
+                  Click the button below to fetch your subscription information.
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-3"
+                  onClick={handleSyncSubscription}
+                  disabled={isSyncing}
+                >
+                  {isSyncing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCcw className="mr-2 h-4 w-4" />
+                      Sync Subscription Data
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -259,7 +335,7 @@ export default function SubscriptionSection({ profile }: SubscriptionSectionProp
                   <AlertDialogDescription>
                     Are you sure you want to cancel your subscription? 
                     <br /><br />
-                    <strong>Your subscription will remain active until {formatDate(profile.subscriptionCurrentPeriodEnd)}</strong>. 
+                    <strong>Your subscription will remain active until {formatDate(currentPeriodEnd)}</strong>. 
                     After that date, you will lose access to premium features.
                     <br /><br />
                     You can reactivate your subscription anytime before the end of the billing period.
