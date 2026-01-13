@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     // Get current user's profile to verify they're a parent/teacher
     const { data: parentProfile, error: parentError } = await supabase
       .from('profiles')
-      .select('*')
+      .select('user_id, family_id, is_primary_parent, is_sub_account, organisation_id')
       .eq('user_id', user.id)
       .single();
 
@@ -30,14 +30,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if user is a sub-account (they can't manage students)
-    if ((parentProfile as any).is_sub_account) {
+    if (parentProfile.is_sub_account) {
       return NextResponse.json({ error: 'Sub-accounts cannot manage student settings' }, { status: 403 });
     }
 
     // Get the student profile to verify relationship
     const { data: studentProfile, error: studentError } = await supabase
       .from('profiles')
-      .select('*')
+      .select('user_id, family_id, parent_account_id, is_sub_account, organisation_id')
       .eq('user_id', studentId)
       .single();
 
@@ -48,9 +48,11 @@ export async function POST(req: NextRequest) {
     // Verify the parent has permission to edit this student
     const isAuthorized = 
       // Student's parent_account_id matches current user
-      (studentProfile as any).parent_account_id === user.id ||
+      studentProfile.parent_account_id === user.id ||
+      // Same family_id
+      (parentProfile.family_id && studentProfile.family_id === parentProfile.family_id) ||
       // Same organisation and student is a sub-account
-      (parentProfile.organisation_id && studentProfile.organisation_id === parentProfile.organisation_id && (studentProfile as any).is_sub_account);
+      (parentProfile.organisation_id && studentProfile.organisation_id === parentProfile.organisation_id && studentProfile.is_sub_account);
 
     if (!isAuthorized) {
       return NextResponse.json({ error: 'You do not have permission to edit this student' }, { status: 403 });
