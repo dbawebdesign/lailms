@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if user is a sub-account
-    if (currentProfile.is_sub_account) {
+    if ((currentProfile as any).is_sub_account) {
       return NextResponse.json({ error: 'Sub-accounts cannot update profile settings' }, { status: 403 });
     }
 
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate and add username if provided
-    if (username !== undefined && username !== currentProfile.username) {
+    if (username !== undefined && username !== (currentProfile as any).username) {
       if (username === null || username === '') {
         // Allow clearing username for homeschool accounts
         updateData.username = null;
@@ -113,10 +113,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       profile: {
-        userId: updatedProfile.user_id,
-        username: updatedProfile.username,
-        firstName: updatedProfile.first_name,
-        lastName: updatedProfile.last_name,
+        userId: (updatedProfile as any).user_id,
+        username: (updatedProfile as any).username,
+        firstName: (updatedProfile as any).first_name,
+        lastName: (updatedProfile as any).last_name,
       },
     });
   } catch (error: any) {

@@ -28,29 +28,29 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if user is a sub-account
-    if (profile.is_sub_account) {
+    if ((profile as any).is_sub_account) {
       return NextResponse.json({ error: 'Sub-accounts cannot manage subscriptions' }, { status: 403 });
     }
 
     // Check if user has a subscription
-    if (!profile.stripe_subscription_id) {
+    if (!(profile as any).stripe_subscription_id) {
       return NextResponse.json({ error: 'No subscription found' }, { status: 400 });
     }
 
     // Check if subscription is set to cancel
-    if (!profile.subscription_cancel_at_period_end) {
+    if (!(profile as any).subscription_cancel_at_period_end) {
       return NextResponse.json({ error: 'Subscription is not set to cancel' }, { status: 400 });
     }
 
     // Check if subscription is already fully canceled
-    if (profile.subscription_status === 'canceled') {
+    if ((profile as any).subscription_status === 'canceled') {
       return NextResponse.json({ 
         error: 'Subscription has already been canceled. Please create a new subscription.' 
       }, { status: 400 });
     }
 
     // Reactivate subscription by removing cancel_at_period_end
-    const subscription = await stripe.subscriptions.update(profile.stripe_subscription_id, {
+    const subscription = await stripe.subscriptions.update((profile as any).stripe_subscription_id, {
       cancel_at_period_end: false,
     });
 

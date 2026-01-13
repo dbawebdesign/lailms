@@ -28,21 +28,21 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if user is a sub-account (they can't manage subscriptions)
-    if (profile.is_sub_account) {
+    if ((profile as any).is_sub_account) {
       return NextResponse.json({ error: 'Sub-accounts cannot manage subscriptions' }, { status: 403 });
     }
 
     // Check if subscription is already canceled
-    if (profile.subscription_status === 'canceled') {
+    if ((profile as any).subscription_status === 'canceled') {
       return NextResponse.json({ error: 'Subscription is already canceled' }, { status: 400 });
     }
 
-    let subscriptionId = profile.stripe_subscription_id;
+    let subscriptionId = (profile as any).stripe_subscription_id;
 
     // If we don't have subscription ID but have customer ID, look it up from Stripe
-    if (!subscriptionId && profile.stripe_customer_id) {
+    if (!subscriptionId && (profile as any).stripe_customer_id) {
       const subscriptions = await stripe.subscriptions.list({
-        customer: profile.stripe_customer_id,
+        customer: (profile as any).stripe_customer_id,
         status: 'active',
         limit: 1,
       });

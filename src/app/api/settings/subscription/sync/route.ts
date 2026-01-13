@@ -35,18 +35,18 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if user is a sub-account
-    if (profile.is_sub_account) {
+    if ((profile as any).is_sub_account) {
       return NextResponse.json({ error: 'Sub-accounts cannot manage subscriptions' }, { status: 403 });
     }
 
     // Check if user has a Stripe customer ID
-    if (!profile.stripe_customer_id) {
+    if (!(profile as any).stripe_customer_id) {
       return NextResponse.json({ error: 'No Stripe customer found for this account' }, { status: 400 });
     }
 
     // Fetch all subscriptions for this customer from Stripe
     const subscriptions = await stripe.subscriptions.list({
-      customer: profile.stripe_customer_id,
+      customer: (profile as any).stripe_customer_id,
       status: 'all',
       limit: 10,
     });

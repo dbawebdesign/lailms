@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check if user is a sub-account
-    if (profile.is_sub_account) {
+    if ((profile as any).is_sub_account) {
       return NextResponse.json({ error: 'Sub-accounts cannot view student list' }, { status: 403 });
     }
 
@@ -42,11 +42,11 @@ export async function GET(req: NextRequest) {
     }
 
     // Also get students by family_id
-    if (profile.family_id) {
+    if ((profile as any).family_id) {
       const { data: familyStudents } = await supabase
         .from('profiles')
         .select('user_id, first_name, last_name, grade_level, is_sub_account, created_at')
-        .eq('family_id', profile.family_id)
+        .eq('family_id', (profile as any).family_id)
         .eq('is_sub_account', true)
         .neq('user_id', user.id)
         .order('first_name');
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Also check family_students table
-    if (profile.family_id) {
+    if ((profile as any).family_id) {
       const { data: linkedStudents } = await supabase
         .from('family_students')
         .select(`
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
             created_at
           )
         `)
-        .eq('family_id', profile.family_id);
+        .eq('family_id', (profile as any).family_id);
 
       if (linkedStudents) {
         linkedStudents.forEach(ls => {
