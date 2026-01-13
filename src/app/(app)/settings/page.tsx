@@ -46,9 +46,12 @@ export default async function SettingsPage() {
   }
 
   // Check if user is a sub-account - redirect to dashboard
-  if (profile.is_sub_account) {
+  if ((profile as any).is_sub_account) {
     redirect("/dashboard?error=settings_not_available");
   }
+
+  // Cast to any to avoid TypeScript issues with dynamically selected fields
+  const profileData = profile as any;
 
   return (
     <SettingsPageClient 
@@ -57,25 +60,25 @@ export default async function SettingsPage() {
         email: user.email || '',
       }}
       profile={{
-        userId: profile.user_id,
-        username: profile.username,
-        firstName: profile.first_name,
-        lastName: profile.last_name,
-        role: profile.role,
-        activeRole: profile.active_role,
-        organisationId: profile.organisation_id,
-        familyId: profile.family_id,
-        isSubAccount: profile.is_sub_account,
-        isPrimaryParent: profile.is_primary_parent,
-        paid: profile.paid,
-        paidAt: profile.paid_at,
-        stripeCustomerId: profile.stripe_customer_id,
-        stripeSubscriptionId: profile.stripe_subscription_id,
-        subscriptionStatus: profile.subscription_status,
-        subscriptionCancelAtPeriodEnd: profile.subscription_cancel_at_period_end,
-        subscriptionCurrentPeriodEnd: profile.subscription_current_period_end,
-        paymentAmountCents: profile.payment_amount_cents,
-        paymentCurrency: profile.payment_currency,
+        userId: profileData.user_id,
+        username: profileData.username,
+        firstName: profileData.first_name,
+        lastName: profileData.last_name,
+        role: profileData.role,
+        activeRole: profileData.active_role,
+        organisationId: profileData.organisation_id,
+        familyId: profileData.family_id,
+        isSubAccount: profileData.is_sub_account,
+        isPrimaryParent: profileData.is_primary_parent,
+        paid: profileData.paid,
+        paidAt: profileData.paid_at,
+        stripeCustomerId: profileData.stripe_customer_id,
+        stripeSubscriptionId: profileData.stripe_subscription_id,
+        subscriptionStatus: profileData.subscription_status,
+        subscriptionCancelAtPeriodEnd: profileData.subscription_cancel_at_period_end,
+        subscriptionCurrentPeriodEnd: profileData.subscription_current_period_end,
+        paymentAmountCents: profileData.payment_amount_cents,
+        paymentCurrency: profileData.payment_currency,
       }}
     />
   );
