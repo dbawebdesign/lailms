@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
 
       if (familyStudents) {
         // Add students not already in the list
-        familyStudents.forEach(student => {
+        familyStudents.forEach((student: any) => {
           if (!students.find(s => s.user_id === student.user_id)) {
             students.push(student);
           }
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
         .eq('family_id', (profile as any).family_id);
 
       if (linkedStudents) {
-        linkedStudents.forEach(ls => {
+        linkedStudents.forEach((ls: any) => {
           if (ls.profiles && !students.find(s => s.user_id === ls.student_id)) {
             students.push(ls.profiles);
           }
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Format the response
-    const formattedStudents = students.map(student => ({
+    const formattedStudents = students.map((student: any) => ({
       userId: student.user_id,
       firstName: student.first_name,
       lastName: student.last_name,
