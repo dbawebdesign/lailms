@@ -119,30 +119,26 @@ export async function POST(req: NextRequest) {
     // Get organization abbreviation
     const orgAbbr = profileData.organisations?.abbr
 
-    // For homeschool users who may not have an org abbreviation yet,
-    // try to get the auth email directly from auth.users
-    let authEmail: string | null = null
-
-    if (!orgAbbr) {
-      // Try to get the user's email from auth.users using admin client
-      const adminSupabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false
-          }
+    // Always get the user's actual auth email from auth.users
+    // This handles both email-signup users and legacy .internal users
+    const adminSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
         }
-      )
+      }
+    )
 
-      const { data: authUserData } = await adminSupabase.auth.admin.getUserById(profileData.user_id)
-      authEmail = authUserData?.user?.email || null
-      
-      console.log('Login API: Got auth email from admin:', authEmail);
-    }
+    const { data: authUserData } = await adminSupabase.auth.admin.getUserById(profileData.user_id)
+    const authEmail = authUserData?.user?.email || null
+    
+    console.log('Login API: Got auth email from admin:', authEmail);
 
     // Determine the email to use for authentication
+    // Prefer the actual auth email, fall back to .internal pseudo-email only if needed
     const loginEmail = authEmail || (orgAbbr ? `${identifier}@${orgAbbr}.internal` : null)
     
     if (!loginEmail) {

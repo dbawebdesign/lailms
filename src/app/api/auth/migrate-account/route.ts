@@ -57,10 +57,28 @@ export async function POST(request: NextRequest) {
     const { data: authUser } = await supabase.auth.admin.getUserById(profile.user_id)
     
     if (!authUser?.user?.email?.endsWith('.internal')) {
-      // User already migrated
+      // User has a real email - check if they actually went through migration
+      // or if they were always an email-based user (e.g., signed up with email directly)
+      const { data: migrationRecords } = await supabase
+        .from('account_migrations')
+        .select('id, status')
+        .eq('user_id', profile.user_id)
+        .eq('status', 'completed')
+        .limit(1)
+      
+      if (migrationRecords && migrationRecords.length > 0) {
+        // User actually went through migration - tell them to use email
+        return NextResponse.json({ 
+          migrated: true,
+          message: 'Account already migrated. Please use email/password or Google login.'
+        }, { status: 200 })
+      }
+      
+      // User never went through migration - they signed up with email directly
+      // Just return a "no migration needed" response so normal login can proceed
       return NextResponse.json({ 
-        migrated: true,
-        message: 'Account already migrated. Please use email/password or Google login.'
+        needsMigration: false,
+        migrated: false 
       }, { status: 200 })
     }
 
