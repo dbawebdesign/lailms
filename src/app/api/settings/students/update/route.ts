@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     // Get current user's profile to verify they're a parent/teacher
     const { data: parentProfile, error: parentError } = await supabase
       .from('profiles')
-      .select('user_id, family_id, is_primary_parent, is_sub_account, organisation_id')
+      .select('user_id, is_sub_account, organisation_id')
       .eq('user_id', user.id)
       .single();
 
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     // Get the student profile to verify relationship
     const { data: studentProfile, error: studentError } = await supabase
       .from('profiles')
-      .select('user_id, family_id, parent_account_id, is_sub_account, organisation_id')
+      .select('user_id, parent_account_id, is_sub_account, organisation_id')
       .eq('user_id', studentId)
       .single();
 
@@ -49,8 +49,6 @@ export async function POST(req: NextRequest) {
     const isAuthorized = 
       // Student's parent_account_id matches current user
       studentProfile.parent_account_id === user.id ||
-      // Same family_id
-      (parentProfile.family_id && studentProfile.family_id === parentProfile.family_id) ||
       // Same organisation and student is a sub-account
       (parentProfile.organisation_id && studentProfile.organisation_id === parentProfile.organisation_id && studentProfile.is_sub_account);
 
