@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     // Check if it's a username (no @ symbol)
     if (!email.includes('@')) {
       // Look up the user's profile to get organization info
+      // Convert username to lowercase for case-insensitive matching (usernames are stored in lowercase)
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select(`
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
           organisation_id,
           organisations (abbr)
         `)
-        .eq('username', email)
+        .eq('username', email.toLowerCase())
         .single()
 
       if (profileError || !profileData) {

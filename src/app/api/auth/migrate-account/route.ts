@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     )
 
     // Check if this is an old-system user
+    // Convert username to lowercase for case-insensitive matching (usernames are stored in lowercase)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select(`
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
           organisation_type
         )
       `)
-      .eq('username', username)
+      .eq('username', username.toLowerCase())
       .single()
 
     if (profileError || !profile) {

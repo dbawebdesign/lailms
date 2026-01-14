@@ -35,10 +35,11 @@ export async function POST(req: NextRequest) {
     )
 
     // Check if user exists
+    // Convert username to lowercase for case-insensitive matching (usernames are stored in lowercase)
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('user_id, username, organisation_id')
-      .eq('username', username)
+      .eq('username', username.toLowerCase())
       .single<Tables<'profiles'>>()
 
     if (profileError || !profileData) {

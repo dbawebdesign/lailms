@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
     console.log('Login API: Looking up profile for username:', identifier);
     
     // Get the organization and role from the profile
+    // Convert username to lowercase for case-insensitive matching (usernames are stored in lowercase)
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select(`
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
         active_role,
         organisations (abbr, organisation_type)
       `)
-      .eq('username', identifier)
+      .eq('username', identifier.toLowerCase())
       .single<ProfileWithOrgAndRole>()
       
     console.log('Login API: Profile lookup result:', profileData);

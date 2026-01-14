@@ -66,10 +66,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if username is already taken
+    // Convert username to lowercase for case-insensitive matching (usernames are stored in lowercase)
     const { data: existingUser, error: userCheckError } = await supabase
       .from('profiles')
       .select('user_id')
-      .eq('username', username)
+      .eq('username', username.toLowerCase())
       .limit(1)
       .returns<Tables<"profiles">[]>()
 
@@ -78,7 +79,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Create a pseudo-email for authentication
-    const pseudoEmail = `${username}@${inviteData.organisations.abbr}.internal`
+    // Use lowercase username for consistency
+    const pseudoEmail = `${username.toLowerCase()}@${inviteData.organisations.abbr}.internal`
 
     // Create the user in auth.users
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
@@ -106,7 +108,7 @@ export async function POST(req: NextRequest) {
       .from('profiles')
       .insert({
         user_id: authUser.user.id,
-        username: username,
+        username: username.toLowerCase(), // Store username in lowercase for case-insensitive matching
         first_name: firstName,
         last_name: lastName,
         grade_level: gradeLevel,

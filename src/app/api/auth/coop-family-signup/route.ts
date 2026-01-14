@@ -79,10 +79,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if username is already taken
+    // Convert username to lowercase for case-insensitive matching (usernames are stored in lowercase)
     const { data: existingUser, error: userCheckError } = await supabase
       .from('profiles')
       .select('user_id')
-      .eq('username', primaryParentInfo.username)
+      .eq('username', primaryParentInfo.username.toLowerCase())
       .limit(1)
 
     if (existingUser && existingUser.length > 0) {
@@ -114,7 +115,8 @@ export async function POST(request: NextRequest) {
     const organizationUnitId = newUnit.id
 
     // Create primary parent user
-    const pseudoEmail = `${primaryParentInfo.username}@${organizationAbbr}.internal`
+    // Use lowercase username for consistency with other signup flows
+    const pseudoEmail = `${primaryParentInfo.username.toLowerCase()}@${organizationAbbr}.internal`
 
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
       email: pseudoEmail,
@@ -141,7 +143,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .insert({
         user_id: parentUserId,
-        username: primaryParentInfo.username,
+        username: primaryParentInfo.username.toLowerCase(), // Store username in lowercase for case-insensitive matching
         first_name: primaryParentInfo.firstName,
         last_name: primaryParentInfo.lastName,
         role: 'admin',
