@@ -148,6 +148,19 @@ export default function RootLayout({
         {/* FirstPromoter tracking scripts (loaded non-blocking) */}
         <Script src="/fprmain.js" strategy="afterInteractive" />
         <Script src="https://cdn.firstpromoter.com/fpr.js" strategy="afterInteractive" />
+        {/* Google Analytics */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-BLH6Q6WH88"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-BLH6Q6WH88');
+          `}
+        </Script>
         {/* Structured-data scripts */}
         <script
           type="application/ld+json"
