@@ -1,3 +1,4 @@
+import { canManageFamilyStudent, type FamilyProfile } from '@/lib/auth/family-access';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
       .from('profiles')
       .select('user_id, family_id, is_primary_parent, is_sub_account, organisation_id')
       .eq('user_id', user.id)
-      .single();
+      .single<FamilyProfile>();
 
     if (parentError || !parentProfile) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
@@ -37,22 +38,16 @@ export async function POST(req: NextRequest) {
     // Get the student profile to verify relationship
     const { data: studentProfile, error: studentError } = await supabase
       .from('profiles')
-      .select('user_id, family_id, parent_account_id, is_sub_account, organisation_id')
+      .select('user_id, role, family_id, parent_account_id, is_sub_account, organisation_id')
       .eq('user_id', studentId)
-      .single();
+      .single<FamilyProfile>();
 
     if (studentError || !studentProfile) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
     // Verify the parent has permission to edit this student
-    const isAuthorized = 
-      // Student's parent_account_id matches current user
-      studentProfile.parent_account_id === user.id ||
-      // Same family_id
-      (parentProfile.family_id && studentProfile.family_id === parentProfile.family_id) ||
-      // Same organisation and student is a sub-account
-      (parentProfile.organisation_id && studentProfile.organisation_id === parentProfile.organisation_id && studentProfile.is_sub_account);
+    const isAuthorized = canManageFamilyStudent(parentProfile, studentProfile);
 
     if (!isAuthorized) {
       return NextResponse.json({ error: 'You do not have permission to edit this student' }, { status: 403 });

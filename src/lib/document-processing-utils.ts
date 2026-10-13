@@ -29,7 +29,7 @@ export async function retryFailedDocuments(documentIds: string[]): Promise<{
     };
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  const supabase = createSupabaseServerClient();
 
   for (const documentId of documentIds) {
     try {
@@ -38,11 +38,7 @@ export async function retryFailedDocuments(documentIds: string[]): Promise<{
         .from('documents')
         .update({
           status: 'queued',
-          metadata: supabase.rpc('jsonb_set', {
-            target: 'metadata',
-            path: '{retry_attempted_at}',
-            new_value: JSON.stringify(new Date().toISOString())
-          })
+          updated_at: new Date().toISOString()
         })
         .eq('id', documentId);
 

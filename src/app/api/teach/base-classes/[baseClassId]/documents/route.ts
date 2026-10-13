@@ -140,27 +140,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // 5. Asynchronously trigger the process-document Edge Function
     if (documentRecord && documentRecord.id) {
-      const processFunctionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/process-document`;
-      fetch(processFunctionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Supabase Edge Functions are often protected, Authorization might be needed
-          // If your function is protected, you might need to pass the service_role key
-          // or a user token if the function expects user context for RLS on related tables.
-          // For a service-to-service call like this, a specific auth mechanism (e.g. function secret) is best.
-          // For simplicity, assuming it might be accessible or uses a service key internally already if called from backend.
-          // 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` // Example if service key needed
-        },
-        body: JSON.stringify({ documentId: documentRecord.id }),
-      })
-      .then(async (response) => {
-        if (!response.ok) {
-          const errorData = await response.text();
-          console.error(`Error triggering process-document function for ${documentRecord.id}: ${response.status} ${response.statusText}`, errorData);
-        } else {
-          console.log(`Successfully triggered process-document function for ${documentRecord.id}`);
-        }
+      supabase.functions.invoke('process-document', {
+        body: { documentId: documentRecord.id },
+      }).then(({ error }) => {
+        if (error) console.error('Document processing dispatch failed:', error);
       })
       .catch((err) => {
         console.error(`Network error triggering process-document function for ${documentRecord.id}:`, err);

@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
     if (supabaseUrl && supabaseAnonKey) {
       try {
-        const invokeClient = createClient(supabaseUrl, supabaseAnonKey);
+        const invokeClient = supabase; // Forward the verified user session to the Edge Function.
         const { error: invokeError } = await invokeClient.functions.invoke(
           'process-document',
           {

@@ -161,7 +161,7 @@ export async function POST(request: Request) {
         // Decide how to handle this - maybe update status to error?
     } else {
         // Create a temporary client for function invocation
-        const invokeClient = createClient(supabaseUrl, supabaseAnonKey);
+        const invokeClient = supabase; // Forward the verified user session to the Edge Function.
         
         // 🚀 ASYNC PROCESSING: Fire-and-forget invocation to prevent HTTP timeout
         // Don't await - let the edge function run in background while we return immediately

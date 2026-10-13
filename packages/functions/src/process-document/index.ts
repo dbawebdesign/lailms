@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { authorizeDocumentProcessing } from './authorize.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { YoutubeTranscript } from 'npm:youtube-transcript';
 // @ts-ignore
@@ -1598,7 +1599,16 @@ serve(async (req: Request) => {
       });
     }
 
-    supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const denied = await authorizeDocumentProcessing(adminClient, documentId,
+      req.headers.get('Authorization'), supabaseServiceRoleKey);
+    if (denied) {
+      return new Response(JSON.stringify({ success: false, error: 'Document processing access denied' }), {
+        status: denied, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    // Only assign the client used by the catch/failure handler after authorization.
+    supabaseClient = adminClient;
 
     await updateDocumentStatus(supabaseClient, documentId, 'processing', { 
       processing_attempted_at: new Date().toISOString(),

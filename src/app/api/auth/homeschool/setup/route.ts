@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { ensureBootstrapProfile } from '@/lib/auth/bootstrap-profile'
+import { randomBytes } from 'crypto'
+import type { FamilyProvisioningProfile } from '@/lib/auth/family-access'
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
     const supabaseAdmin = createSupabaseServiceClient() // Use service client for admin operations
     const body = await request.json()
-    const { action, data } = body
+    const { action, data = {} } = body
 
     // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -17,15 +20,35 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const { error: bootstrapError } = await ensureBootstrapProfile(user)
+    if (bootstrapError) return NextResponse.json({ error: 'Failed to initialize profile' }, { status: 500 })
+    const { data: parent, error: parentError } = await supabase
+      .from('profiles').select('*').eq('user_id', user.id).single<FamilyProvisioningProfile>()
+    if (parentError || !parent) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+    if (parent.is_sub_account || parent.role === 'student') {
+      return NextResponse.json({ error: 'Student accounts cannot provision families' }, { status: 403 })
+    }
+    if (['create_family', 'create_coop', 'join_coop'].includes(action) && parent.organisation_id) {
+      return NextResponse.json({ error: 'This account already belongs to an organization' }, { status: 409 })
+    }
+    if (['create_family', 'create_coop', 'join_coop'].includes(action)
+        && !['firstName', 'lastName'].every(key => typeof data[key] === 'string' && data[key].trim().length > 0 && data[key].length <= 50)) {
+      return NextResponse.json({ error: 'First and last name are required' }, { status: 400 })
+    }
+
     switch (action) {
       case 'create_family': {
         const { familyName, firstName, lastName } = data
+        if (typeof familyName !== 'string' || !familyName.trim() || familyName.length > 100) {
+          return NextResponse.json({ error: 'Family name is required' }, { status: 400 })
+        }
 
         // Create organization
-        const { data: org, error: orgError } = await supabase
+        const { data: org, error: orgError } = await supabaseAdmin
           .from('organisations')
           .insert({
             name: familyName,
+            abbr: `F_${randomBytes(6).toString('hex')}`,
             organisation_type: 'individual_family',
             max_students: 4,
             subscription_status: 'pending'
@@ -41,7 +64,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Create organization unit
-        const { data: orgUnit, error: unitError } = await supabase
+        const { data: orgUnit, error: unitError } = await supabaseAdmin
           .from('organisation_units')
           .insert({
             organisation_id: org.id,
@@ -59,7 +82,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Create homeschool family info
-        const { data: familyInfo, error: familyError } = await supabase
+        const { data: familyInfo, error: familyError } = await supabaseAdmin
           .from('homeschool_family_info')
           .insert({
             organisation_id: org.id,
@@ -78,7 +101,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Update user profile
-        const { error: profileError } = await supabase
+        const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .update({
             first_name: firstName,
@@ -87,6 +110,7 @@ export async function POST(request: NextRequest) {
             organisation_unit_id: orgUnit.id,
             family_id: familyInfo.id,
             role: 'teacher',
+            active_role: 'teacher',
             is_primary_parent: true,
             onboarding_step: 'add_students'
           })
@@ -101,7 +125,7 @@ export async function POST(request: NextRequest) {
 
         // Generate student invite code
         const inviteCode = `${familyName.toLowerCase().replace(/\s+/g, '-')}-student-${Math.random().toString(36).substr(2, 9)}`
-        await supabase
+        await supabaseAdmin
           .from('invite_codes')
           .insert({
             code: inviteCode,
@@ -120,12 +144,25 @@ export async function POST(request: NextRequest) {
       }
 
       case 'add_students': {
-        const { students, familyId, organizationId } = data
+        const { students } = data
+        const familyId = parent.family_id
+        const organizationId = parent.organisation_id
+        if (!parent.is_primary_parent || !familyId || !organizationId
+            || (data.familyId && data.familyId !== familyId)
+            || (data.organizationId && data.organizationId !== organizationId)) {
+          return NextResponse.json({ error: 'You cannot add students to this family' }, { status: 403 })
+        }
+        if (!Array.isArray(students) || students.length === 0 || students.length > 4
+            || students.some(s => typeof s.firstName !== 'string' || !s.firstName.trim() || s.firstName.length > 50
+              || typeof s.gradeLevel !== 'string' || s.gradeLevel.length > 20)) {
+          return NextResponse.json({ error: 'Provide one to four valid students' }, { status: 400 })
+        }
 
         // Get the organization unit ID
-        const { data: orgUnit } = await supabase
+        const { data: orgUnit } = await supabaseAdmin
           .from('organisation_units')
           .select('id')
+          .eq('id', parent.organisation_unit_id!)
           .eq('organisation_id', organizationId)
           .single()
 
@@ -150,7 +187,7 @@ export async function POST(request: NextRequest) {
           // Create auth user with a random password using service role
           const { data: studentAuth, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email: studentEmail,
-            password: Math.random().toString(36).substr(2, 32) + 'Aa1!',
+            password: randomBytes(32).toString('base64url') + 'Aa1!',
             email_confirm: true,
             user_metadata: {
               first_name: student.firstName,
@@ -175,7 +212,7 @@ export async function POST(request: NextRequest) {
           console.log('Created shadow auth with ID:', studentId)
           
           // Create student profile linked to the shadow auth account
-          const { data: profileData, error: profileError } = await (supabase as any)
+          const { data: profileData, error: profileError } = await (supabaseAdmin as any)
             .from('profiles')
             .insert({
               user_id: studentId, // Using the auth user ID
@@ -187,11 +224,11 @@ export async function POST(request: NextRequest) {
               organisation_id: organizationId,
               organisation_unit_id: orgUnit.id, // Use the correct unit ID
               family_id: familyId,
-              paid: true, // Inherit from parent's payment
+              paid: parent.paid === true,
               onboarding_completed: true,
               is_sub_account: true, // Flag to indicate this is a sub-account
               parent_account_id: user.id, // Link to parent account
-              additional_roles: JSON.stringify(['student'])
+              additional_roles: ['student']
             })
             .select()
             .single()
@@ -273,12 +310,16 @@ export async function POST(request: NextRequest) {
 
       case 'create_coop': {
         const { coopName, firstName, lastName, estimatedFamilies } = data
+        if (typeof coopName !== 'string' || !coopName.trim() || coopName.length > 100) {
+          return NextResponse.json({ error: 'Co-op name is required' }, { status: 400 })
+        }
 
         // Create co-op organization
-        const { data: org, error: orgError } = await supabase
+        const { data: org, error: orgError } = await supabaseAdmin
           .from('organisations')
           .insert({
             name: coopName,
+            abbr: `C_${randomBytes(6).toString('hex')}`,
             organisation_type: 'coop_network',
             settings: {
               estimated_families: estimatedFamilies
@@ -295,13 +336,15 @@ export async function POST(request: NextRequest) {
         }
 
         // Update user profile as co-op admin
-        const { error: profileError } = await supabase
+        const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .update({
             first_name: firstName,
             last_name: lastName,
             organisation_id: org.id,
             role: 'admin',
+            active_role: 'teacher',
+            additional_roles: ['teacher'],
             is_primary_parent: true,
             onboarding_step: 'payment'
           })
@@ -316,7 +359,7 @@ export async function POST(request: NextRequest) {
 
         // Generate admin invite code for other families
         const adminCode = `${coopName.toLowerCase().replace(/\s+/g, '-')}-admin-${Math.random().toString(36).substr(2, 9)}`
-        await supabase
+        await supabaseAdmin
           .from('invite_codes')
           .insert({
             code: adminCode,
@@ -331,6 +374,38 @@ export async function POST(request: NextRequest) {
           organizationId: org.id,
           inviteCode: adminCode
         })
+      }
+
+      case 'join_coop': {
+        const { joinCode, firstName, lastName } = data
+        if (typeof joinCode !== 'string' || !joinCode || joinCode.length > 200) {
+          return NextResponse.json({ error: 'Invalid invite code' }, { status: 400 })
+        }
+        const { data: invite, error: inviteError } = await supabaseAdmin.from('invite_codes')
+          .select('organisation_id, role, expires_at, organisations(organisation_type)')
+          .eq('code', joinCode).single()
+        if (inviteError || !invite || !['admin', 'teacher', 'parent'].includes(invite.role)
+            || (invite.expires_at && Date.parse(invite.expires_at) <= Date.now())
+            || (invite.organisations as any)?.organisation_type !== 'coop_network') {
+          return NextResponse.json({ error: 'Invalid or expired co-op invite code' }, { status: 400 })
+        }
+        // The invite chooses the organisation. Body-supplied IDs or roles are never used.
+        const familyName = `${lastName.trim()} Family`
+        const { data: unit, error: unitError } = await supabaseAdmin.from('organisation_units')
+          .insert({ organisation_id: invite.organisation_id, name: familyName, unit_type: 'family' })
+          .select('id').single()
+        if (unitError || !unit) return NextResponse.json({ error: 'Could not create family unit' }, { status: 500 })
+        const { data: family, error: familyError } = await supabaseAdmin.from('homeschool_family_info')
+          .insert({ organisation_id: invite.organisation_id, organisation_unit_id: unit.id,
+            family_name: familyName, primary_parent_id: user.id }).select('id').single()
+        if (familyError || !family) return NextResponse.json({ error: 'Could not create family' }, { status: 500 })
+        const { error } = await supabaseAdmin.from('profiles').update({
+          first_name: firstName, last_name: lastName, organisation_id: invite.organisation_id,
+          organisation_unit_id: unit.id, family_id: family.id, role: 'teacher', active_role: 'teacher',
+          is_primary_parent: true, onboarding_completed: false, onboarding_step: 'add_students',
+        }).eq('user_id', user.id)
+        if (error) return NextResponse.json({ error: 'Could not join co-op' }, { status: 500 })
+        return NextResponse.json({ success: true, organizationId: invite.organisation_id, familyId: family.id })
       }
 
       default:

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { createClient } from '@supabase/supabase-js';
 import { brainbytesGenerationService } from '@/lib/services/brainbytes-generation-service';
 
 interface PodcastRequest {
@@ -12,7 +11,7 @@ interface PodcastRequest {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { lessonId, content: fallbackContent, gradeLevel, userId, internal } = body;
+    const { lessonId, gradeLevel } = body;
 
     if (!lessonId) {
       return NextResponse.json(
@@ -21,36 +20,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let supabase;
-    let user;
-    
-    // Handle internal requests from course generation
-    if (internal && userId) {
-      // Use service role client for internal requests to bypass RLS
-      supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false
-          }
-        }
-      );
-      user = { id: userId };
-      console.log('🔧 [PodcastAPI] Internal brainbytes request (using service role):', { lessonId, userId, internal });
-    } else {
-      // Handle regular requests with authentication
-      supabase = createSupabaseServerClient();
-      const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
-      if (userError || !authUser) {
-        return NextResponse.json(
-          { error: 'Authentication required' },
-          { status: 401 }
-        );
-      }
-      user = authUser;
-    }
+    const supabase = createSupabaseServerClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
     // Check if regeneration is requested
     const regenerate = request.nextUrl.searchParams.get('regenerate') === 'true';
@@ -62,7 +34,7 @@ export async function POST(request: NextRequest) {
       user,
       {
         regenerate,
-        internal: !!internal,
+        internal: false,
         gradeLevel: gradeLevel || 'middle_school',
         maxRetries: 3,
         retryDelay: 2000

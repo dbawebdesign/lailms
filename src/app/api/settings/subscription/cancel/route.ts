@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Update profile with cancellation info and subscription ID if we looked it up
-    const { error: updateError } = await supabase
+    const { error: updateError } = await createSupabaseServiceClient()
       .from('profiles')
       .update({
         stripe_subscription_id: subscription.id,

@@ -2,10 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import { CourseGenerationOrchestratorV3 } from '../../src/lib/services/course-generation-orchestrator-v3';
 import { knowledgeBaseAnalyzer } from '../../src/lib/services/knowledge-base-analyzer';
 import { CourseGenerator } from '../../src/lib/services/course-generator';
+import { AdaptivePollDelay, intervalMs, schedulePeriodic } from '../../src/lib/services/worker-polling';
 
 
 const WORKER_ID = process.env.WORKER_ID || `worker-${Date.now()}`;
-const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || '5000');
+const POLL_INTERVAL = intervalMs(process.env.POLL_INTERVAL, 5000);
+const IDLE_POLL_INTERVAL = Math.max(POLL_INTERVAL, intervalMs(process.env.IDLE_POLL_INTERVAL, 30000));
 const MAX_RETRIES = parseInt(process.env.MAX_RETRIES || '3');
 
 // Initialize Supabase client
@@ -21,6 +23,8 @@ const supabase = createClient(
 class CourseGenerationWorker {
   private isRunning = false;
   private orchestrator: CourseGenerationOrchestratorV3;
+  private stopCleanup?: () => void;
+  private wakeUp?: () => void;
 
   constructor() {
     this.orchestrator = new CourseGenerationOrchestratorV3(supabase);
@@ -29,21 +33,22 @@ class CourseGenerationWorker {
   async start() {
     console.log(`🚀 Course Generation Worker ${WORKER_ID} starting...`);
     this.isRunning = true;
+    this.stopCleanup = schedulePeriodic(cleanupStaleJobs, 300000, error => console.error('Cleanup error:', error));
     
     // Set up graceful shutdown
     process.on('SIGTERM', () => this.shutdown());
     process.on('SIGINT', () => this.shutdown());
     
     // Start processing loop
+    const delay = new AdaptivePollDelay(POLL_INTERVAL, IDLE_POLL_INTERVAL);
     while (this.isRunning) {
+      let foundWork = false;
       try {
-        await this.processNextJob();
+        foundWork = await this.processNextJob();
       } catch (error) {
         console.error('Worker error:', error);
-        await this.sleep(POLL_INTERVAL * 2); // Back off on error
       }
-      
-      await this.sleep(POLL_INTERVAL);
+      if (this.isRunning) await this.sleep(delay.next(foundWork));
     }
   }
 
@@ -53,17 +58,23 @@ class CourseGenerationWorker {
       .rpc('dequeue_course_job', { worker_id_param: WORKER_ID });
       
     if (dequeueError) {
-      console.error('Dequeue error:', dequeueError);
-      return;
+      throw dequeueError;
     }
     
     if (!queueItem || queueItem.length === 0) {
       // No jobs available
-      return;
+      return false;
     }
     
     const { id: queueId, job_id: jobId, job: jobPayload } = queueItem[0];
     console.log(`📋 Processing job ${jobId} (queue: ${queueId})`);
+    // Renew the lease during long AI calls so cleanup cannot reclaim live work.
+    const stopHeartbeat = schedulePeriodic(async () => {
+      const { error } = await supabase.from('course_generation_queue')
+        .update({ locked_at: new Date().toISOString() })
+        .eq('id', queueId).eq('worker_id', WORKER_ID).eq('status', 'processing');
+      if (error) throw error;
+    }, 60000, error => console.error('Worker lease renewal failed:', error));
     
     try {
       // Use atomic payload returned by RPC to avoid a second read
@@ -76,7 +87,7 @@ class CourseGenerationWorker {
       if (job.status === 'completed' || job.status === 'failed') {
         console.log(`Job ${jobId} already ${job.status}, marking queue item complete`);
         await supabase.rpc('complete_course_job', { queue_id_param: queueId });
-        return;
+        return true;
       }
       
       // Compute the generation request once (ensure baseClassId, etc.)
@@ -158,35 +169,41 @@ class CourseGenerationWorker {
           .update({
             status: 'failed',
             error_message: error instanceof Error ? error.message : 'Unknown error',
-            failed_at: new Date().toISOString()
+            updated_at: new Date().toISOString()
           })
           .eq('id', jobId);
           
         await supabase.rpc('complete_course_job', { queue_id_param: queueId });
       }
+    } finally {
+      stopHeartbeat();
     }
+    return true;
   }
 
   private async shutdown() {
     console.log('🛑 Shutting down worker...');
     this.isRunning = false;
     
-    // Clean up any resources
-    // Note: Current jobs will continue running
-    
-    process.exit(0);
+    this.stopCleanup?.();
+    this.wakeUp?.();
+    // Let an in-flight job finish; a forced platform shutdown is recovered by its lease.
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise(resolve => {
+      const timer = setTimeout(resolve, ms);
+      this.wakeUp = () => { clearTimeout(timer); resolve(); };
+    });
   }
 }
 
 // Periodic cleanup of stale jobs
 async function cleanupStaleJobs() {
   try {
-    const { data: cleanedCount } = await supabase
+    const { data: cleanedCount, error } = await supabase
       .rpc('cleanup_stale_course_jobs');
+    if (error) throw error;
       
     if (cleanedCount && cleanedCount > 0) {
       console.log(`🧹 Cleaned up ${cleanedCount} stale jobs`);
@@ -195,9 +212,6 @@ async function cleanupStaleJobs() {
     console.error('Cleanup error:', error);
   }
 }
-
-// Start cleanup interval
-setInterval(cleanupStaleJobs, 60000); // Every minute
 
 // Start worker
 const worker = new CourseGenerationWorker();

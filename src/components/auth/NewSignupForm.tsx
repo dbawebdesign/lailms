@@ -82,15 +82,14 @@ export default function NewSignupForm() {
 
     try {
       // Check if username is already taken
-      const { data: existingUser } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('username', username.toLowerCase())
-        .single()
-
-      if (existingUser) {
+      const availabilityResponse = await fetch('/api/auth/check-username', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      })
+      const availability = await availabilityResponse.json()
+      if (!availabilityResponse.ok) throw new Error(availability.error || 'Could not check username')
+      if (!availability.available) {
         toast.error('This username is already taken. Please choose another.')
-        setIsLoading(false)
         return
       }
 
@@ -117,19 +116,8 @@ export default function NewSignupForm() {
           setShowEmailConfirmation(true)
         } else {
           // Email already confirmed (shouldn't happen with confirmations enabled, but handle it)
-          // Create initial profile
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
-              user_id: data.user.id,
-              username: username.toLowerCase(), // Use the chosen username
-              role: 'teacher', // Default to teacher for homeschool users
-              active_role: 'teacher' // Set active_role to teacher for homeschool users
-            })
-
-          if (profileError && profileError.code !== '23505') { // Ignore duplicate key errors
-            console.error('Profile creation error:', profileError)
-          }
+          const bootstrapResponse = await fetch('/api/auth/bootstrap-profile', { method: 'POST' })
+          if (!bootstrapResponse.ok) throw new Error('Could not create profile. Please try again.')
 
           // Track referral signup with FirstPromoter
           try {

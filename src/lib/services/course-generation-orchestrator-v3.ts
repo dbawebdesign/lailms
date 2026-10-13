@@ -143,12 +143,8 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
         }
       });
 
-      // Check cache for similar content using lessonTitle from input_data
-      const cachedContent = await this.checkContentCache(
-        'lesson_section',
-        lessonTitle,
-        sectionTitle
-      );
+      const cacheKey = generationCacheKey({ id: task.id, job_id: task.job_id, input_data: task.input_data }, request);
+      const cachedContent = cacheKey ? await this.checkContentCache(cacheKey) : null;
 
       if (cachedContent) {
         await this.logger.log({
@@ -169,20 +165,13 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
         return cachedContent;
       }
 
-      // Get knowledge base content using lessonTitle
-      const kbContent = await this.getRelevantKnowledgeBaseContent(
-        request.baseClassId,
-        lessonTitle,
-        sectionTitle,
-        'kb_supplemented'
-      );
-
-      // Call parent class method to use V1/V2 format
+      // The parent loads the knowledge base using the requested generation mode.
       const result = await super.executeLessonSectionTask(task, outline, request);
       
       // Cache the content for future use
-      if (result) {
+      if (result && cacheKey) {
         await this.cacheContent(
+          cacheKey,
           'lesson_section',
           lessonTitle,
           sectionTitle,
@@ -225,12 +214,9 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
    * Check content cache for similar content
    */
   private async checkContentCache(
-    contentType: string,
-    title: string,
-    subtitle: string
+    cacheKey: string
   ): Promise<any | null> {
     try {
-      const cacheKey = this.generateCacheKey(contentType, title, subtitle);
       
       const { data, error } = await (this.supabaseV3 as any)
         .from('course_generation_cache')
@@ -263,13 +249,13 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
    * Cache generated content
    */
   private async cacheContent(
+    cacheKey: string,
     contentType: string,
     title: string,
     subtitle: string,
     content: any
   ): Promise<void> {
     try {
-      const cacheKey = this.generateCacheKey(contentType, title, subtitle);
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7); // 7 day cache
 
@@ -290,13 +276,6 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
       // Cache error - continue without caching
       console.error('Cache error:', error);
     }
-  }
-
-  /**
-   * Generate cache key
-   */
-  private generateCacheKey(contentType: string, title: string, subtitle: string): string {
-    return `${contentType}:${title.toLowerCase().replace(/\s+/g, '-')}:${subtitle.toLowerCase().replace(/\s+/g, '-')}`;
   }
 
   /**
@@ -338,4 +317,4 @@ export class CourseGenerationOrchestratorV3 extends CourseGenerationOrchestrator
     // This could update the course_generation_analytics table
   }
 
-}
+}import { generationCacheKey } from './generation-cache-key';

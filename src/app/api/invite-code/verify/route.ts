@@ -1,5 +1,4 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -7,31 +6,11 @@ export async function POST(req: NextRequest) {
     // Get request body
     const { code } = await req.json()
 
-    if (!code) {
+    if (typeof code !== 'string' || !code || code.length > 200) {
       return NextResponse.json({ error: 'Invite code is required' }, { status: 400 })
     }
 
-    // Create Supabase server client with async handlers
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          async get(name: string) {
-            const cookieStore = await cookies()
-            return cookieStore.get(name)?.value
-          },
-          async set(name: string, value: string, options: CookieOptions) {
-            const cookieStore = await cookies()
-            cookieStore.set({ name, value, ...options })
-          },
-          async remove(name: string, options: CookieOptions) {
-            const cookieStore = await cookies()
-            cookieStore.set({ name, value: '', ...options })
-          },
-        },
-      }
-    )
+    const supabase = createSupabaseServiceClient()
 
     // Define expected type for invite code data with nested organisation
     type InviteCodeWithOrg = {
@@ -57,7 +36,6 @@ export async function POST(req: NextRequest) {
       .eq('code', code)
       .single<InviteCodeWithOrg>()
 
-    console.log('Invite code query result:', { error, data }); // Debug log
 
     if (error || !data) {
       return NextResponse.json({ error: 'Invalid invite code' }, { status: 400 })

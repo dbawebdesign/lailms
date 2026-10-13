@@ -191,7 +191,7 @@ export async function POST(request: Request) {
     if (!supabaseUrl || !supabaseAnonKey) {
       console.warn('Supabase URL or Anon Key not configured for function invocation. Skipping.');
     } else {
-      const invokeClient = createClient(supabaseUrl, supabaseAnonKey);
+      const invokeClient = supabase; // Forward the verified user session to the Edge Function.
       // Fire-and-forget invocation to avoid API timeout while long-running processing happens in background
       invokeClient.functions
         .invoke('process-document', {

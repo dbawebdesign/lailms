@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireGlobalAdmin } from '@/lib/auth/require-global-admin'
 
 // Use admin client that bypasses RLS
 const supabaseAdmin = createClient(
@@ -15,6 +16,8 @@ const supabaseAdmin = createClient(
 
 export async function GET(request: NextRequest) {
   try {
+    const denied = await requireGlobalAdmin()
+    if (denied) return denied
     // Fetch regular survey responses (authenticated users)
     const { data: surveyData, error: surveyError } = await supabaseAdmin
       .from('survey_responses')

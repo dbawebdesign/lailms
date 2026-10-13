@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers' 
 import { NextRequest, NextResponse } from 'next/server'
+import { createSupabaseServiceClient } from '@/lib/supabase/server'
 
 // Define the expected type for the profile data including the related organisation
 type ProfileWithOrgAndRole = {
@@ -97,7 +98,9 @@ export async function POST(req: NextRequest) {
     
     // Get the organization and role from the profile
     // Convert username to lowercase for case-insensitive matching (usernames are stored in lowercase)
-    const { data: profileData, error: profileError } = await supabase
+    // The lookup is private server work. No profile is returned until the
+    // supplied password has been verified by Supabase Auth below.
+    const { data: profileData, error: profileError } = await createSupabaseServiceClient()
       .from('profiles')
       .select(`
         user_id,

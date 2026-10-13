@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { createClient } from '@supabase/supabase-js';
 import { mindMapGenerationService } from '@/lib/services/mind-map-generation-service';
 import { Tables } from 'packages/types/db';
 
@@ -34,35 +33,11 @@ function extractFromNodes(nodes: any[]): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { lessonId, baseClassId, userId, internal } = body;
+    const { lessonId, baseClassId } = body;
     
-    let supabase;
-    let user;
-    
-    // Handle internal requests from course generation
-    if (internal && userId) {
-      // Use service role client for internal requests to bypass RLS
-      supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false
-          }
-        }
-      );
-      user = { id: userId };
-      console.log('🔧 Internal mind map request (using service role):', { lessonId, userId, internal });
-    } else {
-      // Handle regular requests with authentication
-      supabase = createSupabaseServerClient();
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-      user = authUser;
-    }
+    const supabase = createSupabaseServerClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
     // Determine the type of mind map to generate
     const isLessonMindMap = !!lessonId;
@@ -85,7 +60,7 @@ export async function POST(request: NextRequest) {
         supabase, 
         lessonId, 
         user, 
-        { regenerate, internal: !!internal }
+        { regenerate, internal: false }
       );
       
       if (!result.success) {
@@ -101,7 +76,7 @@ export async function POST(request: NextRequest) {
         supabase, 
         baseClassId, 
         user, 
-        { regenerate, internal: !!internal }
+        { regenerate, internal: false }
       );
       
       if (!result.success) {

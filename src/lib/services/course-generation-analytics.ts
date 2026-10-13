@@ -82,15 +82,8 @@ export class CourseGenerationAnalyticsService {
    * Start continuous system monitoring
    */
   private startSystemMonitoring(): void {
-    // Monitor system metrics every 30 seconds
-    setInterval(() => {
-      this.collectSystemMetrics();
-    }, 30000);
-
-    // Flush performance buffer every 5 minutes
-    setInterval(() => {
-      this.flushPerformanceBuffer();
-    }, 300000);
+    schedulePeriodic(() => this.collectSystemMetrics(), 300000, console.error);
+    schedulePeriodic(() => this.flushPerformanceBuffer(), 300000, console.error);
   }
 
   /**
@@ -456,12 +449,13 @@ export class CourseGenerationAnalyticsService {
   }
 
   private async getQueueSize(): Promise<number> {
-    const { data } = await this.supabase
+    const { count, error } = await this.supabase
       .from('course_generation_tasks')
-      .select('id')
-      .eq('status', 'queued');
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['pending', 'queued', 'retrying']);
     
-    return data?.length || 0;
+    if (error) throw error;
+    return count || 0;
   }
 
   private async getKnowledgeBaseSize(baseClassId: string | null): Promise<number> {
@@ -515,4 +509,4 @@ export class CourseGenerationAnalyticsService {
       throw error;
     }
   }
-} 
+} import { schedulePeriodic } from './worker-polling';

@@ -1,3 +1,4 @@
+import { ensureBootstrapProfile } from '@/lib/auth/bootstrap-profile'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -87,19 +88,7 @@ export async function GET(request: NextRequest) {
       } else {
         // No profile found - this is a new user who just confirmed their email
         // Create initial profile for homeschool users
-        // Get username from user metadata (set during signup) or fallback to email prefix
-        const usernameFromMetadata = data.user.user_metadata?.username
-        const fallbackUsername = data.user.email?.split('@')[0] || 'user'
-        const username = usernameFromMetadata || fallbackUsername
-
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: data.user.id,
-            username: username,
-            role: 'teacher', // Default to teacher for homeschool users
-            active_role: 'teacher' // Set active_role to teacher for homeschool users
-          })
+        const { error: profileError } = await ensureBootstrapProfile(data.user)
 
         if (profileError && profileError.code !== '23505') { // Ignore duplicate key errors
           console.error('Profile creation error:', profileError)

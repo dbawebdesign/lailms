@@ -1,3 +1,4 @@
+import { canManageFamilyStudent, type FamilyProfile } from '@/lib/auth/family-access'
 import { cookies } from 'next/headers'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 
@@ -34,15 +35,12 @@ export async function getActiveProfile() {
       // SAFEGUARD: Verify the sub-account belongs to the current authenticated user's family
       const { data: currentProfile } = await supabase
         .from('profiles')
-        .select('family_id, organisation_id')
+        .select('user_id, role, family_id, parent_account_id, is_sub_account, is_primary_parent')
         .eq('user_id', user.id)
-        .single()
+        .single<FamilyProfile>()
       
       if (currentProfile) {
-        const sameFamily = ((currentProfile as any).family_id && (subProfile as any).family_id === (currentProfile as any).family_id) ||
-                          ((currentProfile as any).organisation_id && (subProfile as any).organisation_id === (currentProfile as any).organisation_id)
-        
-        if (sameFamily) {
+        if (canManageFamilyStudent(currentProfile, subProfile)) {
           console.log('Found valid sub-account profile:', subProfile)
           return {
             profile: subProfile,
