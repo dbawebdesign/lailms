@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 
 // Username validation regex: 3-20 characters, alphanumeric, underscore, hyphen
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,20}$/;
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Check if username is available
-        const { data: existingUser, error: checkError } = await supabase
+        const { data: existingUser, error: checkError } = await createSupabaseServiceClient()
           .from('profiles')
           .select('user_id')
           .eq('username', trimmedUsername)
@@ -106,6 +106,9 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (updateError) {
+      if (updateError.code === '23505') {
+        return NextResponse.json({ error: 'Username is already taken' }, { status: 409 });
+      }
       console.error('Error updating profile:', updateError);
       return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
     }

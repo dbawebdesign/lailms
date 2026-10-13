@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { authorizeDocumentProcessing } from '../process-document/authorize.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // import { corsHeaders } from '../_shared/cors.ts'; // This file is deleted
 
@@ -473,6 +474,11 @@ serve(async (req: Request) => {
     // Initialize Supabase client
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
       global: { headers: { Authorization: `Bearer ${supabaseServiceRoleKey}` } }
+    });
+    const denied = await authorizeDocumentProcessing(supabase, documentId,
+      req.headers.get('Authorization'), supabaseServiceRoleKey);
+    if (denied) return new Response(JSON.stringify({ error: 'Document processing access denied' }), {
+      status: denied, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
     // Fetch document details to get organisation_id

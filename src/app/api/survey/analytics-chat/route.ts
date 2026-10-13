@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireGlobalAdmin } from '@/lib/auth/require-global-admin'
 import OpenAI from 'openai'
 import { visualizationGenerator, VisualizationRequest } from '@/lib/services/visualization-generator'
 
@@ -58,6 +59,8 @@ const createDataVisualizationTool = {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await requireGlobalAdmin()
+  if (denied) return denied
   try {
     const { message, conversationHistory = [] } = await request.json()
 

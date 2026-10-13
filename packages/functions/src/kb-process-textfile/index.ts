@@ -132,7 +132,13 @@ serve(async (req: Request) => {
       throw new Error('Missing Supabase/OpenAI environment variables.');
     }
 
-    supabaseAdminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const denied = await authorizeDocumentProcessing(adminClient, documentId,
+      req.headers.get('Authorization'), supabaseServiceRoleKey);
+    if (denied) return new Response(JSON.stringify({ error: 'Document processing access denied' }), {
+      status: denied, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+    supabaseAdminClient = adminClient;
 
     await updateDocumentStatus(supabaseAdminClient, documentId, 'processing', { 
       processing_attempted_at: new Date().toISOString(),
@@ -259,4 +265,4 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 
     });
   }
-}) 
+}) import { authorizeDocumentProcessing } from '../process-document/authorize.ts';

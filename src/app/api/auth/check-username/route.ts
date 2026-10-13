@@ -15,12 +15,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Username must be between 3 and 20 characters' }, { status: 400 })
     }
 
-    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-      return NextResponse.json({ error: 'Username can only contain letters, numbers, underscores, and hyphens' }, { status: 400 })
-    }
-
-    if (!/^[a-zA-Z]/.test(username)) {
-      return NextResponse.json({ error: 'Username must start with a letter' }, { status: 400 })
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*[a-zA-Z0-9]$/.test(username)) {
+      return NextResponse.json({ error: 'Username must start and end with a letter or number and may contain dots, underscores, and hyphens' }, { status: 400 })
     }
 
     // Initialize Supabase client with service role key

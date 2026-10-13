@@ -64,48 +64,14 @@ function CoopOnboarding({ onBack }: CoopOnboardingProps) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No authenticated user')
 
-      // Create the co-op organization
-      const { data: org, error: orgError } = await supabase
-        .from('organisations')
-        .insert({
-          name: coopName,
-          organisation_type: 'coop_network',
-          settings: {
-            estimated_families: parseInt(numberOfFamilies)
-          }
-        })
-        .select()
-        .single()
-
-      if (orgError) throw orgError
-
-      // Update user profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          first_name: firstName,
-          last_name: lastName,
-          organisation_id: org.id,
-          role: 'admin',
-          is_primary_parent: true,
-          onboarding_completed: false,
-          onboarding_step: 'payment'
-        })
-        .eq('user_id', user.id)
-
-      if (profileError) throw profileError
-
-      // Generate admin invite codes for the co-op
-      const { error: inviteError } = await supabase
-        .from('invite_codes')
-        .insert({
-          code: `${coopName.toLowerCase().replace(/\s+/g, '-')}-admin-${Math.random().toString(36).substr(2, 9)}`,
-          organisation_id: org.id,
-          role: 'admin',
-          created_by: user.id
-        })
-
-      if (inviteError) throw inviteError
+      const response = await fetch('/api/auth/homeschool/setup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create_coop', data: {
+          coopName, firstName, lastName, estimatedFamilies: Number(numberOfFamilies)
+        } })
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Failed to create co-op')
 
       toast.success('Co-op created successfully!')
       
@@ -128,37 +94,12 @@ function CoopOnboarding({ onBack }: CoopOnboardingProps) {
 
     setIsLoading(true)
     try {
-      // Verify the invite code
-      const response = await fetch('/api/invite-code/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: joinCode })
+      const response = await fetch('/api/auth/homeschool/setup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'join_coop', data: { joinCode, firstName, lastName } })
       })
-
-      if (!response.ok) {
-        throw new Error('Invalid invite code')
-      }
-
-      const codeData = await response.json()
-      
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('No authenticated user')
-
-      // Update user profile with co-op info
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          first_name: firstName,
-          last_name: lastName,
-          organisation_id: codeData.organisation.id,
-          role: 'teacher',
-          is_primary_parent: true,
-          onboarding_completed: false,
-          onboarding_step: 'add_students'
-        })
-        .eq('user_id', user.id)
-
-      if (profileError) throw profileError
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Invalid invite code')
 
       toast.success('Successfully joined the co-op!')
       router.push('/dashboard')
@@ -477,141 +418,13 @@ export default function HomeschoolOnboarding() {
         return
       }
       
-      // If profile doesn't exist, create it first with basic info
-      if (!existingProfile) {
-        console.log('Creating initial profile...')
-        
-        // Get username from user metadata (set during signup) or fallback to email prefix
-        const usernameFromMetadata = user.user_metadata?.username
-        const fallbackUsername = user.email?.split('@')[0] || 'user'
-        const profileUsername = usernameFromMetadata || fallbackUsername
-        
-        const { error: initialProfileError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: user.id,
-            username: profileUsername, // Use username from signup or email prefix
-            first_name: firstName,
-            last_name: lastName,
-            role: 'teacher',
-            active_role: 'teacher',
-            onboarding_completed: false
-          })
-        
-        if (initialProfileError) {
-          console.error('Initial profile creation error:', initialProfileError)
-          throw new Error(initialProfileError.message || 'Failed to create initial profile')
-        }
-        console.log('Initial profile created successfully')
-      }
-
-      // Step 1: Create organization first
-      console.log('Creating organization...')
-      
-      // Generate abbreviation from family name
-      const generateAbbreviation = (name: string): string => {
-        // Take first letter of each word, max 4 letters
-        const words = name.split(' ').filter(w => w.length > 0)
-        let abbr = words.map(w => w[0].toUpperCase()).join('').slice(0, 4)
-        
-        // If abbreviation is too short, pad with first letters
-        if (abbr.length < 2) {
-          abbr = name.slice(0, 3).toUpperCase()
-        }
-        
-        // Add random suffix to ensure uniqueness
-        const suffix = Math.random().toString(36).substr(2, 3).toUpperCase()
-        return `${abbr}_${suffix}`
-      }
-      
-      const abbreviation = generateAbbreviation(familyName)
-      
-      const { data: org, error: orgError } = await supabase
-        .from('organisations')
-        .insert({
-          name: familyName,
-          abbr: abbreviation,
-          abbreviation: abbreviation, // Both fields for compatibility
-          organisation_type: 'individual_family',
-          max_students: 4,
-          subscription_status: 'pending'
-        })
-        .select()
-        .single()
-
-      if (orgError) {
-        console.error('Organization creation error:', orgError)
-        throw new Error(orgError.message || 'Failed to create organization')
-      }
-      
-      console.log('Organization created:', org)
-      setOrganizationId(org.id)
-
-      // Step 2: Create organization unit
-      console.log('Creating organization unit...')
-      const { data: orgUnit, error: unitError } = await supabase
-        .from('organisation_units')
-        .insert({
-          organisation_id: org.id,
-          name: familyName,
-          unit_type: 'family'
-        })
-        .select()
-        .single()
-
-      if (unitError) {
-        console.error('Organization unit creation error:', unitError)
-        throw new Error(unitError.message || 'Failed to create organization unit')
-      }
-      
-      console.log('Organization unit created:', orgUnit)
-
-      // Step 3: Create homeschool family info
-      console.log('Creating family info...')
-      const { data: familyInfo, error: familyError } = await supabase
-        .from('homeschool_family_info')
-        .insert({
-          organisation_id: org.id,
-          organisation_unit_id: orgUnit.id,
-          family_name: familyName,
-          primary_parent_id: user.id
-        })
-        .select()
-        .single()
-
-      if (familyError) {
-        console.error('Family info creation error:', familyError)
-        throw new Error(familyError.message || 'Failed to create family info')
-      }
-      
-      console.log('Family info created:', familyInfo)
-
-      // Step 4: Now update the profile with all the IDs
-      console.log('Updating profile with organization info...')
-      
-      // Update the existing profile with organization details
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          first_name: firstName,
-          last_name: lastName,
-          organisation_id: org.id,
-          organisation_unit_id: orgUnit.id,
-          family_id: familyInfo.id,
-          role: 'teacher',
-          active_role: 'teacher',
-          is_primary_parent: true,
-          onboarding_step: 'add_students',
-          onboarding_completed: false
-        })
-        .eq('user_id', user.id)
-
-      if (profileError) {
-        console.error('Profile update error:', profileError)
-        throw new Error(profileError.message || 'Failed to update profile')
-      }
-      
-      console.log('Profile updated successfully')
+      const response = await fetch('/api/auth/homeschool/setup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create_family', data: { familyName, firstName, lastName } })
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Failed to create family account')
+      setOrganizationId(result.organizationId)
 
       setCurrentStep('add_students')
       toast.success('Family account created successfully!')

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { Tables } from 'packages/types/db'
-import { PROFILE_ROLE_FIELDS, UserRole } from '@/lib/utils/roleUtils'
+import { PROFILE_ROLE_FIELDS, UserRole, isValidUserRole } from '@/lib/utils/roleUtils'
 
 interface SwitchRoleRequest {
   newRole: UserRole
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     const body: SwitchRoleRequest = await request.json()
     
-    if (!body.newRole) {
+    if (typeof body.newRole !== 'string' || !isValidUserRole(body.newRole)) {
       return NextResponse.json({ error: 'New role is required' }, { status: 400 })
     }
 

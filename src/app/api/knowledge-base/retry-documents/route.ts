@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const invokeClient = createClient(supabaseUrl, supabaseAnonKey);
+    const invokeClient = supabase; // Forward the verified user session to the Edge Function.
     const results = [];
 
     for (const documentId of documentIds) {

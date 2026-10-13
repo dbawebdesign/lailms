@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import type { FamilyProvisioningProfile } from '@/lib/auth/family-access'
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,13 +31,17 @@ export async function POST(request: NextRequest) {
         )
       `)
       .eq('user_id', user.id)
-      .single()
+      .single<FamilyProvisioningProfile>()
     
     if (profileError || !profile) {
       return NextResponse.json(
         { error: 'Profile not found' },
         { status: 404 }
       )
+    }
+
+    if (profile.is_sub_account || !profile.is_primary_parent || profile.role === 'student') {
+      return NextResponse.json({ error: 'Only a family parent can create student accounts' }, { status: 403 })
     }
     
     const organizationId = profile.organisation_id
@@ -140,7 +145,7 @@ export async function POST(request: NextRequest) {
         organisation_id: organizationId,
         organisation_unit_id: unitId, // Use the correct unit ID
         family_id: familyId,
-        paid: true, // Inherits from parent's payment
+        paid: profile.paid === true,
         onboarding_completed: true,
         is_sub_account: true, // Flag to indicate this is a sub-account
         parent_account_id: user.id, // Link to parent account
@@ -149,7 +154,7 @@ export async function POST(request: NextRequest) {
       
       console.log('Profile payload:', profilePayload)
       
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData, error: profileError } = await supabaseAdmin
         .from('profiles')
         .insert(profilePayload)
         .select()

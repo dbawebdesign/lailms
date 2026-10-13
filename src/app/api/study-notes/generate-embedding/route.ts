@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -13,6 +9,9 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase: SupabaseClient = createSupabaseServerClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     const { noteId } = await request.json();
 
     if (!noteId) {
@@ -24,6 +23,7 @@ export async function POST(request: NextRequest) {
       .from('study_notes')
       .select('title, content')
       .eq('id', noteId)
+      .eq('user_id', user.id)
       .single();
 
     if (noteError || !note) {
@@ -45,10 +45,11 @@ export async function POST(request: NextRequest) {
     const { error: updateError } = await supabase
       .from('study_notes')
       .update({
-        embedding: embedding,
+        content_embedding: JSON.stringify(embedding),
         updated_at: new Date().toISOString()
       })
-      .eq('id', noteId);
+      .eq('id', noteId)
+      .eq('user_id', user.id);
 
     if (updateError) {
       console.error('Error updating note with embedding:', updateError);
