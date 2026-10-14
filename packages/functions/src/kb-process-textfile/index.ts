@@ -1,4 +1,5 @@
 import { AI_MODELS } from '../../../../src/lib/ai/model-policy.ts';
+import { authorizeDocumentProcessing } from '../process-document/authorize.ts';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -266,4 +267,4 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 
     });
   }
-}) import { authorizeDocumentProcessing } from '../process-document/authorize.ts';
+});

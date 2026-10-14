@@ -29,6 +29,12 @@ function sources(directory: string): string[] {
     return entry.isDirectory() ? sources(file) : /\.tsx?$/.test(file) ? [file] : [];
   });
 }
+it.each(['process-document', 'summarize-chunks', 'kb-process-textfile'])('parses the deployed %s Edge entrypoint', name => {
+  const file = `packages/functions/src/${name}/index.ts`;
+  const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+  const diagnostics = (source as ts.SourceFile & { parseDiagnostics: ts.Diagnostic[] }).parseDiagnostics;
+  expect(diagnostics.map(diagnostic => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))).toEqual([]);
+});
 it('migrates actual SDK and raw-fetch text requests without leaving incompatible sampling parameters', () => {
   let requests = 0;
   const files = [...sources('src/app/api'), ...sources('src/lib/services'), ...sources('packages/functions/src')];

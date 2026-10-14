@@ -37,7 +37,6 @@
     "@floating-ui/react": "^0.27.13",
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^3.10.0",
-    "@langchain/community": "^0.3.53",
     "@langchain/core": "^0.3.72",
     "@radix-ui/react-accordion": "^1.2.10",
     "@radix-ui/react-alert-dialog": "^1.1.15",
