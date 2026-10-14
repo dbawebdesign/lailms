@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { CourseModule, CourseGenerationRequest } from './course-generator';
 
 /**
@@ -104,7 +105,7 @@ Generate complete educational content as JSON:
 CRITICAL: Generate REAL EDUCATIONAL CONTENT that teaches concepts thoroughly. Each section should have substantial content appropriate for ${request.academicLevel} learners with ${request.lessonDetailLevel} depth.`;
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-4.1-mini",
+    ...textGenerationParams('intensive', 16000),
     messages: [
       {
         role: "system",
@@ -115,8 +116,6 @@ CRITICAL: Generate REAL EDUCATIONAL CONTENT that teaches concepts thoroughly. Ea
         content: prompt
       }
     ],
-    temperature: 0.7,
-    max_tokens: 16000 // Optimized for efficient module content generation
   });
 
   const content = completion.choices[0]?.message?.content;
@@ -183,4 +182,4 @@ export const PERFORMANCE_ESTIMATES = {
     apiCalls: 25,
     estimatedTime: '10-15 minutes'
   }
-}; 
+};

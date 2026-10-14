@@ -1,9 +1,10 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 import { v4 as uuidv4 } from 'uuid'
 
-// Initialize OpenAI client for o3 model
-const openaiO3 = new OpenAI({
+// Initialize OpenAI client for GPT-6.1 Sol model
+const openaiVisualizations = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
@@ -47,15 +48,15 @@ export interface VisualizationResult {
 export class VisualizationGenerator {
   
   /**
-   * Generate interactive visualization using o3 model with GPT-4.1 optimized prompts
+   * Generate interactive visualization using GPT-6.1 Sol model with GPT-4.1 optimized prompts
    */
   async generateVisualization(
     request: VisualizationRequest,
     surveyData: any
   ): Promise<VisualizationResult> {
     
-    // GPT-4.1 optimized prompt structure for o3 model
-    const o3SystemPrompt = `# Role and Objective
+    // GPT-4.1 optimized prompt structure for GPT-6.1 Sol model
+    const visualizationSystemPrompt = `# Role and Objective
 You are an expert data visualization specialist and interactive media designer with advanced expertise in survey data analysis, statistical visualization, and user experience design. Your objective is to create compelling, interactive visualizations that effectively communicate survey insights.
 
 # Instructions
@@ -132,15 +133,15 @@ Survey Data Context: ${JSON.stringify(surveyData, null, 2)}
 Think step by step through the data analysis and visualization design process. Create a professional, interactive visualization that effectively communicates the survey insights while meeting the user's specific requirements. Ensure the output is immediately usable and professionally presented.`
 
     try {
-      console.log('🎨 Generating visualization with o3 model...')
+      console.log('🎨 Generating visualization with GPT-6.1 Sol model...')
       
-      // Call o3 model for advanced visualization generation
-      const completion = await openaiO3.chat.completions.create({
-        model: 'o3', // Use o3 for advanced reasoning
+      // Call GPT-6.1 Sol model for advanced visualization generation
+      const completion = await openaiVisualizations.chat.completions.create({
+        ...textGenerationParams('intensive', 8000), // Use GPT-6.1 Sol for advanced reasoning
         messages: [
           {
             role: 'system',
-            content: o3SystemPrompt
+            content: visualizationSystemPrompt
           },
           {
             role: 'user',
@@ -162,13 +163,11 @@ Survey Data to Analyze:
 ${JSON.stringify(surveyData, null, 2)}`
           }
         ],
-        temperature: 0.3, // Lower temperature for consistent, professional output
-        max_completion_tokens: 8000 // o3 model uses max_completion_tokens instead of max_tokens
       })
 
       const result = completion.choices[0]?.message?.content
       if (!result) {
-        throw new Error('No response from o3 model')
+        throw new Error('No response from GPT-6.1 Sol model')
       }
 
       // Parse the JSON response
@@ -389,4 +388,4 @@ ${JSON.stringify(surveyData, null, 2)}`
 }
 
 // Export singleton instance
-export const visualizationGenerator = new VisualizationGenerator() 
+export const visualizationGenerator = new VisualizationGenerator()

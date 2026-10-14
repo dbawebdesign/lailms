@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 import { createBrowserClient } from '@supabase/ssr';
@@ -60,12 +61,11 @@ export async function generateWithCitations(request: GenerationRequest) {
   try {
     // Get generation from OpenAI
     const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      ...textGenerationParams('intensive', 8192),
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Context information:\n${formattedContext}\n\nQuestion: ${prompt}` }
       ],
-      temperature: 0.3,
     });
     
     const response = completion.choices[0].message.content || "Sorry, I couldn't generate a response.";
@@ -192,4 +192,4 @@ async function storeCitation(
     console.error('Error in storeCitation:', error);
     return false;
   }
-} 
+}

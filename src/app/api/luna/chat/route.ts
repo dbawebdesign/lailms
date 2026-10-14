@@ -1,3 +1,4 @@
+import { AI_MODELS, textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
@@ -311,12 +312,10 @@ ${contextParts.length > 0 ? `Context:\n${contextParts.join('\n\n')}` : ''}`;
       { role: 'user', content: documentContent ? `${message}\n\nAttached source contents:\n${documentContent}` : message }
     ];
 
-    // Call OpenAI with GPT-4.1-mini
+    // Ordinary conversational chat uses the light task tier.
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Using the latest available model
+      ...textGenerationParams('light', documentContent ? 6000 : 2000),
       messages,
-      temperature: 0.7,
-      max_tokens: documentContent ? 6000 : 2000,
       stream: false
     });
 
@@ -336,7 +335,7 @@ ${contextParts.length > 0 ? `Context:\n${contextParts.join('\n\n')}` : ''}`;
         metadata: { 
           reply_to: userMessageId || null,
           response_format: detectedFormat,
-          model: 'gpt-4o-mini',
+          model: AI_MODELS.light,
           tokens_used: completion.usage?.total_tokens || 0
         }
       })
@@ -431,4 +430,4 @@ function generateQuickActions(response: string, format: string) {
   };
 
   return [...baseActions.slice(0, 3), ...(formatActions[format] || [])];
-} 
+}

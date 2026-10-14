@@ -1,5 +1,7 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 // Initialize OpenAI client
 const openaiClient = process.env.OPENAI_API_KEY ? new OpenAI({
@@ -7,6 +9,9 @@ const openaiClient = process.env.OPENAI_API_KEY ? new OpenAI({
 }) : null;
 
 export async function POST(request: NextRequest) {
+  const supabase = createSupabaseServerClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!openaiClient) {
     console.error("[Luna Title Generation API] OpenAI client is not initialized. Check API key.");
     return NextResponse.json(
@@ -27,6 +32,11 @@ export async function POST(request: NextRequest) {
     }
     
     const { messages, conversationId } = requestBody;
+    if (conversationId) {
+      const { data: conversation, error } = await supabase.from('luna_conversations')
+        .select('id').eq('id', conversationId).eq('user_id', user.id).maybeSingle();
+      if (error || !conversation) return NextResponse.json({ error: 'Conversation not found' }, { status: 403 });
+    }
 
     // Validate input
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -36,12 +46,15 @@ export async function POST(request: NextRequest) {
     // Filter to get meaningful content (skip system messages, loading messages, etc.)
     const meaningfulMessages = messages
       .filter((msg: any) => 
-        msg.content && 
+        typeof msg?.content === 'string' &&
         msg.content.trim() && 
         !msg.isLoading &&
         (msg.role === 'user' || msg.role === 'assistant')
       )
       .slice(0, 8); // Use first 8 meaningful messages for context
+    if (meaningfulMessages.reduce((total: number, msg: any) => total + msg.content.length, 0) > 16000) {
+      return NextResponse.json({ error: 'Conversation context is too large' }, { status: 413 });
+    }
 
     if (meaningfulMessages.length === 0) {
       return NextResponse.json({ error: 'No meaningful messages found' }, { status: 400 });
@@ -56,7 +69,7 @@ export async function POST(request: NextRequest) {
     
     // Generate title using AI
     const titleResponse = await openaiClient.chat.completions.create({
-      model: "gpt-4.1-mini",
+      ...textGenerationParams('light', 20),
       messages: [
         {
           role: "system",
@@ -94,8 +107,6 @@ Respond with ONLY the title, nothing else.`
           content: `Analyze this conversation and create a concise, specific title:\n\n${conversationContext}`
         }
       ],
-      temperature: 0.3,
-      max_tokens: 20
     });
 
     const generatedTitle = titleResponse.choices[0].message.content?.trim();
@@ -136,4 +147,4 @@ Respond with ONLY the title, nothing else.`
       error: 'AI title generation failed, using fallback'
     });
   }
-} 
+}

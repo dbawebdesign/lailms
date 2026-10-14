@@ -1,3 +1,4 @@
+import { AI_MODELS } from '../../../../src/lib/ai/model-policy.ts';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { authorizeDocumentProcessing } from '../process-document/authorize.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -34,15 +35,14 @@ interface ChunkRecord {
   organisation_id?: string; // Added to potentially fetch if needed for document_summaries
 }
 
-// Helper: robustly extract text from GPT-5-nano Responses API payloads
+// Helper: robustly extract text from GPT-6 Luna Responses API payloads
 function extractResponseText(result: any): string {
-  console.log('GPT-5-nano response structure:', JSON.stringify(result, null, 2));
   
   if (!result) return '';
   
   // Check if response is incomplete due to max_output_tokens
   if (result.status === 'incomplete' && result.incomplete_details?.reason === 'max_output_tokens') {
-    console.warn('GPT-5-nano response incomplete due to max_output_tokens limit');
+    console.warn('GPT-6 Luna response incomplete due to max_output_tokens limit');
     // Try to extract any partial content that might exist
   }
   
@@ -100,11 +100,11 @@ function extractResponseText(result: any): string {
     return result.message.trim();
   }
   
-  console.warn('Could not extract text from GPT-5-nano response. Status:', result.status, 'Incomplete reason:', result.incomplete_details?.reason);
+  console.warn('Could not extract text from GPT-6 Luna response. Status:', result.status, 'Incomplete reason:', result.incomplete_details?.reason);
   return '';
 }
 
-async function callGpt5Nano(
+async function callSummaryModel(
   messages: Array<{ role: 'system' | 'user'; content: string }>,
   apiKey: string,
   maxTokens: number
@@ -116,11 +116,11 @@ async function callGpt5Nano(
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'gpt-5-nano',
+      model: AI_MODELS.light,
       input: messages,
       max_output_tokens: maxTokens,
       reasoning: {
-        effort: 'low'  // Use low reasoning effort for simple summarization tasks
+        effort: 'none'
       }
     }),
   });
@@ -147,7 +147,7 @@ async function summarizeChunk(content: string, apiKey: string): Promise<string> 
     { role: 'system' as const, content: 'You are a highly efficient summarizer. Create clear, concise summaries that capture the key information while being brief.' },
     { role: 'user' as const, content: `Provide a brief, factual summary of the following text (no more than 2-3 sentences):\n\n${content}` },
   ];
-  return await callGpt5Nano(messages, apiKey, 400); // Increased from 150 to account for reasoning overhead
+  return await callSummaryModel(messages, apiKey, 400); // Increased from 150 to account for reasoning overhead
 }
 
 /**
@@ -185,7 +185,7 @@ async function summarizeChunksBatchWithProgressiveUpdates(
         },
       ];
       
-      const batchResponse = await callGpt5Nano(messages, apiKey, 800 + (batch.length * 100)); // Dynamic token allocation
+      const batchResponse = await callSummaryModel(messages, apiKey, 800 + (batch.length * 100)); // Dynamic token allocation
       
       // Parse the batch response to extract individual summaries
       const summaries = parseBatchSummaryResponse(batchResponse, batch);
@@ -315,7 +315,7 @@ async function summarizeChunksBatch(chunks: ChunkRecord[], apiKey: string): Prom
         },
       ];
       
-      const batchResponse = await callGpt5Nano(messages, apiKey, 800 + (batch.length * 100)); // Dynamic token allocation
+      const batchResponse = await callSummaryModel(messages, apiKey, 800 + (batch.length * 100)); // Dynamic token allocation
       
       // Parse the batch response to extract individual summaries
       const summaries = parseBatchSummaryResponse(batchResponse, batch);
@@ -355,7 +355,7 @@ async function summarizeChunksBatch(chunks: ChunkRecord[], apiKey: string): Prom
 }
 
 /**
- * Helper function to parse batch summary responses from GPT-5-nano
+ * Helper function to parse batch summary responses from GPT-6 Luna
  */
 function parseBatchSummaryResponse(response: string, chunks: ChunkRecord[]): Map<string, string> {
   const results = new Map<string, string>();
@@ -412,7 +412,7 @@ async function summarizeSection(chunkContents: string[], sectionIdentifier: stri
     { role: 'system' as const, content: 'You are a highly efficient summarizer. Create clear, concise summaries that capture the key information while being brief.' },
     { role: 'user' as const, content: `These are text segments from the "${sectionIdentifier}" section of a document. Create a concise section summary that captures the key points (maximum 3-4 sentences):\n\n${combinedContents}` },
   ];
-  return await callGpt5Nano(messages, apiKey, 500); // Increased from 200 to account for reasoning overhead
+  return await callSummaryModel(messages, apiKey, 500); // Increased from 200 to account for reasoning overhead
 }
 
 /**
@@ -428,7 +428,7 @@ async function summarizeDocument(
     { role: 'system' as const, content: 'You are a highly efficient summarizer. Create clear, concise summaries that capture the key information while being brief.' },
     { role: 'user' as const, content: `These are summaries of different sections of a document. Create a comprehensive but concise document summary (4-5 sentences maximum):\n\n${formattedSections}` },
   ];
-  return await callGpt5Nano(messages, apiKey, 600); // Increased from 250 to account for reasoning overhead
+  return await callSummaryModel(messages, apiKey, 600); // Increased from 250 to account for reasoning overhead
 }
 
 // Main function handler
@@ -809,7 +809,7 @@ async function finalizeDocumentProcessing(
         summary: documentSummaryText,
         summary_level: 'document',
         status: 'completed',
-        model_used: 'gpt-5-nano',
+        model_used: AI_MODELS.light,
         updated_at: new Date().toISOString(), 
       }, { onConflict: 'document_id, summary_level' });
 
@@ -841,4 +841,4 @@ async function finalizeDocumentProcessing(
     // Ensure message from error is passed
     return { success: false, message: `Error finalizing document processing: ${error instanceof Error ? error.message : String(error)}` };
   }
-} 
+}

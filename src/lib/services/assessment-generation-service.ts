@@ -1,3 +1,4 @@
+import { textGenerationParams, AI_MODELS } from '@/lib/ai/model-policy';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 import { Tables } from '../../../packages/types/db';
@@ -301,7 +302,7 @@ export class AssessmentGenerationService {
           show_results_immediately: true,
           allow_review: true,
           ai_grading_enabled: true,
-          ai_model: 'gpt-4.1-mini'
+          ai_model: AI_MODELS.intensive
           // Removed non-existent columns: scope_id, is_active, total_points, question_count, metadata
         })
         .select()
@@ -669,7 +670,7 @@ export class AssessmentGenerationService {
     try {
       const response = await limit(() =>
         this.openai.chat.completions.create({
-          model: 'gpt-4.1-mini', // Using GPT-4.1-mini as requested
+          ...textGenerationParams('intensive', 20000), // Using GPT-4.1-mini as requested
           messages: [
             {
               role: 'system',
@@ -680,8 +681,6 @@ export class AssessmentGenerationService {
               content: prompt
             }
           ],
-          temperature: 0.8, // Slightly higher for more creative variation in question generation
-          max_tokens: 20000, // Increased for class exams
         })
       );
 
@@ -914,7 +913,6 @@ Begin by analyzing the content for key testable concepts, then generate question
             }
             return null;
           },
-          
           // Attempt 2: Find last complete question by looking for question_text
           () => {
             const questionMatches = [...cleanedResponse.matchAll(/"question_text":\s*"[^"]*"/g)];
@@ -930,7 +928,6 @@ Begin by analyzing the content for key testable concepts, then generate question
             }
             return null;
           },
-          
           // Attempt 3: Extract only complete questions by parsing incrementally
           () => {
             const questions = [];
@@ -1057,7 +1054,7 @@ Begin by analyzing the content for key testable concepts, then generate question
         show_results_immediately: true,
         allow_review: true,
         ai_grading_enabled: true,
-        ai_model: 'gpt-4.1-mini'
+        ai_model: AI_MODELS.intensive
       };
 
       const { data: assessment, error: assessmentError } = await this.supabase
@@ -1107,7 +1104,7 @@ Begin by analyzing the content for key testable concepts, then generate question
       
       const response = await limit(() =>
         this.openai.chat.completions.create({
-          model: 'gpt-4.1-mini',
+          ...textGenerationParams('intensive', 1000),
           messages: [
             {
               role: 'system',
@@ -1118,8 +1115,6 @@ Begin by analyzing the content for key testable concepts, then generate question
               content: this.buildContentAnalysisPrompt(processedContent, analysisDepth)
             }
           ],
-          temperature: 0.3,
-          max_tokens: 1000,
         })
       );
 
@@ -1701,4 +1696,4 @@ Focus on extracting concepts that can be assessed through questions.`;
       return question;
     }
   }
-} 
+}

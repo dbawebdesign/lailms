@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import { knowledgeBaseAnalyzer, COURSE_GENERATION_MODES } from './knowledge-base-analyzer';
@@ -941,7 +942,7 @@ CRITICAL: This content should feel like learning from a master teacher who is pa
 
     const completion = await this.callOpenAIWithTimeout(
       () => this.openai.chat.completions.create({
-        model: "gpt-4.1-mini",
+        ...textGenerationParams('intensive', 16000),
         messages: [
           {
             role: "system",
@@ -959,8 +960,6 @@ CRITICAL: This content should feel like learning from a master teacher who is pa
           }
         ],
         response_format: { type: "json_object" },
-        temperature: 0.7,
-        max_tokens: 16000  // Optimized for efficient content generation
       }),
       `Section Content Generation: ${sectionTitle}`,
       240000 // 4 minutes for content generation
@@ -1960,4 +1959,4 @@ What makes this particularly important for ${request.academicLevel || 'college'}
   }
 }
 
-export const courseGenerationOrchestrator = new CourseGenerationOrchestrator(); 
+export const courseGenerationOrchestrator = new CourseGenerationOrchestrator();

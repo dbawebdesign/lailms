@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
@@ -103,7 +104,7 @@ OUTPUT FORMAT (JSON only):
 }`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      ...textGenerationParams('light', 1000),
       messages: [
         { 
           role: 'system', 
@@ -111,8 +112,6 @@ OUTPUT FORMAT (JSON only):
         },
         { role: 'user', content: expansionPrompt }
       ],
-      temperature: 0.3,
-      max_tokens: 1000,
     });
 
     const response = completion.choices[0]?.message?.content || '';
@@ -144,4 +143,4 @@ OUTPUT FORMAT (JSON only):
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
-} 
+}

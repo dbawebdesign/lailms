@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
@@ -263,9 +264,7 @@ Use this exact structure:
 </instructions>`;
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4.1-mini',
-    max_tokens: 4000,
-    temperature: 0.7,
+    ...textGenerationParams('intensive', 4000),
     messages: [
       {
         role: 'user',
@@ -383,4 +382,4 @@ async function generatePDF(content: string, lessonTitle: string): Promise<Buffer
   // Convert to buffer
   const pdfOutput = doc.output('arraybuffer');
   return Buffer.from(pdfOutput);
-} 
+}

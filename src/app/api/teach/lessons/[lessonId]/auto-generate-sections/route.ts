@@ -1,3 +1,4 @@
+import { AI_MODELS, textGenerationParams } from '@/lib/ai/model-policy';
 import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Lesson, Path, BaseClass, GeneratedOutline } from '@/types/teach';
@@ -93,7 +94,7 @@ const openai = new OpenAI({
 async function generateEmbedding(text: string): Promise<number[]> {
   try {
     const response = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
+      model: AI_MODELS.embedding,
       input: text,
       dimensions: 1536
     });
@@ -117,16 +118,12 @@ async function searchKnowledgeBase(
   const searchQueries = [
     // Most specific: lesson + path + subject
     `${context.lesson_title} ${context.path_title} ${context.base_class_subject}`,
-    
     // Medium specificity: lesson + subject
     `${context.lesson_title} ${context.base_class_subject}`,
-    
     // Lesson objective if available
     ...(context.lesson_objective ? [`${context.lesson_objective} ${context.base_class_subject}`] : []),
-    
     // Path/module level
     `${context.path_title} ${context.base_class_subject}`,
-    
     // Subject + grade level for general context
     `${context.base_class_subject} ${context.base_class_gradeLevel}`,
   ].filter(Boolean);
@@ -481,19 +478,16 @@ export async function POST(
       lesson_title: typedLessonData.title,
       lesson_objective: typedLessonData.description,
       lesson_order_index: typedLessonData.order_index,
-      
       path_id: typedLessonData.paths.id,
       path_title: typedLessonData.paths.title,
       path_description: typedLessonData.paths.description,
       path_order_index: typedLessonData.paths.order_index,
-      
       base_class_id: typedLessonData.paths.base_classes.id,
       base_class_name: typedLessonData.paths.base_classes.name,
       base_class_description: typedLessonData.paths.base_classes.description,
       base_class_subject: typedLessonData.paths.base_classes.settings?.subject,
       base_class_gradeLevel: typedLessonData.paths.base_classes.settings?.gradeLevel,
       base_class_settings: typedLessonData.paths.base_classes.settings,
-      
       organisation_id: typedLessonData.paths.base_classes.organisation_id,
     };
 
@@ -530,7 +524,7 @@ export async function POST(
     try {
       console.log(`[auto-generate-sections] Calling OpenAI with enhanced knowledge base context for lessonId: ${lessonId}`);
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4.1-mini', // Use the more capable model for complex knowledge integration
+        ...textGenerationParams('intensive', 6000), // Use the more capable model for complex knowledge integration
         messages: [
           { 
             role: 'system', 
@@ -554,8 +548,6 @@ JSON FORMAT REQUIREMENTS:
             content: aiPrompt 
           }
         ],
-        temperature: 0.7,
-        max_tokens: 6000, // Increased for more comprehensive content
       });
 
       const aiResponseContent = completion.choices[0]?.message?.content;
@@ -689,4 +681,4 @@ JSON FORMAT REQUIREMENTS:
     console.error(`[auto-generate-sections] Unexpected error for lessonId ${lessonId}:`, error);
     return NextResponse.json({ error: 'An unexpected error occurred', details: error.message }, { status: 500 });
   }
-} 
+}

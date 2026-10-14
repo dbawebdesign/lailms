@@ -1,3 +1,4 @@
+import { AI_MODELS } from '../../../../src/lib/ai/model-policy.ts';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -68,7 +69,7 @@ async function getEmbedding(text: string, apiKey: string): Promise<number[]> {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ input: text, model: 'text-embedding-3-small' }),
+    body: JSON.stringify({ input: text, model: AI_MODELS.embedding }),
   });
   if (!response.ok) {
     const errorBody = await response.text();

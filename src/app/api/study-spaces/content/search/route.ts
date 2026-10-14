@@ -1,3 +1,4 @@
+import { AI_MODELS } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { StudyContentSearchQuery, StudyContentSearchResult } from '@/types/study-content';
@@ -315,10 +316,10 @@ function generateFacets(results: any[]): any {
  */
 async function generateQueryEmbedding(query: string): Promise<number[]> {
   const response = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
+    model: AI_MODELS.embedding,
     input: query,
     dimensions: 1536
   });
   
   return response.data[0].embedding;
-} 
+}

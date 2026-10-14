@@ -1,3 +1,4 @@
+import { textGenerationParams, AI_MODELS } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -131,7 +132,7 @@ Example good titles: "Understanding Photosynthesis Process", "World War II Cause
     `;
 
     const titleResponse = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      ...textGenerationParams('light', 50),
       messages: [
         {
           role: 'system',
@@ -142,8 +143,6 @@ Example good titles: "Understanding Photosynthesis Process", "World War II Cause
           content: titlePrompt
         }
       ],
-      max_tokens: 50,
-      temperature: 0.3,
     });
 
     const podcastTitle = titleResponse.choices[0]?.message?.content?.replace(/['"]/g, '').trim() || 'Brainbytes Podcast';
@@ -175,7 +174,7 @@ Format the response as a single cohesive script for Luna to speak. Do not includ
     `;
 
     const scriptResponse = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      ...textGenerationParams('light', 1000),
       messages: [
         {
           role: 'system',
@@ -186,8 +185,6 @@ Format the response as a single cohesive script for Luna to speak. Do not includ
           content: scriptPrompt
         }
       ],
-      max_tokens: 1000,
-      temperature: 0.7,
     });
 
     const script = scriptResponse.choices[0]?.message?.content;
@@ -241,7 +238,7 @@ Format the response as a single cohesive script for Luna to speak. Do not includ
 
     // Convert script to audio using TTS (explicitly using shimmer voice)
     const ttsResponse = await openai.audio.speech.create({
-      model: 'tts-1',
+      model: AI_MODELS.speech,
       voice: 'shimmer',  // Explicitly set to shimmer
       input: cleanScript,
       response_format: 'mp3',
@@ -315,4 +312,4 @@ Format the response as a single cohesive script for Luna to speak. Do not includ
       { status: 500 }
     );
   }
-} 
+}

@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Tables } from "packages/types/db";
@@ -92,7 +93,7 @@ Please create a comprehensive IEP including measurable goals, objectives, accomm
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini',
+        ...textGenerationParams('intensive', 4096),
         messages: [
           {
             role: 'system',
@@ -103,8 +104,6 @@ Please create a comprehensive IEP including measurable goals, objectives, accomm
             content: userPrompt
           }
         ],
-        max_tokens: 4096,
-        temperature: 0.7,
       }),
     });
 
@@ -137,4 +136,4 @@ Please create a comprehensive IEP including measurable goals, objectives, accomm
       { status: 500 }
     );
   }
-} 
+}

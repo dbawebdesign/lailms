@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -181,13 +182,11 @@ ${subtopics ? `**Suggested Subtopics**: ${subtopics}` : ''}
 Generate a comprehensive mind map structure that helps students understand and organize information about this topic.`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      ...textGenerationParams('intensive', 12000),
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      temperature: 0.7,
-      max_tokens: 12000,
     });
 
     const content = completion.choices[0]?.message?.content;
@@ -234,4 +233,4 @@ Generate a comprehensive mind map structure that helps students understand and o
       { status: 500 }
     );
   }
-} 
+}

@@ -1,3 +1,4 @@
+import { AI_MODELS, textGenerationParams } from '@/lib/ai/model-policy';
 import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { OpenAI } from 'openai';
@@ -82,7 +83,7 @@ const openai = new OpenAI({
 async function generateEmbedding(text: string): Promise<number[]> {
   try {
     const response = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
+      model: AI_MODELS.embedding,
       input: text,
       dimensions: 1536
     });
@@ -245,13 +246,11 @@ Focus on creating content that truly helps students understand and apply the con
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Using the preferred model from memory
+      ...textGenerationParams('intensive', 2000), // Using the preferred model from memory
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      temperature: 0.7,
-      max_tokens: 2000,
       response_format: { type: 'json_object' }
     });
 

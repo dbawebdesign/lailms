@@ -1,3 +1,4 @@
+import { textGenerationParams, AI_MODELS } from '../../../../src/lib/ai/model-policy.ts';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { authorizeDocumentProcessing } from './authorize.ts';
 import { bytesToBase64 } from './bytes-to-base64.ts';
@@ -852,7 +853,7 @@ async function extractTextFromImage(filePath: string, supabase: SupabaseClient, 
         break;
     }
 
-    console.log(`Processing image with GPT-4o-mini vision API, type: ${mimeType}, size: ${uint8Array.length} bytes`);
+    console.log(`Processing image with GPT-6 Luna vision API, type: ${mimeType}, size: ${uint8Array.length} bytes`);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -861,7 +862,7 @@ async function extractTextFromImage(filePath: string, supabase: SupabaseClient, 
         'Authorization': `Bearer ${openaiApiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        ...textGenerationParams('light', 4000),
         messages: [
           {
             role: 'user',
@@ -880,22 +881,20 @@ async function extractTextFromImage(filePath: string, supabase: SupabaseClient, 
             ]
           }
         ],
-        max_tokens: 4000,
-        temperature: 0.1
       }),
     });
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error('GPT-4o-mini vision API error response:', errorBody);
-      throw new Error(`GPT-4o-mini vision API request failed with status ${response.status}: ${errorBody}`);
+      console.error('GPT-6 Luna vision API error response:', errorBody);
+      throw new Error(`GPT-6 Luna vision API request failed with status ${response.status}: ${errorBody}`);
     }
 
     const result = await response.json();
     
     if (!result.choices || !result.choices[0] || !result.choices[0].message || !result.choices[0].message.content) {
-      console.error('GPT-4o-mini vision API returned invalid response:', result);
-      throw new Error('GPT-4o-mini vision API did not return valid text content.');
+      console.error('GPT-6 Luna vision API returned invalid response:', result);
+      throw new Error('GPT-6 Luna vision API did not return valid text content.');
     }
 
     const extractedText = result.choices[0].message.content.trim();
@@ -926,23 +925,23 @@ async function transcribeAudio(filePath: string, supabase: SupabaseClient, bucke
       const formData = new FormData();
       const fileName = filePath.split('/').pop() || 'audio.mp3';
       formData.append('file', audioFileData, fileName);
-      formData.append('model', 'whisper-1');
-      const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      formData.append('model', AI_MODELS.transcription);
+      const transcriptionResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openaiApiKey}`
         },
         body: formData
       });
-      if (!whisperResponse.ok) {
-        const errorBody = await whisperResponse.text();
-        console.error('Whisper API error response:', errorBody);
-        throw new Error(`Whisper API request failed with status ${whisperResponse.status}: ${errorBody}`);
+      if (!transcriptionResponse.ok) {
+        const errorBody = await transcriptionResponse.text();
+        console.error('Transcription API error response:', errorBody);
+        throw new Error(`Transcription API request failed with status ${transcriptionResponse.status}: ${errorBody}`);
       }
-      const { text: transcript } = await whisperResponse.json();
+      const { text: transcript } = await transcriptionResponse.json();
       if (typeof transcript !== 'string') {
-        console.error('Whisper API did not return a string transcript:', transcript);
-        throw new Error('Whisper API did not return a valid text transcript.');
+        console.error('Transcription API did not return a string transcript:', transcript);
+        throw new Error('Transcription API did not return a valid text transcript.');
       }
       console.log(`Successfully transcribed audio ${filePath}. Transcript length: ${transcript.length}.`);
       return transcript;
@@ -1130,7 +1129,7 @@ async function getEmbedding(text: string, apiKey: string): Promise<number[]> {
           },
           body: JSON.stringify({
             input: text,
-            model: 'text-embedding-3-small'
+            model: AI_MODELS.embedding
           })
         });
         if (response.ok) {

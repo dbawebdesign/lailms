@@ -1,3 +1,4 @@
+import { AI_MODELS } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Generate embedding using OpenAI's text-embedding-3-small model
     const embeddingResponse = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
+      model: AI_MODELS.embedding,
       input: textToEmbed,
     });
 
@@ -62,4 +63,4 @@ export async function POST(request: NextRequest) {
     console.error('Error generating embedding:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+}

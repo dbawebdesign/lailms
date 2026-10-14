@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Tables } from "packages/types/db";
@@ -179,9 +180,7 @@ Follow the exact format shown in the examples. Each criterion line must be follo
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini',
-        max_tokens: 4096,
-        temperature: 0.3, // Lower temperature for more consistent formatting
+        ...textGenerationParams('intensive', 4096),
         messages: [
           {
             role: 'system',
@@ -235,4 +234,4 @@ Follow the exact format shown in the examples. Each criterion line must be follo
       { status: 500 }
     );
   }
-} 
+}
