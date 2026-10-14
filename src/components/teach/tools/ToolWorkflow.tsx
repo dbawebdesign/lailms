@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TeachingTool, ToolInputField } from '@/types/teachingTools';
+import { manualToolRequest } from '@/lib/teaching-tools/manual-request';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -198,10 +199,11 @@ export function ToolWorkflow({ tool, onBack }: ToolWorkflowProps) {
     setError('');
     
     try {
-      const response = await fetch(`/api/tools/${tool.id}`, {
+      const manualRequest = manualToolRequest(tool, formData);
+      const response = await fetch(manualRequest.url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(manualRequest.body),
       });
 
       if (!response.ok) {
@@ -1313,4 +1315,4 @@ What would you like to improve or expand on?`,
       )}
     </div>
   );
-} 
+}
