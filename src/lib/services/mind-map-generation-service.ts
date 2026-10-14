@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 
@@ -310,13 +311,11 @@ Use these colors in order: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`
     console.log('🤖 [MindMapService] Calling OpenAI for mind map generation...');
     
     const aiResponse = await this.openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      ...textGenerationParams('intensive', 12000),
       messages: [
         { role: 'system', content: 'You are an expert educational mind map creator. Create comprehensive 4-level hierarchical mind maps from lesson content. Always return valid JSON with the exact structure: center, branches (with concepts array), concepts (with points array), points (with details array). Use actual educational content, not meta-descriptions.' },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.1,
-      max_tokens: 12000
     });
 
     let mindMapData;
@@ -524,13 +523,11 @@ Colors: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D`;
     console.log('🤖 [MindMapService] Calling OpenAI for base class mind map generation...');
 
     const aiResponse = await this.openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      ...textGenerationParams('intensive', 12000),
       messages: [
         { role: 'system', content: 'You are an expert educational mind map creator. Create comprehensive 4-level hierarchical mind maps from lesson content. Always return valid JSON with the exact structure: center, branches (with concepts array), concepts (with points array), points (with details array). Use actual educational content, not meta-descriptions.' },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.2,
-      max_tokens: 12000
     });
 
     let mindMapData;

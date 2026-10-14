@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
@@ -251,7 +252,7 @@ Respond ONLY with valid JSON in this exact format:
       
       // Call OpenAI for comprehensive content analysis
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4.1-mini',
+        ...textGenerationParams('intensive', 2000),
         messages: [
           {
             role: 'system',
@@ -262,8 +263,6 @@ Respond ONLY with valid JSON in this exact format:
             content: analysisPrompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 2000 // Increased for more comprehensive analysis
       });
 
       const analysisResult = completion.choices[0]?.message?.content;
@@ -332,4 +331,4 @@ Respond ONLY with valid JSON in this exact format:
       { status: 500 }
     );
   }
-} 
+}

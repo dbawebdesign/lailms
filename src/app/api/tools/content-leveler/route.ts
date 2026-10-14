@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Tables } from "packages/types/db";
@@ -154,7 +155,7 @@ Please create leveled versions of this content that maintain the core concepts w
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini',
+        ...textGenerationParams('intensive', 4096),
         messages: [
           {
             role: 'system',
@@ -165,8 +166,6 @@ Please create leveled versions of this content that maintain the core concepts w
             content: userPrompt
           }
         ],
-        max_tokens: 4096,
-        temperature: 0.6,
       }),
     });
 
@@ -199,4 +198,4 @@ Please create leveled versions of this content that maintain the core concepts w
       { status: 500 }
     );
   }
-} 
+}

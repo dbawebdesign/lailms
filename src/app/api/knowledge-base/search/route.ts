@@ -1,3 +1,4 @@
+import { AI_MODELS } from '@/lib/ai/model-policy';
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
@@ -134,7 +135,7 @@ export async function POST(request: NextRequest) {
 
     // Generate embedding for the search query
     const embeddingResponse = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
+      model: AI_MODELS.embedding,
       input: query,
       dimensions: 1536
     })
@@ -242,4 +243,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-} 
+}

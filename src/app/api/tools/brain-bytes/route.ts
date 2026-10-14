@@ -1,3 +1,4 @@
+import { textGenerationParams, AI_MODELS } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -93,7 +94,7 @@ LUNA: That's a wrap on today's Brain Bytes! Remember, learning is an adventure, 
 - Maintain Luna's encouraging and educational tone throughout`;
 
     const scriptCompletion = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      ...textGenerationParams('light', 1500),
       messages: [
         {
           role: 'system',
@@ -113,8 +114,6 @@ You are Luna, an AI educational podcast host who creates engaging, grade-appropr
           content: scriptPrompt
         }
       ],
-      max_tokens: 1500,
-      temperature: 0.8,
     });
 
     const script = scriptCompletion.choices[0]?.message?.content;
@@ -168,7 +167,7 @@ You are Luna, an AI educational podcast host who creates engaging, grade-appropr
 
     // Generate audio using OpenAI TTS
     const audioResponse = await openai.audio.speech.create({
-      model: 'tts-1',
+      model: AI_MODELS.speech,
       voice: LUNA_VOICE_ID,
       input: cleanScript,
       speed: 1.0,
@@ -231,4 +230,4 @@ You are Luna, an AI educational podcast host who creates engaging, grade-appropr
       { status: 500 }
     );
   }
-} 
+}

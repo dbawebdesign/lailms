@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import OpenAI from 'openai';
 import { APIError } from 'openai/error';
 import { encode } from 'gpt-tokenizer';
@@ -32,13 +33,11 @@ export class QuestionGenerationService {
     try {
       const response = await limit(() => 
         this.openai.chat.completions.create({
-          model: 'gpt-4.1-mini',
+          ...textGenerationParams('intensive', 2000),
           messages: [
             { role: 'system', content: 'You are an expert educational assessment creator.' },
             { role: 'user', content: prompt }
           ],
-          temperature: 0.7,
-          max_tokens: 2000,
         })
       );
 
@@ -205,4 +204,4 @@ Now, based on the content provided, generate ${count} questions in the specified
 
     return formatted;
   }
-} 
+}

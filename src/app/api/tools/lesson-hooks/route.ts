@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Tables } from "packages/types/db";
@@ -136,7 +137,7 @@ Please create 3-5 different engaging lesson hooks that will capture student atte
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini',
+        ...textGenerationParams('light', 4096),
         messages: [
           {
             role: 'system',
@@ -147,8 +148,6 @@ Please create 3-5 different engaging lesson hooks that will capture student atte
             content: userPrompt
           }
         ],
-        max_tokens: 4096,
-        temperature: 0.8,
       }),
     });
 
@@ -181,4 +180,4 @@ Please create 3-5 different engaging lesson hooks that will capture student atte
       { status: 500 }
     );
   }
-} 
+}

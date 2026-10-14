@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
@@ -116,7 +117,7 @@ EXAMPLE OF GOOD vs BAD CONTENT:
 Use these colors in rotation: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE185D, #7C2D12, #1F2937`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      ...textGenerationParams('light', 2000),
       messages: [
         { 
           role: 'system', 
@@ -124,8 +125,6 @@ Use these colors in rotation: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE18
         },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.3,
-      max_tokens: 2000,
     });
 
     const response = completion.choices[0]?.message?.content || '';
@@ -168,4 +167,4 @@ Use these colors in rotation: #DC2626, #059669, #7C3AED, #EA580C, #0891B2, #BE18
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
-} 
+}

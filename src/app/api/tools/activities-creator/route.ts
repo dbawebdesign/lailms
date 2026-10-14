@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Tables } from "packages/types/db";
@@ -316,13 +317,11 @@ Follow the format EXACTLY as specified in the system prompt examples.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini',
+        ...textGenerationParams('intensive', 8000),
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_tokens: 8000,
-        temperature: 0.3,
       }),
     });
 

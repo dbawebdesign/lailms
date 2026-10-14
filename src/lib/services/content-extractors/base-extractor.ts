@@ -1,3 +1,4 @@
+import { AI_MODELS } from '@/lib/ai/model-policy';
 import { StudyContent, ContentType } from '@/types/study-content';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
@@ -108,7 +109,7 @@ export abstract class BaseContentExtractor {
   protected async generateEmbedding(text: string): Promise<number[]> {
     try {
       const response = await this.openai.embeddings.create({
-        model: 'text-embedding-3-small',
+        model: AI_MODELS.embedding,
         input: text.substring(0, 8000), // Limit text length
         dimensions: 1536
       });
@@ -182,4 +183,4 @@ export abstract class BaseContentExtractor {
   protected formatTags(tags: (string | null | undefined)[]): string[] {
     return tags.filter((tag): tag is string => Boolean(tag));
   }
-} 
+}

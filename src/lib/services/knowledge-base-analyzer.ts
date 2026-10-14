@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { textGenerationParams, AI_MODELS } from '@/lib/ai/model-policy';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 
@@ -172,7 +173,7 @@ Provide analysis in JSON format:
 
     try {
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4.1-mini",
+        ...textGenerationParams('intensive', 8192),
         messages: [
           {
             role: "system",
@@ -184,7 +185,6 @@ Provide analysis in JSON format:
           }
         ],
         response_format: { type: "json_object" },
-        temperature: 0.3,
       });
 
       const analysis = JSON.parse(completion.choices[0]?.message?.content || '{}');
@@ -274,7 +274,7 @@ Provide analysis in JSON format:
 
       // Generate embedding for the query using OpenAI
       const embeddingResponse = await this.openai.embeddings.create({
-        model: "text-embedding-3-small",
+        model: AI_MODELS.embedding,
         input: query,
       });
       
@@ -469,7 +469,7 @@ Provide analysis in JSON format:
     try {
       // Generate embeddings for the query
       const embeddingResponse = await this.openai.embeddings.create({
-        model: "text-embedding-3-small",
+        model: AI_MODELS.embedding,
         input: query,
       });
       
@@ -596,4 +596,4 @@ Provide analysis in JSON format:
   }
 }
 
-export const knowledgeBaseAnalyzer = new KnowledgeBaseAnalyzer(); 
+export const knowledgeBaseAnalyzer = new KnowledgeBaseAnalyzer();

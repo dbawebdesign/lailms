@@ -1,3 +1,4 @@
+import { AI_MODELS } from '@/lib/ai/model-policy';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { 
   StudyContent, 
@@ -445,7 +446,7 @@ export class ContentAggregationService {
 
   private async generateEmbedding(text: string): Promise<number[]> {
     const response = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
+      model: AI_MODELS.embedding,
       input: text.substring(0, 8000), // Limit text length
       dimensions: 1536
     });
@@ -786,4 +787,4 @@ export class ContentAggregationService {
       console.error('Failed to complete indexing job:', error);
     }
   }
-} 
+}

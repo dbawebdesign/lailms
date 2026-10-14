@@ -2220,7 +2220,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.doc,.docx,.txt,.md"
+          accept=".pdf,.doc,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.webp"
           multiple
           onChange={handleFileUpload}
           className="hidden"

@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { Tables } from 'packages/types/db';
 import OpenAI from 'openai';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -126,7 +127,7 @@ class AIInsightsService {
     const prompt = this.buildInsightPrompt(userData);
     
     const response = await this.openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      ...textGenerationParams('light', 1000),
       messages: [
         {
           role: 'system',
@@ -164,8 +165,6 @@ class AIInsightsService {
           content: prompt
         }
       ],
-      temperature: 0.7,
-      max_tokens: 1000,
     });
 
     const content = response.choices[0]?.message?.content;
@@ -461,4 +460,4 @@ class AIInsightsService {
   }
 }
 
-export const aiInsightsService = new AIInsightsService(); 
+export const aiInsightsService = new AIInsightsService();

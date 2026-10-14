@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Tables } from 'packages/types/db';
 import OpenAI from 'openai';
@@ -157,7 +158,7 @@ export class AIGradingService {
       
       const response = await limit(() =>
         this.openai.chat.completions.create({
-          model: 'gpt-4.1-mini',
+          ...textGenerationParams('intensive', 1000),
           messages: [
             {
               role: 'system',
@@ -168,8 +169,6 @@ export class AIGradingService {
               content: prompt
             }
           ],
-          temperature: 0.1, // Low temperature for consistent grading
-          max_tokens: 1000,
         })
       );
 
@@ -507,4 +506,4 @@ OUTPUT FORMAT (JSON):
       throw new Error('Failed to apply manual grade');
     }
   }
-} 
+}

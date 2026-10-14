@@ -1,3 +1,4 @@
+import { AI_MODELS, textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
@@ -358,10 +359,8 @@ IMPORTANT: Include all sections as shown above. Make activities engaging, age-ap
     });
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      ...textGenerationParams('light', 1500),
       messages,
-      max_tokens: 1500,
-      temperature: 0.7,
     });
 
     const response = completion.choices[0]?.message?.content;
@@ -465,7 +464,7 @@ IMPORTANT: Include all sections as shown above. Make activities engaging, age-ap
 
         // Generate audio using OpenAI TTS
         const audioResponse = await openai.audio.speech.create({
-          model: 'tts-1',
+          model: AI_MODELS.speech,
           voice: 'nova', // Luna's voice
           input: cleanScript,
           speed: 1.0,
@@ -630,7 +629,7 @@ OUTPUT FORMAT (JSON only):
 }`;
 
     const completion = await openai.chat.completions.create({
-              model: 'gpt-4.1-mini',
+              ...textGenerationParams('light', 1000),
       messages: [
         { 
           role: 'system', 
@@ -638,8 +637,6 @@ OUTPUT FORMAT (JSON only):
         },
         { role: 'user', content: expansionPrompt }
       ],
-      temperature: 0.3,
-      max_tokens: 1000,
     });
 
     const response = completion.choices[0]?.message?.content || '';
@@ -672,4 +669,4 @@ OUTPUT FORMAT (JSON only):
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
-} 
+}

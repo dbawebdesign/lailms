@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireGlobalAdmin } from '@/lib/auth/require-global-admin'
@@ -326,19 +327,17 @@ Think step by step about each user request. Provide data-driven insights for sta
 
     // Call OpenAI API with visualization tool
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      ...textGenerationParams('light', 1000),
       messages: messages as any,
       tools: [createDataVisualizationTool],
       tool_choice: 'auto',
-      temperature: 0.7,
-      max_tokens: 1000
     })
 
     // Check if Luna wants to create a visualization
     if (completion.choices[0].message.tool_calls) {
       const toolCall = completion.choices[0].message.tool_calls[0]
       
-      if (toolCall.function.name === 'createDataVisualization') {
+      if (toolCall.type === 'function' && toolCall.function.name === 'createDataVisualization') {
         try {
           console.log('🎨 Luna detected visualization request, switching to o3 model...')
           
@@ -401,4 +400,4 @@ Think step by step about each user request. Provide data-driven insights for sta
       { status: 500 }
     )
   }
-} 
+}

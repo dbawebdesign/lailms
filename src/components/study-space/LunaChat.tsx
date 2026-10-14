@@ -96,6 +96,7 @@ export interface LunaChatRef {
 
 interface StudyChatHistory {
   id: string;
+  serverConversationId?: string | null;
   title: string;
   messages: ChatMessage[];
   lastUpdated: string;
@@ -199,7 +200,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
     setChatHistory(prevHistory => {
       const updatedHistory = prevHistory.map(chat => 
         chat.id === currentChatId 
-          ? { ...chat, messages, lastUpdated: new Date().toISOString() }
+          ? { ...chat, messages, serverConversationId: conversationIdRef.current, lastUpdated: new Date().toISOString() }
           : chat
       );
       
@@ -207,6 +208,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
       if (!prevHistory.find(chat => chat.id === currentChatId)) {
         const newChat: StudyChatHistory = {
           id: currentChatId,
+          serverConversationId: conversationIdRef.current,
           title: messages[0]?.content.slice(0, 50) + (messages[0]?.content.length > 50 ? '...' : '') || 'New Chat',
           messages,
           lastUpdated: new Date().toISOString()
@@ -231,11 +233,12 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
     if (!currentChatId) {
       const newChatId = Date.now().toString();
       setCurrentChatId(newChatId);
-      conversationIdRef.current = newChatId;
+      // Local history IDs are not server-owned conversation IDs.
+      conversationIdRef.current = null;
     }
 
     const userMessage: ChatMessage = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       role: 'user',
       content: input,
       created_at: new Date().toISOString()
@@ -256,6 +259,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: input,
+          userMessageId: userMessage.id,
           conversationId: conversationIdRef.current,
           responseFormat: 'text',
           highlightedText,
@@ -278,7 +282,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
 
       // Add assistant response to the chat
       const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+        id: data.messageId || crypto.randomUUID(),
         role: 'assistant',
         content: data.response || data.message,
         response_format: data.responseFormat,
@@ -356,7 +360,7 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
       
       setCurrentChatId(chatId);
       setMessages(chat.messages);
-      conversationIdRef.current = chatId;
+      conversationIdRef.current = chat.serverConversationId || null;
       setChatView('chat'); // Switch to chat view when loading a conversation
     onChatViewChange?.(true); // Notify parent that chat interface is open
       
@@ -832,4 +836,4 @@ export const LunaChat = forwardRef<LunaChatRef, LunaChatProps>(({
   }
 });
 
-LunaChat.displayName = 'LunaChat'; 
+LunaChat.displayName = 'LunaChat';

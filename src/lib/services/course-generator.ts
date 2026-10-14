@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
@@ -370,7 +371,7 @@ export class CourseGenerator {
     const prompt = this.buildCourseOutlinePrompt(request, kbAnalysis, kbContent, modeConfig);
 
     const completion = await this.openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      ...textGenerationParams('intensive', 8192),
       messages: [
         {
           role: "system",
@@ -382,7 +383,6 @@ export class CourseGenerator {
         }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.7,
     });
 
     const outlineData = JSON.parse(completion.choices[0]?.message?.content || '{}');
@@ -843,7 +843,7 @@ Generate comprehensive educational lesson content in JSON format:
 Remember: Every element should contribute to TEACHING and helping students achieve mastery. Focus on creating actual educational content that guides learning, not just information delivery.`;
 
     const completion = await this.openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      ...textGenerationParams('intensive', 16000),
       messages: [
         {
           role: "system",
@@ -860,8 +860,6 @@ Remember: Every element should contribute to TEACHING and helping students achie
         }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.7,
-      max_tokens: 16000  // Optimized for efficient content generation
     });
 
     try {
@@ -1231,7 +1229,7 @@ Remember: Every element should contribute to TEACHING and helping students achie
       `;
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4.1-mini",
+        ...textGenerationParams('intensive', 16000),
         messages: [
           {
             role: "system",
@@ -1242,8 +1240,6 @@ Remember: Every element should contribute to TEACHING and helping students achie
             content: prompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 16000  // Optimized for efficient content generation // Much larger for complete module content
       });
 
       const content = completion.choices[0]?.message?.content;
@@ -2043,7 +2039,7 @@ Generate complete educational content for ALL ${lesson.contentOutline.length} se
 
     try {
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4.1-mini",
+        ...textGenerationParams('intensive', 16000),
         messages: [
           {
             role: "system",
@@ -2061,8 +2057,6 @@ Generate complete educational content for ALL ${lesson.contentOutline.length} se
           }
         ],
         response_format: { type: "json_object" },
-        temperature: 0.7,
-        max_tokens: 16000  // Optimized for efficient content generation
       });
 
       const content = completion.choices[0]?.message?.content || '{}';
@@ -2454,7 +2448,7 @@ ${this.getAcademicLevelGuidance(request.academicLevel)}
 CRITICAL: Questions must be based ONLY on the actual lesson content provided above. Do not use external knowledge or make assumptions beyond what was taught in the lesson sections.`;
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4.1-mini",
+        ...textGenerationParams('intensive', 16000),
         messages: [
           {
             role: "system",
@@ -2469,8 +2463,6 @@ CRITICAL: Questions must be based ONLY on the actual lesson content provided abo
           }
         ],
         response_format: { type: "json_object" },
-        temperature: 0.7,
-        max_tokens: 16000  // Optimized for efficient content generation
       });
 
       const content = completion.choices[0]?.message?.content || '{}';
@@ -2748,4 +2740,4 @@ GENERAL GUIDANCE:
   }
 }
 
-export const courseGenerator = new CourseGenerator(); 
+export const courseGenerator = new CourseGenerator();

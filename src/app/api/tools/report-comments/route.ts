@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Tables } from "packages/types/db";
@@ -134,9 +135,7 @@ Generate multiple comment variations (2-3 options) with different approaches so 
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini',
-        max_tokens: 4096,
-        temperature: 0.7,
+        ...textGenerationParams('light', 4096),
         messages: [
           {
             role: 'system',
@@ -189,4 +188,4 @@ Generate multiple comment variations (2-3 options) with different approaches so 
       { status: 500 }
     );
   }
-} 
+}

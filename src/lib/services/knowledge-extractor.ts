@@ -1,3 +1,4 @@
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 
@@ -184,7 +185,7 @@ Return a JSON response with the following structure:
 `;
 
     const completion = await this.openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      ...textGenerationParams('intensive', 8192),
       messages: [
         {
           role: "system",
@@ -196,7 +197,6 @@ Return a JSON response with the following structure:
         }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.3,
     });
 
     return JSON.parse(completion.choices[0]?.message?.content || '{}');
@@ -286,7 +286,7 @@ Return JSON format:
 `;
 
     const completion = await this.openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      ...textGenerationParams('intensive', 8192),
       messages: [
         {
           role: "system",
@@ -298,7 +298,6 @@ Return JSON format:
         }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.3,
     });
 
     const result = JSON.parse(completion.choices[0]?.message?.content || '{"concepts": []}');
@@ -344,7 +343,7 @@ Return JSON format:
 `;
 
     const completion = await this.openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      ...textGenerationParams('intensive', 8192),
       messages: [
         {
           role: "system",
@@ -356,7 +355,6 @@ Return JSON format:
         }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.3,
     });
 
     const result = JSON.parse(completion.choices[0]?.message?.content || '{"relationships": []}');
@@ -542,4 +540,4 @@ Return JSON format:
   }
 }
 
-export const knowledgeExtractor = new KnowledgeExtractor(); 
+export const knowledgeExtractor = new KnowledgeExtractor();

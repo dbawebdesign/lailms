@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { textGenerationParams } from '@/lib/ai/model-policy';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
@@ -1176,7 +1177,7 @@ export class CourseGenerationOrchestratorV2 {
     const prompt = this.buildLessonSectionPrompt(lesson, sectionTitle, sectionIndex, kbContent, outline, request);
     
     const completion = await this.callOpenAIWithCircuitBreaker({
-      model: "gpt-4.1-mini",
+      ...textGenerationParams('intensive', 16000),
       messages: [
         {
           role: "system",
@@ -1188,8 +1189,6 @@ export class CourseGenerationOrchestratorV2 {
         }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.7,
-      max_tokens: 16000  // Sufficient for lesson content with optimized prompts
     });
     
     const content = completion.choices[0]?.message?.content || '{}';
@@ -2942,7 +2941,7 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
 
     // Generate outline with OpenAI (same approach as v1)
     const completion = await this.openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      ...textGenerationParams('intensive', 16000),
       messages: [
         {
           role: 'system',
@@ -2954,8 +2953,6 @@ Generate complete educational content for the "${sectionTitle}" section now:`;
         }
       ],
       response_format: { type: "json_object" }, // Force valid JSON like v1
-      temperature: 0.7,
-      max_tokens: 16000  // Sufficient for course outlines with optimized prompts
     });
 
     const outlineText = completion.choices[0]?.message?.content;
@@ -3997,4 +3994,4 @@ Respond with ONLY valid JSON in this exact format:
   }
 }
 
-// Class is already exported in its declaration above 
+// Class is already exported in its declaration above
