@@ -1,4 +1,5 @@
 import React from 'react';
+import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import { parseRubricContent } from '../src/lib/teaching-tools/rubric-parser';
 import { RubricDisplay } from '../src/components/teach/tools/RubricDisplay';
