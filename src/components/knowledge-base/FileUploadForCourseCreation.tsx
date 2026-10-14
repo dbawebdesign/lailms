@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { FileUploadDropzone } from './FileUploadDropzone';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,6 +56,7 @@ export default function FileUploadForCourseCreation({
   onSkipUploads 
 }: FileUploadForCourseCreationProps) {
   const [queuedItems, setQueuedItems] = useState<QueuedFile[]>([]);
+  const uploadedItems = useRef(new Set<string>());
   const [urlInput, setUrlInput] = useState('');
   const [instructions, setInstructions] = useState('');
   const [processingProgress, setProcessingProgress] = useState<ProcessingProgress>({
@@ -113,6 +114,7 @@ export default function FileUploadForCourseCreation({
     try {
       // Upload all items simultaneously
       const uploadPromises = queuedItems.map(async (item) => {
+        if (uploadedItems.current.has(item.id)) return;
         setQueuedItems(prev => prev.map(qi => 
           qi.id === item.id ? { ...qi, status: 'uploading' } : qi
         ));
@@ -123,9 +125,11 @@ export default function FileUploadForCourseCreation({
             const formData = new FormData();
             formData.append('file', item.file);
             formData.append('organisation_id', organisationId);
+            if (baseClassId) formData.append('base_class_id', baseClassId);
 
             const response = await fetch('/api/knowledge-base/upload', {
               method: 'POST',
+              headers: { 'Idempotency-Key': item.id },
               body: formData,
             });
 
@@ -141,10 +145,10 @@ export default function FileUploadForCourseCreation({
           // Submit URL
           const response = await fetch('/api/knowledge-base/url', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Idempotency-Key': item.id },
             body: JSON.stringify({ 
               url: item.url,
-              type: urlType 
+              type: urlType, base_class_id: baseClassId
             }),
           });
 
@@ -154,6 +158,7 @@ export default function FileUploadForCourseCreation({
           }
           }
 
+          uploadedItems.current.add(item.id);
           setQueuedItems(prev => prev.map(qi => 
             qi.id === item.id ? { ...qi, status: 'uploaded' } : qi
           ));
@@ -168,11 +173,14 @@ export default function FileUploadForCourseCreation({
             qi.id === item.id ? { ...qi, status: 'error' } : qi
           ));
           console.error(`Failed to process ${item.name}:`, error);
+          throw error;
         }
       });
 
       // Wait for all uploads to complete
-      await Promise.all(uploadPromises);
+      const results = await Promise.allSettled(uploadPromises);
+      const failed = results.find(result => result.status === 'rejected');
+      if (failed?.status === 'rejected') throw failed.reason;
 
       setProcessingProgress(prev => ({
         ...prev,

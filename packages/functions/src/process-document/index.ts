@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { authorizeDocumentProcessing } from './authorize.ts';
+import { bytesToBase64 } from './bytes-to-base64.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { YoutubeTranscript } from 'npm:youtube-transcript';
 // @ts-ignore
@@ -829,7 +830,7 @@ async function extractTextFromImage(filePath: string, supabase: SupabaseClient, 
 
     const arrayBuffer = await imageFileData.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
-    const base64String = btoa(String.fromCharCode(...uint8Array));
+    const base64String = bytesToBase64(uint8Array);
     
     const fileExtension = filePath.split('.').pop()?.toLowerCase();
     let mimeType = 'image/jpeg';
@@ -1166,7 +1167,7 @@ async function getEmbedding(text: string, apiKey: string): Promise<number[]> {
     throw new Error('Max retries exceeded for embedding generation');
 }
 
-serve(async (req: Request)=>{
+async function handleProcessDocument(req: Request) {
     if (req.method === 'OPTIONS') {
       return new Response('ok', {
         headers: corsHeaders
@@ -1781,4 +1782,35 @@ serve(async (req: Request)=>{
         status: 500
       });
     }
+ }
+
+// Upload callers request an immediate acknowledgement; existing synchronous callers keep their contract.
+declare const EdgeRuntime: { waitUntil(task: Promise<unknown>): void };
+serve(async (req: Request) => {
+  if (req.method !== 'POST') return handleProcessDocument(req);
+  let body: { documentId?: string; background?: boolean };
+  try { body = await req.clone().json(); } catch { return handleProcessDocument(req); }
+  if (body.background !== true) return handleProcessDocument(req);
+  const url = Deno.env.get('SUPABASE_URL');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !serviceKey || !Deno.env.get('OPENAI_API_KEY')) {
+    return new Response(JSON.stringify({ error: 'Background processing is unavailable' }), {
+      status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+  if (!body.documentId) return handleProcessDocument(req);
+  const denied = await authorizeDocumentProcessing(createClient(url, serviceKey), body.documentId,
+    req.headers.get('Authorization'), serviceKey);
+  if (denied) return new Response(JSON.stringify({ error: 'Document processing access denied' }), {
+    status: denied, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+  if (typeof EdgeRuntime === 'undefined') return new Response(JSON.stringify({ error: 'Background processing is unavailable' }), {
+    status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+  EdgeRuntime.waitUntil(handleProcessDocument(req).then(response => {
+    if (!response.ok) console.error('Background document processing failed', { documentId: body.documentId, status: response.status });
+  }));
+  return new Response(JSON.stringify({ documentId: body.documentId, status: 'queued' }), {
+    status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 });

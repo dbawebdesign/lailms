@@ -30,7 +30,7 @@ it('retains trusted machine access with the real service credential', async()=>{
 });
 
 describe.each(['process-document','kb-process-textfile','summarize-chunks'])('%s real handler boundary', functionName => {
-  it.each([null,'Bearer other-tenant-token'])('denies %s before writes or AI calls', async authorization => {
+  it.each([[null, false], ['Bearer other-tenant-token', false], [null, true], ['Bearer other-tenant-token', true]])('denies %s with background=%s before writes or AI calls', async (authorization, background) => {
     const write=jest.fn(), externalFetch=jest.fn();
     const client=makeClient(authorization?'intruder':null,doc,{role:'teacher',organisation_id:'org-b'});
     const readFrom=client.from;
@@ -47,7 +47,7 @@ describe.each(['process-document','kb-process-textfile','summarize-chunks'])('%s
     });
     const response=await handler(new Request('http://localhost/functions/v1/'+functionName,{
       method:'POST',headers:authorization?{Authorization:authorization}:{},
-      body:JSON.stringify({documentId:'victim-document',summarizeLevel:'document',internal:true}),
+      body:JSON.stringify({documentId:'victim-document',summarizeLevel:'document',internal:true,background}),
     }));
     expect(response.status).toBe(authorization?403:401);
     expect(write).not.toHaveBeenCalled(); expect(externalFetch).not.toHaveBeenCalled();
