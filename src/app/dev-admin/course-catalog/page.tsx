@@ -4,29 +4,28 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DevAdminCourseGenerator } from '@/components/dev-admin/DevAdminCourseGenerator'
 import { DevAdminCourseList } from '@/components/dev-admin/DevAdminCourseList'
 import RealtimeCourseGenerationWidget from '@/components/dashboard/RealtimeCourseGenerationWidget'
-import { 
-  BookOpen, 
-  Plus, 
+import {
+  BookOpen,
+  Plus,
   GraduationCap,
   AlertCircle,
   ArrowLeft,
   Activity
 } from 'lucide-react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 function DevAdminCourseCatalogContent() {
   const searchParams = useSearchParams()
-  const [password, setPassword] = useState('')
-  const [authenticated, setAuthenticated] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null))
+  }, [])
   const [activeTab, setActiveTab] = useState('create')
 
   // Check for tab parameter in URL
@@ -36,62 +35,6 @@ function DevAdminCourseCatalogContent() {
       setActiveTab(tab)
     }
   }, [searchParams])
-
-  const checkPassword = () => {
-    const devPassword = 'TerroirLAI'
-    if (password === devPassword) {
-      setAuthenticated(true)
-      setError(null)
-    } else {
-      setError('Invalid password')
-    }
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    checkPassword()
-  }
-
-  if (!authenticated) {
-    return (
-      <div className="container mx-auto p-6 max-w-md">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <GraduationCap className="w-5 h-5" />
-              Course Catalog Admin
-            </CardTitle>
-            <CardDescription>
-              Enter the developer password to access course catalog management
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter developer password"
-                />
-              </div>
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              <Button type="submit" className="w-full">
-                Access Course Catalog Admin
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -164,23 +107,23 @@ function DevAdminCourseCatalogContent() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <RealtimeCourseGenerationWidget 
-                userId="dev-admin" // Dev admin user
+              {userId && <RealtimeCourseGenerationWidget
+                userId={userId}
                 className="w-full"
                 initialJobs={[]} // Start with empty array, will fetch jobs dynamically
-              />
-              
+              />}
+
               <div className="mt-6">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setActiveTab('create')}
                   className="mr-4"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Create New Course
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setActiveTab('manage')}
                 >
                   <BookOpen className="w-4 h-4 mr-2" />

@@ -1,21 +1,13 @@
+import { requireGlobalAdmin } from '@/lib/auth/require-global-admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
-
-const DEV_ADMIN_PASSWORD = 'TerroirLAI';
-
-function validateDevAdminPassword(request: NextRequest): boolean {
-  const authHeader = request.headers.get('x-dev-admin-password');
-  return authHeader === DEV_ADMIN_PASSWORD;
-}
 
 export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  // Check dev admin password
-  if (!validateDevAdminPassword(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await requireGlobalAdmin();
+  if (denied) return denied;
 
   try {
     const supabase = createSupabaseServiceClient();

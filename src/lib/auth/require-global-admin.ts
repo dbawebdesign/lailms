@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { isPlatformAdmin } from './platform-admin';
 
-/** These analytics contain responses from every organisation. */
-export async function requireGlobalAdmin(): Promise<NextResponse | null> {
+export async function getGlobalAdminAccess() {
   const supabase = createSupabaseServerClient();
   const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (error || !user) return { user: null, status: 401 as const };
   // Organisation roles and user_metadata are not platform authority.
-  // app_metadata can only be assigned by a trusted Supabase admin operation.
-  if (user.app_metadata?.platform_admin !== true) {
-    return NextResponse.json({ error: 'Administrator access required' }, { status: 403 });
-  }
-  return null;
+  if (!isPlatformAdmin(user)) return { user: null, status: 403 as const };
+  return { user, status: null };
+}
+
+export async function requireGlobalAdmin(): Promise<NextResponse | null> {
+  const { status } = await getGlobalAdminAccess();
+  if (!status) return null;
+  return NextResponse.json({ error: status === 401 ? 'Authentication required' : 'Administrator access required' }, { status });
 }

@@ -1,5 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import type { User } from '@supabase/supabase-js'
+import { isPlatformAdmin } from '@/lib/auth/platform-admin'
 
 export async function middleware(request: NextRequest) {
   // Skip middleware entirely for image optimization and static requests to reduce log noise
@@ -79,6 +81,29 @@ export async function middleware(request: NextRequest) {
   // Enforce canceled accounts: redirect all authenticated requests to /canceled
   // Allowlist certain paths so the canceled page and its API can function
   const pathname = request.nextUrl.pathname
+  let user: User | null = null
+  try {
+    const result = await supabase.auth.getUser()
+    if (!result.error) user = result.data.user
+  } catch {
+    // An unavailable auth service must never open the admin boundary.
+  }
+  const isAdminPage = pathname === '/dev-admin' || pathname.startsWith('/dev-admin/')
+  const isAdminApi = pathname === '/api/dev-admin' || pathname.startsWith('/api/dev-admin/')
+  if (isAdminPage || isAdminApi) {
+    const withSessionCookies = (next: NextResponse) => {
+      for (const cookie of response.cookies.getAll()) next.cookies.set(cookie)
+      return next
+    }
+    if (!user) {
+      if (isAdminApi) return withSessionCookies(NextResponse.json({ error: 'Authentication required' }, { status: 401 }))
+      return withSessionCookies(NextResponse.redirect(new URL('/login?next=/dev-admin', request.url)))
+    }
+    if (!isPlatformAdmin(user)) {
+      if (isAdminApi) return withSessionCookies(NextResponse.json({ error: 'Administrator access required' }, { status: 403 }))
+      return withSessionCookies(new NextResponse('Administrator access required', { status: 403 }))
+    }
+  }
   const isAllowedPath =
     pathname.startsWith('/canceled') ||
     pathname.startsWith('/api/account/reactivate') ||
@@ -88,7 +113,6 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/auth')
 
   try {
-    const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: profile } = await supabase
         .from('profiles')
@@ -120,4 +144,4 @@ export const config = {
      */
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
-} 
+}

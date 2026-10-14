@@ -1,16 +1,14 @@
+import { requireGlobalAdmin } from '@/lib/auth/require-global-admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { AIGradingService } from '@/lib/services/ai-grading-service';
 
 export async function POST(request: NextRequest) {
+  const denied = await requireGlobalAdmin();
+  if (denied) return denied;
   try {
     const supabase = createSupabaseServerClient();
     
-    // Get the current user (should be admin/instructor)
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     // Get all attempts that need AI grading
     const { data: pendingAttempts, error: attemptsError } = await supabase
@@ -111,14 +109,11 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint to check batch processing status
 export async function GET(request: NextRequest) {
+  const denied = await requireGlobalAdmin();
+  if (denied) return denied;
   try {
     const supabase = createSupabaseServerClient();
     
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     // Get status of all grading attempts
     const { data: gradingAttempts, error: statusError } = await supabase

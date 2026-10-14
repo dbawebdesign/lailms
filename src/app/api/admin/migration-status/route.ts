@@ -1,6 +1,6 @@
+import { requireGlobalAdmin } from '@/lib/auth/require-global-admin'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 interface Migration {
   status: 'completed' | 'pending' | 'failed'
@@ -14,26 +14,9 @@ interface AuthUser {
 }
 
 export async function GET(request: NextRequest) {
+  const denied = await requireGlobalAdmin()
+  if (denied) return denied
   try {
-    // Check if user is admin
-    const supabase = createSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check user role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
     // Initialize admin client
     const adminSupabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

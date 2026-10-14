@@ -1,3 +1,4 @@
+import { requireGlobalAdmin } from '@/lib/auth/require-global-admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
@@ -16,6 +17,8 @@ interface ClassInstanceAnalysis extends ClassInstance {
 }
 
 export async function POST() {
+  const denied = await requireGlobalAdmin();
+  if (denied) return denied;
   try {
     const supabase = await createSupabaseServerClient();
     const today = new Date().toISOString().split('T')[0];
@@ -104,6 +107,8 @@ export async function POST() {
 
 // GET endpoint for checking current status without updates
 export async function GET() {
+  const denied = await requireGlobalAdmin();
+  if (denied) return denied;
   try {
     const supabase = await createSupabaseServerClient();
     

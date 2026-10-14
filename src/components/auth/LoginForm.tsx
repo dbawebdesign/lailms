@@ -18,6 +18,7 @@ export default function LoginForm() {
   const justRegistered = searchParams.get('registered') === 'true'
   const passwordUpdated = searchParams.get('message') === 'password-updated'
   const resetSuccess = searchParams.get('reset') === 'success'
+  const adminReturn = searchParams.get('next') === '/dev-admin'
   
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -93,7 +94,7 @@ export default function LoginForm() {
 
       // Add a small delay to ensure session is fully established before redirecting
       setTimeout(() => {
-        router.push(redirectPath);
+        router.push(adminReturn ? '/dev-admin' : redirectPath);
       }, 100);
     } catch (error: any) {
       setError(error.message || 'Failed to log in')
@@ -110,7 +111,7 @@ export default function LoginForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback${adminReturn ? '?next=/dev-admin' : ''}`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent'

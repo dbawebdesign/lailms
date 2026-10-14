@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,7 +27,6 @@ export default function MessagingPage() {
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(true)
 
-  const supabase = createClient()
 
   useEffect(() => {
     loadUsers()
@@ -37,14 +35,10 @@ export default function MessagingPage() {
 
   const loadUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('user_id, first_name, last_name, username, role')
-        .neq('role', 'super_admin')
-        .order('first_name')
-
-      if (error) throw error
-      setUsers(data || [])
+      const response = await fetch('/api/dev-admin/messaging?view=users')
+      if (!response.ok) throw new Error('Failed to load users')
+      const data = await response.json()
+      setUsers(data.users || [])
     } catch (error) {
       console.error('Error loading users:', error)
       toast({
@@ -59,34 +53,10 @@ export default function MessagingPage() {
 
   const loadMessages = async () => {
     try {
-      const { data, error } = await supabase
-        .from('admin_messages')
-        .select(`
-          id,
-          from_admin_id,
-          subject,
-          message,
-          created_at,
-          updated_at,
-          to_user_id,
-          profiles!admin_messages_to_user_id_fkey (
-            user_id,
-            first_name,
-            last_name,
-            username,
-            role
-          ),
-          admin_message_responses (
-            id,
-            message_id,
-            response,
-            responded_at
-          )
-        `)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      setMessages((data || []) as AdminMessageWithProfile[])
+      const response = await fetch('/api/dev-admin/messaging')
+      if (!response.ok) throw new Error('Failed to load messages')
+      const data = await response.json()
+      setMessages((data.messages || []) as AdminMessageWithProfile[])
     } catch (error) {
       console.error('Error loading messages:', error)
       toast({
@@ -111,19 +81,11 @@ export default function MessagingPage() {
 
     setLoading(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const { error } = await supabase
-        .from('admin_messages')
-        .insert({
-          from_admin_id: user.id,
-          to_user_id: selectedUserId,
-          subject: subject.trim(),
-          message: messageContent.trim()
-        })
-
-      if (error) throw error
+      const response = await fetch('/api/dev-admin/messaging', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toUserId: selectedUserId, subject: subject.trim(), message: messageContent.trim() })
+      })
+      if (!response.ok) throw new Error('Failed to send message')
 
       toast({
         title: "Success",

@@ -1,6 +1,7 @@
 import { ensureBootstrapProfile } from '@/lib/auth/bootstrap-profile'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { isPlatformAdmin } from '@/lib/auth/platform-admin'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -37,6 +38,10 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error && data.user) {
+      // This fixed return target is navigation only; the owner boundary is rechecked.
+      if (next === '/dev-admin' && isPlatformAdmin(data.user)) {
+        return NextResponse.redirect(new URL('/dev-admin', origin))
+      }
       // Get user profile to determine redirect
       const { data: profile } = await supabase
         .from('profiles')

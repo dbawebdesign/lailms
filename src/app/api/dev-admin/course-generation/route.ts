@@ -1,21 +1,13 @@
+import { getGlobalAdminAccess } from '@/lib/auth/require-global-admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { CourseGenerationOrchestratorV2 } from '@/lib/services/course-generation-orchestrator-v2';
 import { knowledgeBaseAnalyzer } from '@/lib/services/knowledge-base-analyzer';
 import type { CourseGenerationRequest } from '@/lib/services/course-generator';
 
-const DEV_ADMIN_PASSWORD = 'TerroirLAI';
-
-function validateDevAdminPassword(request: NextRequest): boolean {
-  const authHeader = request.headers.get('x-dev-admin-password');
-  return authHeader === DEV_ADMIN_PASSWORD;
-}
-
 export async function POST(request: NextRequest) {
-  // Check dev admin password
-  if (!validateDevAdminPassword(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const { user, status } = await getGlobalAdminAccess();
+  if (status || !user) return NextResponse.json({ error: status === 401 ? 'Authentication required' : 'Administrator access required' }, { status: status || 403 });
 
   try {
     const supabase = createSupabaseServiceClient();
@@ -64,7 +56,7 @@ export async function POST(request: NextRequest) {
     const generationRequest: CourseGenerationRequest = {
       baseClassId,
       organisationId: baseClass.organisation_id,
-      userId: 'dev-admin', // Dev admin system user
+      userId: user.id,
       title,
       description,
       generationMode: generationMode as any,
@@ -88,7 +80,7 @@ export async function POST(request: NextRequest) {
         job_type: 'generate_course_v2_teach',
         status: 'queued',
         job_data: generationRequest as any,
-        user_id: null, // Dev admin - no specific user
+        user_id: user.id,
         generation_config: {
           isDevAdmin: true,
           courseCatalog: true
