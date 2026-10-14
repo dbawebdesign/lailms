@@ -32,6 +32,7 @@ import {
   generateFallbackTitle 
 } from '@/lib/utils/conversationTitleGenerator';
 import { useAskLuna } from '@/context/AskLunaContext';
+import { uploadChatAttachments, waitForChatAttachments } from '@/lib/luna/upload-attachments';
 import { SelectedTextContext } from '@/components/student/SelectedTextContext';
 
 interface LunaConversation {
@@ -177,6 +178,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
   const [messages, setMessages] = useState<ExtendedChatMessage[]>([]);
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [attachmentStatus, setAttachmentStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
@@ -185,6 +187,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
   
   // File attachment state
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const attachmentUploads = useRef(new globalThis.Map<string, string>());
   const [attachedUrls, setAttachedUrls] = useState<AttachedUrl[]>([]);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInput, setUrlInput] = useState('');
@@ -283,25 +286,13 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
       }
 
       try {
-        // Save user message and call API (simplified version of handleSendMessage)
-        if (conversationToUse) {
-          await supabase
-            .from('luna_messages')
-            .insert({
-              id: userMsg.id,
-              conversation_id: conversationToUse.id,
-              role: 'user',
-              content: messageToSend,
-              persona: currentPersona,
-              created_at: new Date().toISOString(),
-            });
-        }
-
         const response = await fetch('/api/luna/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             message: messageToSend,
+            conversationId: conversationToUse?.id,
+            userMessageId: userMsg.id,
             persona: currentPersona,
             userRole: userRole,
             context: isReady ? context : undefined,
@@ -318,7 +309,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
         const result = await response.json();
 
         const assistantMsg: ChatMessage = {
-          id: uuidv4(),
+          id: result.messageId || uuidv4(),
           role: 'assistant',
           content: result.response || 'Sorry, I encountered an error.',
           timestamp: new Date(),
@@ -329,20 +320,6 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
         const finalMessages = [...messages, userMsg, assistantMsg];
         setMessages(finalMessages);
         messageHistory.current.push({ role: 'assistant', content: assistantMsg.content });
-
-        // Save assistant message
-        if (conversationToUse) {
-          await supabase
-            .from('luna_messages')
-            .insert({
-              id: assistantMsg.id,
-              conversation_id: conversationToUse.id,
-              role: 'assistant',
-              content: assistantMsg.content,
-              persona: currentPersona,
-              created_at: new Date().toISOString(),
-            });
-        }
 
         // Clear selected text after successful response
         if (selectedTextContext) {
@@ -1016,7 +993,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
 
       // Add user message to state immediately
       const userMsg: ChatMessage = {
-        id: Date.now().toString(),
+        id: uuidv4(),
         role: 'user',
         content: responseText,
         timestamp: new Date(),
@@ -1037,45 +1014,6 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
       const tempMessages = [...messages, userMsg, assistantMsg];
       setMessages(tempMessages);
 
-      // Save user message to database - using exact pattern from handleSendMessage
-      if (conversationToUse) {
-        console.log('💾 Attempting to save action button response message:', {
-          conversationId: conversationToUse.id,
-          messageId: userMsg.id,
-          role: 'user',
-          persona: currentPersona,
-          content: responseText
-        });
-        
-        const messageData = {
-          id: userMsg.id,
-          conversation_id: conversationToUse.id,
-          role: 'user' as const,
-          content: responseText,
-          persona: currentPersona,
-          created_at: new Date().toISOString(),
-        };
-        
-        const { data: insertedMessage, error: messageError } = await supabase
-          .from('luna_messages')
-          .insert(messageData)
-          .select()
-          .single();
-          
-        if (messageError) {
-          console.error('❌ Message insert failed:', {
-            error: messageError,
-            code: messageError.code,
-            message: messageError.message,
-            details: messageError.details,
-            hint: messageError.hint
-          });
-          // Don't throw here, continue with the flow
-        } else {
-          console.log('✅ Action button response message saved successfully:', insertedMessage?.id);
-        }
-      }
-
       // Prepare chat history for Luna API
       const chatHistory = messageHistory.current.slice(-20);
       chatHistory.push({ role: 'user', content: responseText });
@@ -1086,6 +1024,8 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: responseText,
+          conversationId: conversationToUse?.id,
+          userMessageId: userMsg.id,
           persona: currentPersona,
           userRole: userRole,
           context: isReady ? context : undefined,
@@ -1103,6 +1043,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
       // Update assistant message with response
       const finalAssistantMsg: ChatMessage = {
         ...assistantMsg,
+        id: result.messageId || assistantMsg.id,
         content: result.response || 'Sorry, I encountered an error.',
         isLoading: false,
         citations: result.citations || [],
@@ -1201,42 +1142,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
         console.log('🔍 No UI update triggers detected in response');
       }
 
-      // Save assistant message to database - using pattern from handleSendMessage
       if (conversationToUse) {
-        console.log('💾 Saving assistant message to database');
-        
-        const assistantMessageData = {
-          id: finalAssistantMsg.id,
-          conversation_id: conversationToUse.id,
-          role: 'assistant' as const,
-          content: finalAssistantMsg.content,
-          persona: currentPersona,
-          is_outline: finalAssistantMsg.isOutline || false,
-          outline_data: finalAssistantMsg.outlineData || null,
-          citations: finalAssistantMsg.citations || [],
-
-          created_at: new Date().toISOString(),
-        };
-        
-        const { data: insertedAssistantMsg, error: assistantMsgError } = await supabase
-          .from('luna_messages')
-          .insert(assistantMessageData)
-          .select()
-          .single();
-          
-        if (assistantMsgError) {
-          console.error('❌ Failed to save assistant message:', {
-            error: assistantMsgError,
-            code: assistantMsgError.code,
-            message: assistantMsgError.message,
-            details: assistantMsgError.details,
-            hint: assistantMsgError.hint
-          });
-          // Don't throw here, continue with local state
-        } else {
-          console.log('✅ Assistant message saved successfully:', insertedAssistantMsg?.id);
-        }
-        
         // Update conversation
         const { error: updateError } = await supabase
           .from('luna_conversations')
@@ -1421,23 +1327,25 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
       id: Math.random().toString(36).substr(2, 9)
     }));
     
-    // Combine message with attachment info
     let messageToSend = message.trim();
-    
-    if (attachedFiles.length > 0) {
-      messageToSend += '\n\n[Files attached: ' + attachedFiles.map(f => f.file.name).join(', ') + ']';
-    }
-    
-    if (attachedUrls.length > 0 || newUrls.length > 0) {
-      const allUrls = [...attachedUrls, ...newUrls];
-      messageToSend += '\n\n[URLs: ' + allUrls.map(u => u.url).join(', ') + ']';
-    }
-
-    setMessage('');
-    setAttachedFiles([]);
-    setAttachedUrls([]);
+    let documentIds: string[];
     setError(null);
     setIsLoading(true);
+    try {
+      if (attachedFiles.length || attachedUrls.length) setAttachmentStatus('Uploading attachments...');
+      documentIds = await uploadChatAttachments(attachedFiles, attachedUrls, attachmentUploads.current);
+      if (documentIds.length) setAttachmentStatus('Reading attachments. Large files may take a few minutes...');
+      await waitForChatAttachments(documentIds);
+      setAttachmentStatus('');
+    } catch (error) {
+      setAttachmentStatus('');
+      setError(error instanceof Error ? error.message : 'Could not prepare attachments');
+      setIsLoading(false);
+      return;
+    }
+    if (attachedFiles.length) messageToSend += '\n\n[Files attached: ' + attachedFiles.map(f => f.file.name).join(', ') + ']';
+    if (attachedUrls.length || newUrls.length) messageToSend += '\n\n[URLs: ' + [...attachedUrls, ...newUrls].map(u => u.url).join(', ') + ']';
+    if (!messageToSend) messageToSend = 'Please review the attached documents.';
 
     const userMsg: ChatMessage = {
       id: uuidv4(),
@@ -1495,72 +1403,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
     }
 
     try {
-      // Save user message to Supabase
-      if (conversationToUse) {
-        console.log('💾 Attempting to save user message:', {
-          conversationId: conversationToUse.id,
-          messageId: userMsg.id,
-          role: 'user',
-          persona: currentPersona,
-          conversationExists: !!conversationToUse,
-          userId: userId
-        });
-        
-        // Verify conversation exists in database before saving message
-        const { data: convCheck, error: convCheckError } = await supabase
-          .from('luna_conversations')
-          .select('id, user_id')
-          .eq('id', conversationToUse.id)
-          .single();
-          
-        if (convCheckError || !convCheck) {
-          console.error('❌ Conversation verification failed:', {
-            error: convCheckError,
-            conversationId: conversationToUse.id,
-            exists: !!convCheck
-          });
-          throw new Error(`Conversation ${conversationToUse.id} does not exist in database`);
-        }
-        
-        console.log('✅ Conversation verified, proceeding with message save');
-        
-        const messageData = {
-          id: userMsg.id,
-          conversation_id: conversationToUse.id,
-          role: 'user' as const,
-          content: messageToSend,
-          persona: currentPersona,
-          created_at: new Date().toISOString(),
-        };
-        
-        console.log('💾 Inserting message with data:', messageData);
-        
-        const { data: insertedMessage, error: messageError } = await supabase
-          .from('luna_messages')
-          .insert(messageData)
-          .select()
-          .single();
-          
-        if (messageError) {
-          console.error('❌ Message insert failed:', {
-            error: messageError,
-            code: messageError.code,
-            message: messageError.message,
-            details: messageError.details,
-            hint: messageError.hint
-          });
-          throw new Error(`Failed to save message: ${messageError.message} (Code: ${messageError.code})`);
-        }
-        
-        if (!insertedMessage) {
-          throw new Error('Message insert succeeded but no data returned');
-        }
-        
-        console.log('✅ User message saved successfully:', insertedMessage.id);
-      } else {
-        console.error('❌ No conversation available for message saving');
-        throw new Error('No conversation available to save message');
-      }
+      if (!conversationToUse) throw new Error('No conversation available');
 
       // Call Luna API
       console.log('🚀 Sending to Luna API:', {
@@ -1575,6 +1418,9 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: messageToSend,
+          conversationId: conversationToUse?.id,
+          userMessageId: userMsg.id,
+          documentIds: documentIds.length ? documentIds : undefined,
           persona: currentPersona,
           userRole: userRole,
           context: isReady ? context : undefined,
@@ -1602,7 +1448,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
                                                (result.generationConfig || result.baseClassId);
 
       const assistantMsg: ExtendedChatMessage = {
-        id: uuidv4(),
+        id: result.messageId || uuidv4(),
         role: 'assistant',
         content: result.response || 'Sorry, I encountered an error.',
         timestamp: new Date(),
@@ -1646,42 +1492,10 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
         ] : undefined
       };
 
-      // Save assistant message to Supabase
-      if (conversationToUse) {
-        console.log('💾 Saving assistant message to database');
-        
-        const assistantMessageData = {
-          id: assistantMsg.id,
-          conversation_id: conversationToUse.id,
-          role: 'assistant' as const,
-          content: assistantMsg.content,
-          persona: currentPersona,
-          is_outline: assistantMsg.isOutline || false,
-          outline_data: assistantMsg.outlineData || null,
-          citations: assistantMsg.citations || [],
-
-          created_at: new Date().toISOString(),
-        };
-        
-        const { data: insertedAssistantMsg, error: assistantMsgError } = await supabase
-          .from('luna_messages')
-          .insert(assistantMessageData)
-          .select()
-          .single();
-          
-        if (assistantMsgError) {
-          console.error('❌ Failed to save assistant message:', {
-            error: assistantMsgError,
-            code: assistantMsgError.code,
-            message: assistantMsgError.message,
-            details: assistantMsgError.details,
-            hint: assistantMsgError.hint
-          });
-          // Don't throw here, continue with local state
-        } else {
-          console.log('✅ Assistant message saved successfully:', insertedAssistantMsg?.id);
-        }
-      }
+      setMessage('');
+      setAttachedFiles([]);
+      setAttachedUrls([]);
+      attachmentUploads.current.clear();
 
       const finalMessages = [...messages, userMsg, assistantMsg];
       setMessages(finalMessages);
@@ -2352,6 +2166,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
           </div>
         )}
         
+        {attachmentStatus && <p role="status" className="mb-2 text-sm text-muted-foreground">{attachmentStatus}</p>}
         {/* File and URL attachments display */}
         {(attachedFiles.length > 0 || attachedUrls.length > 0) && (
           <div className="mb-3 flex flex-wrap gap-2">
@@ -2363,6 +2178,7 @@ export const SupabaseEnhancedLunaChat: React.FC<SupabaseEnhancedLunaChatProps> =
                   variant="ghost"
                   size="sm"
                   className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                  disabled={isLoading}
                   onClick={() => removeFile(file.id)}
                 >
                   <X size={10} />

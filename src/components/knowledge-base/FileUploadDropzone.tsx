@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { FileIcon, UploadIcon, XIcon, LinkIcon, YoutubeIcon } from 'lucide-react'
 import { formatBytes } from '@/lib/utils'
@@ -103,6 +103,7 @@ export function FileUploadDropzone({
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [url, setUrl] = useState('')
+  const urlUploadRequest = useRef({ url: '', id: '' });
   const [urlType, setUrlType] = useState<'youtube' | 'webpage' | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [urlValidationMessage, setUrlValidationMessage] = useState('')
@@ -250,11 +251,15 @@ export function FileUploadDropzone({
     try {
       setIsUploading(true);
       
+      if (urlUploadRequest.current.url !== trimmedUrl) {
+        urlUploadRequest.current = { url: trimmedUrl, id: crypto.randomUUID() };
+      }
       // Create a document record directly via API with URL in metadata
       const response = await fetch('/api/knowledge-base/url', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Idempotency-Key': urlUploadRequest.current.id,
         },
         body: JSON.stringify({
           url: trimmedUrl,
@@ -267,6 +272,7 @@ export function FileUploadDropzone({
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
       
+      urlUploadRequest.current = { url: '', id: '' };
       // Clear URL input
       setUrl('');
       setUrlType(null);
@@ -304,27 +310,19 @@ export function FileUploadDropzone({
     try {
       setIsUploading(true)
 
-      // Prepare form data
-      const formData = new FormData()
-      files.forEach((uploadedFile) => {
-        formData.append('file', uploadedFile.file)
-      })
-      formData.append('organisation_id', organisationId)
-
-      // Replace direct onUpload call with fetch to API endpoint
-      const response = await fetch('/api/knowledge-base/upload', {
-        method: 'POST',
-        body: formData,
-        // Headers might not be needed as FormData sets Content-Type
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+      // The API accepts one file per request. Keep unfinished files if a later upload fails.
+      for (const uploadedFile of files) {
+        const formData = new FormData();
+        formData.append('file', uploadedFile.file);
+        const response = await fetch('/api/knowledge-base/upload', {
+          method: 'POST', headers: { 'Idempotency-Key': uploadedFile.id }, body: formData,
+        });
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || `Upload failed: ${response.status}`);
+        }
+        setFiles(prev => prev.filter(item => item.id !== uploadedFile.id));
       }
-
-      // Assuming the API returns the details of the uploaded document(s)
-      // const result = await response.json()
 
       // Clear files after successful upload
       setFiles([])

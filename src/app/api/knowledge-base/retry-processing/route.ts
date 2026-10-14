@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { dispatchDocument } from '@/lib/knowledge-base/dispatch-document';
 
 export async function POST(request: Request) {
   try {
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     }
 
     // Reset document status to queued for retry
-    const { error: updateError } = await supabase
+    const { data: claimed, error: updateError } = await supabase
       .from('documents')
       .update({
         status: 'queued',
@@ -50,38 +50,14 @@ export async function POST(request: Request) {
         },
         updated_at: new Date().toISOString()
       })
-      .eq('id', documentId);
+      .eq('id', documentId).eq('status', 'error').select('id').maybeSingle();
 
     if (updateError) {
       console.error('Error updating document for retry:', updateError);
       return NextResponse.json({ error: 'Failed to reset document for retry' }, { status: 500 });
     }
 
-    // Invoke the processing function again
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (supabaseUrl && supabaseAnonKey) {
-      try {
-        const invokeClient = supabase; // Forward the verified user session to the Edge Function.
-        const { error: invokeError } = await invokeClient.functions.invoke(
-          'process-document',
-          {
-            body: { documentId }
-          }
-        );
-
-        if (invokeError) {
-          console.error('Failed to invoke process-document for retry:', invokeError);
-          // Don't fail the whole request - the document is queued and can be processed later
-        } else {
-          console.log('Successfully re-invoked process-document function for retry');
-        }
-      } catch (err) {
-        console.error('Error invoking process-document for retry:', err);
-        // Don't fail the whole request
-      }
-    }
+    if (claimed) dispatchDocument(supabase, documentId);
 
     return NextResponse.json({ 
       success: true, 

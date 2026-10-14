@@ -77,6 +77,7 @@ export default function StreamlinedCourseCreator({
   
   const [creationStep, setCreationStep] = useState<'upload' | 'processing' | 'review'>('upload');
   const [queuedItems, setQueuedItems] = useState<QueuedItem[]>([]);
+  const uploadedItems = useRef(new Map<string, string>());
   const [urlInput, setUrlInput] = useState('');
   const [instructions, setInstructions] = useState('');
   
@@ -324,7 +325,9 @@ export default function StreamlinedCourseCreator({
       setProcessingMessage('Uploading content...');
       setProgress(30);
 
+      const retryingSources = uploadedItems.current.size > 0;
       const uploadPromises = queuedItems.map(async (item) => {
+        if (uploadedItems.current.has(item.id)) return;
         setQueuedItems(prev => prev.map(qi => 
           qi.id === item.id ? { ...qi, status: 'uploading' } : qi
         ));
@@ -341,6 +344,7 @@ export default function StreamlinedCourseCreator({
 
             const response = await fetch('/api/knowledge-base/upload', {
               method: 'POST',
+              headers: { 'Idempotency-Key': item.id },
               body: formData,
             });
 
@@ -349,12 +353,15 @@ export default function StreamlinedCourseCreator({
               const errorMessage = errorData.error || errorData.message || `Upload failed with status ${response.status}`;
               throw new Error(errorMessage);
             }
+            const uploaded = await response.json();
+            if (!uploaded.id) throw new Error('Upload response is missing its document ID');
+            uploadedItems.current.set(item.id, uploaded.id);
           } else if (item.type === 'url' && item.url) {
             const urlType = item.url.includes('youtube.com') || item.url.includes('youtu.be') ? 'youtube' : 'webpage';
             
             const response = await fetch('/api/knowledge-base/url', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'Idempotency-Key': item.id },
               body: JSON.stringify({ 
                 url: item.url, 
                 type: urlType,
@@ -368,6 +375,9 @@ export default function StreamlinedCourseCreator({
               const errorMessage = errorData.error || errorData.message || `URL processing failed with status ${response.status}`;
               throw new Error(errorMessage);
             }
+            const uploaded = await response.json();
+            if (!uploaded.id) throw new Error('Upload response is missing its document ID');
+            uploadedItems.current.set(item.id, uploaded.id);
           }
 
           setQueuedItems(prev => prev.map(qi => 
@@ -381,7 +391,9 @@ export default function StreamlinedCourseCreator({
         }
       });
 
-      await Promise.all(uploadPromises);
+      const results = await Promise.allSettled(uploadPromises);
+      const failed = results.find(result => result.status === 'rejected');
+      if (failed?.status === 'rejected') throw failed.reason;
 
       // Step 3: Wait for document processing to complete (running in background)
       setProcessingMessage('🔄 Processing documents in background... Large PDFs may take several minutes.');
@@ -390,6 +402,19 @@ export default function StreamlinedCourseCreator({
       // Wait for all documents to be processed
       if (!newBaseClassId) {
         throw new Error('Failed to create course - missing base class ID');
+      }
+      if (retryingSources && uploadedItems.current.size) {
+        const { data: sources, error } = await supabase.from('documents').select('id,status')
+          .eq('base_class_id', newBaseClassId).in('id', [...uploadedItems.current.values()]);
+        if (error) throw new Error('Could not check sources for retry');
+        for (const source of sources || []) {
+          if (source.status !== 'error') continue;
+          const retry = await fetch('/api/knowledge-base/retry-processing', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ documentId: source.id }),
+          });
+          if (!retry.ok) throw new Error((await retry.json()).error || 'Could not retry source processing');
+        }
       }
       await waitForDocumentProcessing(newBaseClassId, organisationId);
 
