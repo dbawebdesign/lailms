@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,7 +20,6 @@ interface Organisation {
 }
 
 export default function OrganisationsPage() {
-  const router = useRouter()
   const [organisations, setOrganisations] = useState<Organisation[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -32,41 +30,16 @@ export default function OrganisationsPage() {
   const [abbr, setAbbr] = useState('')
   const [orgType, setOrgType] = useState<string>('')
   
-  // Password protection
-  const [password, setPassword] = useState('')
-  const [authenticated, setAuthenticated] = useState(false)
-  
-  // Check if the auth is correct
-  const checkPassword = () => {
-    const devPassword = process.env.NEXT_PUBLIC_DEV_ADMIN_PASSWORD
-    if (!devPassword) {
-      setError('Dev admin password not configured')
-      return
-    }
-    if (password === devPassword) {
-      setAuthenticated(true)
-      fetchOrganisations()
-    } else {
-      setError('Invalid password')
-    }
-  }
-  
-  // Check for existing auth
   useEffect(() => {
-    setLoading(false)
+    fetchOrganisations()
   }, [])
   
   // Fetch organisations from API
   const fetchOrganisations = async () => {
-    if (!authenticated) return
-    
     try {
       setLoading(true)
       const response = await fetch('/api/dev-admin/organisations', {
-        method: 'GET',
-        headers: {
-          'x-dev-admin-password': process.env.NEXT_PUBLIC_DEV_ADMIN_PASSWORD || ''
-        }
+        method: 'GET'
       })
       
       if (!response.ok) {
@@ -107,8 +80,7 @@ export default function OrganisationsPage() {
       const response = await fetch('/api/dev-admin/organisations', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-dev-admin-password': process.env.NEXT_PUBLIC_DEV_ADMIN_PASSWORD || ''
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           name,
@@ -144,43 +116,6 @@ export default function OrganisationsPage() {
     } finally {
       setCreating(false)
     }
-  }
-  
-  // Show login form if not authenticated
-  if (!authenticated) {
-    return (
-      <div className="container mx-auto p-6 flex items-center justify-center min-h-screen">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Developer Admin Access</CardTitle>
-            <CardDescription>
-              This area is restricted to authorized developers only.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={(e) => { e.preventDefault(); checkPassword(); }}>
-              <div className="grid w-full items-center gap-4">
-                <div className="flex flex-col space-y-1.5">
-                  <Label htmlFor="password">Developer Password</Label>
-                  <Input 
-                    id="password" 
-                    type="password" 
-                    placeholder="Enter developer password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-              </div>
-              {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
-            </form>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={() => router.push('/')}>Back</Button>
-            <Button onClick={checkPassword}>Access</Button>
-          </CardFooter>
-        </Card>
-      </div>
-    )
   }
   
   return (

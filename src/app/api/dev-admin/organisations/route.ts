@@ -1,20 +1,12 @@
+import { requireGlobalAdmin } from '@/lib/auth/require-global-admin';
 import { NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-
-const DEV_ADMIN_PASSWORD = 'TerroirLAI';
-
-function validateDevAdminPassword(request: Request): boolean {
-  const authHeader = request.headers.get('x-dev-admin-password');
-  return authHeader === DEV_ADMIN_PASSWORD;
-}
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 export async function GET(request: Request) {
-  // Check dev admin password
-  if (!validateDevAdminPassword(request)) {
-    return NextResponse.json({ error: 'Unauthorized - Invalid dev admin password' }, { status: 401 });
-  }
+  const denied = await requireGlobalAdmin();
+  if (denied) return denied;
 
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
 
   try {
     // Get all organizations with member counts
@@ -39,21 +31,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  // Check dev admin password
-  if (!validateDevAdminPassword(request)) {
-    return NextResponse.json({ error: 'Unauthorized - Invalid dev admin password' }, { status: 401 });
-  }
+  const denied = await requireGlobalAdmin();
+  if (denied) return denied;
 
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
 
   try {
     const body = await request.json();
-    const { name, organisation_type, settings, password } = body;
+    const { name, organisation_type, settings } = body;
 
-    // Also allow password in request body as fallback
-    if (!validateDevAdminPassword(request) && password !== DEV_ADMIN_PASSWORD) {
-      return NextResponse.json({ error: 'Unauthorized - Invalid dev admin password' }, { status: 401 });
-    }
 
     // Validate required fields
     if (!name || !organisation_type) {

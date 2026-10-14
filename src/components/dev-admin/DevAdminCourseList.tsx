@@ -61,11 +61,7 @@ export function DevAdminCourseList() {
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/dev-admin/course-catalog', {
-        headers: {
-          'x-dev-admin-password': 'TerroirLAI'
-        }
-      });
+      const response = await fetch('/api/dev-admin/course-catalog');
 
       const data = await response.json();
       
@@ -93,10 +89,7 @@ export function DevAdminCourseList() {
     try {
       setDeleting(courseId);
       const response = await fetch(`/api/dev-admin/course-catalog/${courseId}`, {
-        method: 'DELETE',
-        headers: {
-          'x-dev-admin-password': 'TerroirLAI'
-        }
+        method: 'DELETE'
       });
 
       const data = await response.json();
