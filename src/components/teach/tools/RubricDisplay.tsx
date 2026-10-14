@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { parseRubricContent, type ParsedRubric } from '@/lib/teaching-tools/rubric-parser';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,25 +26,6 @@ interface RubricDisplayProps {
   onRefineWithLuna?: (currentRubric: ParsedRubric) => void;
 }
 
-interface RubricLevel {
-  level: string;
-  points: number;
-  description: string;
-}
-
-interface RubricCriterion {
-  name: string;
-  levels: RubricLevel[];
-}
-
-interface ParsedRubric {
-  title: string;
-  criteria: RubricCriterion[];
-  totalPoints: number;
-  subject?: string;
-  gradeLevel?: string;
-}
-
 export function RubricDisplay({ content, metadata, onCopy, copiedItems, onRefineWithLuna }: RubricDisplayProps) {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editedRubric, setEditedRubric] = useState<ParsedRubric | null>(null);
@@ -52,190 +34,11 @@ export function RubricDisplay({ content, metadata, onCopy, copiedItems, onRefine
   // Safely access UIContext for panel control
   const { setPanelVisible } = useUIContext();
 
-  // Enhanced parsing logic with multiple strategies
-  const parseRubricContent = (content: string): ParsedRubric => {
-    console.log('Parsing rubric content:', content.substring(0, 200) + '...');
-    
-    const lines = content.split('\n').map(line => line.trim()).filter(line => line);
-    const criteria: RubricCriterion[] = [];
-    let title = 'Assessment Rubric';
-    let subject = '';
-    let gradeLevel = '';
-    
-    // Extract title (first line with "Rubric" or first **bold** line)
-    const titleLine = lines.find(line => 
-      line.toLowerCase().includes('rubric') || 
-      (line.startsWith('**') && line.endsWith('**'))
-    );
-    if (titleLine) {
-      title = titleLine.replace(/\*\*/g, '').trim();
-    }
-    
-    // Extract subject and grade level
-    const subjectMatch = content.match(/subject:\s*([^\n*]+)/i);
-    if (subjectMatch) subject = subjectMatch[1].trim();
-    
-    const gradeMatch = content.match(/grade[^:]*:\s*([^\n*]+)/i);
-    if (gradeMatch) gradeLevel = gradeMatch[1].trim();
-    
-    console.log('Extracted metadata:', { title, subject, gradeLevel });
-    
-    // Process each line to find criteria
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      
-      // Skip metadata lines
-      if (line.toLowerCase().includes('grade') || 
-          line.toLowerCase().includes('subject') ||
-          line.toLowerCase().includes('total points') ||
-          line.toLowerCase().includes('performance levels') ||
-          line.toLowerCase().includes('scoring guide') ||
-          line.startsWith('---') ||
-          line.startsWith('###') ||
-          line.startsWith('*Grade') ||
-          line.startsWith('*Subject')) {
-        continue;
-      }
-      
-      // Check if this line contains both criteria name and pipe-separated levels
-      if (line.includes('|')) {
-        // Look for criteria header at the beginning of the line
-        const criteriaMatch = line.match(/^(\d+\.?\s*|\*\*\d+\.?\s*)(.*?)(\|.*)/);
-        if (criteriaMatch) {
-          const criteriaName = criteriaMatch[2].replace(/\*\*/g, '').trim();
-          const levelsLine = criteriaMatch[3]; // Everything after the criteria name
-          
-          console.log('Found criteria with levels on same line:', criteriaName);
-          console.log('Levels line:', levelsLine);
-          
-          const levels = parsePerformanceLevelsFromPipeLine(levelsLine);
-          if (levels.length > 0) {
-            criteria.push({
-              name: criteriaName,
-              levels: levels
-            });
-            console.log(`Added criteria: ${criteriaName} with ${levels.length} levels`);
-          }
-        }
-      }
-      
-      // Also check for traditional format where criteria header is separate
-      const criteriaMatch = line.match(/^(\d+\.?\s*|\*\*\d+\.?\s*)(.*?)(\*\*)?$/);
-      if (criteriaMatch && !line.includes('|')) {
-        const criteriaName = criteriaMatch[2].replace(/\*\*/g, '').trim();
-        console.log('Found criteria header:', criteriaName);
-        
-        // Look for the next line with pipe-separated levels
-        let levelsLine = '';
-        for (let j = i + 1; j < lines.length; j++) {
-          const nextLine = lines[j];
-          if (nextLine.includes('|')) {
-            levelsLine = nextLine;
-            console.log('Found levels line:', levelsLine);
-            break;
-          }
-          // Stop if we hit another criteria header
-          if (nextLine.match(/^(\d+\.?\s*|\*\*\d+\.?\s*)/)) {
-            break;
-          }
-        }
-        
-        if (levelsLine) {
-          const levels = parsePerformanceLevelsFromPipeLine(levelsLine);
-          if (levels.length > 0) {
-            criteria.push({
-              name: criteriaName,
-              levels: levels
-            });
-            console.log(`Added criteria: ${criteriaName} with ${levels.length} levels`);
-          }
-        }
-      }
-    }
-    
-    // Calculate total points based on actual levels
-    const totalPoints = criteria.length > 0 ? 
-      Math.max(...criteria[0].levels.map(l => l.points)) * criteria.length : 
-      0;
-    
-    console.log('Final parsed rubric:', { title, subject, gradeLevel, criteriaCount: criteria.length, totalPoints });
-    
-    return {
-      title,
-      subject,
-      gradeLevel,
-      criteria,
-      totalPoints
-    };
-  };
-
-  // Parse performance levels from pipe-separated line
-  const parsePerformanceLevelsFromPipeLine = (line: string): RubricLevel[] => {
-    console.log('Parsing pipe line:', line);
-    
-    const levels: RubricLevel[] = [];
-    // Remove leading pipe if present and split on remaining pipes
-    const cleanLine = line.startsWith('|') ? line.substring(1) : line;
-    const parts = cleanLine.split('|').map(part => part.trim()).filter(part => part);
-    
-    console.log('Pipe parts:', parts);
-    
-    // Each part is a complete description, not grouped by 3
-    // The format is: Description1 | Description2 | Description3 | Description4
-    // We need to assign points in descending order (4, 3, 2, 1)
-    const levelNames = ['Exemplary', 'Proficient', 'Developing', 'Beginning'];
-    
-    parts.forEach((description, index) => {
-      const points = parts.length - index; // Highest points for first description
-      const levelName = levelNames[index] || `Level ${points}`;
-      
-      levels.push({
-        level: levelName,
-        points: points,
-        description: description
-      });
-      
-      console.log(`Parsed level: ${levelName} (${points}pts) - ${description.substring(0, 50)}...`);
-    });
-    
-    console.log('Final parsed levels:', levels);
-    return levels;
-  };
-
-  // Extract levels from description text (fallback method)
-  const extractLevelsFromDescription = (description: string): RubricLevel[] => {
-    console.log('Extracting levels from description:', description);
-    
-    const levels: RubricLevel[] = [];
-    
-    // Try to find numbered or named levels
-    const levelPatterns = [
-      /(\w+)\s*\((\d+)\s*pts?\):\s*([^.]+)/gi,
-      /(\w+)\s*-\s*(\d+)\s*points?:\s*([^.]+)/gi,
-      /(\d+)\.\s*(\w+):\s*([^.]+)/gi
-    ];
-    
-    for (const pattern of levelPatterns) {
-      const matches = Array.from(description.matchAll(pattern));
-      for (const match of matches) {
-        const levelName = match[1] || match[2];
-        const points = parseInt(match[2] || match[1]) || levels.length + 1;
-        const desc = match[3] || match[2];
-        
-        levels.push({
-          level: levelName,
-          points: points,
-          description: desc.trim()
-        });
-      }
-      
-      if (levels.length > 0) break;
-    }
-    
-    return levels.sort((a, b) => b.points - a.points);
-  };
-
   const [rubricData, setRubricData] = useState<ParsedRubric>(() => parseRubricContent(content));
+  useEffect(() => {
+    setRubricData(parseRubricContent(content));
+    setEditedRubric(null);
+  }, [content]);
 
   // Initialize edited rubric state
   React.useEffect(() => {
@@ -545,4 +348,4 @@ export function RubricDisplay({ content, metadata, onCopy, copiedItems, onRefine
       </Card>
     </div>
   );
-} 
+}
