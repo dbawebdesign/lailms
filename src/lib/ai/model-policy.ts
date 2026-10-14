@@ -9,6 +9,14 @@ export const AI_MODELS = {
 
 export type TextTaskTier = 'intensive' | 'light';
 
+const INTENSIVE_TEACHING_TOOLS = new Set([
+  'rubric-generator', 'activities-creator', 'iep-generator', 'content-leveler', 'mindmap-generator',
+]);
+
+export function teachingToolTier(toolId: string): TextTaskTier {
+  return INTENSIVE_TEACHING_TOOLS.has(toolId) ? 'intensive' : 'light';
+}
+
 /** GPT-6 uses completion limits and reasoning settings, not legacy sampling options. */
 export function textGenerationParams(tier: TextTaskTier, outputBudget = 8192) {
   if (!Number.isSafeInteger(outputBudget) || outputBudget < 1 || outputBudget > 120000) {

@@ -1,4 +1,4 @@
-import { AI_MODELS, textGenerationParams } from '@/lib/ai/model-policy';
+import { AI_MODELS, teachingToolTier, textGenerationParams } from '@/lib/ai/model-policy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
@@ -358,8 +358,9 @@ IMPORTANT: Include all sections as shown above. Make activities engaging, age-ap
       content: prompt
     });
 
+    const tier = teachingToolTier(toolId);
     const completion = await openai.chat.completions.create({
-      ...textGenerationParams('light', 1500),
+      ...textGenerationParams(tier, tier === 'intensive' ? 4096 : 1500),
       messages,
     });
 
